@@ -17,28 +17,23 @@ local MAX_ERRORS = 200
 
 local origErrorHandler = geterrorhandler()
 seterrorhandler(function(msg)
-    -- Only capture WatchingMachine errors
-    if msg and (msg:find("WatchingMachine") or msg:find("WM_") or msg:find("DebuffTracker") or
-                msg:find("PvPTracker") or msg:find("AutoLogger") or msg:find("KeywordMonitor") or
-                msg:find("MailLogger") or msg:find("ServicesParser") or msg:find("Recruiter") or
-                msg:find("WhisperLogs") or msg:find("GuildInvite") or msg:find("watchingmachine")) then
-        local entry = date("%H:%M:%S") .. " | " .. tostring(msg)
-        -- Append stack trace
-        local stack = debugstack(2, 8, 0)
-        if stack then
-            entry = entry .. "\n" .. stack
-        end
-        table.insert(WM._errorLog, entry)
-        -- Trim if too many
-        while #WM._errorLog > MAX_ERRORS do
-            table.remove(WM._errorLog, 1)
-        end
-        -- Also save to DB immediately if available
-        if WatchingMachineDB then
-            WatchingMachineDB.errorLog = WM._errorLog
-        end
+    local msgStr = tostring(msg or "unknown")
+    local stack = debugstack(2, 12, 0) or ""
+    
+    -- TEMPORARY: Capture ALL errors to diagnose issues
+    local entry = date("%H:%M:%S") .. " | " .. msgStr
+    if stack ~= "" then
+        -- Compact the stack trace to one line
+        entry = entry .. " || STACK: " .. stack:gsub("\n", " >> ")
     end
-    -- Call original handler so errors still show in default UI
+    table.insert(WM._errorLog, entry)
+    while #WM._errorLog > MAX_ERRORS do
+        table.remove(WM._errorLog, 1)
+    end
+    if WatchingMachineDB then
+        WatchingMachineDB.errorLog = WM._errorLog
+    end
+
     if origErrorHandler then
         return origErrorHandler(msg)
     end
@@ -470,6 +465,13 @@ local function InitCoreDB()
                 end
             else
                 WatchingMachineDB[k] = v
+            end
+        elseif type(v) == "table" and type(WatchingMachineDB[k]) == "table" then
+            -- Merge missing keys into existing tables (e.g. new modules into moduleStates)
+            for k2, v2 in pairs(v) do
+                if WatchingMachineDB[k][k2] == nil then
+                    WatchingMachineDB[k][k2] = v2
+                end
             end
         end
     end

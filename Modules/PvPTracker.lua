@@ -101,16 +101,19 @@ end
 
 -- Check if player is in a battleground or arena
 local function IsInBattleground()
-    for i = 1, GetMaxBattlefieldID and GetMaxBattlefieldID() or 3 do
+    -- Check instance type first (most reliable)
+    local _, instanceType = IsInInstance()
+    if instanceType == "pvp" or instanceType == "arena" then
+        return true
+    end
+    -- Check battlefield status as backup
+    local maxBG = 3
+    if GetMaxBattlefieldID then maxBG = GetMaxBattlefieldID() or 3 end
+    for i = 1, maxBG do
         local status = GetBattlefieldStatus(i)
         if status == "active" then
             return true
         end
-    end
-    -- Also check by instance type
-    local _, instanceType = IsInInstance()
-    if instanceType == "pvp" or instanceType == "arena" then
-        return true
     end
     return false
 end
@@ -309,25 +312,26 @@ function PvPTracker:TriggerAlert(name, unit)
     if PvPTrackerDB.alertChat then
         local killStr = ""
         if enemy.kills > 0 then
-            killStr = " — killed you " .. enemy.kills .. "x"
+            killStr = " - killed you " .. enemy.kills .. "x"
         end
         local guildStr = ""
         if enemy.guild and enemy.guild ~= "" then
             guildStr = " <" .. enemy.guild .. ">"
         end
-        self:Print("|cFFFF0000⚠ ENEMY DETECTED:|r " .. nameStr .. guildStr .. killStr)
+        self:Print("|cFFFF0000>> ENEMY DETECTED:|r " .. nameStr .. guildStr .. killStr)
     end
     
     -- Sound alert
     if PvPTrackerDB.alertSound then
-        -- Try custom sound first, fall back to built-in
-        PlaySoundFile(568016, "Master") -- PVP flag taken sound
+        if PlaySound then
+            PlaySound(8332, "Master")  -- PVP flag captured
+        end
     end
     
     -- Screen alert (raid warning frame)
     if PvPTrackerDB.alertScreen then
         if RaidWarningFrame and RaidWarningFrame.AddMessage then
-            RaidWarningFrame:AddMessage("⚠ ENEMY: " .. name .. " ⚠", 1, 0.2, 0.2, 1, 3)
+            RaidWarningFrame:AddMessage("ENEMY: " .. name, 1, 0.2, 0.2, 1, 3)
         end
     end
 end
@@ -336,39 +340,49 @@ end
 -- COMBAT LOG PROCESSING
 -- ============================================
 
+-- Safe flag check - handles nil constants gracefully
+local PLAYER_FLAG = COMBATLOG_OBJECT_TYPE_PLAYER or 0x0400
+local HOSTILE_FLAG = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x0040
+
+local function IsHostilePlayer(flags)
+    if not flags or flags == 0 then return false end
+    if not bit or not bit.band then return false end
+    return bit.band(flags, PLAYER_FLAG) > 0 and bit.band(flags, HOSTILE_FLAG) > 0
+end
+
+local function IsPlayerFlag(flags)
+    if not flags or flags == 0 then return false end
+    if not bit or not bit.band then return false end
+    return bit.band(flags, PLAYER_FLAG) > 0
+end
+
 function PvPTracker:ProcessCombatLog()
-    if not PvPTrackerDB.enabled then return end
+    if not PvPTrackerDB or not PvPTrackerDB.enabled then return end
+    if not CombatLogGetCurrentEventInfo then return end
     
     local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags = CombatLogGetCurrentEventInfo()
     
-    if not destGUID or not sourceGUID then return end
+    if not subevent then return end
+    if not destGUID and not sourceGUID then return end
     
     -- Track damage sources hitting the player (for kill attribution)
-    if destGUID == playerGUID then
-        -- Check if source is a hostile player
-        if sourceGUID and sourceName then
-            local isPlayer = bit.band(sourceFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) > 0
-            local isEnemy = bit.band(sourceFlags or 0, COMBATLOG_OBJECT_REACTION_HOSTILE) > 0
-            
-            if isPlayer and isEnemy then
-                -- Damage events
-                if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
-                   subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
-                   subevent == "SPELL_INSTAKILL" then
-                    lastDamageSource = {
-                        name = sourceName,
-                        guid = sourceGUID,
-                        time = GetTime(),
-                    }
-                end
+    if destGUID and destGUID == playerGUID and sourceGUID and sourceName then
+        if IsHostilePlayer(sourceFlags) then
+            if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
+               subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
+               subevent == "SPELL_INSTAKILL" then
+                lastDamageSource = {
+                    name = sourceName,
+                    guid = sourceGUID,
+                    time = GetTime(),
+                }
             end
         end
     end
     
     -- Detect player death
     if subevent == "UNIT_DIED" and destGUID == playerGUID then
-        -- Attribute kill to last damage source if recent (within 5 seconds)
-        if lastDamageSource.name and (GetTime() - (lastDamageSource.time or 0)) < 5 then
+        if lastDamageSource.name and lastDamageSource.time and (GetTime() - lastDamageSource.time) < 5 then
             self:RecordKill(lastDamageSource.name, lastDamageSource.guid)
             lastDamageSource = {}
         end
@@ -376,16 +390,14 @@ function PvPTracker:ProcessCombatLog()
     
     -- Also catch PARTY_KILL where we are the victim
     if subevent == "PARTY_KILL" and destGUID == playerGUID then
-        local isPlayer = bit.band(sourceFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) > 0
-        if isPlayer and sourceName then
+        if sourceName and IsPlayerFlag(sourceFlags) then
             self:RecordKill(sourceName, sourceGUID)
         end
     end
     
     -- Proximity: check if any combat log source is a tracked enemy
-    if sourceName and PvPTrackerDB.enemies[sourceName] then
-        local isPlayer = bit.band(sourceFlags or 0, COMBATLOG_OBJECT_TYPE_PLAYER) > 0
-        if isPlayer then
+    if sourceName and PvPTrackerDB.enemies and PvPTrackerDB.enemies[sourceName] then
+        if IsPlayerFlag(sourceFlags) then
             self:TriggerAlert(sourceName, nil)
         end
     end
@@ -404,25 +416,55 @@ function PvPTracker:RegisterEvents()
     eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
     
+    -- Error throttle: if we get 5 errors in 10 seconds, disable the handler
+    local errorCount = 0
+    local errorResetTime = 0
+    local handlerDisabled = false
+    
     eventFrame:SetScript("OnEvent", function(self, event, ...)
+        if handlerDisabled then return end
+        
+        local ok, err
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-            PvPTracker:ProcessCombatLog()
+            ok, err = pcall(PvPTracker.ProcessCombatLog, PvPTracker)
         elseif event == "UPDATE_MOUSEOVER_UNIT" then
-            PvPTracker:CheckUnit("mouseover")
+            ok, err = pcall(PvPTracker.CheckUnit, PvPTracker, "mouseover")
         elseif event == "PLAYER_TARGET_CHANGED" then
-            PvPTracker:CheckUnit("target")
+            ok, err = pcall(PvPTracker.CheckUnit, PvPTracker, "target")
         elseif event == "NAME_PLATE_UNIT_ADDED" then
             local unit = ...
-            PvPTracker:CheckUnit(unit)
+            ok, err = pcall(PvPTracker.CheckUnit, PvPTracker, unit)
+        else
+            ok = true
+        end
+        
+        if not ok then
+            local now = GetTime()
+            if now - errorResetTime > 10 then
+                errorCount = 0
+                errorResetTime = now
+            end
+            errorCount = errorCount + 1
+            if errorCount <= 3 then
+                PvPTracker:Print("|cFFFF0000Error:|r " .. tostring(err))
+            end
+            if errorCount >= 5 then
+                handlerDisabled = true
+                PvPTracker:Print("|cFFFF0000Too many errors - PvP event handler paused. Use /reload to retry.|r")
+            end
         end
     end)
     
-    -- Periodic nameplate scan
+    -- Periodic nameplate scan (also pcall-protected)
     eventFrame:SetScript("OnUpdate", function(self, elapsed)
+        if handlerDisabled then return end
         scanTimer = scanTimer + elapsed
         if scanTimer >= SCAN_INTERVAL then
             scanTimer = 0
-            PvPTracker:ScanNameplates()
+            local ok, err = pcall(PvPTracker.ScanNameplates, PvPTracker)
+            if not ok then
+                PvPTracker:Print("|cFFFF0000Scan error:|r " .. tostring(err))
+            end
         end
     end)
 end
