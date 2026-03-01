@@ -8,6 +8,42 @@ _G.WatchingMachine = WM
 WM.version = "2.1"
 WM.modules = {}
 
+-- ============================================
+-- ERROR LOGGING (loads before everything else)
+-- ============================================
+
+WM._errorLog = {}
+local MAX_ERRORS = 200
+
+local origErrorHandler = geterrorhandler()
+seterrorhandler(function(msg)
+    -- Only capture WatchingMachine errors
+    if msg and (msg:find("WatchingMachine") or msg:find("WM_") or msg:find("DebuffTracker") or
+                msg:find("PvPTracker") or msg:find("AutoLogger") or msg:find("KeywordMonitor") or
+                msg:find("MailLogger") or msg:find("ServicesParser") or msg:find("Recruiter") or
+                msg:find("WhisperLogs") or msg:find("GuildInvite") or msg:find("watchingmachine")) then
+        local entry = date("%H:%M:%S") .. " | " .. tostring(msg)
+        -- Append stack trace
+        local stack = debugstack(2, 8, 0)
+        if stack then
+            entry = entry .. "\n" .. stack
+        end
+        table.insert(WM._errorLog, entry)
+        -- Trim if too many
+        while #WM._errorLog > MAX_ERRORS do
+            table.remove(WM._errorLog, 1)
+        end
+        -- Also save to DB immediately if available
+        if WatchingMachineDB then
+            WatchingMachineDB.errorLog = WM._errorLog
+        end
+    end
+    -- Call original handler so errors still show in default UI
+    if origErrorHandler then
+        return origErrorHandler(msg)
+    end
+end)
+
 -- Security Configuration
 local REQUIRED_GUILD = "Socks and Sandals"
 local OFFICER_RANK_THRESHOLD = 1  -- Rank index 0 = GM, 1 = Officer only
@@ -437,6 +473,15 @@ local function InitCoreDB()
             end
         end
     end
+    -- Initialize error log in DB and merge any early errors
+    if not WatchingMachineDB.errorLog then
+        WatchingMachineDB.errorLog = {}
+    end
+    -- Merge any errors captured before DB was ready
+    for _, entry in ipairs(WM._errorLog) do
+        table.insert(WatchingMachineDB.errorLog, entry)
+    end
+    WM._errorLog = WatchingMachineDB.errorLog
 end
 
 -- ============================================
@@ -1104,6 +1149,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
     print("|cFFFFFF00/wmachine debug|r - Show security debug info")
     print("|cFFFFFF00/wmachine recheck|r - Force security recheck")
+    print("|cFFFFFF00/wmachine errors|r - Show captured error log")
+    print("|cFFFFFF00/wmachine clearerrors|r - Clear error log")
     print("|cFFFFFF00/wmachine help|r - Show this help")
 end
 
@@ -1141,6 +1188,34 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         if isAuthorized then
             WM:OnSecurityCheckPassed()
         end
+        return
+    end
+    
+    -- Error log commands (always available, even if not authorized)
+    if cmd == "errors" or cmd == "errorlog" or cmd == "err" then
+        local log = WatchingMachineDB and WatchingMachineDB.errorLog or WM._errorLog
+        if not log or #log == 0 then
+            WM:Print("No errors captured. If you're seeing errors, do /reload then run this again.")
+        else
+            WM:Print("=== Error Log (" .. #log .. " entries) ===")
+            local start = math.max(1, #log - 19)
+            for i = start, #log do
+                print("|cFFFF6666[" .. i .. "]|r " .. log[i]:gsub("\n", " | "))
+            end
+            if #log > 20 then
+                WM:Print("Showing last 20 of " .. #log .. ". Full log in SavedVariables.")
+            end
+            WM:Print("Full log: WTF/Account/YOUR_ACCOUNT/SavedVariables/WatchingMachine.lua -> errorLog table")
+        end
+        return
+    end
+    
+    if cmd == "clearerrors" or cmd == "clearerr" then
+        if WatchingMachineDB then
+            WatchingMachineDB.errorLog = {}
+            WM._errorLog = WatchingMachineDB.errorLog
+        end
+        WM:Print("Error log cleared.")
         return
     end
     
@@ -1251,7 +1326,6 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         
     elseif cmd == "help" then
         WM:ShowHelp()
-        
     elseif cmd == "status" then
         WM:Print("=== Module Status ===")
         for name, module in pairs(WM.modules) do
