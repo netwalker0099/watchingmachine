@@ -1257,18 +1257,23 @@ function DebuffTracker:CreateUI()
             classLabel:SetText("|cFF" .. string.format("%02x%02x%02x", 
                 classColor.r*255, classColor.g*255, classColor.b*255) .. className .. ":|r")
             
-            scrollY = scrollY + 15
+            scrollY = scrollY + 18
             
             for _, debuff in ipairs(classDebuffs) do
-                local debuffCB = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-                debuffCB:SetPoint("TOPLEFT", 45, -scrollY)
-                debuffCB:SetScale(0.85)
+                -- Wrapper frame at normal scale to hold the scaled checkbox
+                local wrapper = CreateFrame("Frame", nil, scrollChild)
+                wrapper:SetSize(280, 22)
+                wrapper:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 40, -scrollY)
+                
+                local debuffCB = CreateFrame("CheckButton", nil, wrapper, "InterfaceOptionsCheckButtonTemplate")
+                debuffCB:SetPoint("LEFT", wrapper, "LEFT", 0, 0)
                 debuffCB.Text:SetText(debuff.name .. " |cFF888888(P:" .. debuff.priority .. ")|r")
                 debuffCB:SetChecked(DebuffTrackerDB.trackedDebuffs[category.name][debuff.name])
                 
                 -- Store reference
                 table.insert(debuffCheckboxes[category.name], {
                     checkbox = debuffCB,
+                    wrapper = wrapper,
                     label = classLabel,
                     debuffName = debuff.name,
                 })
@@ -1284,7 +1289,7 @@ function DebuffTracker:CreateUI()
                     debuffCB:SetAlpha(0.4)
                 end
                 
-                scrollY = scrollY + 20
+                scrollY = scrollY + 24
             end
         end
         
