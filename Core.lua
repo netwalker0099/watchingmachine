@@ -14,26 +14,53 @@ WM.modules = {}
 
 WM._errorLog = {}
 local MAX_ERRORS = 200
+local WM_ERROR_PATTERNS = {
+    "WatchingMachine", "watchingmachine", "WM_",
+    "PvPTracker", "DebuffTracker", "AutoLogger",
+    "KeywordMonitor", "MailLogger", "ServicesParser",
+    "Recruiter", "WhisperLogs", "GuildInvite",
+}
 
 local origErrorHandler = geterrorhandler()
 seterrorhandler(function(msg)
     local msgStr = tostring(msg or "unknown")
-    local stack = debugstack(2, 12, 0) or ""
     
-    -- TEMPORARY: Capture ALL errors to diagnose issues
-    local entry = date("%H:%M:%S") .. " | " .. msgStr
-    if stack ~= "" then
-        -- Compact the stack trace to one line
-        entry = entry .. " || STACK: " .. stack:gsub("\n", " >> ")
+    -- Only capture WatchingMachine-related errors
+    local isWM = false
+    for _, pattern in ipairs(WM_ERROR_PATTERNS) do
+        if msgStr:find(pattern, 1, true) then
+            isWM = true
+            break
+        end
     end
-    table.insert(WM._errorLog, entry)
-    while #WM._errorLog > MAX_ERRORS do
-        table.remove(WM._errorLog, 1)
+    
+    -- If not found in message, check stack trace
+    if not isWM then
+        local stack = debugstack(2, 6, 0) or ""
+        for _, pattern in ipairs(WM_ERROR_PATTERNS) do
+            if stack:find(pattern, 1, true) then
+                isWM = true
+                break
+            end
+        end
     end
-    if WatchingMachineDB then
-        WatchingMachineDB.errorLog = WM._errorLog
+    
+    if isWM then
+        local stack = debugstack(2, 8, 0) or ""
+        local entry = date("%H:%M:%S") .. " | " .. msgStr
+        if stack ~= "" then
+            entry = entry .. " || STACK: " .. stack:gsub("\n", " >> ")
+        end
+        table.insert(WM._errorLog, entry)
+        while #WM._errorLog > MAX_ERRORS do
+            table.remove(WM._errorLog, 1)
+        end
+        if WatchingMachineDB then
+            WatchingMachineDB.errorLog = WM._errorLog
+        end
     end
-
+    
+    -- Always pass through to original handler
     if origErrorHandler then
         return origErrorHandler(msg)
     end
