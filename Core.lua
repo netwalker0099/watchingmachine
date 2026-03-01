@@ -861,7 +861,7 @@ function WM:CreateModuleCards()
             title = "Debuff Tracker",
             desc = "Raid debuff monitoring",
             color = {1, 0.8, 0},
-            icon = "Interface\\Icons\\Spell_Shadow_CurseOfTongues",
+            icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
         },
         PvPTracker = {
             title = "PvP Enemy Tracker",
