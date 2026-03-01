@@ -110,146 +110,12 @@ local DEBUFF_CATEGORIES = {
 }
 
 -- ============================================
--- UI THEMES
+-- THEME HELPERS (uses global WM theme system)
 -- ============================================
 
-local THEMES = {
-    ["Default"] = {
-        -- Tracker frame
-        tracker = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 12,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 },
-            bgColor = { 0, 0, 0, 0.7 },
-            borderColor = { 0.3, 0.3, 0.3, 1 },
-        },
-        -- Title bar
-        titleBar = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            bgColor = { 0.1, 0.1, 0.1, 0.9 },
-            height = 18,
-            fontObject = "GameFontNormalSmall",
-            fontColor = { 1, 0.8, 0, 1 },
-        },
-        -- Category indicators
-        indicator = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 1,
-            bgColor = { 0.2, 0.2, 0.2, 0.8 },
-            borderColor = { 0.5, 0.5, 0.5, 1 },
-            activeColor = { 0, 1, 0, 1 },      -- Green = debuff present
-            warningColor = { 1, 1, 0, 1 },     -- Yellow = suboptimal
-            missingColor = { 1, 0, 0, 1 },     -- Red = missing
-            inactiveColor = { 0.5, 0.5, 0.5, 1 },
-        },
-        -- Settings panel
-        settings = {
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            edgeSize = 32,
-            tileSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-            headerColor = { 1, 0.8, 0, 1 },
-            separatorColor = { 0.4, 0.4, 0.4, 0.5 },
-        },
-    },
-    ["ElvUI"] = {
-        -- Tracker frame - Tukui pixel-perfect style
-        tracker = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 1,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 },
-            bgColor = { 0.06, 0.06, 0.06, 0.92 },
-            borderColor = { 0.15, 0.15, 0.15, 1 },
-            -- Outer glow border (Tukui signature double-border)
-            outerBorder = true,
-            outerBorderColor = { 0, 0, 0, 1 },
-            outerBorderSize = 1,
-        },
-        -- Title bar - very minimal
-        titleBar = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            bgColor = { 0.1, 0.1, 0.1, 0.95 },
-            height = 16,
-            fontObject = "GameFontNormalSmall",
-            fontColor = { 0.84, 0.75, 0.65, 1 },  -- Tukui's warm gold
-            -- Bottom accent line
-            accentLine = true,
-            accentColor = { 0.18, 0.18, 0.18, 1 },
-        },
-        -- Category indicators - flat dark style
-        indicator = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 1,
-            bgColor = { 0.08, 0.08, 0.08, 0.9 },
-            borderColor = { 0.18, 0.18, 0.18, 1 },
-            activeColor = { 0.18, 0.78, 0.18, 1 },   -- Muted green
-            warningColor = { 0.9, 0.8, 0.1, 1 },     -- Muted gold
-            missingColor = { 0.78, 0.18, 0.18, 1 },   -- Muted red
-            inactiveColor = { 0.25, 0.25, 0.25, 1 },
-            -- Tukui inner shadow effect
-            innerShadow = true,
-        },
-        -- Settings panel - dark flat panel
-        settings = {
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 1,
-            tileSize = 1,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 },
-            bgColor = { 0.06, 0.06, 0.06, 0.95 },
-            borderColor = { 0.15, 0.15, 0.15, 1 },
-            headerColor = { 0.84, 0.75, 0.65, 1 },
-            separatorColor = { 0.18, 0.18, 0.18, 0.8 },
-            -- Outer border for the double-border look
-            outerBorder = true,
-            outerBorderColor = { 0, 0, 0, 1 },
-        },
-    },
-}
-
-local THEME_LIST = { "Default", "ElvUI" }
-
--- Helper: Get current theme table
+-- Local convenience wrapper
 local function GetTheme()
-    local themeName = DebuffTrackerDB and DebuffTrackerDB.theme or "Default"
-    return THEMES[themeName] or THEMES["Default"]
-end
-
--- Helper: Create the Tukui-style outer border frame (pixel border effect)
-local function CreateOuterBorder(parent, color)
-    if parent._outerBorder then
-        parent._outerBorder:Show()
-        return parent._outerBorder
-    end
-    
-    local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    border:SetPoint("TOPLEFT", -1, 1)
-    border:SetPoint("BOTTOMRIGHT", 1, -1)
-    border:SetFrameLevel(math.max(parent:GetFrameLevel() - 1, 0))
-    border:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    border:SetBackdropColor(0, 0, 0, 0)
-    local c = color or { 0, 0, 0, 1 }
-    border:SetBackdropBorderColor(c[1], c[2], c[3], c[4])
-    
-    parent._outerBorder = border
-    return border
-end
-
--- Helper: Remove/hide outer border
-local function RemoveOuterBorder(parent)
-    if parent._outerBorder then
-        parent._outerBorder:Hide()
-    end
+    return WM:GetTheme()
 end
 
 -- Helper: Create accent line under title bar (Tukui style)
@@ -272,7 +138,6 @@ local function CreateAccentLine(parent, color)
     return line
 end
 
--- Helper: Remove/hide accent line
 local function RemoveAccentLine(parent)
     if parent._accentLine then
         parent._accentLine:Hide()
@@ -287,7 +152,6 @@ local defaults = {
     showOnlyOnBoss = false,
     trackedCategories = {},  -- Will be populated with all categories enabled
     trackedDebuffs = {},     -- Per-debuff enable/disable: trackedDebuffs["Armor"]["Sunder Armor"] = true/false
-    theme = "Default",
     scale = 1.0,
     alpha = 1.0,
     frameX = nil,
@@ -357,23 +221,6 @@ function DebuffTracker:InitDB()
                 DebuffTrackerDB.trackedDebuffs[cat.name][debuff.name] = true
             end
         end
-    end
-    
-    -- Auto-detect ElvUI / Tukui on first run (only if theme hasn't been explicitly set yet)
-    if not DebuffTrackerDB._themeInitialized then
-        if IsAddOnLoaded and (IsAddOnLoaded("ElvUI") or IsAddOnLoaded("Tukui")) then
-            DebuffTrackerDB.theme = "ElvUI"
-            self:Print("ElvUI/Tukui detected - auto-selected ElvUI theme")
-        elseif C_AddOns and C_AddOns.IsAddOnLoaded and (C_AddOns.IsAddOnLoaded("ElvUI") or C_AddOns.IsAddOnLoaded("Tukui")) then
-            DebuffTrackerDB.theme = "ElvUI"
-            self:Print("ElvUI/Tukui detected - auto-selected ElvUI theme")
-        end
-        DebuffTrackerDB._themeInitialized = true
-    end
-    
-    -- Validate saved theme still exists
-    if not THEMES[DebuffTrackerDB.theme] then
-        DebuffTrackerDB.theme = "Default"
     end
 end
 
@@ -499,33 +346,33 @@ end
 function DebuffTracker:ApplyTrackerTheme()
     if not trackerFrame then return end
     local theme = GetTheme()
-    local t = theme.tracker
+    local t = theme.panel  -- Use panel style for tracker frame
     local tt = theme.titleBar
     
     -- Main tracker frame
     trackerFrame:SetBackdrop({
         bgFile = t.bgFile,
         edgeFile = t.edgeFile,
-        tile = true, tileSize = 16, edgeSize = t.edgeSize,
+        tile = true, tileSize = t.tileSize or 16, edgeSize = t.edgeSize,
         insets = t.insets,
     })
-    trackerFrame:SetBackdropColor(unpack(t.bgColor))
-    trackerFrame:SetBackdropBorderColor(unpack(t.borderColor))
+    if t.bgColor then trackerFrame:SetBackdropColor(unpack(t.bgColor)) end
+    if t.borderColor then trackerFrame:SetBackdropBorderColor(unpack(t.borderColor)) end
     
     -- Outer border (Tukui double-border)
     if t.outerBorder then
-        CreateOuterBorder(trackerFrame, t.outerBorderColor)
+        WM:CreateOuterBorder(trackerFrame, t.outerBorderColor)
     else
-        RemoveOuterBorder(trackerFrame)
+        WM:RemoveOuterBorder(trackerFrame)
     end
     
     -- Title bar
     trackerFrame.titleBar:SetBackdrop({
-        bgFile = tt.bgFile,
+        bgFile = "Interface\\Buttons\\WHITE8X8",
     })
     trackerFrame.titleBar:SetBackdropColor(unpack(tt.bgColor))
     trackerFrame.titleBar:SetHeight(tt.height)
-    trackerFrame.title:SetFontObject(tt.fontObject)
+    trackerFrame.title:SetFontObject("GameFontNormalSmall")
     trackerFrame.title:SetTextColor(unpack(tt.fontColor))
     
     -- Accent line
@@ -550,42 +397,19 @@ function DebuffTracker:ApplyCategoryTheme()
             edgeSize = ti.edgeSize,
         })
         catFrame:SetBackdropColor(unpack(ti.bgColor))
-        -- Border color will be set by UpdateDebuffs based on state
         catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
     end
 end
 
 function DebuffTracker:ApplySettingsTheme()
     if not mainFrame then return end
-    local theme = GetTheme()
-    local ts = theme.settings
-    
-    mainFrame:SetBackdrop({
-        bgFile = ts.bgFile,
-        edgeFile = ts.edgeFile,
-        tile = true, tileSize = ts.tileSize, edgeSize = ts.edgeSize,
-        insets = ts.insets,
-    })
-    
-    if ts.bgColor then
-        mainFrame:SetBackdropColor(unpack(ts.bgColor))
-    end
-    if ts.borderColor then
-        mainFrame:SetBackdropBorderColor(unpack(ts.borderColor))
-    end
-    
-    -- Outer border for settings
-    if ts.outerBorder then
-        CreateOuterBorder(mainFrame, ts.outerBorderColor)
-    else
-        RemoveOuterBorder(mainFrame)
-    end
+    WM:SkinPanel(mainFrame)
 end
 
 function DebuffTracker:ApplyTheme()
     self:ApplyTrackerTheme()
     self:ApplySettingsTheme()
-    self:UpdateDebuffs()  -- Re-apply state colors with new theme
+    self:UpdateDebuffs()
 end
 
 -- ============================================
@@ -596,7 +420,7 @@ function DebuffTracker:CreateTrackerFrame()
     if trackerFrame then return trackerFrame end
     
     local theme = GetTheme()
-    local t = theme.tracker
+    local t = theme.panel
     local tt = theme.titleBar
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerFrame", UIParent, "BackdropTemplate")
@@ -611,15 +435,15 @@ function DebuffTracker:CreateTrackerFrame()
     frame:SetBackdrop({
         bgFile = t.bgFile,
         edgeFile = t.edgeFile,
-        tile = true, tileSize = 16, edgeSize = t.edgeSize,
+        tile = true, tileSize = t.tileSize or 16, edgeSize = t.edgeSize,
         insets = t.insets,
     })
-    frame:SetBackdropColor(unpack(t.bgColor))
-    frame:SetBackdropBorderColor(unpack(t.borderColor))
+    if t.bgColor then frame:SetBackdropColor(unpack(t.bgColor)) end
+    if t.borderColor then frame:SetBackdropBorderColor(unpack(t.borderColor)) end
     
     -- Outer border (Tukui double-border effect)
     if t.outerBorder then
-        CreateOuterBorder(frame, t.outerBorderColor)
+        WM:CreateOuterBorder(frame, t.outerBorderColor)
     end
     
     -- Title bar
@@ -628,12 +452,12 @@ function DebuffTracker:CreateTrackerFrame()
     titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
     titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
     titleBar:SetBackdrop({
-        bgFile = tt.bgFile,
+        bgFile = "Interface\\Buttons\\WHITE8X8",
     })
     titleBar:SetBackdropColor(unpack(tt.bgColor))
     frame.titleBar = titleBar
     
-    local title = titleBar:CreateFontString(nil, "OVERLAY", tt.fontObject)
+    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("LEFT", 5, 0)
     title:SetText("Debuffs")
     title:SetTextColor(unpack(tt.fontColor))
@@ -1024,10 +848,9 @@ function DebuffTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local theme = GetTheme()
-    local ts = theme.settings
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(380, 560)
+    frame:SetSize(380, 520)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1038,21 +861,14 @@ function DebuffTracker:CreateUI()
     frame:SetFrameStrata("HIGH")
     frame:Hide()
     
-    frame:SetBackdrop({
-        bgFile = ts.bgFile,
-        edgeFile = ts.edgeFile,
-        tile = true, tileSize = ts.tileSize, edgeSize = ts.edgeSize,
-        insets = ts.insets,
-    })
-    if ts.bgColor then frame:SetBackdropColor(unpack(ts.bgColor)) end
-    if ts.borderColor then frame:SetBackdropBorderColor(unpack(ts.borderColor)) end
-    if ts.outerBorder then CreateOuterBorder(frame, ts.outerBorderColor) end
+    WM:SkinPanel(frame)
+    WM:RegisterSkinnedPanel(frame)
     
     -- Title
     local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleText:SetPoint("TOP", 0, -15)
     titleText:SetText("Debuff Tracker Settings")
-    titleText:SetTextColor(unpack(ts.headerColor))
+    titleText:SetTextColor(unpack(theme.headerColor))
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -1108,100 +924,11 @@ function DebuffTracker:CreateUI()
     
     yOffset = yOffset - 30
     
-    -- Theme selector
-    local themeLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    themeLabel:SetPoint("TOPLEFT", 20, yOffset)
-    themeLabel:SetText("UI Theme:")
-    themeLabel:SetTextColor(unpack(ts.headerColor))
-    
-    -- Dropdown button (manual implementation - no UIDropDownMenu dependency)
-    local themeDropdown = CreateFrame("Frame", "WM_DebuffTrackerThemeDropdown", frame, "BackdropTemplate")
-    themeDropdown:SetSize(150, 22)
-    themeDropdown:SetPoint("LEFT", themeLabel, "RIGHT", 10, 0)
-    themeDropdown:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    themeDropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    themeDropdown:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    
-    local themeText = themeDropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    themeText:SetPoint("LEFT", 8, 0)
-    themeText:SetText(DebuffTrackerDB.theme or "Default")
-    
-    local themeArrow = themeDropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    themeArrow:SetPoint("RIGHT", -6, 0)
-    themeArrow:SetText("v")
-    
-    -- Dropdown menu frame
-    local themeMenu = CreateFrame("Frame", "WM_DebuffTrackerThemeMenu", themeDropdown, "BackdropTemplate")
-    themeMenu:SetPoint("TOPLEFT", themeDropdown, "BOTTOMLEFT", 0, -2)
-    themeMenu:SetSize(150, (#THEME_LIST * 20) + 6)
-    themeMenu:SetFrameStrata("TOOLTIP")
-    themeMenu:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    themeMenu:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-    themeMenu:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    themeMenu:Hide()
-    
-    for idx, themeName in ipairs(THEME_LIST) do
-        local item = CreateFrame("Button", nil, themeMenu)
-        item:SetSize(146, 18)
-        item:SetPoint("TOPLEFT", 2, -((idx - 1) * 20) - 3)
-        
-        local itemText = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        itemText:SetPoint("LEFT", 6, 0)
-        itemText:SetText(themeName)
-        
-        local itemHighlight = item:CreateTexture(nil, "HIGHLIGHT")
-        itemHighlight:SetAllPoints()
-        itemHighlight:SetColorTexture(0.3, 0.3, 0.5, 0.3)
-        
-        item:SetScript("OnClick", function()
-            DebuffTrackerDB.theme = themeName
-            themeText:SetText(themeName)
-            themeMenu:Hide()
-            -- Destroy and recreate the settings frame with new theme
-            -- (simpler than trying to re-skin every child element)
-            mainFrame:Hide()
-            mainFrame = nil
-            DebuffTracker.mainFrame = nil
-            DebuffTracker:ApplyTrackerTheme()
-            DebuffTracker:UpdateDebuffs()
-            DebuffTracker:Print("Theme changed to: " .. themeName .. ". Reopen settings to see themed panel.")
-        end)
-    end
-    
-    themeDropdown:EnableMouse(true)
-    themeDropdown:SetScript("OnMouseDown", function()
-        if themeMenu:IsShown() then
-            themeMenu:Hide()
-        else
-            themeMenu:Show()
-        end
-    end)
-    
-    -- Close menu when clicking elsewhere
-    themeMenu:SetScript("OnShow", function(self)
-        self:SetPropagateKeyboardInput(true)
-    end)
-    frame:HookScript("OnHide", function()
-        themeMenu:Hide()
-    end)
-    
-    yOffset = yOffset - 32
-    
     -- Category & Debuff Selection header
     local catHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     catHeader:SetPoint("TOPLEFT", 20, yOffset)
     catHeader:SetText("Debuff Selection by Class:")
-    catHeader:SetTextColor(unpack(ts.headerColor))
+    catHeader:SetTextColor(unpack(theme.headerColor))
     
     yOffset = yOffset - 5
     
@@ -1367,7 +1094,7 @@ function DebuffTracker:CreateUI()
         sep:SetHeight(1)
         sep:SetPoint("TOPLEFT", 5, -scrollY)
         sep:SetPoint("TOPRIGHT", -5, -scrollY)
-        sep:SetColorTexture(unpack(ts.separatorColor))
+        sep:SetColorTexture(unpack(theme.separatorColor))
         
         scrollY = scrollY + 8
     end

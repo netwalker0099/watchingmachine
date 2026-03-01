@@ -157,12 +157,8 @@ function AutoLogger:CreateSettingsUI()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:Hide()
     
-    frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left = 8, right = 8, top = 8, bottom = 8 }
-    })
+    WM:SkinPanel(frame)
+    WM:RegisterSkinnedPanel(frame)
     
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
