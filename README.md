@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.0 | Author: Robert
+Version 2.1 | Author: Robert
 
 ## Overview
 
-Watching Machine combines eight powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition.
+Watching Machine combines nine powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition.
 
 ## Security
 
@@ -24,7 +24,7 @@ Automatically manages chat and combat logging.
 - Automatically enables combat logging in raid instances (10/25-man for TBC)
 - Optional logging in 5-man dungeons
 
-### 2. Keyword Monitor  
+### 2. Keyword Monitor
 Monitor public channels for specific keywords with duplicate detection.
 - Monitor Trade, General, LFG, and other channels
 - 5-minute result retention with deduplication
@@ -59,6 +59,7 @@ Auto-invite guild members to raid when they say the trigger word.
 Visual raid debuff monitoring for raid leaders.
 - Tracks important debuffs on your target with priority awareness
 - Shows visual indicators (green=present, red=missing, yellow=suboptimal)
+- Per-debuff selection: choose exactly which debuffs to track per category
 - **Armor Reduction**: Improved Expose Armor > Expose Armor > Sunder Armor > Faerie Fire
 - **Physical Damage**: Blood Frenzy, Savage Combat
 - **Shadow Damage**: Shadow Weaving, Curse of Elements
@@ -71,10 +72,58 @@ Visual raid debuff monitoring for raid leaders.
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 
-### 8. Recruiting Tool *(Officers Only)*
+### 8. PvP Enemy Tracker
+Track hostile players who kill you in world PvP and get proximity alerts.
+- **Kill Tracking**: Automatically logs players who kill you outside battlegrounds/arenas
+  - Records killer name, class, level, guild, zone, timestamp, and kill count
+  - Attributes kills via last-damage-source tracking (5-second window)
+  - Ignores deaths in battlegrounds and arenas
+- **Proximity Detection** (5 layers):
+  - Nameplate detection (NAME_PLATE_UNIT_ADDED event)
+  - Periodic nameplate scan (every 1 second, 40 nameplates)
+  - Mouseover detection
+  - Target change detection
+  - Combat log source matching
+- **Alert System**:
+  - Chat alerts with class-colored names, guild, and kill count
+  - Sound alerts (PvP flag capture sound)
+  - Screen alerts via RaidWarningFrame
+  - Per-player cooldown (default 30s) to prevent spam
+  - Each alert type independently toggleable
+- **Kill-on-Sight List**:
+  - Sorted by kill count, scrollable
+  - Add manually by name or "Add Target" button
+  - Hover tooltip with guild, notes, and exact kill dates
+  - Per-entry remove, Clear All with confirmation
+  - "Manual tracking only" mode to disable auto-logging
+- Error-resilient: pcall-protected event handlers with auto-disable on repeated failures
+
+### 9. Recruiting Tool *(Officers Only)*
 Automated guild recruiting system.
 - Scan unguilded players by class and level range (1-70 for TBC)
 - Customizable message with %GUILD% placeholder
+
+## Global Theme System
+
+Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
+
+### Available Themes
+- **Default**: Standard WoW dialog box styling with gold headers and bright status colors
+- **ElvUI**: Pixel-perfect dark theme with 1px borders, double-border effect, warm gold text, and muted colors. Auto-detected if ElvUI or Tukui is installed.
+
+### Theme Coverage
+- Dashboard and all module cards
+- All module settings panels (8 modules)
+- Debuff Tracker overlay and indicators
+- Live re-skinning: theme changes apply immediately without /reload
+
+## Error Logging
+
+Built-in error capture system for debugging.
+- Captures all WatchingMachine-related errors with timestamps and stack traces
+- Stored in SavedVariables (persists across sessions, max 200 entries)
+- `/wmachine errors` - show last 20 errors in chat (works even if not authorized)
+- `/wmachine clearerrors` - clear the error log
 
 ## Installation
 
@@ -86,6 +135,7 @@ Automated guild recruiting system.
 
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
+- `/wmachine settings` - Open theme/addon settings
 - `/wmachine logger` - Open Auto Logger settings
 - `/wmachine keyword` - Open Keyword Monitor
 - `/wmachine mail` - Open Mail & Trade Logger
@@ -93,10 +143,13 @@ Automated guild recruiting system.
 - `/wmachine wcl` - Open Whisper Logs (WCL Lookup)
 - `/wmachine ginvite` - Open Guild Invite
 - `/wmachine debuff` - Open Debuff Tracker settings
+- `/wmachine pvp` - Open PvP Enemy Tracker
 - `/wmachine recruit` - Open Recruiting Tool (Officers only)
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
+- `/wmachine errors` - Show captured error log
+- `/wmachine clearerrors` - Clear error log
 - `/wmachine help` - Show command help
 
 ### Minimap Button
@@ -105,7 +158,7 @@ Automated guild recruiting system.
 
 ## Saved Variables
 
-- `WatchingMachineDB` - Core settings
+- `WatchingMachineDB` - Core settings, theme, error log
 - `AutoLoggerDB` - Auto Logger settings
 - `KeywordMonitorDB` - Keyword Monitor data
 - `MailLoggerDB` - Mail & Trade logs
@@ -113,9 +166,20 @@ Automated guild recruiting system.
 - `WhisperLogsDB` - Whisper Logs data
 - `GuildInviteDB` - Guild Invite settings and log
 - `DebuffTrackerDB` - Debuff Tracker settings
+- `PvPTrackerDB` - PvP Enemy Tracker data and enemy list
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.1
+- Added PvP Enemy Tracker module (world PvP kill logging and proximity alerts)
+- Added global theme system (ElvUI/Tukui skin for entire addon)
+- Added Settings panel accessible via dashboard button and `/wmachine settings`
+- Added built-in error logging with stack traces (`/wmachine errors`)
+- Added per-debuff selection to Debuff Tracker
+- Moved theme system from DebuffTracker to Core.lua (all modules now themed)
+- Auto-detects ElvUI/Tukui on first load and selects matching theme
+- Fixed module initialization for existing installs (new modules merge into saved moduleStates)
 
 ### Version 2.0
 - Updated for TBC Classic Anniversary Edition
