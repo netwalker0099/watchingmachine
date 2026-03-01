@@ -109,6 +109,176 @@ local DEBUFF_CATEGORIES = {
     },
 }
 
+-- ============================================
+-- UI THEMES
+-- ============================================
+
+local THEMES = {
+    ["Default"] = {
+        -- Tracker frame
+        tracker = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 12,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+            bgColor = { 0, 0, 0, 0.7 },
+            borderColor = { 0.3, 0.3, 0.3, 1 },
+        },
+        -- Title bar
+        titleBar = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            bgColor = { 0.1, 0.1, 0.1, 0.9 },
+            height = 18,
+            fontObject = "GameFontNormalSmall",
+            fontColor = { 1, 0.8, 0, 1 },
+        },
+        -- Category indicators
+        indicator = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            bgColor = { 0.2, 0.2, 0.2, 0.8 },
+            borderColor = { 0.5, 0.5, 0.5, 1 },
+            activeColor = { 0, 1, 0, 1 },      -- Green = debuff present
+            warningColor = { 1, 1, 0, 1 },     -- Yellow = suboptimal
+            missingColor = { 1, 0, 0, 1 },     -- Red = missing
+            inactiveColor = { 0.5, 0.5, 0.5, 1 },
+        },
+        -- Settings panel
+        settings = {
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            edgeSize = 32,
+            tileSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 },
+            headerColor = { 1, 0.8, 0, 1 },
+            separatorColor = { 0.4, 0.4, 0.4, 0.5 },
+        },
+    },
+    ["ElvUI"] = {
+        -- Tracker frame - Tukui pixel-perfect style
+        tracker = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            bgColor = { 0.06, 0.06, 0.06, 0.92 },
+            borderColor = { 0.15, 0.15, 0.15, 1 },
+            -- Outer glow border (Tukui signature double-border)
+            outerBorder = true,
+            outerBorderColor = { 0, 0, 0, 1 },
+            outerBorderSize = 1,
+        },
+        -- Title bar - very minimal
+        titleBar = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            bgColor = { 0.1, 0.1, 0.1, 0.95 },
+            height = 16,
+            fontObject = "GameFontNormalSmall",
+            fontColor = { 0.84, 0.75, 0.65, 1 },  -- Tukui's warm gold
+            -- Bottom accent line
+            accentLine = true,
+            accentColor = { 0.18, 0.18, 0.18, 1 },
+        },
+        -- Category indicators - flat dark style
+        indicator = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            bgColor = { 0.08, 0.08, 0.08, 0.9 },
+            borderColor = { 0.18, 0.18, 0.18, 1 },
+            activeColor = { 0.18, 0.78, 0.18, 1 },   -- Muted green
+            warningColor = { 0.9, 0.8, 0.1, 1 },     -- Muted gold
+            missingColor = { 0.78, 0.18, 0.18, 1 },   -- Muted red
+            inactiveColor = { 0.25, 0.25, 0.25, 1 },
+            -- Tukui inner shadow effect
+            innerShadow = true,
+        },
+        -- Settings panel - dark flat panel
+        settings = {
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+            tileSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            bgColor = { 0.06, 0.06, 0.06, 0.95 },
+            borderColor = { 0.15, 0.15, 0.15, 1 },
+            headerColor = { 0.84, 0.75, 0.65, 1 },
+            separatorColor = { 0.18, 0.18, 0.18, 0.8 },
+            -- Outer border for the double-border look
+            outerBorder = true,
+            outerBorderColor = { 0, 0, 0, 1 },
+        },
+    },
+}
+
+local THEME_LIST = { "Default", "ElvUI" }
+
+-- Helper: Get current theme table
+local function GetTheme()
+    local themeName = DebuffTrackerDB and DebuffTrackerDB.theme or "Default"
+    return THEMES[themeName] or THEMES["Default"]
+end
+
+-- Helper: Create the Tukui-style outer border frame (pixel border effect)
+local function CreateOuterBorder(parent, color)
+    if parent._outerBorder then
+        parent._outerBorder:Show()
+        return parent._outerBorder
+    end
+    
+    local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    border:SetPoint("TOPLEFT", -1, 1)
+    border:SetPoint("BOTTOMRIGHT", 1, -1)
+    border:SetFrameLevel(math.max(parent:GetFrameLevel() - 1, 0))
+    border:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    border:SetBackdropColor(0, 0, 0, 0)
+    local c = color or { 0, 0, 0, 1 }
+    border:SetBackdropBorderColor(c[1], c[2], c[3], c[4])
+    
+    parent._outerBorder = border
+    return border
+end
+
+-- Helper: Remove/hide outer border
+local function RemoveOuterBorder(parent)
+    if parent._outerBorder then
+        parent._outerBorder:Hide()
+    end
+end
+
+-- Helper: Create accent line under title bar (Tukui style)
+local function CreateAccentLine(parent, color)
+    if parent._accentLine then
+        parent._accentLine:Show()
+        local c = color or { 0.18, 0.18, 0.18, 1 }
+        parent._accentLine:SetColorTexture(c[1], c[2], c[3], c[4])
+        return parent._accentLine
+    end
+    
+    local line = parent:CreateTexture(nil, "OVERLAY")
+    line:SetHeight(1)
+    line:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
+    line:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+    local c = color or { 0.18, 0.18, 0.18, 1 }
+    line:SetColorTexture(c[1], c[2], c[3], c[4])
+    
+    parent._accentLine = line
+    return line
+end
+
+-- Helper: Remove/hide accent line
+local function RemoveAccentLine(parent)
+    if parent._accentLine then
+        parent._accentLine:Hide()
+    end
+end
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -116,6 +286,8 @@ local defaults = {
     showOnlyInRaid = true,
     showOnlyOnBoss = false,
     trackedCategories = {},  -- Will be populated with all categories enabled
+    trackedDebuffs = {},     -- Per-debuff enable/disable: trackedDebuffs["Armor"]["Sunder Armor"] = true/false
+    theme = "Default",
     scale = 1.0,
     alpha = 1.0,
     frameX = nil,
@@ -124,9 +296,13 @@ local defaults = {
     hideWhenNoTarget = true,
 }
 
--- Initialize tracked categories
+-- Initialize tracked categories and per-debuff defaults (all enabled)
 for _, cat in ipairs(DEBUFF_CATEGORIES) do
     defaults.trackedCategories[cat.name] = true
+    defaults.trackedDebuffs[cat.name] = {}
+    for _, debuff in ipairs(cat.debuffs) do
+        defaults.trackedDebuffs[cat.name][debuff.name] = true
+    end
 end
 
 -- State
@@ -154,12 +330,50 @@ function DebuffTracker:InitDB()
             if type(value) == "table" then
                 DebuffTrackerDB[key] = {}
                 for k2, v2 in pairs(value) do
-                    DebuffTrackerDB[key][k2] = v2
+                    if type(v2) == "table" then
+                        DebuffTrackerDB[key][k2] = {}
+                        for k3, v3 in pairs(v2) do
+                            DebuffTrackerDB[key][k2][k3] = v3
+                        end
+                    else
+                        DebuffTrackerDB[key][k2] = v2
+                    end
                 end
             else
                 DebuffTrackerDB[key] = value
             end
         end
+    end
+    -- Ensure all categories and debuffs exist in trackedDebuffs (handles addon updates adding new debuffs)
+    if not DebuffTrackerDB.trackedDebuffs then
+        DebuffTrackerDB.trackedDebuffs = {}
+    end
+    for _, cat in ipairs(DEBUFF_CATEGORIES) do
+        if not DebuffTrackerDB.trackedDebuffs[cat.name] then
+            DebuffTrackerDB.trackedDebuffs[cat.name] = {}
+        end
+        for _, debuff in ipairs(cat.debuffs) do
+            if DebuffTrackerDB.trackedDebuffs[cat.name][debuff.name] == nil then
+                DebuffTrackerDB.trackedDebuffs[cat.name][debuff.name] = true
+            end
+        end
+    end
+    
+    -- Auto-detect ElvUI / Tukui on first run (only if theme hasn't been explicitly set yet)
+    if not DebuffTrackerDB._themeInitialized then
+        if IsAddOnLoaded and (IsAddOnLoaded("ElvUI") or IsAddOnLoaded("Tukui")) then
+            DebuffTrackerDB.theme = "ElvUI"
+            self:Print("ElvUI/Tukui detected - auto-selected ElvUI theme")
+        elseif C_AddOns and C_AddOns.IsAddOnLoaded and (C_AddOns.IsAddOnLoaded("ElvUI") or C_AddOns.IsAddOnLoaded("Tukui")) then
+            DebuffTrackerDB.theme = "ElvUI"
+            self:Print("ElvUI/Tukui detected - auto-selected ElvUI theme")
+        end
+        DebuffTrackerDB._themeInitialized = true
+    end
+    
+    -- Validate saved theme still exists
+    if not THEMES[DebuffTrackerDB.theme] then
+        DebuffTrackerDB.theme = "Default"
     end
 end
 
@@ -205,6 +419,9 @@ local function GetActiveDebuff(unit, category)
     local bestDebuff = nil
     local bestPriority = 0
     
+    -- Get the per-debuff enable/disable table for this category
+    local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs and DebuffTrackerDB.trackedDebuffs[category.name]
+    
     for i = 1, 40 do
         local name, icon, count, debuffType, duration, expirationTime, source, isStealable, 
               nameplateShowPersonal, spellId = UnitDebuff(unit, i)
@@ -213,37 +430,40 @@ local function GetActiveDebuff(unit, category)
         
         -- Check against category debuffs
         for _, debuff in ipairs(category.debuffs) do
-            -- Check by name (more reliable in Classic)
-            if name == debuff.name then
-                if debuff.priority > bestPriority then
-                    bestDebuff = {
-                        name = name,
-                        icon = icon,
-                        count = count,
-                        duration = duration,
-                        expirationTime = expirationTime,
-                        priority = debuff.priority,
-                        definition = debuff,
-                    }
-                    bestPriority = debuff.priority
+            -- Skip if this specific debuff is disabled in options
+            if not debuffToggles or debuffToggles[debuff.name] ~= false then
+                -- Check by name (more reliable in Classic)
+                if name == debuff.name then
+                    if debuff.priority > bestPriority then
+                        bestDebuff = {
+                            name = name,
+                            icon = icon,
+                            count = count,
+                            duration = duration,
+                            expirationTime = expirationTime,
+                            priority = debuff.priority,
+                            definition = debuff,
+                        }
+                        bestPriority = debuff.priority
+                    end
                 end
-            end
-            
-            -- Also check by spellID if available
-            if spellId then
-                for _, id in ipairs(debuff.spellIDs) do
-                    if spellId == id then
-                        if debuff.priority > bestPriority then
-                            bestDebuff = {
-                                name = name,
-                                icon = icon,
-                                count = count,
-                                duration = duration,
-                                expirationTime = expirationTime,
-                                priority = debuff.priority,
-                                definition = debuff,
-                            }
-                            bestPriority = debuff.priority
+                
+                -- Also check by spellID if available
+                if spellId then
+                    for _, id in ipairs(debuff.spellIDs) do
+                        if spellId == id then
+                            if debuff.priority > bestPriority then
+                                bestDebuff = {
+                                    name = name,
+                                    icon = icon,
+                                    count = count,
+                                    duration = duration,
+                                    expirationTime = expirationTime,
+                                    priority = debuff.priority,
+                                    definition = debuff,
+                                }
+                                bestPriority = debuff.priority
+                            end
                         end
                     end
                 end
@@ -254,17 +474,118 @@ local function GetActiveDebuff(unit, category)
     return bestDebuff
 end
 
--- Get the best possible debuff in a category
+-- Get the best possible debuff in a category (only among enabled debuffs)
 local function GetBestDebuff(category)
     local best = nil
     local bestPriority = 0
+    local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs and DebuffTrackerDB.trackedDebuffs[category.name]
+    
     for _, debuff in ipairs(category.debuffs) do
-        if debuff.priority > bestPriority then
-            best = debuff
-            bestPriority = debuff.priority
+        -- Skip if this specific debuff is disabled in options
+        if not debuffToggles or debuffToggles[debuff.name] ~= false then
+            if debuff.priority > bestPriority then
+                best = debuff
+                bestPriority = debuff.priority
+            end
         end
     end
     return best
+end
+
+-- ============================================
+-- THEME APPLICATION
+-- ============================================
+
+function DebuffTracker:ApplyTrackerTheme()
+    if not trackerFrame then return end
+    local theme = GetTheme()
+    local t = theme.tracker
+    local tt = theme.titleBar
+    
+    -- Main tracker frame
+    trackerFrame:SetBackdrop({
+        bgFile = t.bgFile,
+        edgeFile = t.edgeFile,
+        tile = true, tileSize = 16, edgeSize = t.edgeSize,
+        insets = t.insets,
+    })
+    trackerFrame:SetBackdropColor(unpack(t.bgColor))
+    trackerFrame:SetBackdropBorderColor(unpack(t.borderColor))
+    
+    -- Outer border (Tukui double-border)
+    if t.outerBorder then
+        CreateOuterBorder(trackerFrame, t.outerBorderColor)
+    else
+        RemoveOuterBorder(trackerFrame)
+    end
+    
+    -- Title bar
+    trackerFrame.titleBar:SetBackdrop({
+        bgFile = tt.bgFile,
+    })
+    trackerFrame.titleBar:SetBackdropColor(unpack(tt.bgColor))
+    trackerFrame.titleBar:SetHeight(tt.height)
+    trackerFrame.title:SetFontObject(tt.fontObject)
+    trackerFrame.title:SetTextColor(unpack(tt.fontColor))
+    
+    -- Accent line
+    if tt.accentLine then
+        CreateAccentLine(trackerFrame.titleBar, tt.accentColor)
+    else
+        RemoveAccentLine(trackerFrame.titleBar)
+    end
+    
+    -- Apply to category indicators
+    self:ApplyCategoryTheme()
+end
+
+function DebuffTracker:ApplyCategoryTheme()
+    local theme = GetTheme()
+    local ti = theme.indicator
+    
+    for _, catFrame in ipairs(categoryFrames) do
+        catFrame:SetBackdrop({
+            bgFile = ti.bgFile,
+            edgeFile = ti.edgeFile,
+            edgeSize = ti.edgeSize,
+        })
+        catFrame:SetBackdropColor(unpack(ti.bgColor))
+        -- Border color will be set by UpdateDebuffs based on state
+        catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
+    end
+end
+
+function DebuffTracker:ApplySettingsTheme()
+    if not mainFrame then return end
+    local theme = GetTheme()
+    local ts = theme.settings
+    
+    mainFrame:SetBackdrop({
+        bgFile = ts.bgFile,
+        edgeFile = ts.edgeFile,
+        tile = true, tileSize = ts.tileSize, edgeSize = ts.edgeSize,
+        insets = ts.insets,
+    })
+    
+    if ts.bgColor then
+        mainFrame:SetBackdropColor(unpack(ts.bgColor))
+    end
+    if ts.borderColor then
+        mainFrame:SetBackdropBorderColor(unpack(ts.borderColor))
+    end
+    
+    -- Outer border for settings
+    if ts.outerBorder then
+        CreateOuterBorder(mainFrame, ts.outerBorderColor)
+    else
+        RemoveOuterBorder(mainFrame)
+    end
+end
+
+function DebuffTracker:ApplyTheme()
+    self:ApplyTrackerTheme()
+    self:ApplySettingsTheme()
+    self:UpdateDebuffs()  -- Re-apply state colors with new theme
 end
 
 -- ============================================
@@ -273,6 +594,10 @@ end
 
 function DebuffTracker:CreateTrackerFrame()
     if trackerFrame then return trackerFrame end
+    
+    local theme = GetTheme()
+    local t = theme.tracker
+    local tt = theme.titleBar
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerFrame", UIParent, "BackdropTemplate")
     frame:SetSize(200, 30)
@@ -284,29 +609,40 @@ function DebuffTracker:CreateTrackerFrame()
     frame:SetFrameStrata("HIGH")
     
     frame:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+        bgFile = t.bgFile,
+        edgeFile = t.edgeFile,
+        tile = true, tileSize = 16, edgeSize = t.edgeSize,
+        insets = t.insets,
     })
-    frame:SetBackdropColor(0, 0, 0, 0.7)
-    frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    frame:SetBackdropColor(unpack(t.bgColor))
+    frame:SetBackdropBorderColor(unpack(t.borderColor))
+    
+    -- Outer border (Tukui double-border effect)
+    if t.outerBorder then
+        CreateOuterBorder(frame, t.outerBorderColor)
+    end
     
     -- Title bar
     local titleBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    titleBar:SetHeight(18)
+    titleBar:SetHeight(tt.height)
     titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
     titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
     titleBar:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
+        bgFile = tt.bgFile,
     })
-    titleBar:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    titleBar:SetBackdropColor(unpack(tt.bgColor))
     frame.titleBar = titleBar
     
-    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local title = titleBar:CreateFontString(nil, "OVERLAY", tt.fontObject)
     title:SetPoint("LEFT", 5, 0)
-    title:SetText("|cFFFFCC00Debuffs|r")
+    title:SetText("Debuffs")
+    title:SetTextColor(unpack(tt.fontColor))
     frame.title = title
+    
+    -- Accent line (Tukui style)
+    if tt.accentLine then
+        CreateAccentLine(titleBar, tt.accentColor)
+    end
     
     -- Lock button
     local lockBtn = CreateFrame("Button", nil, titleBar)
@@ -387,6 +723,9 @@ end
 function DebuffTracker:CreateCategoryIndicators(container)
     categoryFrames = {}
     
+    local theme = GetTheme()
+    local ti = theme.indicator
+    
     local xOffset = 0
     local yOffset = 0
     local indicatorSize = 24
@@ -397,12 +736,12 @@ function DebuffTracker:CreateCategoryIndicators(container)
         local catFrame = CreateFrame("Frame", nil, container, "BackdropTemplate")
         catFrame:SetSize(indicatorSize, indicatorSize)
         catFrame:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 1,
+            bgFile = ti.bgFile,
+            edgeFile = ti.edgeFile,
+            edgeSize = ti.edgeSize,
         })
-        catFrame:SetBackdropColor(0.2, 0.2, 0.2, 0.8)
-        catFrame:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+        catFrame:SetBackdropColor(unpack(ti.bgColor))
+        catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
         
         -- Icon
         local icon = catFrame:CreateTexture(nil, "ARTWORK")
@@ -438,16 +777,23 @@ function DebuffTracker:CreateCategoryIndicators(container)
             GameTooltip:AddLine(category.name, category.color[1], category.color[2], category.color[3])
             GameTooltip:AddLine(" ")
             
-            -- List possible debuffs
+            -- List possible debuffs with enabled/disabled status
             GameTooltip:AddLine("Debuffs (priority order):", 1, 1, 1)
             local sorted = {}
             for _, d in ipairs(category.debuffs) do
                 table.insert(sorted, d)
             end
             table.sort(sorted, function(a, b) return a.priority > b.priority end)
+            local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs and DebuffTrackerDB.trackedDebuffs[category.name]
             for _, d in ipairs(sorted) do
+                local isEnabled = not debuffToggles or debuffToggles[d.name] ~= false
                 local classColor = RAID_CLASS_COLORS[d.class] or {r=1, g=1, b=1}
-                GameTooltip:AddLine("  " .. d.name .. " (" .. d.class .. ")", classColor.r, classColor.g, classColor.b)
+                local prefix = isEnabled and "|cFF00FF00[ON]|r " or "|cFF666666[OFF]|r "
+                if isEnabled then
+                    GameTooltip:AddLine(prefix .. d.name .. " (" .. d.class .. ")", classColor.r, classColor.g, classColor.b)
+                else
+                    GameTooltip:AddLine(prefix .. d.name .. " (" .. d.class .. ")", 0.4, 0.4, 0.4)
+                end
             end
             
             -- Show current status
@@ -580,11 +926,14 @@ end
 function DebuffTracker:UpdateDebuffs()
     if not trackerFrame or not trackerFrame:IsShown() then return end
     
+    local theme = GetTheme()
+    local ti = theme.indicator
+    
     local unit = "target"
     if not UnitExists(unit) or not UnitCanAttack("player", unit) then
         -- Clear all indicators
         for _, catFrame in ipairs(categoryFrames) do
-            catFrame:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+            catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
             catFrame.icon:SetTexture(nil)
             catFrame.status:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-NotReady")
             catFrame.stackText:SetText("")
@@ -607,7 +956,7 @@ function DebuffTracker:UpdateDebuffs()
             if activeDebuff then
                 -- Debuff present
                 catFrame.icon:SetTexture(activeDebuff.icon)
-                catFrame:SetBackdropBorderColor(0, 1, 0, 1)  -- Green border
+                catFrame:SetBackdropBorderColor(unpack(ti.activeColor))
                 catFrame.status:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-Ready")
                 
                 -- Show stack count if applicable
@@ -620,8 +969,8 @@ function DebuffTracker:UpdateDebuffs()
                 -- Check if it's the best version
                 local best = GetBestDebuff(category)
                 if best and activeDebuff.priority < best.priority then
-                    -- Not optimal - yellow border
-                    catFrame:SetBackdropBorderColor(1, 1, 0, 1)
+                    -- Not optimal
+                    catFrame:SetBackdropBorderColor(unpack(ti.warningColor))
                 end
             else
                 -- Debuff missing
@@ -630,7 +979,7 @@ function DebuffTracker:UpdateDebuffs()
                     -- Show what should be there (greyed out)
                     catFrame.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
                 end
-                catFrame:SetBackdropBorderColor(1, 0, 0, 1)  -- Red border
+                catFrame:SetBackdropBorderColor(unpack(ti.missingColor))
                 catFrame.status:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-NotReady")
                 catFrame.stackText:SetText("")
             end
@@ -646,11 +995,22 @@ function DebuffTracker:GetQuickStatus()
     if not DebuffTrackerDB then return "|cFF888888Not initialized|r" end
     
     if DebuffTrackerDB.enabled then
-        local count = 0
-        for _, enabled in pairs(DebuffTrackerDB.trackedCategories) do
-            if enabled then count = count + 1 end
+        local catCount = 0
+        local debuffCount = 0
+        local totalDebuffs = 0
+        for _, cat in ipairs(DEBUFF_CATEGORIES) do
+            if DebuffTrackerDB.trackedCategories[cat.name] then
+                catCount = catCount + 1
+                for _, debuff in ipairs(cat.debuffs) do
+                    totalDebuffs = totalDebuffs + 1
+                    if DebuffTrackerDB.trackedDebuffs[cat.name] and 
+                       DebuffTrackerDB.trackedDebuffs[cat.name][debuff.name] ~= false then
+                        debuffCount = debuffCount + 1
+                    end
+                end
+            end
         end
-        return "|cFF00FF00Active|r (" .. count .. " categories)"
+        return "|cFF00FF00Active|r (" .. catCount .. " categories, " .. debuffCount .. "/" .. totalDebuffs .. " debuffs)"
     else
         return "|cFFFF0000Disabled|r"
     end
@@ -663,8 +1023,11 @@ end
 function DebuffTracker:CreateUI()
     if mainFrame then return mainFrame end
     
+    local theme = GetTheme()
+    local ts = theme.settings
+    
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(350, 450)
+    frame:SetSize(380, 560)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -676,16 +1039,20 @@ function DebuffTracker:CreateUI()
     frame:Hide()
     
     frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+        bgFile = ts.bgFile,
+        edgeFile = ts.edgeFile,
+        tile = true, tileSize = ts.tileSize, edgeSize = ts.edgeSize,
+        insets = ts.insets,
     })
+    if ts.bgColor then frame:SetBackdropColor(unpack(ts.bgColor)) end
+    if ts.borderColor then frame:SetBackdropBorderColor(unpack(ts.borderColor)) end
+    if ts.outerBorder then CreateOuterBorder(frame, ts.outerBorderColor) end
     
     -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFCC00Debuff Tracker Settings|r")
+    local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleText:SetPoint("TOP", 0, -15)
+    titleText:SetText("Debuff Tracker Settings")
+    titleText:SetTextColor(unpack(ts.headerColor))
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -739,33 +1106,271 @@ function DebuffTracker:CreateUI()
         DebuffTracker:UpdateVisibility()
     end)
     
-    yOffset = yOffset - 35
+    yOffset = yOffset - 30
     
-    -- Category header
+    -- Theme selector
+    local themeLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    themeLabel:SetPoint("TOPLEFT", 20, yOffset)
+    themeLabel:SetText("UI Theme:")
+    themeLabel:SetTextColor(unpack(ts.headerColor))
+    
+    -- Dropdown button (manual implementation - no UIDropDownMenu dependency)
+    local themeDropdown = CreateFrame("Frame", "WM_DebuffTrackerThemeDropdown", frame, "BackdropTemplate")
+    themeDropdown:SetSize(150, 22)
+    themeDropdown:SetPoint("LEFT", themeLabel, "RIGHT", 10, 0)
+    themeDropdown:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    themeDropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
+    themeDropdown:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    
+    local themeText = themeDropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    themeText:SetPoint("LEFT", 8, 0)
+    themeText:SetText(DebuffTrackerDB.theme or "Default")
+    
+    local themeArrow = themeDropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    themeArrow:SetPoint("RIGHT", -6, 0)
+    themeArrow:SetText("v")
+    
+    -- Dropdown menu frame
+    local themeMenu = CreateFrame("Frame", "WM_DebuffTrackerThemeMenu", themeDropdown, "BackdropTemplate")
+    themeMenu:SetPoint("TOPLEFT", themeDropdown, "BOTTOMLEFT", 0, -2)
+    themeMenu:SetSize(150, (#THEME_LIST * 20) + 6)
+    themeMenu:SetFrameStrata("TOOLTIP")
+    themeMenu:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    themeMenu:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+    themeMenu:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    themeMenu:Hide()
+    
+    for idx, themeName in ipairs(THEME_LIST) do
+        local item = CreateFrame("Button", nil, themeMenu)
+        item:SetSize(146, 18)
+        item:SetPoint("TOPLEFT", 2, -((idx - 1) * 20) - 3)
+        
+        local itemText = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        itemText:SetPoint("LEFT", 6, 0)
+        itemText:SetText(themeName)
+        
+        local itemHighlight = item:CreateTexture(nil, "HIGHLIGHT")
+        itemHighlight:SetAllPoints()
+        itemHighlight:SetColorTexture(0.3, 0.3, 0.5, 0.3)
+        
+        item:SetScript("OnClick", function()
+            DebuffTrackerDB.theme = themeName
+            themeText:SetText(themeName)
+            themeMenu:Hide()
+            -- Destroy and recreate the settings frame with new theme
+            -- (simpler than trying to re-skin every child element)
+            mainFrame:Hide()
+            mainFrame = nil
+            DebuffTracker.mainFrame = nil
+            DebuffTracker:ApplyTrackerTheme()
+            DebuffTracker:UpdateDebuffs()
+            DebuffTracker:Print("Theme changed to: " .. themeName .. ". Reopen settings to see themed panel.")
+        end)
+    end
+    
+    themeDropdown:EnableMouse(true)
+    themeDropdown:SetScript("OnMouseDown", function()
+        if themeMenu:IsShown() then
+            themeMenu:Hide()
+        else
+            themeMenu:Show()
+        end
+    end)
+    
+    -- Close menu when clicking elsewhere
+    themeMenu:SetScript("OnShow", function(self)
+        self:SetPropagateKeyboardInput(true)
+    end)
+    frame:HookScript("OnHide", function()
+        themeMenu:Hide()
+    end)
+    
+    yOffset = yOffset - 32
+    
+    -- Category & Debuff Selection header
     local catHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     catHeader:SetPoint("TOPLEFT", 20, yOffset)
-    catHeader:SetText("Tracked Debuff Categories:")
+    catHeader:SetText("Debuff Selection by Class:")
+    catHeader:SetTextColor(unpack(ts.headerColor))
     
-    yOffset = yOffset - 20
+    yOffset = yOffset - 5
     
-    -- Category checkboxes
+    -- Scroll frame for categories + debuffs
+    local scrollFrame = CreateFrame("ScrollFrame", "WM_DebuffTrackerScrollFrame", frame, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 15, yOffset)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
+    
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(scrollFrame:GetWidth())
+    scrollChild:SetHeight(1)  -- Will be set dynamically
+    scrollFrame:SetScrollChild(scrollChild)
+    
+    -- Build the category + debuff checkbox tree
+    local scrollY = 0
+    local debuffCheckboxes = {}  -- Store references so we can enable/disable them
+    
     for _, category in ipairs(DEBUFF_CATEGORIES) do
-        local cb = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 30, yOffset)
-        cb.Text:SetText("|cFF" .. string.format("%02x%02x%02x", 
-            category.color[1]*255, category.color[2]*255, category.color[3]*255) .. 
-            category.name .. "|r")
-        cb:SetChecked(DebuffTrackerDB.trackedCategories[category.name])
-        cb:SetScript("OnClick", function(self)
-            DebuffTrackerDB.trackedCategories[category.name] = self:GetChecked()
+        -- Category header checkbox
+        local catCB = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
+        catCB:SetPoint("TOPLEFT", 5, -scrollY)
+        
+        local colorHex = string.format("%02x%02x%02x", 
+            category.color[1]*255, category.color[2]*255, category.color[3]*255)
+        catCB.Text:SetText("|cFF" .. colorHex .. category.name .. "|r")
+        catCB.Text:SetFontObject("GameFontNormal")
+        catCB:SetChecked(DebuffTrackerDB.trackedCategories[category.name])
+        
+        -- Store debuff CBs for this category so we can grey them out
+        debuffCheckboxes[category.name] = {}
+        
+        scrollY = scrollY + 24
+        
+        -- Group debuffs by class for display
+        local classesSeen = {}
+        local classOrder = {}
+        for _, debuff in ipairs(category.debuffs) do
+            if not classesSeen[debuff.class] then
+                classesSeen[debuff.class] = {}
+                table.insert(classOrder, debuff.class)
+            end
+            table.insert(classesSeen[debuff.class], debuff)
+        end
+        
+        -- Create per-class debuff checkboxes
+        for _, className in ipairs(classOrder) do
+            local classDebuffs = classesSeen[className]
+            local classColor = RAID_CLASS_COLORS[className] or {r=1, g=1, b=1}
+            
+            -- Class label
+            local classLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            classLabel:SetPoint("TOPLEFT", 35, -scrollY)
+            classLabel:SetText("|cFF" .. string.format("%02x%02x%02x", 
+                classColor.r*255, classColor.g*255, classColor.b*255) .. className .. ":|r")
+            
+            scrollY = scrollY + 15
+            
+            for _, debuff in ipairs(classDebuffs) do
+                local debuffCB = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
+                debuffCB:SetPoint("TOPLEFT", 45, -scrollY)
+                debuffCB:SetScale(0.85)
+                debuffCB.Text:SetText(debuff.name .. " |cFF888888(P:" .. debuff.priority .. ")|r")
+                debuffCB:SetChecked(DebuffTrackerDB.trackedDebuffs[category.name][debuff.name])
+                
+                -- Store reference
+                table.insert(debuffCheckboxes[category.name], {
+                    checkbox = debuffCB,
+                    label = classLabel,
+                    debuffName = debuff.name,
+                })
+                
+                debuffCB:SetScript("OnClick", function(self)
+                    DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] = self:GetChecked()
+                    DebuffTracker:UpdateDebuffs()
+                end)
+                
+                -- Disable if category is unchecked
+                if not DebuffTrackerDB.trackedCategories[category.name] then
+                    debuffCB:Disable()
+                    debuffCB:SetAlpha(0.4)
+                end
+                
+                scrollY = scrollY + 20
+            end
+        end
+        
+        -- Enable All / Disable All buttons for this category
+        local enableAllBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+        enableAllBtn:SetSize(65, 16)
+        enableAllBtn:SetPoint("TOPLEFT", 45, -scrollY)
+        enableAllBtn:SetText("All On")
+        enableAllBtn:GetFontString():SetFont(GameFontNormalSmall:GetFont())
+        enableAllBtn:SetScript("OnClick", function()
+            for _, entry in ipairs(debuffCheckboxes[category.name]) do
+                entry.checkbox:SetChecked(true)
+                DebuffTrackerDB.trackedDebuffs[category.name][entry.debuffName] = true
+            end
+            DebuffTracker:UpdateDebuffs()
+        end)
+        
+        local disableAllBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+        disableAllBtn:SetSize(65, 16)
+        disableAllBtn:SetPoint("LEFT", enableAllBtn, "RIGHT", 5, 0)
+        disableAllBtn:SetText("All Off")
+        disableAllBtn:GetFontString():SetFont(GameFontNormalSmall:GetFont())
+        disableAllBtn:SetScript("OnClick", function()
+            for _, entry in ipairs(debuffCheckboxes[category.name]) do
+                entry.checkbox:SetChecked(false)
+                DebuffTrackerDB.trackedDebuffs[category.name][entry.debuffName] = false
+            end
+            DebuffTracker:UpdateDebuffs()
+        end)
+        
+        -- Disable the enable/disable buttons if category is off
+        if not DebuffTrackerDB.trackedCategories[category.name] then
+            enableAllBtn:Disable()
+            enableAllBtn:SetAlpha(0.4)
+            disableAllBtn:Disable()
+            disableAllBtn:SetAlpha(0.4)
+        end
+        
+        -- Store button references for the category toggle
+        debuffCheckboxes[category.name].enableAllBtn = enableAllBtn
+        debuffCheckboxes[category.name].disableAllBtn = disableAllBtn
+        
+        scrollY = scrollY + 22
+        
+        -- Category checkbox OnClick - enable/disable all child checkboxes
+        catCB:SetScript("OnClick", function(self)
+            local checked = self:GetChecked()
+            DebuffTrackerDB.trackedCategories[category.name] = checked
+            for _, entry in ipairs(debuffCheckboxes[category.name]) do
+                if checked then
+                    entry.checkbox:Enable()
+                    entry.checkbox:SetAlpha(1.0)
+                else
+                    entry.checkbox:Disable()
+                    entry.checkbox:SetAlpha(0.4)
+                end
+            end
+            if checked then
+                debuffCheckboxes[category.name].enableAllBtn:Enable()
+                debuffCheckboxes[category.name].enableAllBtn:SetAlpha(1.0)
+                debuffCheckboxes[category.name].disableAllBtn:Enable()
+                debuffCheckboxes[category.name].disableAllBtn:SetAlpha(1.0)
+            else
+                debuffCheckboxes[category.name].enableAllBtn:Disable()
+                debuffCheckboxes[category.name].enableAllBtn:SetAlpha(0.4)
+                debuffCheckboxes[category.name].disableAllBtn:Disable()
+                debuffCheckboxes[category.name].disableAllBtn:SetAlpha(0.4)
+            end
             DebuffTracker:UpdateFrameSize()
             DebuffTracker:UpdateDebuffs()
         end)
         
-        yOffset = yOffset - 22
+        -- Separator line
+        local sep = scrollChild:CreateTexture(nil, "ARTWORK")
+        sep:SetHeight(1)
+        sep:SetPoint("TOPLEFT", 5, -scrollY)
+        sep:SetPoint("TOPRIGHT", -5, -scrollY)
+        sep:SetColorTexture(unpack(ts.separatorColor))
+        
+        scrollY = scrollY + 8
     end
     
-    yOffset = yOffset - 15
+    -- Set scroll child height
+    scrollChild:SetHeight(scrollY + 10)
+    
+    -- Bottom buttons
     
     -- Reset position button
     local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
