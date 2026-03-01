@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "2.0"
+WM.version = "2.1"
 WM.modules = {}
 
 -- Security Configuration
@@ -75,6 +75,7 @@ function WM:ModulePrint(moduleName, msg)
         Recruiter = "FFD700",
         GuildInvite = "00FF00",
         DebuffTracker = "FFCC00",
+        PvPTracker = "FF3333",
     }
     local color = colors[moduleName] or "FFFFFF"
     DEFAULT_CHAT_FRAME:AddMessage("|cFF" .. color .. "[WM:" .. moduleName .. "]|r " .. msg)
@@ -415,6 +416,7 @@ local coreDefaults = {
         WhisperLogs = true,
         GuildInvite = true,
         DebuffTracker = true,
+        PvPTracker = true,
         Recruiter = true,
     },
 }
@@ -743,7 +745,7 @@ function WM:CreateModuleCards()
     local cardHeight = 55
     local cardSpacing = 6
     
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "Recruiter"}
+    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter"}
     local moduleInfo = {
         AutoLogger = {
             title = "Auto Logger",
@@ -785,7 +787,13 @@ function WM:CreateModuleCards()
             title = "Debuff Tracker",
             desc = "Raid debuff monitoring",
             color = {1, 0.8, 0},
-            icon = "Interface\\Icons\\Spell_Shadow_CurseOfTounable",
+            icon = "Interface\\Icons\\Spell_Shadow_CurseOfTongues",
+        },
+        PvPTracker = {
+            title = "PvP Enemy Tracker",
+            desc = "Track and alert on hostile players",
+            color = {0.9, 0.2, 0.2},
+            icon = "Interface\\Icons\\Ability_Dualwield",
         },
         Recruiter = {
             title = "Recruiting Tool",
@@ -1087,6 +1095,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
+    print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")
     if isOfficer then
         print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool |cFFFFD700(Officers)|r")
     end
@@ -1211,6 +1220,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("DebuffTracker module not available")
+        end
+        
+    elseif cmd == "pvp" or cmd == "enemies" or cmd == "pvptracker" or cmd == "kos" then
+        local module = WM.modules.PvPTracker
+        if module and module.Toggle then
+            module:Toggle()
+        else
+            WM:Print("PvPTracker module not available")
         end
         
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then
