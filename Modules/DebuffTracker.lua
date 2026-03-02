@@ -158,6 +158,7 @@ local defaults = {
     frameY = nil,
     compactMode = false,
     hideWhenNoTarget = true,
+    autoDetect = true,       -- Auto-configure based on raid composition
 }
 
 -- Initialize tracked categories and per-debuff defaults (all enabled)
@@ -175,6 +176,135 @@ local trackerFrame = nil
 local categoryFrames = {}
 local updateTimer = 0
 local UPDATE_INTERVAL = 0.2  -- Update 5 times per second
+local raidClasses = {}       -- Set of classes currently in raid: raidClasses["WARRIOR"] = count
+local raidScanDirty = true   -- Flag to trigger rescan
+
+-- ============================================
+-- RAID COMPOSITION SCANNING
+-- ============================================
+
+-- Scan raid/party for all unique classes
+function DebuffTracker:ScanRaidComposition()
+    local newClasses = {}
+    
+    -- Always include player
+    local _, playerClass = UnitClass("player")
+    if playerClass then
+        newClasses[playerClass] = (newClasses[playerClass] or 0) + 1
+    end
+    
+    if IsInRaid() then
+        for i = 1, 40 do
+            local unit = "raid" .. i
+            if UnitExists(unit) then
+                local _, class = UnitClass(unit)
+                if class then
+                    newClasses[class] = (newClasses[class] or 0) + 1
+                end
+            end
+        end
+    elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
+        for i = 1, 4 do
+            local unit = "party" .. i
+            if UnitExists(unit) then
+                local _, class = UnitClass(unit)
+                if class then
+                    newClasses[class] = (newClasses[class] or 0) + 1
+                end
+            end
+        end
+    end
+    
+    -- Check if composition actually changed
+    local changed = false
+    for class, count in pairs(newClasses) do
+        if raidClasses[class] ~= count then changed = true break end
+    end
+    if not changed then
+        for class in pairs(raidClasses) do
+            if not newClasses[class] then changed = true break end
+        end
+    end
+    
+    if changed then
+        raidClasses = newClasses
+        if DebuffTrackerDB and DebuffTrackerDB.autoDetect then
+            self:ApplyAutoDetect()
+        end
+    end
+    
+    raidScanDirty = false
+end
+
+-- Check if a specific class is in the raid
+function DebuffTracker:IsClassInRaid(className)
+    return raidClasses[className] and raidClasses[className] > 0
+end
+
+-- Check if any debuff in a category can be provided by the current raid
+function DebuffTracker:IsCategoryCoverable(category)
+    for _, debuff in ipairs(category.debuffs) do
+        if self:IsClassInRaid(debuff.class) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Apply auto-detection: enable categories/debuffs based on raid composition
+function DebuffTracker:ApplyAutoDetect()
+    if not DebuffTrackerDB or not DebuffTrackerDB.autoDetect then return end
+    
+    local changed = false
+    
+    for _, category in ipairs(DEBUFF_CATEGORIES) do
+        local hasCoverage = self:IsCategoryCoverable(category)
+        
+        -- Auto-enable/disable the category
+        if DebuffTrackerDB.trackedCategories[category.name] ~= hasCoverage then
+            DebuffTrackerDB.trackedCategories[category.name] = hasCoverage
+            changed = true
+        end
+        
+        -- Within category, enable debuffs whose class is present, disable others
+        if not DebuffTrackerDB.trackedDebuffs[category.name] then
+            DebuffTrackerDB.trackedDebuffs[category.name] = {}
+        end
+        for _, debuff in ipairs(category.debuffs) do
+            local classPresent = self:IsClassInRaid(debuff.class)
+            if DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] ~= classPresent then
+                DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] = classPresent
+                changed = true
+            end
+        end
+    end
+    
+    if changed then
+        self:UpdateFrameSize()
+        self:UpdateDebuffs()
+        -- Refresh settings UI if open
+        if mainFrame and mainFrame:IsShown() then
+            self:RefreshSettingsUI()
+        end
+    end
+end
+
+-- Get a summary string of detected classes
+function DebuffTracker:GetRaidCompositionString()
+    local classes = {}
+    for class, count in pairs(raidClasses) do
+        local color = RAID_CLASS_COLORS[class]
+        if color then
+            table.insert(classes, "|cFF" .. string.format("%02x%02x%02x", color.r*255, color.g*255, color.b*255) 
+                .. class .. "|r(" .. count .. ")")
+        else
+            table.insert(classes, class .. "(" .. count .. ")")
+        end
+    end
+    table.sort(classes)
+    if #classes == 0 then return "None detected" end
+    return table.concat(classes, ", ")
+end
 
 -- ============================================
 -- INITIALIZATION
@@ -183,6 +313,10 @@ local UPDATE_INTERVAL = 0.2  -- Update 5 times per second
 function DebuffTracker:Initialize()
     self:InitDB()
     self:CreateTrackerFrame()
+    -- Initial raid scan after a short delay (roster may not be ready yet)
+    WM.RunAfter(2, function()
+        DebuffTracker:ScanRaidComposition()
+    end)
 end
 
 function DebuffTracker:InitDB()
@@ -221,6 +355,10 @@ function DebuffTracker:InitDB()
                 DebuffTrackerDB.trackedDebuffs[cat.name][debuff.name] = true
             end
         end
+    end
+    -- Ensure autoDetect exists for existing installs
+    if DebuffTrackerDB.autoDetect == nil then
+        DebuffTrackerDB.autoDetect = true
     end
 end
 
@@ -522,6 +660,10 @@ function DebuffTracker:CreateTrackerFrame()
         updateTimer = updateTimer + elapsed
         if updateTimer >= UPDATE_INTERVAL then
             updateTimer = 0
+            -- Process pending raid scan
+            if raidScanDirty then
+                DebuffTracker:ScanRaidComposition()
+            end
             DebuffTracker:UpdateDebuffs()
         end
     end)
@@ -530,7 +672,11 @@ function DebuffTracker:CreateTrackerFrame()
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
     frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    frame:RegisterEvent("RAID_ROSTER_UPDATE")
     frame:SetScript("OnEvent", function(self, event)
+        if event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+            raidScanDirty = true
+        end
         DebuffTracker:UpdateVisibility()
         DebuffTracker:UpdateDebuffs()
     end)
@@ -601,7 +747,7 @@ function DebuffTracker:CreateCategoryIndicators(container)
             GameTooltip:AddLine(category.name, category.color[1], category.color[2], category.color[3])
             GameTooltip:AddLine(" ")
             
-            -- List possible debuffs with enabled/disabled status
+            -- List possible debuffs with enabled/disabled status and raid availability
             GameTooltip:AddLine("Debuffs (priority order):", 1, 1, 1)
             local sorted = {}
             for _, d in ipairs(category.debuffs) do
@@ -612,11 +758,23 @@ function DebuffTracker:CreateCategoryIndicators(container)
             for _, d in ipairs(sorted) do
                 local isEnabled = not debuffToggles or debuffToggles[d.name] ~= false
                 local classColor = RAID_CLASS_COLORS[d.class] or {r=1, g=1, b=1}
-                local prefix = isEnabled and "|cFF00FF00[ON]|r " or "|cFF666666[OFF]|r "
-                if isEnabled then
-                    GameTooltip:AddLine(prefix .. d.name .. " (" .. d.class .. ")", classColor.r, classColor.g, classColor.b)
+                local inRaid = DebuffTracker:IsClassInRaid(d.class)
+                
+                local prefix
+                if not isEnabled then
+                    prefix = "|cFF666666[OFF]|r "
+                elseif inRaid then
+                    prefix = "|cFF00FF00[ON]|r "
                 else
-                    GameTooltip:AddLine(prefix .. d.name .. " (" .. d.class .. ")", 0.4, 0.4, 0.4)
+                    prefix = "|cFFFF8800[NO " .. d.class .. "]|r "
+                end
+                
+                if isEnabled and inRaid then
+                    GameTooltip:AddLine(prefix .. d.name, classColor.r, classColor.g, classColor.b)
+                elseif isEnabled then
+                    GameTooltip:AddLine(prefix .. d.name, 0.6, 0.4, 0.1)
+                else
+                    GameTooltip:AddLine(prefix .. d.name, 0.4, 0.4, 0.4)
                 end
             end
             
@@ -624,9 +782,17 @@ function DebuffTracker:CreateCategoryIndicators(container)
             if self.currentDebuff then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("Active: " .. self.currentDebuff.name, 0, 1, 0)
-            else
+            elseif DebuffTracker:IsCategoryCoverable(category) then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("MISSING!", 1, 0, 0)
+            else
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("No class in raid for this category", 0.5, 0.5, 0.5)
+            end
+            
+            if DebuffTrackerDB.autoDetect then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Auto-detect: ON", 0.4, 0.8, 0.4)
             end
             
             GameTooltip:Show()
@@ -834,7 +1000,8 @@ function DebuffTracker:GetQuickStatus()
                 end
             end
         end
-        return "|cFF00FF00Active|r (" .. catCount .. " categories, " .. debuffCount .. "/" .. totalDebuffs .. " debuffs)"
+        local autoTag = DebuffTrackerDB.autoDetect and " |cFF88CCFF[Auto]|r" or ""
+        return "|cFF00FF00Active|r (" .. catCount .. " categories, " .. debuffCount .. "/" .. totalDebuffs .. " debuffs)" .. autoTag
     else
         return "|cFFFF0000Disabled|r"
     end
@@ -850,7 +1017,7 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(380, 520)
+    frame:SetSize(380, 580)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -924,11 +1091,88 @@ function DebuffTracker:CreateUI()
     
     yOffset = yOffset - 30
     
+    -- ========================================
+    -- AUTO-DETECT SECTION
+    -- ========================================
+    
+    local autoHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    autoHeader:SetPoint("TOPLEFT", 20, yOffset)
+    autoHeader:SetText("Raid Auto-Detection:")
+    autoHeader:SetTextColor(unpack(theme.headerColor))
+    
+    yOffset = yOffset - 22
+    
+    -- Auto-detect checkbox
+    local autoCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    autoCB:SetPoint("TOPLEFT", 20, yOffset)
+    autoCB.Text:SetText("Auto-configure from raid composition")
+    autoCB:SetChecked(DebuffTrackerDB.autoDetect)
+    frame.autoCB = autoCB
+    
+    yOffset = yOffset - 20
+    
+    -- Auto-detect description
+    local autoDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    autoDesc:SetPoint("TOPLEFT", 40, yOffset)
+    autoDesc:SetWidth(320)
+    autoDesc:SetJustifyH("LEFT")
+    autoDesc:SetText("|cFF888888Scans raid roster for classes. Only shows debuff categories that your raid can actually provide. Re-scans when roster changes.|r")
+    frame.autoDesc = autoDesc
+    
+    yOffset = yOffset - 30
+    
+    -- Raid composition display
+    local compLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    compLabel:SetPoint("TOPLEFT", 25, yOffset)
+    compLabel:SetText("Detected classes:")
+    compLabel:SetTextColor(0.7, 0.7, 0.7)
+    
+    local compText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    compText:SetPoint("TOPLEFT", 25, yOffset - 14)
+    compText:SetWidth(280)
+    compText:SetJustifyH("LEFT")
+    compText:SetText(DebuffTracker:GetRaidCompositionString())
+    frame.compText = compText
+    
+    -- Scan Now button
+    local scanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    scanBtn:SetSize(70, 18)
+    scanBtn:SetPoint("TOPRIGHT", -20, yOffset)
+    scanBtn:SetText("Scan Now")
+    scanBtn:SetScript("OnClick", function()
+        DebuffTracker:ScanRaidComposition()
+        if frame.compText then
+            frame.compText:SetText(DebuffTracker:GetRaidCompositionString())
+        end
+        DebuffTracker:Print("Raid scanned: " .. DebuffTracker:GetRaidCompositionString())
+    end)
+    frame.scanBtn = scanBtn
+    
+    yOffset = yOffset - 36
+    
+    -- Separator
+    local autoSep = frame:CreateTexture(nil, "ARTWORK")
+    autoSep:SetHeight(1)
+    autoSep:SetPoint("TOPLEFT", 15, yOffset)
+    autoSep:SetPoint("TOPRIGHT", -15, yOffset)
+    autoSep:SetColorTexture(unpack(theme.separatorColor))
+    
+    yOffset = yOffset - 8
+    
+    -- ========================================
+    -- DEBUFF SELECTION SECTION
+    -- ========================================
+    
     -- Category & Debuff Selection header
     local catHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     catHeader:SetPoint("TOPLEFT", 20, yOffset)
     catHeader:SetText("Debuff Selection by Class:")
     catHeader:SetTextColor(unpack(theme.headerColor))
+    
+    local manualNote = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    manualNote:SetPoint("LEFT", catHeader, "RIGHT", 8, 0)
+    manualNote:SetText("")
+    frame.manualNote = manualNote
     
     yOffset = yOffset - 5
     
@@ -939,25 +1183,36 @@ function DebuffTracker:CreateUI()
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollChild:SetWidth(scrollFrame:GetWidth())
-    scrollChild:SetHeight(1)  -- Will be set dynamically
+    scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
     
     -- Build the category + debuff checkbox tree
     local scrollY = 0
-    local debuffCheckboxes = {}  -- Store references so we can enable/disable them
+    local debuffCheckboxes = {}
     
     for _, category in ipairs(DEBUFF_CATEGORIES) do
+        local catCoverable = DebuffTracker:IsCategoryCoverable(category)
+        
         -- Category header checkbox
         local catCB = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
         catCB:SetPoint("TOPLEFT", 5, -scrollY)
         
         local colorHex = string.format("%02x%02x%02x", 
             category.color[1]*255, category.color[2]*255, category.color[3]*255)
-        catCB.Text:SetText("|cFF" .. colorHex .. category.name .. "|r")
+        
+        -- Show coverage indicator in category name
+        local coverageTag = ""
+        if DebuffTrackerDB.autoDetect then
+            if catCoverable then
+                coverageTag = " |cFF00FF00(available)|r"
+            else
+                coverageTag = " |cFF666666(no class in raid)|r"
+            end
+        end
+        catCB.Text:SetText("|cFF" .. colorHex .. category.name .. "|r" .. coverageTag)
         catCB.Text:SetFontObject("GameFontNormal")
         catCB:SetChecked(DebuffTrackerDB.trackedCategories[category.name])
         
-        -- Store debuff CBs for this category so we can grey them out
         debuffCheckboxes[category.name] = {}
         
         scrollY = scrollY + 24
@@ -977,17 +1232,26 @@ function DebuffTracker:CreateUI()
         for _, className in ipairs(classOrder) do
             local classDebuffs = classesSeen[className]
             local classColor = RAID_CLASS_COLORS[className] or {r=1, g=1, b=1}
+            local classInRaid = DebuffTracker:IsClassInRaid(className)
             
-            -- Class label
+            -- Class label with raid presence indicator
             local classLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             classLabel:SetPoint("TOPLEFT", 35, -scrollY)
+            
+            local raidTag = ""
+            if DebuffTrackerDB.autoDetect then
+                if classInRaid then
+                    raidTag = " |cFF00FF00(" .. (raidClasses[className] or 0) .. " in raid)|r"
+                else
+                    raidTag = " |cFFFF4444(not in raid)|r"
+                end
+            end
             classLabel:SetText("|cFF" .. string.format("%02x%02x%02x", 
-                classColor.r*255, classColor.g*255, classColor.b*255) .. className .. ":|r")
+                classColor.r*255, classColor.g*255, classColor.b*255) .. className .. ":|r" .. raidTag)
             
             scrollY = scrollY + 18
             
             for _, debuff in ipairs(classDebuffs) do
-                -- Wrapper frame at normal scale to hold the scaled checkbox
                 local wrapper = CreateFrame("Frame", nil, scrollChild)
                 wrapper:SetSize(280, 22)
                 wrapper:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 40, -scrollY)
@@ -997,12 +1261,12 @@ function DebuffTracker:CreateUI()
                 debuffCB.Text:SetText(debuff.name .. " |cFF888888(P:" .. debuff.priority .. ")|r")
                 debuffCB:SetChecked(DebuffTrackerDB.trackedDebuffs[category.name][debuff.name])
                 
-                -- Store reference
                 table.insert(debuffCheckboxes[category.name], {
                     checkbox = debuffCB,
                     wrapper = wrapper,
                     label = classLabel,
                     debuffName = debuff.name,
+                    className = className,
                 })
                 
                 debuffCB:SetScript("OnClick", function(self)
@@ -1010,8 +1274,9 @@ function DebuffTracker:CreateUI()
                     DebuffTracker:UpdateDebuffs()
                 end)
                 
-                -- Disable if category is unchecked
-                if not DebuffTrackerDB.trackedCategories[category.name] then
+                -- Disable if category is unchecked OR auto-detect is on
+                local catEnabled = DebuffTrackerDB.trackedCategories[category.name]
+                if not catEnabled or DebuffTrackerDB.autoDetect then
                     debuffCB:Disable()
                     debuffCB:SetAlpha(0.4)
                 end
@@ -1047,26 +1312,26 @@ function DebuffTracker:CreateUI()
             DebuffTracker:UpdateDebuffs()
         end)
         
-        -- Disable the enable/disable buttons if category is off
-        if not DebuffTrackerDB.trackedCategories[category.name] then
+        -- Disable buttons if category is off or auto-detect is on
+        if not DebuffTrackerDB.trackedCategories[category.name] or DebuffTrackerDB.autoDetect then
             enableAllBtn:Disable()
             enableAllBtn:SetAlpha(0.4)
             disableAllBtn:Disable()
             disableAllBtn:SetAlpha(0.4)
         end
         
-        -- Store button references for the category toggle
         debuffCheckboxes[category.name].enableAllBtn = enableAllBtn
         debuffCheckboxes[category.name].disableAllBtn = disableAllBtn
         
         scrollY = scrollY + 22
         
-        -- Category checkbox OnClick - enable/disable all child checkboxes
+        -- Category checkbox OnClick
         catCB:SetScript("OnClick", function(self)
             local checked = self:GetChecked()
             DebuffTrackerDB.trackedCategories[category.name] = checked
+            local canEdit = checked and not DebuffTrackerDB.autoDetect
             for _, entry in ipairs(debuffCheckboxes[category.name]) do
-                if checked then
+                if canEdit then
                     entry.checkbox:Enable()
                     entry.checkbox:SetAlpha(1.0)
                 else
@@ -1074,7 +1339,7 @@ function DebuffTracker:CreateUI()
                     entry.checkbox:SetAlpha(0.4)
                 end
             end
-            if checked then
+            if canEdit then
                 debuffCheckboxes[category.name].enableAllBtn:Enable()
                 debuffCheckboxes[category.name].enableAllBtn:SetAlpha(1.0)
                 debuffCheckboxes[category.name].disableAllBtn:Enable()
@@ -1089,6 +1354,12 @@ function DebuffTracker:CreateUI()
             DebuffTracker:UpdateDebuffs()
         end)
         
+        -- Also disable category CB when auto-detect is on
+        if DebuffTrackerDB.autoDetect then
+            catCB:Disable()
+            catCB:SetAlpha(0.6)
+        end
+        
         -- Separator line
         local sep = scrollChild:CreateTexture(nil, "ARTWORK")
         sep:SetHeight(1)
@@ -1099,12 +1370,31 @@ function DebuffTracker:CreateUI()
         scrollY = scrollY + 8
     end
     
-    -- Set scroll child height
     scrollChild:SetHeight(scrollY + 10)
     
-    -- Bottom buttons
+    -- Store references for auto-detect toggle
+    frame.debuffCheckboxes = debuffCheckboxes
+    frame.scrollChild = scrollChild
     
-    -- Reset position button
+    -- Auto-detect checkbox OnClick (defined after debuffCheckboxes exist)
+    autoCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.autoDetect = self:GetChecked()
+        if DebuffTrackerDB.autoDetect then
+            DebuffTracker:ScanRaidComposition()
+            frame.manualNote:SetText("|cFF888888(auto-managed)|r")
+        else
+            frame.manualNote:SetText("")
+        end
+        -- Rebuild UI to reflect enable/disable state
+        DebuffTracker:RefreshSettingsUI()
+    end)
+    
+    -- Set initial manual note
+    if DebuffTrackerDB.autoDetect then
+        frame.manualNote:SetText("|cFF888888(auto-managed)|r")
+    end
+    
+    -- Bottom buttons
     local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     resetBtn:SetSize(120, 22)
     resetBtn:SetPoint("BOTTOMLEFT", 20, 15)
@@ -1119,13 +1409,11 @@ function DebuffTracker:CreateUI()
         DebuffTracker:Print("Tracker position reset")
     end)
     
-    -- Test mode button
     local testBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     testBtn:SetSize(100, 22)
     testBtn:SetPoint("BOTTOMRIGHT", -20, 15)
     testBtn:SetText("Test Display")
     testBtn:SetScript("OnClick", function()
-        -- Temporarily show the tracker regardless of settings
         if trackerFrame then
             trackerFrame:Show()
             DebuffTracker:Print("Showing tracker for testing. Target a mob to see debuffs.")
@@ -1136,6 +1424,21 @@ function DebuffTracker:CreateUI()
     self.mainFrame = frame
     
     return frame
+end
+
+-- Refresh the settings UI by destroying and recreating it
+function DebuffTracker:RefreshSettingsUI()
+    if mainFrame then
+        local wasShown = mainFrame:IsShown()
+        mainFrame:Hide()
+        mainFrame:SetParent(nil)
+        mainFrame = nil
+        self.mainFrame = nil
+        if wasShown then
+            self:CreateUI()
+            mainFrame:Show()
+        end
+    end
 end
 
 function DebuffTracker:Toggle()
