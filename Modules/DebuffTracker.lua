@@ -10,6 +10,7 @@ DebuffTracker.version = "2.0"
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)
 -- Priority: Higher number = better version of debuff
+-- spec: Required talent spec (nil = any spec of that class)
 -- ============================================
 
 local DEBUFF_CATEGORIES = {
@@ -19,11 +20,11 @@ local DEBUFF_CATEGORIES = {
         shortName = "Armor",
         color = {1, 0.5, 0},  -- Orange
         debuffs = {
-            { name = "Improved Expose Armor", spellIDs = {26866}, priority = 100, class = "ROGUE" },
+            { name = "Improved Expose Armor", spellIDs = {26866}, priority = 100, class = "ROGUE", spec = "Combat" },
             { name = "Expose Armor", spellIDs = {26866, 11198, 8647, 8646}, priority = 90, class = "ROGUE" },
             { name = "Sunder Armor", spellIDs = {25225, 11597, 11596, 8380, 7405, 7386}, priority = 80, class = "WARRIOR" },
-            { name = "Faerie Fire", spellIDs = {26993, 9907, 9749, 778, 770}, priority = 50, class = "DRUID" },
-            { name = "Faerie Fire (Feral)", spellIDs = {27011, 17392, 17391, 16857}, priority = 50, class = "DRUID" },
+            { name = "Faerie Fire", spellIDs = {26993, 9907, 9749, 778, 770}, priority = 50, class = "DRUID", spec = "Balance" },
+            { name = "Faerie Fire (Feral)", spellIDs = {27011, 17392, 17391, 16857}, priority = 50, class = "DRUID", spec = "Feral" },
         }
     },
     -- Physical Damage Increase
@@ -32,8 +33,7 @@ local DEBUFF_CATEGORIES = {
         shortName = "Phys%",
         color = {0.8, 0.2, 0.2},  -- Red
         debuffs = {
-            { name = "Blood Frenzy", spellIDs = {29859, 29858}, priority = 100, class = "WARRIOR" },
-            { name = "Savage Combat", spellIDs = {58413, 58412}, priority = 100, class = "ROGUE" },
+            { name = "Blood Frenzy", spellIDs = {29859, 29858}, priority = 100, class = "WARRIOR", spec = "Arms" },
         }
     },
     -- Shadow Damage
@@ -42,7 +42,7 @@ local DEBUFF_CATEGORIES = {
         shortName = "Shadow",
         color = {0.5, 0, 0.8},  -- Purple
         debuffs = {
-            { name = "Shadow Weaving", spellIDs = {15334, 15333, 15332, 15331, 15258}, priority = 100, class = "PRIEST" },
+            { name = "Shadow Weaving", spellIDs = {15334, 15333, 15332, 15331, 15258}, priority = 100, class = "PRIEST", spec = "Shadow" },
             { name = "Curse of Elements", spellIDs = {27228, 11722, 11721, 1490}, priority = 90, class = "WARLOCK" },
         }
     },
@@ -52,7 +52,7 @@ local DEBUFF_CATEGORIES = {
         shortName = "Hit",
         color = {0, 0.7, 1},  -- Cyan
         debuffs = {
-            { name = "Misery", spellIDs = {33198, 33197, 33196, 33195, 33191}, priority = 100, class = "PRIEST" },
+            { name = "Misery", spellIDs = {33198, 33197, 33196, 33195, 33191}, priority = 100, class = "PRIEST", spec = "Shadow" },
         }
     },
     -- Fire Damage
@@ -61,7 +61,7 @@ local DEBUFF_CATEGORIES = {
         shortName = "Fire",
         color = {1, 0.4, 0},  -- Fire orange
         debuffs = {
-            { name = "Improved Scorch", spellIDs = {12873, 12872, 12871, 12870, 12869}, priority = 100, class = "MAGE" },
+            { name = "Improved Scorch", spellIDs = {12873, 12872, 12871, 12870, 12869}, priority = 100, class = "MAGE", spec = "Fire" },
             { name = "Curse of Elements", spellIDs = {27228, 11722, 11721, 1490}, priority = 90, class = "WARLOCK" },
         }
     },
@@ -71,9 +71,8 @@ local DEBUFF_CATEGORIES = {
         shortName = "AtkSpd",
         color = {0.6, 0.6, 0.6},  -- Gray
         debuffs = {
-            { name = "Improved Thunder Clap", spellIDs = {25264, 11581, 11580, 8198, 8204, 6343}, priority = 100, class = "WARRIOR" },
+            { name = "Improved Thunder Clap", spellIDs = {25264, 11581, 11580, 8198, 8204, 6343}, priority = 100, class = "WARRIOR", spec = "Arms" },
             { name = "Thunder Clap", spellIDs = {25264, 11581, 11580, 8198, 8204, 6343}, priority = 80, class = "WARRIOR" },
-            { name = "Infected Wounds", spellIDs = {48485, 48484, 48483}, priority = 90, class = "DRUID" },
         }
     },
     -- Attack Power Reduction
@@ -83,7 +82,7 @@ local DEBUFF_CATEGORIES = {
         color = {0.4, 0.4, 0.8},  -- Blue-gray
         debuffs = {
             { name = "Demoralizing Shout", spellIDs = {25203, 11556, 11555, 6190, 5242, 1160}, priority = 100, class = "WARRIOR" },
-            { name = "Demoralizing Roar", spellIDs = {27551, 9898, 9747, 9490, 1735, 99}, priority = 95, class = "DRUID" },
+            { name = "Demoralizing Roar", spellIDs = {27551, 9898, 9747, 9490, 1735, 99}, priority = 95, class = "DRUID", spec = "Feral" },
             { name = "Curse of Weakness", spellIDs = {27224, 11708, 11707, 7646, 6205, 702, 1108}, priority = 80, class = "WARLOCK" },
         }
     },
@@ -93,9 +92,9 @@ local DEBUFF_CATEGORIES = {
         shortName = "Heal-",
         color = {0, 0.6, 0.3},  -- Green
         debuffs = {
-            { name = "Mortal Strike", spellIDs = {30330, 21553, 21552, 21551, 12294}, priority = 100, class = "WARRIOR" },
+            { name = "Mortal Strike", spellIDs = {30330, 21553, 21552, 21551, 12294}, priority = 100, class = "WARRIOR", spec = "Arms" },
             { name = "Wound Poison", spellIDs = {27189, 13224, 13223, 13222, 13221, 13220, 13219, 13218}, priority = 80, class = "ROGUE" },
-            { name = "Aimed Shot", spellIDs = {27065, 20904, 20903, 20902, 20901, 20900, 19434}, priority = 70, class = "HUNTER" },
+            { name = "Aimed Shot", spellIDs = {27065, 20904, 20903, 20902, 20901, 20900, 19434}, priority = 70, class = "HUNTER", spec = "Marksmanship" },
         }
     },
     -- Hunter's Mark
@@ -107,6 +106,42 @@ local DEBUFF_CATEGORIES = {
             { name = "Hunter's Mark", spellIDs = {14325, 14324, 14323, 1130}, priority = 100, class = "HUNTER" },
         }
     },
+}
+
+-- ============================================
+-- SPEC DETECTION via Raid Member Buffs (TBC)
+-- ============================================
+-- Map class -> list of { buffName, spec } that identify a talent spec.
+-- We scan all raid members for these buffs to determine who is what spec.
+-- If a spec can't be confirmed via buff, we mark it "unconfirmed" but
+-- still allow it (conservative: don't hide debuffs we might actually have).
+
+local SPEC_IDENTIFYING_BUFFS = {
+    PRIEST = {
+        { buff = "Shadowform", spec = "Shadow" },
+        -- Holy/Disc have no persistent identifiable buff in TBC
+    },
+    DRUID = {
+        { buff = "Moonkin Form", spec = "Balance" },
+        { buff = "Moonkin Aura", spec = "Balance" },
+        { buff = "Tree of Life", spec = "Restoration" },
+        { buff = "Tree of Life Aura", spec = "Restoration" },
+        { buff = "Leader of the Pack", spec = "Feral" },
+    },
+    HUNTER = {
+        { buff = "Trueshot Aura", spec = "Marksmanship" },
+        -- BM/Survival don't have persistent auras
+    },
+    -- Warrior, Mage, Rogue, Warlock: no reliable persistent buffs to detect spec
+    -- For these, we assume "unconfirmed" and still allow the debuff
+}
+
+-- Specs that CAN be detected via buffs (if the class is present but spec not confirmed,
+-- and the spec IS in this list, we know they're a different spec)
+local DETECTABLE_SPECS = {
+    PRIEST = { Shadow = true },              -- If priest has no Shadowform, they're NOT Shadow
+    DRUID = { Balance = true, Feral = true, Restoration = true },  -- All druid specs detectable
+    HUNTER = { Marksmanship = true },        -- If hunter has no Trueshot, they're NOT MM
 }
 
 -- ============================================
@@ -159,6 +194,11 @@ local defaults = {
     compactMode = false,
     hideWhenNoTarget = true,
     autoDetect = true,       -- Auto-configure based on raid composition
+    -- Raid alert settings
+    raidAlerts = false,      -- Send raid messages for missing debuffs on boss
+    alertDelay = 5,          -- Seconds a debuff must be missing before alerting
+    alertCooldown = 30,      -- Seconds between repeat alerts for same category
+    alertOnlyOnBoss = true,  -- Only alert for boss targets
 }
 
 -- Initialize tracked categories and per-debuff defaults (all enabled)
@@ -177,41 +217,67 @@ local categoryFrames = {}
 local updateTimer = 0
 local UPDATE_INTERVAL = 0.2  -- Update 5 times per second
 local raidClasses = {}       -- Set of classes currently in raid: raidClasses["WARRIOR"] = count
+local raidSpecs = {}         -- Confirmed specs: raidSpecs["PRIEST"] = { ["Shadow"] = 1 }
 local raidScanDirty = true   -- Flag to trigger rescan
+local specScanTimer = 0      -- Throttle spec scanning (heavier than class scan)
+local SPEC_SCAN_INTERVAL = 5 -- Scan specs every 5 seconds
+
+-- Alert state
+local missingTimers = {}     -- missingTimers["Armor"] = GetTime() when first noticed missing
+local alertCooldowns = {}    -- alertCooldowns["Armor"] = GetTime() of last alert sent
 
 -- ============================================
--- RAID COMPOSITION SCANNING
+-- RAID COMPOSITION + SPEC SCANNING
 -- ============================================
 
--- Scan raid/party for all unique classes
+-- Scan a single unit for spec-identifying buffs
+local function DetectUnitSpec(unit, class)
+    local specEntries = SPEC_IDENTIFYING_BUFFS[class]
+    if not specEntries then return nil end
+    
+    for i = 1, 40 do
+        local buffName = UnitBuff(unit, i)
+        if not buffName then break end
+        for _, entry in ipairs(specEntries) do
+            if buffName == entry.buff then
+                return entry.spec
+            end
+        end
+    end
+    return nil  -- Could not determine spec
+end
+
+-- Scan raid/party for all unique classes and detect specs
 function DebuffTracker:ScanRaidComposition()
     local newClasses = {}
+    local newSpecs = {}
+    
+    -- Helper to process a unit
+    local function ProcessUnit(unit)
+        if not UnitExists(unit) then return end
+        local _, class = UnitClass(unit)
+        if not class then return end
+        
+        newClasses[class] = (newClasses[class] or 0) + 1
+        
+        -- Detect spec via buffs
+        local spec = DetectUnitSpec(unit, class)
+        if spec then
+            if not newSpecs[class] then newSpecs[class] = {} end
+            newSpecs[class][spec] = (newSpecs[class][spec] or 0) + 1
+        end
+    end
     
     -- Always include player
-    local _, playerClass = UnitClass("player")
-    if playerClass then
-        newClasses[playerClass] = (newClasses[playerClass] or 0) + 1
-    end
+    ProcessUnit("player")
     
     if IsInRaid() then
         for i = 1, 40 do
-            local unit = "raid" .. i
-            if UnitExists(unit) then
-                local _, class = UnitClass(unit)
-                if class then
-                    newClasses[class] = (newClasses[class] or 0) + 1
-                end
-            end
+            ProcessUnit("raid" .. i)
         end
     elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
         for i = 1, 4 do
-            local unit = "party" .. i
-            if UnitExists(unit) then
-                local _, class = UnitClass(unit)
-                if class then
-                    newClasses[class] = (newClasses[class] or 0) + 1
-                end
-            end
+            ProcessUnit("party" .. i)
         end
     end
     
@@ -226,8 +292,29 @@ function DebuffTracker:ScanRaidComposition()
         end
     end
     
+    -- Check if specs changed
+    if not changed then
+        for class, specs in pairs(newSpecs) do
+            if not raidSpecs[class] then changed = true break end
+            for spec, count in pairs(specs) do
+                if raidSpecs[class][spec] ~= count then changed = true break end
+            end
+            if changed then break end
+        end
+    end
+    if not changed then
+        for class, specs in pairs(raidSpecs) do
+            if not newSpecs[class] then changed = true break end
+            for spec in pairs(specs) do
+                if not newSpecs[class][spec] then changed = true break end
+            end
+            if changed then break end
+        end
+    end
+    
     if changed then
         raidClasses = newClasses
+        raidSpecs = newSpecs
         if DebuffTrackerDB and DebuffTrackerDB.autoDetect then
             self:ApplyAutoDetect()
         end
@@ -241,17 +328,54 @@ function DebuffTracker:IsClassInRaid(className)
     return raidClasses[className] and raidClasses[className] > 0
 end
 
--- Check if any debuff in a category can be provided by the current raid
+-- Check if a specific spec of a class is available in the raid
+-- Returns: "confirmed", "unconfirmed", or "absent"
+function DebuffTracker:GetSpecStatus(className, specName)
+    if not specName then
+        -- No spec required, just need the class
+        return self:IsClassInRaid(className) and "confirmed" or "absent"
+    end
+    
+    if not self:IsClassInRaid(className) then
+        return "absent"
+    end
+    
+    -- Check if we've confirmed this spec via buff scanning
+    if raidSpecs[className] and raidSpecs[className][specName] and raidSpecs[className][specName] > 0 then
+        return "confirmed"
+    end
+    
+    -- Can we definitively say this spec is NOT present?
+    -- Only if this class's specs are detectable and we scanned everyone
+    local detectable = DETECTABLE_SPECS[className]
+    if detectable and detectable[specName] then
+        -- We CAN detect this spec via buffs. If we haven't seen it, it's absent.
+        return "absent"
+    end
+    
+    -- Spec is not detectable via buffs (warrior, mage, rogue, warlock specs)
+    -- Class is present but we can't confirm the spec
+    return "unconfirmed"
+end
+
+-- Check if a debuff is potentially available given raid comp + specs
+-- Returns: "confirmed", "unconfirmed", or "absent"
+function DebuffTracker:GetDebuffAvailability(debuff)
+    return self:GetSpecStatus(debuff.class, debuff.spec)
+end
+
+-- Check if any debuff in a category can be provided by the current raid (spec-aware)
 function DebuffTracker:IsCategoryCoverable(category)
     for _, debuff in ipairs(category.debuffs) do
-        if self:IsClassInRaid(debuff.class) then
+        local status = self:GetDebuffAvailability(debuff)
+        if status == "confirmed" or status == "unconfirmed" then
             return true
         end
     end
     return false
 end
 
--- Apply auto-detection: enable categories/debuffs based on raid composition
+-- Apply auto-detection: enable categories/debuffs based on raid composition + specs
 function DebuffTracker:ApplyAutoDetect()
     if not DebuffTrackerDB or not DebuffTrackerDB.autoDetect then return end
     
@@ -266,14 +390,15 @@ function DebuffTracker:ApplyAutoDetect()
             changed = true
         end
         
-        -- Within category, enable debuffs whose class is present, disable others
+        -- Within category, enable debuffs whose class+spec is available, disable others
         if not DebuffTrackerDB.trackedDebuffs[category.name] then
             DebuffTrackerDB.trackedDebuffs[category.name] = {}
         end
         for _, debuff in ipairs(category.debuffs) do
-            local classPresent = self:IsClassInRaid(debuff.class)
-            if DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] ~= classPresent then
-                DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] = classPresent
+            local status = self:GetDebuffAvailability(debuff)
+            local shouldEnable = (status == "confirmed" or status == "unconfirmed")
+            if DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] ~= shouldEnable then
+                DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] = shouldEnable
                 changed = true
             end
         end
@@ -289,21 +414,107 @@ function DebuffTracker:ApplyAutoDetect()
     end
 end
 
--- Get a summary string of detected classes
+-- Get a summary string of detected classes + specs
 function DebuffTracker:GetRaidCompositionString()
-    local classes = {}
+    local parts = {}
     for class, count in pairs(raidClasses) do
         local color = RAID_CLASS_COLORS[class]
-        if color then
-            table.insert(classes, "|cFF" .. string.format("%02x%02x%02x", color.r*255, color.g*255, color.b*255) 
-                .. class .. "|r(" .. count .. ")")
+        local hex = color and string.format("%02x%02x%02x", color.r*255, color.g*255, color.b*255) or "ffffff"
+        
+        -- Append detected specs
+        local specStr = ""
+        if raidSpecs[class] then
+            local specParts = {}
+            for spec, scount in pairs(raidSpecs[class]) do
+                table.insert(specParts, spec .. ":" .. scount)
+            end
+            if #specParts > 0 then
+                specStr = " [" .. table.concat(specParts, ",") .. "]"
+            end
+        end
+        
+        table.insert(parts, "|cFF" .. hex .. class .. "|r(" .. count .. ")" .. specStr)
+    end
+    table.sort(parts)
+    if #parts == 0 then return "None detected" end
+    return table.concat(parts, ", ")
+end
+
+-- ============================================
+-- MISSING DEBUFF RAID ALERTS
+-- ============================================
+
+function DebuffTracker:SendAlert(categoryName, debuffNames)
+    local channel = nil
+    
+    -- Determine best channel
+    if IsInRaid() then
+        -- Use RAID_WARNING if we have assist, otherwise RAID
+        if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
+            channel = "RAID_WARNING"
         else
-            table.insert(classes, class .. "(" .. count .. ")")
+            channel = "RAID"
+        end
+    elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
+        channel = "PARTY"
+    end
+    
+    if not channel then return end
+    
+    local msg = "[WM] Missing: " .. categoryName
+    if debuffNames and debuffNames ~= "" then
+        msg = msg .. " (" .. debuffNames .. ")"
+    end
+    
+    SendChatMessage(msg, channel)
+    alertCooldowns[categoryName] = GetTime()
+end
+
+function DebuffTracker:CheckAlerts(unit)
+    if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
+    if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
+    
+    -- Only alert on boss if setting is on
+    if DebuffTrackerDB.alertOnlyOnBoss and not IsBossUnit(unit) then
+        -- Clear timers when not on boss
+        missingTimers = {}
+        return
+    end
+    
+    local now = GetTime()
+    local delay = DebuffTrackerDB.alertDelay or 5
+    local cooldown = DebuffTrackerDB.alertCooldown or 30
+    
+    for _, catFrame in ipairs(categoryFrames) do
+        local category = catFrame.category
+        if DebuffTrackerDB.trackedCategories[category.name] then
+            if catFrame.currentDebuff then
+                -- Debuff present - reset timer
+                missingTimers[category.name] = nil
+            else
+                -- Debuff missing
+                if not missingTimers[category.name] then
+                    -- Start timer
+                    missingTimers[category.name] = now
+                elseif (now - missingTimers[category.name]) >= delay then
+                    -- Been missing long enough - check cooldown
+                    if not alertCooldowns[category.name] or (now - alertCooldowns[category.name]) >= cooldown then
+                        -- Build list of expected debuff names for the alert
+                        local names = {}
+                        local debuffToggles = DebuffTrackerDB.trackedDebuffs[category.name]
+                        for _, debuff in ipairs(category.debuffs) do
+                            if not debuffToggles or debuffToggles[debuff.name] ~= false then
+                                table.insert(names, debuff.name)
+                            end
+                        end
+                        self:SendAlert(category.name, table.concat(names, "/"))
+                        -- Reset the missing timer so it has to be missing another full delay
+                        missingTimers[category.name] = now
+                    end
+                end
+            end
         end
     end
-    table.sort(classes)
-    if #classes == 0 then return "None detected" end
-    return table.concat(classes, ", ")
 end
 
 -- ============================================
@@ -359,6 +570,19 @@ function DebuffTracker:InitDB()
     -- Ensure autoDetect exists for existing installs
     if DebuffTrackerDB.autoDetect == nil then
         DebuffTrackerDB.autoDetect = true
+    end
+    -- Ensure alert settings exist for existing installs
+    if DebuffTrackerDB.raidAlerts == nil then
+        DebuffTrackerDB.raidAlerts = false
+    end
+    if DebuffTrackerDB.alertDelay == nil then
+        DebuffTrackerDB.alertDelay = 5
+    end
+    if DebuffTrackerDB.alertCooldown == nil then
+        DebuffTrackerDB.alertCooldown = 30
+    end
+    if DebuffTrackerDB.alertOnlyOnBoss == nil then
+        DebuffTrackerDB.alertOnlyOnBoss = true
     end
 end
 
@@ -658,13 +882,21 @@ function DebuffTracker:CreateTrackerFrame()
     -- Update handler
     frame:SetScript("OnUpdate", function(self, elapsed)
         updateTimer = updateTimer + elapsed
+        specScanTimer = specScanTimer + elapsed
+        
         if updateTimer >= UPDATE_INTERVAL then
             updateTimer = 0
-            -- Process pending raid scan
+            -- Process pending raid scan (class-level, fast)
             if raidScanDirty then
                 DebuffTracker:ScanRaidComposition()
             end
             DebuffTracker:UpdateDebuffs()
+        end
+        
+        -- Periodic spec scan (buff-based, slower interval)
+        if specScanTimer >= SPEC_SCAN_INTERVAL then
+            specScanTimer = 0
+            DebuffTracker:ScanRaidComposition()  -- Also re-scans specs
         end
     end)
     
@@ -758,23 +990,30 @@ function DebuffTracker:CreateCategoryIndicators(container)
             for _, d in ipairs(sorted) do
                 local isEnabled = not debuffToggles or debuffToggles[d.name] ~= false
                 local classColor = RAID_CLASS_COLORS[d.class] or {r=1, g=1, b=1}
-                local inRaid = DebuffTracker:IsClassInRaid(d.class)
+                local availability = DebuffTracker:GetDebuffAvailability(d)
                 
                 local prefix
                 if not isEnabled then
                     prefix = "|cFF666666[OFF]|r "
-                elseif inRaid then
-                    prefix = "|cFF00FF00[ON]|r "
+                elseif availability == "confirmed" then
+                    prefix = "|cFF00FF00[OK]|r "
+                elseif availability == "unconfirmed" then
+                    prefix = "|cFFFFFF00[?]|r "
                 else
-                    prefix = "|cFFFF8800[NO " .. d.class .. "]|r "
+                    prefix = "|cFFFF4444[NO]|r "
                 end
                 
-                if isEnabled and inRaid then
-                    GameTooltip:AddLine(prefix .. d.name, classColor.r, classColor.g, classColor.b)
+                -- Build spec label
+                local specLabel = d.spec and (" |cFFAAAAAA(" .. d.spec .. " " .. d.class .. ")|r") or (" |cFFAAAAAA(" .. d.class .. ")|r")
+                
+                if isEnabled and availability == "confirmed" then
+                    GameTooltip:AddLine(prefix .. d.name .. specLabel, classColor.r, classColor.g, classColor.b)
+                elseif isEnabled and availability == "unconfirmed" then
+                    GameTooltip:AddLine(prefix .. d.name .. specLabel, 0.8, 0.8, 0.3)
                 elseif isEnabled then
-                    GameTooltip:AddLine(prefix .. d.name, 0.6, 0.4, 0.1)
+                    GameTooltip:AddLine(prefix .. d.name .. specLabel, 0.6, 0.3, 0.1)
                 else
-                    GameTooltip:AddLine(prefix .. d.name, 0.4, 0.4, 0.4)
+                    GameTooltip:AddLine(prefix .. d.name .. specLabel, 0.4, 0.4, 0.4)
                 end
             end
             
@@ -929,6 +1168,8 @@ function DebuffTracker:UpdateDebuffs()
             catFrame.stackText:SetText("")
             catFrame.currentDebuff = nil
         end
+        -- Clear missing timers when no target
+        missingTimers = {}
         return
     end
     
@@ -975,6 +1216,9 @@ function DebuffTracker:UpdateDebuffs()
             end
         end
     end
+    
+    -- Check for missing debuff alerts
+    self:CheckAlerts(unit)
 end
 
 -- ============================================
@@ -1001,7 +1245,8 @@ function DebuffTracker:GetQuickStatus()
             end
         end
         local autoTag = DebuffTrackerDB.autoDetect and " |cFF88CCFF[Auto]|r" or ""
-        return "|cFF00FF00Active|r (" .. catCount .. " categories, " .. debuffCount .. "/" .. totalDebuffs .. " debuffs)" .. autoTag
+        local alertTag = DebuffTrackerDB.raidAlerts and " |cFFFFCC00[Alerts:" .. DebuffTrackerDB.alertDelay .. "s]|r" or ""
+        return "|cFF00FF00Active|r (" .. catCount .. " categories, " .. debuffCount .. "/" .. totalDebuffs .. " debuffs)" .. autoTag .. alertTag
     else
         return "|cFFFF0000Disabled|r"
     end
@@ -1017,7 +1262,7 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(380, 580)
+    frame:SetSize(420, 700)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1160,6 +1405,107 @@ function DebuffTracker:CreateUI()
     yOffset = yOffset - 8
     
     -- ========================================
+    -- RAID ALERT SECTION
+    -- ========================================
+    
+    local alertHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    alertHeader:SetPoint("TOPLEFT", 20, yOffset)
+    alertHeader:SetText("Missing Debuff Alerts:")
+    alertHeader:SetTextColor(unpack(theme.headerColor))
+    
+    yOffset = yOffset - 22
+    
+    -- Enable raid alerts checkbox
+    local alertCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    alertCB:SetPoint("TOPLEFT", 20, yOffset)
+    alertCB.Text:SetText("Send raid message when debuff missing")
+    alertCB:SetChecked(DebuffTrackerDB.raidAlerts)
+    alertCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.raidAlerts = self:GetChecked()
+    end)
+    
+    yOffset = yOffset - 22
+    
+    -- Boss only checkbox
+    local alertBossCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    alertBossCB:SetPoint("TOPLEFT", 35, yOffset)
+    alertBossCB.Text:SetText("Only on boss targets")
+    alertBossCB:SetChecked(DebuffTrackerDB.alertOnlyOnBoss)
+    alertBossCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.alertOnlyOnBoss = self:GetChecked()
+    end)
+    
+    yOffset = yOffset - 24
+    
+    -- Alert delay slider
+    local delayLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    delayLabel:SetPoint("TOPLEFT", 25, yOffset)
+    delayLabel:SetText("Delay before alert:")
+    
+    local delayValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    delayValue:SetPoint("LEFT", delayLabel, "RIGHT", 5, 0)
+    delayValue:SetText(DebuffTrackerDB.alertDelay .. "s")
+    
+    local delaySlider = CreateFrame("Slider", "WM_DebuffAlertDelaySlider", frame, "OptionsSliderTemplate")
+    delaySlider:SetPoint("TOPLEFT", 25, yOffset - 18)
+    delaySlider:SetSize(160, 16)
+    delaySlider:SetMinMaxValues(2, 15)
+    delaySlider:SetValueStep(1)
+    delaySlider:SetObeyStepOnDrag(true)
+    delaySlider:SetValue(DebuffTrackerDB.alertDelay)
+    delaySlider.Low:SetText("2s")
+    delaySlider.High:SetText("15s")
+    delaySlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value + 0.5)
+        DebuffTrackerDB.alertDelay = value
+        delayValue:SetText(value .. "s")
+    end)
+    
+    -- Alert cooldown slider
+    local cdLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    cdLabel:SetPoint("TOPLEFT", 200, yOffset)
+    cdLabel:SetText("Cooldown between alerts:")
+    
+    local cdValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cdValue:SetPoint("LEFT", cdLabel, "RIGHT", 5, 0)
+    cdValue:SetText(DebuffTrackerDB.alertCooldown .. "s")
+    
+    local cdSlider = CreateFrame("Slider", "WM_DebuffAlertCDSlider", frame, "OptionsSliderTemplate")
+    cdSlider:SetPoint("TOPLEFT", 200, yOffset - 18)
+    cdSlider:SetSize(140, 16)
+    cdSlider:SetMinMaxValues(10, 120)
+    cdSlider:SetValueStep(5)
+    cdSlider:SetObeyStepOnDrag(true)
+    cdSlider:SetValue(DebuffTrackerDB.alertCooldown)
+    cdSlider.Low:SetText("10s")
+    cdSlider.High:SetText("120s")
+    cdSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 5 + 0.5) * 5
+        DebuffTrackerDB.alertCooldown = value
+        cdValue:SetText(value .. "s")
+    end)
+    
+    yOffset = yOffset - 40
+    
+    -- Alert description
+    local alertDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    alertDesc:SetPoint("TOPLEFT", 25, yOffset)
+    alertDesc:SetWidth(340)
+    alertDesc:SetJustifyH("LEFT")
+    alertDesc:SetText("|cFF888888Uses /rw if you have assist, otherwise /raid. Only alerts for enabled categories.|r")
+    
+    yOffset = yOffset - 18
+    
+    -- Separator
+    local alertSep = frame:CreateTexture(nil, "ARTWORK")
+    alertSep:SetHeight(1)
+    alertSep:SetPoint("TOPLEFT", 15, yOffset)
+    alertSep:SetPoint("TOPRIGHT", -15, yOffset)
+    alertSep:SetColorTexture(unpack(theme.separatorColor))
+    
+    yOffset = yOffset - 8
+    
+    -- ========================================
     -- DEBUFF SELECTION SECTION
     -- ========================================
     
@@ -1234,14 +1580,24 @@ function DebuffTracker:CreateUI()
             local classColor = RAID_CLASS_COLORS[className] or {r=1, g=1, b=1}
             local classInRaid = DebuffTracker:IsClassInRaid(className)
             
-            -- Class label with raid presence indicator
+            -- Class label with raid presence and spec indicator
             local classLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             classLabel:SetPoint("TOPLEFT", 35, -scrollY)
             
             local raidTag = ""
             if DebuffTrackerDB.autoDetect then
                 if classInRaid then
-                    raidTag = " |cFF00FF00(" .. (raidClasses[className] or 0) .. " in raid)|r"
+                    local specStr = ""
+                    if raidSpecs[className] then
+                        local specParts = {}
+                        for spec, count in pairs(raidSpecs[className]) do
+                            table.insert(specParts, spec)
+                        end
+                        if #specParts > 0 then
+                            specStr = " - " .. table.concat(specParts, ", ")
+                        end
+                    end
+                    raidTag = " |cFF00FF00(" .. (raidClasses[className] or 0) .. " in raid" .. specStr .. ")|r"
                 else
                     raidTag = " |cFFFF4444(not in raid)|r"
                 end
@@ -1258,7 +1614,7 @@ function DebuffTracker:CreateUI()
                 
                 local debuffCB = CreateFrame("CheckButton", nil, wrapper, "InterfaceOptionsCheckButtonTemplate")
                 debuffCB:SetPoint("LEFT", wrapper, "LEFT", 0, 0)
-                debuffCB.Text:SetText(debuff.name .. " |cFF888888(P:" .. debuff.priority .. ")|r")
+                debuffCB.Text:SetText(debuff.name .. (debuff.spec and " |cFFAAAACC[" .. debuff.spec .. "]|r" or "") .. " |cFF888888(P:" .. debuff.priority .. ")|r")
                 debuffCB:SetChecked(DebuffTrackerDB.trackedDebuffs[category.name][debuff.name])
                 
                 table.insert(debuffCheckboxes[category.name], {
