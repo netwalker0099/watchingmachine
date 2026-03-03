@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.1 | Author: Robert
+Version 2.2 | Author: Robert
 
 ## Overview
 
@@ -44,31 +44,51 @@ Parse services channel for boost advertisements by dungeon.
 
 ### 5. Whisper Logs (WCL Lookup)
 Track whispers and quickly look up players on Warcraft Logs.
-- Generates Warcraft Logs URLs for each player
-- "Scan Raid/Party" button to add all group members
+- **Auto-detects your server** via GetRealmName() and injects it into WCL URLs
+- **Per-player realm tracking**: Cross-server whispers and group members get their correct server in the URL, not yours
+- Parses full "Player-Realm" format from whisper events and group roster
+- Generates correct classic.warcraftlogs.com URLs per region (US/EU/KR/TW/CN)
+- "Scan Raid/Party" button to add all group members with correct realms
+- Shows detected server in UI header, cross-server players tagged with realm name
+- Click to copy URL, right-click to remove
 
 ### 6. Guild Invite
 Auto-invite guild members to raid when they say the trigger word.
 - Responds to trigger word (default: "inv") in guild chat or whispers
 - Verifies guild membership before inviting
-- Auto-converts party to raid when party reaches 5 members
+- Auto-converts party to raid only when a 6th member is invited (won't convert legitimate 5-man parties)
 - Say "raid" or "raid convert" in party/guild to manually convert
+- TBC-compatible API calls with pcall protection (safe during arena/BG transitions)
 - Invite logging with timestamps
 
 ### 7. Debuff Tracker
-Visual raid debuff monitoring for raid leaders.
+Visual raid debuff monitoring with auto-detection and raid alerts.
 - Tracks important debuffs on your target with priority awareness
 - Shows visual indicators (green=present, red=missing, yellow=suboptimal)
 - Per-debuff selection: choose exactly which debuffs to track per category
-- **Armor Reduction**: Improved Expose Armor > Expose Armor > Sunder Armor > Faerie Fire
-- **Physical Damage**: Blood Frenzy, Savage Combat
-- **Shadow Damage**: Shadow Weaving, Curse of Elements
-- **Spell Hit**: Misery
-- **Fire Damage**: Improved Scorch, Curse of Elements
-- **Attack Speed**: Thunder Clap (Improved)
-- **AP Reduction**: Demoralizing Shout/Roar
-- **Healing Debuff**: Mortal Strike, Wound Poison
-- **Hunter's Mark**
+- **Raid Auto-Detection**: Scans raid roster for classes and talent specs
+  - Detects specs via persistent buffs (Shadowform, Moonkin Form, Leader of the Pack, Tree of Life, Trueshot Aura)
+  - Three-state availability: confirmed (green), unconfirmed (yellow, class present but spec unknown), absent (red)
+  - Auto-enables only debuff categories your raid can actually provide
+  - Auto-disables individual debuffs when their required class/spec is missing
+  - Re-scans on roster changes and every 5 seconds for spec buffs
+  - Manual override available (toggle auto-detect off for full manual control)
+- **Missing Debuff Raid Alerts**: Sends raid chat/warning when a tracked debuff is missing from a boss
+  - Configurable delay before alerting (2-15 seconds, default 5s)
+  - Configurable cooldown between repeat alerts (10-120 seconds, default 30s)
+  - Uses /rw with assist, /raid without
+  - Boss-only mode (on by default), alerts include expected debuff names
+  - Off by default, enable in settings
+- **Tracked Categories** (TBC-accurate, no WotLK abilities):
+  - **Armor Reduction**: Improved Expose Armor > Expose Armor > Sunder Armor > Faerie Fire
+  - **Physical Damage**: Blood Frenzy (Arms Warrior)
+  - **Shadow Damage**: Shadow Weaving (Shadow Priest), Curse of Elements
+  - **Spell Hit**: Misery (Shadow Priest)
+  - **Fire Damage**: Improved Scorch (Fire Mage), Curse of Elements
+  - **Attack Speed**: Improved Thunder Clap, Thunder Clap
+  - **AP Reduction**: Demoralizing Shout/Roar, Curse of Weakness
+  - **Healing Debuff**: Mortal Strike, Wound Poison, Aimed Shot (MM Hunter)
+  - **Hunter's Mark**
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 
@@ -170,6 +190,17 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.2
+- Debuff Tracker: raid composition auto-detection with talent spec awareness
+- Debuff Tracker: missing debuff raid alerts with configurable delay and cooldown
+- Debuff Tracker: removed WotLK abilities (Savage Combat, Infected Wounds)
+- Debuff Tracker: added spec requirements to debuff definitions (Shadow Priest, Arms Warrior, etc.)
+- Whisper Logs: auto-detects server, per-player realm tracking for correct WCL URLs
+- Whisper Logs: proper cross-server player support via "Player-Realm" parsing
+- Guild Invite: fixed C_PartyInfo retail API calls for TBC Classic (uses global ConvertToRaid/InviteUnit)
+- Guild Invite: auto-convert to raid now only triggers on 6th invite (won't break 5-man parties)
+- Guild Invite: pcall-protected group API calls (safe during arena/BG transitions)
 
 ### Version 2.1
 - Added PvP Enemy Tracker module (world PvP kill logging and proximity alerts)

@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local GuildInvite = {}
 WM:RegisterModule("GuildInvite", GuildInvite)
 
-GuildInvite.version = "2.0"
+GuildInvite.version = "2.2"
 
 -- ============================================
 -- TBC API COMPATIBILITY

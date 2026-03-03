@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local WhisperLogs = {}
 WM:RegisterModule("WhisperLogs", WhisperLogs)
 
-WhisperLogs.version = "2.1"
+WhisperLogs.version = "2.2"
 
 -- Configuration
 -- TBC Anniversary uses classic.warcraftlogs.com
