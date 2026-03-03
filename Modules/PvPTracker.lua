@@ -25,6 +25,11 @@ local defaults = {
     syncAnnounce = true,     -- Show sync messages in chat
     syncOnLogin = true,      -- Auto-request sync from guild on login
     announceRevenge = true,  -- Announce revenge kills to guild chat
+    -- Leaderboard settings
+    leaderboard = {},        -- leaderboard["PlayerName"] = { points=N, lastUpdate=time }
+    myKOSKills = 0,          -- Local player's KOS kill count (= points)
+    leaderboardEnabled = false, -- Enable leaderboard tracking (off by default)
+    leaderboardAnnounce = "off", -- "off", "hourly", "onchange"
 }
 
 -- State
@@ -57,6 +62,12 @@ local SYNC_REQUEST_COOLDOWN = 300   -- 5 minutes between full sync requests
 local lastHelloTime = 0
 local HELLO_COOLDOWN = 60           -- Don't send hello more than once per minute
 local peerSyncTimestamps = {}       -- peerSyncTimestamps["Player"] = time of last full sync from them
+
+-- Leaderboard state
+local lastLeader = nil              -- Name of the current top player
+local lastAnnounceTime = 0          -- Timestamp of last hourly announcement
+local ANNOUNCE_INTERVAL = 3600      -- 1 hour between periodic announcements
+local leaderboardFrame = nil        -- Leaderboard UI frame
 
 -- Compat: TBC uses C_ChatInfo, older Classic uses globals
 local function SafeSendAddonMessage(prefix, message, chatType, target)
@@ -199,7 +210,8 @@ function PvPTracker:SendHello()
     lastHelloTime = now
     
     local count = self:GetEnemyCount()
-    local msg = "H" .. FIELD_SEP .. count .. FIELD_SEP .. SYNC_VERSION
+    local points = PvPTrackerDB.myKOSKills or 0
+    local msg = "H" .. FIELD_SEP .. count .. FIELD_SEP .. SYNC_VERSION .. FIELD_SEP .. points
     SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
 end
 
@@ -431,10 +443,23 @@ function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
         self:SendFullSync()
         
     elseif msgType == "H" and #parts >= 2 then
-        -- Hello: peer logged in with N enemies
+        -- Hello: peer logged in with N enemies (optionally with points)
         local peerCount = tonumber(parts[2]) or 0
+        local peerPoints = tonumber(parts[4]) or 0  -- H:count:version:points
         if PvPTrackerDB.syncAnnounce then
-            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " online (" .. peerCount .. " enemies)")
+            local pointStr = ""
+            if peerPoints > 0 and PvPTrackerDB.leaderboardEnabled then
+                pointStr = ", " .. peerPoints .. " KOS pts"
+            end
+            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " online (" .. peerCount .. " enemies" .. pointStr .. ")")
+        end
+        -- Update leaderboard from hello
+        if peerPoints > 0 and PvPTrackerDB.leaderboardEnabled then
+            if not PvPTrackerDB.leaderboard then PvPTrackerDB.leaderboard = {} end
+            local prev = PvPTrackerDB.leaderboard[senderName]
+            if not prev or peerPoints > (prev.points or 0) then
+                PvPTrackerDB.leaderboard[senderName] = { points = peerPoints, lastUpdate = time() }
+            end
         end
         
     elseif msgType == "V" and #parts >= 3 then
@@ -445,6 +470,12 @@ function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
         local enemy = PvPTrackerDB.enemies and PvPTrackerDB.enemies[enemyName]
         local colorCode = (enemy and CLASS_COLORS[enemy.class]) or "FF3333"
         self:Print("|cFF00FF00REVENGE!|r " .. senderName .. " slew |cFF" .. colorCode .. enemyName .. "|r! " .. avengeText)
+        
+    elseif msgType == "L" and #parts >= 2 then
+        -- Leaderboard: L:Points:EnemyName
+        local points = parts[2]
+        local enemyName = (#parts >= 3) and UnescapeField(parts[3]) or ""
+        self:HandlePointsBroadcast(senderName, points, enemyName)
     end
 end
 
@@ -480,6 +511,10 @@ function PvPTracker:InitDB()
     if PvPTrackerDB.syncAnnounce == nil then PvPTrackerDB.syncAnnounce = true end
     if PvPTrackerDB.syncOnLogin == nil then PvPTrackerDB.syncOnLogin = true end
     if PvPTrackerDB.announceRevenge == nil then PvPTrackerDB.announceRevenge = true end
+    if PvPTrackerDB.leaderboard == nil then PvPTrackerDB.leaderboard = {} end
+    if PvPTrackerDB.myKOSKills == nil then PvPTrackerDB.myKOSKills = 0 end
+    if PvPTrackerDB.leaderboardEnabled == nil then PvPTrackerDB.leaderboardEnabled = false end
+    if PvPTrackerDB.leaderboardAnnounce == nil then PvPTrackerDB.leaderboardAnnounce = "off" end
 end
 
 -- Register addon message prefix and sync event handler
@@ -498,6 +533,13 @@ function PvPTracker:RegisterSync()
         -- Queue processor on OnUpdate
         syncFrame:SetScript("OnUpdate", function(self, elapsed)
             ProcessQueue(elapsed)
+            -- Periodic leaderboard announce
+            if PvPTrackerDB and PvPTrackerDB.leaderboardEnabled then
+                local now = GetTime()
+                if now - lastAnnounceTime >= ANNOUNCE_INTERVAL then
+                    pcall(PvPTracker.CheckPeriodicAnnounce, PvPTracker)
+                end
+            end
         end)
     end
     
@@ -521,6 +563,9 @@ function PvPTracker:Initialize()
     playerGUID = UnitGUID("player")
     self:RegisterEvents()
     self:RegisterSync()
+    -- Init leaderboard state
+    lastLeader = self:GetLeader()
+    lastAnnounceTime = GetTime()  -- Don't announce immediately on login
     self:Print("Loaded. Tracking " .. self:GetEnemyCount() .. " enemies.")
 end
 
@@ -547,10 +592,20 @@ function PvPTracker:GetQuickStatus()
     local count = self:GetEnemyCount()
     local nearby = 0
     for _ in pairs(detectedEnemies) do nearby = nearby + 1 end
+    local base
     if nearby > 0 then
-        return "|cFFFF3333Active|r (" .. count .. " enemies, |cFFFF0000" .. nearby .. " nearby!|r)"
+        base = "|cFFFF3333Active|r (" .. count .. " enemies, |cFFFF0000" .. nearby .. " nearby!|r)"
+    else
+        base = "|cFF00FF00Active|r (" .. count .. " enemies tracked)"
     end
-    return "|cFF00FF00Active|r (" .. count .. " enemies tracked)"
+    -- Append leaderboard info if enabled
+    if PvPTrackerDB.leaderboardEnabled and PvPTrackerDB.guildSync then
+        local pts = PvPTrackerDB.myKOSKills or 0
+        if pts > 0 then
+            base = base .. " |cFFFFCC00[" .. pts .. " pts]|r"
+        end
+    end
+    return base
 end
 
 -- Check if player is in a battleground or arena
@@ -804,23 +859,202 @@ end
 
 local revengeThrottle = {}  -- Prevent double-fire from PARTY_KILL + UNIT_DIED
 
-function PvPTracker:CheckRevengeKill(enemyName)
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
-    if not PvPTrackerDB.announceRevenge then return end
+function PvPTracker:CheckKOSKill(enemyName)
+    if not PvPTrackerDB then return end
     if not enemyName then return end
     
-    -- Throttle: don't announce same enemy twice within 5 seconds
+    -- Throttle: don't process same enemy twice within 5 seconds
     local now = GetTime()
     if revengeThrottle[enemyName] and (now - revengeThrottle[enemyName]) < 5 then return end
     revengeThrottle[enemyName] = now
     
-    -- Check if enemy is on KOS list with guild reporters
+    -- Must be on the KOS list
     local enemy = PvPTrackerDB.enemies and PvPTrackerDB.enemies[enemyName]
     if not enemy then return end
-    if not enemy.guildKills or not next(enemy.guildKills) then return end
     
-    -- Has guild reporters — this is a revenge kill!
-    self:AnnounceRevenge(enemyName)
+    -- Award leaderboard point (always, if leaderboard enabled)
+    if PvPTrackerDB.leaderboardEnabled and PvPTrackerDB.guildSync then
+        self:AwardKOSPoint(enemyName)
+    end
+    
+    -- Check revenge (only if guild reporters exist)
+    if PvPTrackerDB.guildSync and PvPTrackerDB.announceRevenge then
+        if enemy.guildKills and next(enemy.guildKills) then
+            self:AnnounceRevenge(enemyName)
+        end
+    end
+end
+
+-- ============================================
+-- LEADERBOARD SYSTEM
+-- ============================================
+
+-- Get sorted leaderboard: { {name, points, lastUpdate}, ... }
+function PvPTracker:GetSortedLeaderboard()
+    if not PvPTrackerDB or not PvPTrackerDB.leaderboard then return {} end
+    
+    local board = {}
+    
+    -- Include ourselves
+    local myPoints = PvPTrackerDB.myKOSKills or 0
+    if myPoints > 0 and playerName then
+        board[playerName] = { points = myPoints, lastUpdate = time() }
+    end
+    
+    -- Merge guild data (take higher of local vs synced for ourselves, use synced for others)
+    for name, data in pairs(PvPTrackerDB.leaderboard) do
+        if name == playerName then
+            -- For ourselves, use the higher value
+            if data.points and data.points > (myPoints or 0) then
+                board[name] = { points = data.points, lastUpdate = data.lastUpdate or 0 }
+            end
+        else
+            if data.points and data.points > 0 then
+                board[name] = { points = data.points, lastUpdate = data.lastUpdate or 0 }
+            end
+        end
+    end
+    
+    -- Convert to sorted array
+    local sorted = {}
+    for name, data in pairs(board) do
+        table.insert(sorted, { name = name, points = data.points, lastUpdate = data.lastUpdate })
+    end
+    table.sort(sorted, function(a, b)
+        if a.points ~= b.points then return a.points > b.points end
+        return (a.lastUpdate or 0) < (b.lastUpdate or 0)  -- Tie: whoever got there first
+    end)
+    
+    return sorted
+end
+
+-- Get the current leader name and points
+function PvPTracker:GetLeader()
+    local board = self:GetSortedLeaderboard()
+    if #board > 0 then
+        return board[1].name, board[1].points
+    end
+    return nil, 0
+end
+
+-- Award a point for killing a KOS enemy
+function PvPTracker:AwardKOSPoint(enemyName)
+    PvPTrackerDB.myKOSKills = (PvPTrackerDB.myKOSKills or 0) + 1
+    local points = PvPTrackerDB.myKOSKills
+    
+    -- Update ourselves in leaderboard
+    if not PvPTrackerDB.leaderboard then PvPTrackerDB.leaderboard = {} end
+    PvPTrackerDB.leaderboard[playerName] = {
+        points = points,
+        lastUpdate = time(),
+    }
+    
+    -- Local feedback
+    self:Print("|cFFFFCC00+1 KOS Point!|r (" .. points .. " total) — killed " .. enemyName)
+    
+    -- Broadcast to guild
+    self:BroadcastPoints(points, enemyName)
+    
+    -- Check if leadership changed
+    self:CheckLeaderChange()
+    
+    -- Refresh leaderboard UI if open
+    if leaderboardFrame and leaderboardFrame:IsShown() then
+        self:RefreshLeaderboard()
+    end
+end
+
+-- Broadcast our points to guild
+function PvPTracker:BroadcastPoints(points, enemyName)
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    
+    local msg = "L" .. FIELD_SEP .. (points or 0) .. FIELD_SEP .. EscapeField(enemyName or "")
+    SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+end
+
+-- Handle received leaderboard broadcast
+function PvPTracker:HandlePointsBroadcast(senderName, points, enemyName)
+    if senderName == playerName then return end
+    if not PvPTrackerDB.leaderboardEnabled then return end
+    
+    points = tonumber(points) or 0
+    if points <= 0 then return end
+    
+    if not PvPTrackerDB.leaderboard then PvPTrackerDB.leaderboard = {} end
+    
+    local prev = PvPTrackerDB.leaderboard[senderName]
+    local prevPoints = prev and prev.points or 0
+    
+    -- Only update if higher (monotonically increasing)
+    if points > prevPoints then
+        PvPTrackerDB.leaderboard[senderName] = {
+            points = points,
+            lastUpdate = time(),
+        }
+        
+        if PvPTrackerDB.syncAnnounce and enemyName and enemyName ~= "" then
+            self:Print("|cFFFFCC00[Leaderboard]|r " .. senderName .. " scored a KOS kill (" .. enemyName .. ") — " .. points .. " pts")
+        end
+        
+        -- Check if this changed the leader
+        self:CheckLeaderChange()
+        
+        -- Refresh leaderboard UI if open
+        if leaderboardFrame and leaderboardFrame:IsShown() then
+            self:RefreshLeaderboard()
+        end
+    end
+end
+
+-- Check if the top leader changed and announce if configured
+function PvPTracker:CheckLeaderChange()
+    if not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
+    if not PvPTrackerDB.guildSync then return end
+    
+    local newLeader, newPoints = self:GetLeader()
+    if not newLeader or newPoints <= 0 then return end
+    
+    if PvPTrackerDB.leaderboardAnnounce == "onchange" then
+        if lastLeader and newLeader ~= lastLeader and newPoints > 0 then
+            -- Leadership changed hands
+            local chatMsg = "[WM] New KOS Leaderboard Leader: " .. newLeader .. " with " .. newPoints .. " points!"
+            if IsInGuild() then
+                pcall(SendChatMessage, chatMsg, "GUILD")
+            end
+            self:Print("|cFFFFCC00[Leaderboard]|r " .. newLeader .. " takes the lead with " .. newPoints .. " points!")
+        end
+    end
+    
+    lastLeader = newLeader
+end
+
+-- Periodic announcement (called from timer)
+function PvPTracker:CheckPeriodicAnnounce()
+    if not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
+    if not PvPTrackerDB.guildSync then return end
+    if PvPTrackerDB.leaderboardAnnounce ~= "hourly" then return end
+    
+    local now = GetTime()
+    if now - lastAnnounceTime < ANNOUNCE_INTERVAL then return end
+    lastAnnounceTime = now
+    
+    local leader, points = self:GetLeader()
+    if not leader or points <= 0 then return end
+    
+    -- Build top 3
+    local board = self:GetSortedLeaderboard()
+    local top = {}
+    for i = 1, math.min(3, #board) do
+        table.insert(top, board[i].name .. "(" .. board[i].points .. ")")
+    end
+    
+    if #top == 0 then return end
+    
+    local chatMsg = "[WM] KOS Leaderboard — " .. table.concat(top, ", ")
+    if IsInGuild() then
+        pcall(SendChatMessage, chatMsg, "GUILD")
+    end
 end
 
 -- ============================================
@@ -899,14 +1133,14 @@ function PvPTracker:ProcessCombatLog()
     -- Detect PARTY_KILL where we are the killer (works in groups)
     if subevent == "PARTY_KILL" and sourceGUID == playerGUID then
         if destName and IsHostilePlayer(destFlags) then
-            self:CheckRevengeKill(destName)
+            self:CheckKOSKill(destName)
         end
     end
     
     -- Detect UNIT_DIED for hostile players we recently damaged (works solo)
     if subevent == "UNIT_DIED" and destName and destGUID ~= playerGUID then
         if lastDamageDealt[destName] and (GetTime() - lastDamageDealt[destName].time) < 5 then
-            self:CheckRevengeKill(destName)
+            self:CheckKOSKill(destName)
             lastDamageDealt[destName] = nil
         end
     end
@@ -1001,7 +1235,7 @@ function PvPTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local frame = CreateFrame("Frame", "WM_PvPTrackerFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(450, 680)
+    frame:SetSize(450, 780)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1173,6 +1407,154 @@ function PvPTracker:CreateUI()
     revengeCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
     yOffset = yOffset - 28
+    
+    -- ==========================================
+    -- LEADERBOARD SECTION
+    -- ==========================================
+    local lbLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lbLabel:SetPoint("TOPLEFT", 15, yOffset)
+    lbLabel:SetText("KOS Leaderboard")
+    lbLabel:SetTextColor(unpack(theme.headerColor))
+    
+    yOffset = yOffset - 20
+    
+    local lbEnableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    lbEnableCB:SetPoint("TOPLEFT", 15, yOffset)
+    lbEnableCB.Text:SetText("Enable point tracking")
+    lbEnableCB:SetChecked(PvPTrackerDB.leaderboardEnabled)
+    lbEnableCB:SetScript("OnClick", function(self)
+        PvPTrackerDB.leaderboardEnabled = self:GetChecked()
+    end)
+    lbEnableCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("KOS Leaderboard", 1, 0.8, 0)
+        GameTooltip:AddLine("Earn 1 point for each KOS-listed enemy you", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("kill. Points are synced with guild members", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("running WatchingMachine.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    lbEnableCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    -- Announce mode dropdown-like buttons
+    local announceLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    announceLabel:SetPoint("TOPLEFT", 220, yOffset - 2)
+    announceLabel:SetText("|cFF888888Announce:|r")
+    
+    local currentMode = PvPTrackerDB.leaderboardAnnounce or "off"
+    
+    local modeOffBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    modeOffBtn:SetSize(32, 18)
+    modeOffBtn:SetPoint("LEFT", announceLabel, "RIGHT", 5, 0)
+    modeOffBtn:SetText("Off")
+    
+    local modeHourlyBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    modeHourlyBtn:SetSize(48, 18)
+    modeHourlyBtn:SetPoint("LEFT", modeOffBtn, "RIGHT", 2, 0)
+    modeHourlyBtn:SetText("Hourly")
+    
+    local modeChangeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    modeChangeBtn:SetSize(60, 18)
+    modeChangeBtn:SetPoint("LEFT", modeHourlyBtn, "RIGHT", 2, 0)
+    modeChangeBtn:SetText("On Lead")
+    
+    -- Highlight active mode
+    local function UpdateModeButtons()
+        local mode = PvPTrackerDB.leaderboardAnnounce or "off"
+        modeOffBtn:SetText(mode == "off" and "|cFF00FF00Off|r" or "Off")
+        modeHourlyBtn:SetText(mode == "hourly" and "|cFF00FF00Hourly|r" or "Hourly")
+        modeChangeBtn:SetText(mode == "onchange" and "|cFF00FF00On Lead|r" or "On Lead")
+    end
+    
+    modeOffBtn:SetScript("OnClick", function()
+        PvPTrackerDB.leaderboardAnnounce = "off"
+        UpdateModeButtons()
+    end)
+    modeHourlyBtn:SetScript("OnClick", function()
+        PvPTrackerDB.leaderboardAnnounce = "hourly"
+        lastAnnounceTime = GetTime()  -- Reset timer from now
+        UpdateModeButtons()
+    end)
+    modeHourlyBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Hourly Announce", 1, 0.8, 0)
+        GameTooltip:AddLine("Posts the top 3 to guild chat once per hour.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    modeHourlyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    modeChangeBtn:SetScript("OnClick", function()
+        PvPTrackerDB.leaderboardAnnounce = "onchange"
+        UpdateModeButtons()
+    end)
+    modeChangeBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("On Lead Change", 1, 0.8, 0)
+        GameTooltip:AddLine("Posts to guild chat when a new player takes", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("the #1 spot on the leaderboard.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    modeChangeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    UpdateModeButtons()
+    
+    yOffset = yOffset - 24
+    
+    -- Open leaderboard button
+    local lbOpenBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    lbOpenBtn:SetSize(110, 20)
+    lbOpenBtn:SetPoint("TOPLEFT", 15, yOffset)
+    lbOpenBtn:SetText("Show Leaderboard")
+    lbOpenBtn:SetScript("OnClick", function()
+        PvPTracker:ToggleLeaderboard()
+    end)
+    
+    -- My points display
+    local myPointsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    myPointsText:SetPoint("LEFT", lbOpenBtn, "RIGHT", 10, 0)
+    local pts = PvPTrackerDB.myKOSKills or 0
+    myPointsText:SetText("|cFFFFCC00Your Points: " .. pts .. "|r")
+    frame.myPointsText = myPointsText
+    
+    -- Reset points button
+    local lbResetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    lbResetBtn:SetSize(50, 20)
+    lbResetBtn:SetPoint("RIGHT", frame, "TOPRIGHT", -15, yOffset)
+    lbResetBtn:SetText("Reset")
+    lbResetBtn:SetScript("OnClick", function()
+        if lbResetBtn._confirm then
+            PvPTrackerDB.myKOSKills = 0
+            PvPTrackerDB.leaderboard = {}
+            lastLeader = nil
+            if frame.myPointsText then
+                frame.myPointsText:SetText("|cFFFFCC00Your Points: 0|r")
+            end
+            if leaderboardFrame and leaderboardFrame:IsShown() then
+                PvPTracker:RefreshLeaderboard()
+            end
+            PvPTracker:Print("Leaderboard reset.")
+            lbResetBtn:SetText("Reset")
+            lbResetBtn._confirm = false
+        else
+            lbResetBtn:SetText("|cFFFF0000Sure?|r")
+            lbResetBtn._confirm = true
+            WM.RunAfter(3, function()
+                if lbResetBtn._confirm then
+                    lbResetBtn:SetText("Reset")
+                    lbResetBtn._confirm = false
+                end
+            end)
+        end
+    end)
+    lbResetBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Reset Leaderboard", 1, 0.3, 0.3)
+        GameTooltip:AddLine("Clears all leaderboard data including your", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("own points and all synced guild data.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    lbResetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    yOffset = yOffset - 28
+    
+    -- Add enemy manually
     local addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     addLabel:SetPoint("TOPLEFT", 15, yOffset)
     addLabel:SetText("Add to KOS:")
@@ -1365,6 +1747,12 @@ function PvPTracker:RefreshList()
         end
     end
     
+    -- Update points display
+    if mainFrame.myPointsText then
+        local pts = PvPTrackerDB.myKOSKills or 0
+        mainFrame.myPointsText:SetText("|cFFFFCC00Your Points: " .. pts .. "|r")
+    end
+    
     local rowHeight = 22
     local scrollY = 0
     
@@ -1492,6 +1880,186 @@ function PvPTracker:RefreshList()
     end
     
     scrollChild:SetHeight(scrollY + 10)
+end
+
+-- ============================================
+-- LEADERBOARD WINDOW
+-- ============================================
+
+function PvPTracker:CreateLeaderboard()
+    if leaderboardFrame then return leaderboardFrame end
+    
+    local lbf = CreateFrame("Frame", "WM_PvPLeaderboardFrame", UIParent, "BackdropTemplate")
+    lbf:SetSize(280, 340)
+    lbf:SetPoint("CENTER", 250, 0)
+    lbf:SetMovable(true)
+    lbf:EnableMouse(true)
+    lbf:SetClampedToScreen(true)
+    lbf:RegisterForDrag("LeftButton")
+    lbf:SetScript("OnDragStart", lbf.StartMoving)
+    lbf:SetScript("OnDragStop", lbf.StopMovingOrSizing)
+    lbf:SetFrameStrata("DIALOG")
+    lbf:Hide()
+    
+    WM:SkinPanel(lbf)
+    WM:RegisterSkinnedPanel(lbf)
+    
+    local theme = WM:GetTheme()
+    
+    -- Title
+    local title = lbf:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", 0, -12)
+    title:SetText("KOS Leaderboard")
+    title:SetTextColor(1, 0.8, 0)
+    
+    -- Close button
+    local closeBtn = CreateFrame("Button", nil, lbf, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    
+    -- Subtitle: your rank
+    local subtitle = lbf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    subtitle:SetPoint("TOP", 0, -34)
+    lbf.subtitle = subtitle
+    
+    -- Scroll area
+    local scrollFrame = CreateFrame("ScrollFrame", "WM_PvPLeaderboardScroll", lbf, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 10, -52)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
+    
+    local scrollChild = CreateFrame("Frame")
+    scrollChild:SetSize(scrollFrame:GetWidth(), 1)
+    scrollFrame:SetScrollChild(scrollChild)
+    
+    lbf.scrollChild = scrollChild
+    lbf.scrollFrame = scrollFrame
+    lbf.rows = {}
+    
+    leaderboardFrame = lbf
+    return lbf
+end
+
+function PvPTracker:RefreshLeaderboard()
+    if not leaderboardFrame then return end
+    
+    local scrollChild = leaderboardFrame.scrollChild
+    
+    -- Clean old rows
+    if leaderboardFrame.rows then
+        for _, row in ipairs(leaderboardFrame.rows) do
+            row:Hide()
+            row:SetParent(nil)
+        end
+    end
+    leaderboardFrame.rows = {}
+    
+    local board = self:GetSortedLeaderboard()
+    local maxPoints = (board[1] and board[1].points) or 1
+    
+    -- Update subtitle
+    if leaderboardFrame.subtitle then
+        local myRank = "-"
+        local myPts = PvPTrackerDB.myKOSKills or 0
+        for i, entry in ipairs(board) do
+            if entry.name == playerName then
+                myRank = "#" .. i
+                break
+            end
+        end
+        if myPts > 0 then
+            leaderboardFrame.subtitle:SetText("|cFFCCCCCCYou: " .. myPts .. " pts (" .. myRank .. ")|r")
+        else
+            leaderboardFrame.subtitle:SetText("|cFF888888No points yet — kill KOS enemies!|r")
+        end
+    end
+    
+    local rowHeight = 24
+    local scrollY = 0
+    
+    for i, entry in ipairs(board) do
+        local row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
+        row:SetSize(scrollChild:GetWidth(), rowHeight)
+        row:SetPoint("TOPLEFT", 0, -scrollY)
+        
+        -- Rank medal coloring
+        local rankColor
+        if i == 1 then rankColor = "FFD700"      -- Gold
+        elseif i == 2 then rankColor = "C0C0C0"  -- Silver
+        elseif i == 3 then rankColor = "CD7F32"   -- Bronze
+        else rankColor = "888888"
+        end
+        
+        -- Rank number
+        local rankText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        rankText:SetPoint("LEFT", 5, 0)
+        rankText:SetWidth(22)
+        rankText:SetJustifyH("RIGHT")
+        rankText:SetText("|cFF" .. rankColor .. "#" .. i .. "|r")
+        
+        -- Player name
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        nameText:SetPoint("LEFT", 32, 0)
+        nameText:SetWidth(100)
+        nameText:SetJustifyH("LEFT")
+        local nameColor = (entry.name == playerName) and "00FF00" or "FFFFFF"
+        nameText:SetText("|cFF" .. nameColor .. entry.name .. "|r")
+        
+        -- Points bar background
+        local barBg = row:CreateTexture(nil, "ARTWORK")
+        barBg:SetPoint("LEFT", 138, 0)
+        barBg:SetSize(90, 12)
+        barBg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
+        
+        -- Points bar fill
+        local barWidth = math.max(2, (entry.points / maxPoints) * 90)
+        local barFill = row:CreateTexture(nil, "OVERLAY")
+        barFill:SetPoint("LEFT", 138, 0)
+        barFill:SetSize(barWidth, 12)
+        if i == 1 then
+            barFill:SetColorTexture(1, 0.84, 0, 0.8)  -- Gold
+        elseif entry.name == playerName then
+            barFill:SetColorTexture(0, 0.8, 0, 0.7)    -- Green for you
+        else
+            barFill:SetColorTexture(0.8, 0.3, 0.3, 0.7) -- Red
+        end
+        
+        -- Points number
+        local ptsText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        ptsText:SetPoint("LEFT", 232, 0)
+        ptsText:SetWidth(30)
+        ptsText:SetJustifyH("RIGHT")
+        ptsText:SetText("|cFF" .. rankColor .. entry.points .. "|r")
+        
+        table.insert(leaderboardFrame.rows, row)
+        scrollY = scrollY + rowHeight
+    end
+    
+    -- Empty state
+    if #board == 0 then
+        local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        emptyText:SetPoint("CENTER", scrollChild, "TOP", 0, -60)
+        emptyText:SetText("|cFF888888No points scored yet.\nKill enemies on the KOS list to earn points.\nEnable guild sync to see others.|r")
+        emptyText:SetJustifyH("CENTER")
+        
+        local emptyRow = CreateFrame("Frame", nil, scrollChild)
+        emptyRow:SetSize(1, 120)
+        emptyRow._emptyText = emptyText
+        table.insert(leaderboardFrame.rows, emptyRow)
+        scrollY = 120
+    end
+    
+    scrollChild:SetHeight(scrollY + 10)
+end
+
+function PvPTracker:ToggleLeaderboard()
+    if not leaderboardFrame then
+        self:CreateLeaderboard()
+    end
+    if leaderboardFrame:IsShown() then
+        leaderboardFrame:Hide()
+    else
+        self:RefreshLeaderboard()
+        leaderboardFrame:Show()
+    end
 end
 
 -- ============================================
