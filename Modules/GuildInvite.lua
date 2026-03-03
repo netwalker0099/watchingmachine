@@ -7,6 +7,30 @@ WM:RegisterModule("GuildInvite", GuildInvite)
 
 GuildInvite.version = "2.0"
 
+-- ============================================
+-- TBC API COMPATIBILITY
+-- ============================================
+-- TBC Classic uses global functions, retail uses C_PartyInfo namespace
+-- Wrap both with pcall for safety (e.g. post-arena state transitions)
+
+local function SafeInviteUnit(name)
+    local fn = InviteUnit or (C_PartyInfo and C_PartyInfo.InviteUnit)
+    if fn then
+        local ok, err = pcall(fn, name)
+        return ok
+    end
+    return false
+end
+
+local function SafeConvertToRaid()
+    local fn = ConvertToRaid or (C_PartyInfo and C_PartyInfo.ConvertToRaid)
+    if fn then
+        local ok, err = pcall(fn)
+        return ok
+    end
+    return false
+end
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -101,14 +125,15 @@ function GuildInvite:InviteToRaid(playerName, source)
             local numGroupMembers = GetNumGroupMembers()
             -- Convert to raid if party is at 5 members (full) or close to full
             if numGroupMembers >= 4 then
-                C_PartyInfo.ConvertToRaid()
-                self:Print("Auto-converted to raid (party full)")
+                if SafeConvertToRaid() then
+                    self:Print("Auto-converted to raid (party full)")
+                end
             end
         end
     end
     
-    -- Use TBC Anniversary API
-    C_PartyInfo.InviteUnit(playerName)
+    -- Invite the player
+    SafeInviteUnit(playerName)
     
     -- Log the invite
     self:LogInvite(playerName, source)
@@ -134,8 +159,11 @@ function GuildInvite:ConvertToRaid()
         return
     end
     
-    C_PartyInfo.ConvertToRaid()
-    self:Print("Converted to raid.")
+    if SafeConvertToRaid() then
+        self:Print("Converted to raid.")
+    else
+        self:Print("Failed to convert to raid.")
+    end
 end
 
 function GuildInvite:CheckConvertTrigger(message)
@@ -243,8 +271,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if IsInGroup() and not IsInRaid() and UnitIsGroupLeader("player") then
             local numGroupMembers = GetNumGroupMembers()
             if numGroupMembers >= 5 then
-                C_PartyInfo.ConvertToRaid()
-                GuildInvite:Print("Auto-converted to raid (party full)")
+                if SafeConvertToRaid() then
+                    GuildInvite:Print("Auto-converted to raid (party full)")
+                end
             end
         end
     end
