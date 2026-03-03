@@ -24,12 +24,14 @@ local defaults = {
     guildSync = false,       -- Enable guild sync (off by default)
     syncAnnounce = true,     -- Show sync messages in chat
     syncOnLogin = true,      -- Auto-request sync from guild on login
+    announceRevenge = true,  -- Announce revenge kills to guild chat
 }
 
 -- State
 local mainFrame = nil
 local eventFrame = nil
 local lastDamageSource = {}     -- Track who last hit us for kill attribution
+local lastDamageDealt = {}      -- Track who we last hit for revenge detection: lastDamageDealt["Name"] = { guid, time }
 local alertTimestamps = {}      -- alertTimestamps["Name"] = time of last alert
 local detectedEnemies = {}      -- Currently detected nearby enemies
 local scanTimer = 0
@@ -125,6 +127,52 @@ function PvPTracker:BroadcastKill(enemyName, enemyData)
     
     -- Kill broadcasts go immediately (high priority, single message)
     SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+end
+
+-- Announce a revenge kill to guild chat
+function PvPTracker:AnnounceRevenge(enemyName)
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not PvPTrackerDB.announceRevenge then return end
+    if not IsInGuild() then return end
+    
+    local enemy = PvPTrackerDB.enemies and PvPTrackerDB.enemies[enemyName]
+    if not enemy then return end
+    if not enemy.guildKills or not next(enemy.guildKills) then return end
+    
+    -- Build list of guildies who reported this enemy
+    local reporters = {}
+    for reporter, rdata in pairs(enemy.guildKills) do
+        if rdata.kills and rdata.kills > 0 then
+            table.insert(reporters, reporter)
+        end
+    end
+    
+    if #reporters == 0 then return end
+    
+    -- Build the avenge message
+    local avenged
+    if #reporters == 1 then
+        avenged = reporters[1] .. " has been avenged!"
+    elseif #reporters == 2 then
+        avenged = reporters[1] .. " and " .. reporters[2] .. " have been avenged!"
+    else
+        -- 3+: "A, B, and C have been avenged!"
+        local last = table.remove(reporters)
+        avenged = table.concat(reporters, ", ") .. ", and " .. last .. " have been avenged!"
+    end
+    
+    local chatMsg = playerName .. " has slain " .. enemyName .. "! " .. avenged
+    
+    -- Send as visible guild chat message
+    pcall(SendChatMessage, chatMsg, "GUILD")
+    
+    -- Also broadcast via addon message so other WM users see a formatted local alert
+    local addonMsg = "V" .. FIELD_SEP .. EscapeField(enemyName) .. FIELD_SEP .. EscapeField(avenged)
+    SafeSendAddonMessage(SYNC_PREFIX, addonMsg, "GUILD")
+    
+    -- Local feedback
+    local colorCode = CLASS_COLORS[enemy.class] or "FF3333"
+    self:Print("|cFF00FF00REVENGE!|r You slew |cFF" .. colorCode .. enemyName .. "|r! " .. avenged)
 end
 
 -- Send a single enemy record for bulk sync
@@ -388,6 +436,15 @@ function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
         if PvPTrackerDB.syncAnnounce then
             self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " online (" .. peerCount .. " enemies)")
         end
+        
+    elseif msgType == "V" and #parts >= 3 then
+        -- Vengeance: V:EnemyName:AvengeText
+        local enemyName = UnescapeField(parts[2])
+        local avengeText = UnescapeField(parts[3])
+        -- Show formatted revenge alert locally (the guild chat message is already visible)
+        local enemy = PvPTrackerDB.enemies and PvPTrackerDB.enemies[enemyName]
+        local colorCode = (enemy and CLASS_COLORS[enemy.class]) or "FF3333"
+        self:Print("|cFF00FF00REVENGE!|r " .. senderName .. " slew |cFF" .. colorCode .. enemyName .. "|r! " .. avengeText)
     end
 end
 
@@ -422,6 +479,7 @@ function PvPTracker:InitDB()
     if PvPTrackerDB.guildSync == nil then PvPTrackerDB.guildSync = false end
     if PvPTrackerDB.syncAnnounce == nil then PvPTrackerDB.syncAnnounce = true end
     if PvPTrackerDB.syncOnLogin == nil then PvPTrackerDB.syncOnLogin = true end
+    if PvPTrackerDB.announceRevenge == nil then PvPTrackerDB.announceRevenge = true end
 end
 
 -- Register addon message prefix and sync event handler
@@ -741,6 +799,31 @@ function PvPTracker:TriggerAlert(name, unit)
 end
 
 -- ============================================
+-- REVENGE KILL DETECTION
+-- ============================================
+
+local revengeThrottle = {}  -- Prevent double-fire from PARTY_KILL + UNIT_DIED
+
+function PvPTracker:CheckRevengeKill(enemyName)
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not PvPTrackerDB.announceRevenge then return end
+    if not enemyName then return end
+    
+    -- Throttle: don't announce same enemy twice within 5 seconds
+    local now = GetTime()
+    if revengeThrottle[enemyName] and (now - revengeThrottle[enemyName]) < 5 then return end
+    revengeThrottle[enemyName] = now
+    
+    -- Check if enemy is on KOS list with guild reporters
+    local enemy = PvPTrackerDB.enemies and PvPTrackerDB.enemies[enemyName]
+    if not enemy then return end
+    if not enemy.guildKills or not next(enemy.guildKills) then return end
+    
+    -- Has guild reporters — this is a revenge kill!
+    self:AnnounceRevenge(enemyName)
+end
+
+-- ============================================
 -- COMBAT LOG PROCESSING
 -- ============================================
 
@@ -796,6 +879,35 @@ function PvPTracker:ProcessCombatLog()
     if subevent == "PARTY_KILL" and destGUID == playerGUID then
         if sourceName and IsPlayerFlag(sourceFlags) then
             self:RecordKill(sourceName, sourceGUID)
+        end
+    end
+    
+    -- Track outgoing damage from us to hostile players (for revenge detection)
+    if sourceGUID and sourceGUID == playerGUID and destGUID and destName then
+        if IsHostilePlayer(destFlags) then
+            if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
+               subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
+               subevent == "SPELL_INSTAKILL" then
+                lastDamageDealt[destName] = {
+                    guid = destGUID,
+                    time = GetTime(),
+                }
+            end
+        end
+    end
+    
+    -- Detect PARTY_KILL where we are the killer (works in groups)
+    if subevent == "PARTY_KILL" and sourceGUID == playerGUID then
+        if destName and IsHostilePlayer(destFlags) then
+            self:CheckRevengeKill(destName)
+        end
+    end
+    
+    -- Detect UNIT_DIED for hostile players we recently damaged (works solo)
+    if subevent == "UNIT_DIED" and destName and destGUID ~= playerGUID then
+        if lastDamageDealt[destName] and (GetTime() - lastDamageDealt[destName].time) < 5 then
+            self:CheckRevengeKill(destName)
+            lastDamageDealt[destName] = nil
         end
     end
     
@@ -1042,6 +1154,23 @@ function PvPTracker:CreateUI()
     autoSyncCB:SetScript("OnClick", function(self)
         PvPTrackerDB.syncOnLogin = self:GetChecked()
     end)
+    
+    local revengeCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    revengeCB:SetPoint("TOPLEFT", 220, yOffset)
+    revengeCB.Text:SetText("Announce revenge kills")
+    revengeCB:SetChecked(PvPTrackerDB.announceRevenge ~= false)
+    revengeCB:SetScript("OnClick", function(self)
+        PvPTrackerDB.announceRevenge = self:GetChecked()
+    end)
+    revengeCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Announce Revenge Kills", 1, 0.8, 0)
+        GameTooltip:AddLine("When you kill someone on the KOS list who", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("was reported by a guildie, announce the", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("kill to guild chat as a revenge message.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    revengeCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
     yOffset = yOffset - 28
     local addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
