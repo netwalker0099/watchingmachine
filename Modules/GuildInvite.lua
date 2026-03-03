@@ -219,8 +219,19 @@ end
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if not GuildInviteDB or not GuildInviteDB.enabled then return end
     
+    -- Helper: check if sender is the player (ignore our own messages)
+    local function IsSelf(sender)
+        if not sender then return false end
+        local playerName = UnitName("player")
+        if not playerName then return false end
+        -- sender may be "Name" or "Name-Realm"
+        local senderName = sender:match("^([^%-]+)") or sender
+        return senderName == playerName
+    end
+    
     if event == "CHAT_MSG_GUILD" then
         local message, sender = ...
+        if IsSelf(sender) then return end
         if GuildInvite:CheckTrigger(message) then
             -- Guild chat - they're definitely in guild, invite directly
             GuildInvite:InviteToRaid(sender, "Guild")
@@ -231,6 +242,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         
     elseif event == "CHAT_MSG_WHISPER" then
         local message, sender = ...
+        if IsSelf(sender) then return end
         if GuildInvite:CheckTrigger(message) then
             -- Whisper - verify they're in guild first
             if GuildInvite:IsInGuild(sender) then
@@ -247,6 +259,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         
     elseif event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER" then
         local message, sender = ...
+        if IsSelf(sender) then return end
         -- Check for convert trigger in party chat
         if GuildInvite:CheckConvertTrigger(message) then
             GuildInvite:ConvertToRaid()
@@ -257,6 +270,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         
     elseif event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER" then
         local message, sender = ...
+        if IsSelf(sender) then return end
         -- Allow inv trigger from raid members who are in guild
         if GuildInvite:CheckTrigger(message) and GuildInvite:IsInGuild(sender) then
             GuildInvite:InviteToRaid(sender, "Raid")
