@@ -20,6 +20,10 @@ local defaults = {
     alertSoundFile = "Interface\\AddOns\\WatchingMachine\\alert.ogg",  -- fallback to default
     alertCooldown = 30,     -- seconds between repeated alerts for same player
     trackManualOnly = false, -- if true, only track manually added names
+    -- Guild sync settings
+    guildSync = false,       -- Enable guild sync (off by default)
+    syncAnnounce = true,     -- Show sync messages in chat
+    syncOnLogin = true,      -- Auto-request sync from guild on login
 }
 
 -- State
@@ -32,6 +36,360 @@ local scanTimer = 0
 local SCAN_INTERVAL = 1.0       -- Nameplate scan frequency
 local playerName = nil
 local playerGUID = nil
+
+-- ============================================
+-- GUILD SYNC: COMMS LAYER
+-- ============================================
+
+local SYNC_PREFIX = "WMPvP"         -- Addon message prefix (max 16 chars)
+local SYNC_VERSION = 1              -- Protocol version
+local FIELD_SEP = ":"               -- Field separator within messages
+
+-- Sync state
+local syncFrame = nil               -- Frame for CHAT_MSG_ADDON events
+local sendQueue = {}                -- Outbound message queue
+local sendTimer = 0
+local SEND_INTERVAL = 0.35          -- Seconds between queued messages (respect throttle)
+local lastSyncRequest = 0           -- Timestamp of last full sync request we sent
+local SYNC_REQUEST_COOLDOWN = 300   -- 5 minutes between full sync requests
+local lastHelloTime = 0
+local HELLO_COOLDOWN = 60           -- Don't send hello more than once per minute
+local peerSyncTimestamps = {}       -- peerSyncTimestamps["Player"] = time of last full sync from them
+
+-- Compat: TBC uses C_ChatInfo, older Classic uses globals
+local function SafeSendAddonMessage(prefix, message, chatType, target)
+    local fn = C_ChatInfo and C_ChatInfo.SendAddonMessage or SendAddonMessage
+    if fn then
+        local ok = pcall(fn, prefix, message, chatType, target)
+        return ok
+    end
+    return false
+end
+
+local function SafeRegisterPrefix(prefix)
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, prefix)
+    elseif RegisterAddonMessagePrefix then
+        pcall(RegisterAddonMessagePrefix, prefix)
+    end
+end
+
+-- ============================================
+-- GUILD SYNC: MESSAGE QUEUE (throttled)
+-- ============================================
+
+local function QueueMessage(msg)
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    table.insert(sendQueue, msg)
+end
+
+local function ProcessQueue(elapsed)
+    if #sendQueue == 0 then return end
+    sendTimer = sendTimer + elapsed
+    if sendTimer < SEND_INTERVAL then return end
+    sendTimer = 0
+    
+    local msg = table.remove(sendQueue, 1)
+    if msg then
+        SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+    end
+end
+
+-- ============================================
+-- GUILD SYNC: PROTOCOL
+-- ============================================
+
+-- Escape colons in field values (zone names, guild names can have special chars)
+local function EscapeField(str)
+    if not str then return "" end
+    return str:gsub(":", ";")  -- Simple escape: replace : with ;
+end
+
+local function UnescapeField(str)
+    if not str then return "" end
+    return str:gsub(";", ":")
+end
+
+-- Send a real-time kill broadcast: "I just got killed by this person"
+function PvPTracker:BroadcastKill(enemyName, enemyData)
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    
+    local msg = "K" .. FIELD_SEP 
+        .. EscapeField(enemyName) .. FIELD_SEP
+        .. (enemyData.class or "UNKNOWN") .. FIELD_SEP
+        .. (enemyData.level or 0) .. FIELD_SEP
+        .. EscapeField(enemyData.guild or "") .. FIELD_SEP
+        .. EscapeField(enemyData.lastZone or "")
+    
+    -- Kill broadcasts go immediately (high priority, single message)
+    SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+end
+
+-- Send a single enemy record for bulk sync
+function PvPTracker:QueueSyncEntry(enemyName, enemyData)
+    local msg = "S" .. FIELD_SEP
+        .. EscapeField(enemyName) .. FIELD_SEP
+        .. (enemyData.class or "UNKNOWN") .. FIELD_SEP
+        .. (enemyData.kills or 0) .. FIELD_SEP
+        .. (enemyData.lastKill or 0) .. FIELD_SEP
+        .. (enemyData.level or 0) .. FIELD_SEP
+        .. EscapeField(enemyData.guild or "") .. FIELD_SEP
+        .. EscapeField(enemyData.lastZone or "")
+    
+    QueueMessage(msg)
+end
+
+-- Send hello (announce presence)
+function PvPTracker:SendHello()
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    
+    local now = GetTime()
+    if now - lastHelloTime < HELLO_COOLDOWN then return end
+    lastHelloTime = now
+    
+    local count = self:GetEnemyCount()
+    local msg = "H" .. FIELD_SEP .. count .. FIELD_SEP .. SYNC_VERSION
+    SafeSendAddonMessage(SYNC_PREFIX, msg, "GUILD")
+end
+
+-- Request full sync from online guildies
+function PvPTracker:RequestSync()
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    
+    local now = GetTime()
+    if now - lastSyncRequest < SYNC_REQUEST_COOLDOWN then
+        self:Print("Sync request on cooldown. Try again in " .. math.ceil(SYNC_REQUEST_COOLDOWN - (now - lastSyncRequest)) .. "s.")
+        return
+    end
+    lastSyncRequest = now
+    
+    SafeSendAddonMessage(SYNC_PREFIX, "R", "GUILD")
+    self:Print("Requested sync from online guild members.")
+end
+
+-- Send our full enemy list (queued/throttled)
+function PvPTracker:SendFullSync()
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not IsInGuild() then return end
+    
+    local count = 0
+    for enemyName, enemyData in pairs(PvPTrackerDB.enemies) do
+        -- Only sync enemies we have personal kills on (don't echo guild data back)
+        if enemyData.kills and enemyData.kills > 0 then
+            self:QueueSyncEntry(enemyName, enemyData)
+            count = count + 1
+        end
+    end
+    
+    if PvPTrackerDB.syncAnnounce and count > 0 then
+        self:Print("Queued " .. count .. " enemies for guild sync.")
+    end
+end
+
+-- ============================================
+-- GUILD SYNC: RECEIVE + MERGE
+-- ============================================
+
+-- Get total kills including guild reports for an enemy
+function PvPTracker:GetTotalKills(enemyName)
+    local enemy = PvPTrackerDB.enemies[enemyName]
+    if not enemy then return 0 end
+    
+    local total = enemy.kills or 0
+    if enemy.guildKills then
+        for reporter, rdata in pairs(enemy.guildKills) do
+            total = total + (rdata.kills or 0)
+        end
+    end
+    return total
+end
+
+-- Get a summary of guild reporters for an enemy
+function PvPTracker:GetGuildReporters(enemyName)
+    local enemy = PvPTrackerDB.enemies[enemyName]
+    if not enemy or not enemy.guildKills then return "" end
+    
+    local parts = {}
+    for reporter, rdata in pairs(enemy.guildKills) do
+        table.insert(parts, reporter .. "(" .. (rdata.kills or 0) .. ")")
+    end
+    if #parts == 0 then return "" end
+    table.sort(parts)
+    return table.concat(parts, ", ")
+end
+
+-- Merge a received enemy record from a guild member
+function PvPTracker:MergeGuildData(sender, enemyName, class, kills, lastKill, level, guild, zone)
+    -- Ignore our own data echoed back
+    if sender == playerName then return end
+    
+    kills = tonumber(kills) or 0
+    lastKill = tonumber(lastKill) or 0
+    level = tonumber(level) or 0
+    
+    -- Create enemy entry if it doesn't exist
+    if not PvPTrackerDB.enemies[enemyName] then
+        PvPTrackerDB.enemies[enemyName] = {
+            kills = 0,
+            firstKill = 0,
+            lastKill = 0,
+            lastZone = zone or "",
+            class = class or "UNKNOWN",
+            level = level,
+            guild = guild or "",
+            notes = "",
+            guildKills = {},
+        }
+    end
+    
+    local enemy = PvPTrackerDB.enemies[enemyName]
+    
+    -- Ensure guildKills table exists
+    if not enemy.guildKills then
+        enemy.guildKills = {}
+    end
+    
+    -- Update guild kill data for this reporter
+    if not enemy.guildKills[sender] then
+        enemy.guildKills[sender] = { kills = 0, lastReport = 0, lastZone = "" }
+    end
+    
+    local gk = enemy.guildKills[sender]
+    
+    -- For SYNC messages: sender's total kill count (take if higher)
+    if kills > (gk.kills or 0) then
+        gk.kills = kills
+    end
+    gk.lastReport = time()
+    if zone and zone ~= "" then
+        gk.lastZone = zone
+    end
+    
+    -- Update enemy metadata to most recent info
+    if class and class ~= "" and class ~= "UNKNOWN" then
+        enemy.class = class
+    end
+    if level and level > (enemy.level or 0) then
+        enemy.level = level
+    end
+    if guild and guild ~= "" then
+        enemy.guild = guild
+    end
+    if zone and zone ~= "" and lastKill > (enemy.lastKill or 0) then
+        enemy.lastZone = zone
+    end
+end
+
+-- Handle a real-time kill broadcast from a guild member
+function PvPTracker:HandleKillBroadcast(sender, enemyName, class, level, guild, zone)
+    if sender == playerName then return end
+    
+    level = tonumber(level) or 0
+    
+    -- Create enemy if needed
+    if not PvPTrackerDB.enemies[enemyName] then
+        PvPTrackerDB.enemies[enemyName] = {
+            kills = 0,
+            firstKill = 0,
+            lastKill = 0,
+            lastZone = zone or "",
+            class = class or "UNKNOWN",
+            level = level,
+            guild = guild or "",
+            notes = "",
+            guildKills = {},
+        }
+    end
+    
+    local enemy = PvPTrackerDB.enemies[enemyName]
+    if not enemy.guildKills then enemy.guildKills = {} end
+    
+    if not enemy.guildKills[sender] then
+        enemy.guildKills[sender] = { kills = 0, lastReport = 0, lastZone = "" }
+    end
+    
+    -- Increment their kill count by 1 (real-time kill)
+    enemy.guildKills[sender].kills = (enemy.guildKills[sender].kills or 0) + 1
+    enemy.guildKills[sender].lastReport = time()
+    enemy.guildKills[sender].lastZone = zone or ""
+    
+    -- Update metadata
+    if class and class ~= "" and class ~= "UNKNOWN" then enemy.class = class end
+    if level > (enemy.level or 0) then enemy.level = level end
+    if guild and guild ~= "" then enemy.guild = guild end
+    if zone and zone ~= "" then enemy.lastZone = zone end
+    
+    -- Alert if enabled
+    if PvPTrackerDB.syncAnnounce then
+        local colorCode = CLASS_COLORS[enemy.class] or "FF3333"
+        self:Print("|cFFFFCC00[Guild Sync]|r " .. sender .. " killed by |cFF" .. colorCode .. enemyName .. "|r in " .. (zone or "?"))
+    end
+    
+    -- Refresh UI if open
+    if mainFrame and mainFrame:IsShown() then
+        self:RefreshList()
+    end
+end
+
+-- Master message handler
+function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
+    if prefix ~= SYNC_PREFIX then return end
+    if distribution ~= "GUILD" then return end
+    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    
+    -- Strip realm from sender if present
+    local senderName = sender:match("^([^%-]+)") or sender
+    if senderName == playerName then return end  -- Ignore own messages
+    
+    local parts = { strsplit(FIELD_SEP, message) }
+    local msgType = parts[1]
+    
+    if msgType == "K" and #parts >= 6 then
+        -- Kill broadcast: K:Name:Class:Level:Guild:Zone
+        local enemyName = UnescapeField(parts[2])
+        local class = parts[3]
+        local level = parts[4]
+        local guild = UnescapeField(parts[5])
+        local zone = UnescapeField(parts[6])
+        self:HandleKillBroadcast(senderName, enemyName, class, level, guild, zone)
+        
+    elseif msgType == "S" and #parts >= 8 then
+        -- Sync record: S:Name:Class:Kills:LastKill:Level:Guild:Zone
+        local enemyName = UnescapeField(parts[2])
+        local class = parts[3]
+        local kills = parts[4]
+        local lastKill = parts[5]
+        local level = parts[6]
+        local guild = UnescapeField(parts[7])
+        local zone = UnescapeField(parts[8])
+        self:MergeGuildData(senderName, enemyName, class, kills, lastKill, level, guild, zone)
+        
+    elseif msgType == "R" then
+        -- Sync request: someone wants our data
+        -- Throttle: don't send to same person within cooldown
+        local now = GetTime()
+        if peerSyncTimestamps[senderName] and (now - peerSyncTimestamps[senderName]) < SYNC_REQUEST_COOLDOWN then
+            return
+        end
+        peerSyncTimestamps[senderName] = now
+        
+        if PvPTrackerDB.syncAnnounce then
+            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " requested sync. Sending data...")
+        end
+        self:SendFullSync()
+        
+    elseif msgType == "H" and #parts >= 2 then
+        -- Hello: peer logged in with N enemies
+        local peerCount = tonumber(parts[2]) or 0
+        if PvPTrackerDB.syncAnnounce then
+            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " online (" .. peerCount .. " enemies)")
+        end
+    end
+end
 
 -- ============================================
 -- INITIALIZATION
@@ -60,6 +418,43 @@ function PvPTracker:InitDB()
             end
         end
     end
+    -- Ensure sync fields exist for existing installs
+    if PvPTrackerDB.guildSync == nil then PvPTrackerDB.guildSync = false end
+    if PvPTrackerDB.syncAnnounce == nil then PvPTrackerDB.syncAnnounce = true end
+    if PvPTrackerDB.syncOnLogin == nil then PvPTrackerDB.syncOnLogin = true end
+end
+
+-- Register addon message prefix and sync event handler
+function PvPTracker:RegisterSync()
+    SafeRegisterPrefix(SYNC_PREFIX)
+    
+    if not syncFrame then
+        syncFrame = CreateFrame("Frame")
+        syncFrame:RegisterEvent("CHAT_MSG_ADDON")
+        syncFrame:SetScript("OnEvent", function(self, event, prefix, message, distribution, sender)
+            if event == "CHAT_MSG_ADDON" then
+                pcall(PvPTracker.OnAddonMessage, PvPTracker, prefix, message, distribution, sender)
+            end
+        end)
+        
+        -- Queue processor on OnUpdate
+        syncFrame:SetScript("OnUpdate", function(self, elapsed)
+            ProcessQueue(elapsed)
+        end)
+    end
+    
+    -- Send hello after a delay (let guild roster load)
+    if PvPTrackerDB.guildSync then
+        WM.RunAfter(8, function()
+            PvPTracker:SendHello()
+            -- Auto-request sync from guild on login
+            if PvPTrackerDB.syncOnLogin ~= false then
+                WM.RunAfter(3, function()
+                    PvPTracker:RequestSync()
+                end)
+            end
+        end)
+    end
 end
 
 function PvPTracker:Initialize()
@@ -67,6 +462,7 @@ function PvPTracker:Initialize()
     playerName = UnitName("player")
     playerGUID = UnitGUID("player")
     self:RegisterEvents()
+    self:RegisterSync()
     self:Print("Loaded. Tracking " .. self:GetEnemyCount() .. " enemies.")
 end
 
@@ -205,6 +601,9 @@ function PvPTracker:RecordKill(killerName, killerGUID)
     
     local colorCode = CLASS_COLORS[enemy.class] or "FF3333"
     self:Print("|cFF" .. colorCode .. killerName .. "|r killed you in " .. zone .. "! (Kill #" .. enemy.kills .. ")")
+    
+    -- Broadcast to guild
+    self:BroadcastKill(killerName, enemy)
 end
 
 function PvPTracker:AddManualEnemy(name, notes)
@@ -310,9 +709,14 @@ function PvPTracker:TriggerAlert(name, unit)
     
     -- Chat alert
     if PvPTrackerDB.alertChat then
+        local totalKills = self:GetTotalKills(name)
         local killStr = ""
-        if enemy.kills > 0 then
-            killStr = " - killed you " .. enemy.kills .. "x"
+        if totalKills > 0 then
+            if enemy.guildKills and next(enemy.guildKills) then
+                killStr = " - " .. totalKills .. " total kills (" .. enemy.kills .. " yours)"
+            else
+                killStr = " - killed you " .. enemy.kills .. "x"
+            end
         end
         local guildStr = ""
         if enemy.guild and enemy.guild ~= "" then
@@ -485,7 +889,7 @@ function PvPTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local frame = CreateFrame("Frame", "WM_PvPTrackerFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(450, 550)
+    frame:SetSize(450, 680)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -559,7 +963,87 @@ function PvPTracker:CreateUI()
     
     yOffset = yOffset - 28
     
-    -- Add enemy manually
+    -- ==========================================
+    -- GUILD SYNC SECTION
+    -- ==========================================
+    local syncLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    syncLabel:SetPoint("TOPLEFT", 15, yOffset)
+    syncLabel:SetText("Guild Sync")
+    syncLabel:SetTextColor(unpack(theme.headerColor))
+    
+    yOffset = yOffset - 20
+    
+    local syncCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    syncCB:SetPoint("TOPLEFT", 15, yOffset)
+    syncCB.Text:SetText("Enable guild KOS sync")
+    syncCB:SetChecked(PvPTrackerDB.guildSync)
+    syncCB:SetScript("OnClick", function(self)
+        PvPTrackerDB.guildSync = self:GetChecked()
+        if PvPTrackerDB.guildSync then
+            PvPTracker:SendHello()
+        end
+    end)
+    
+    local announceCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    announceCB:SetPoint("TOPLEFT", 220, yOffset)
+    announceCB.Text:SetText("Show sync messages")
+    announceCB:SetChecked(PvPTrackerDB.syncAnnounce)
+    announceCB:SetScript("OnClick", function(self)
+        PvPTrackerDB.syncAnnounce = self:GetChecked()
+    end)
+    
+    yOffset = yOffset - 24
+    
+    local requestSyncBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    requestSyncBtn:SetSize(100, 20)
+    requestSyncBtn:SetPoint("TOPLEFT", 15, yOffset)
+    requestSyncBtn:SetText("Request Sync")
+    requestSyncBtn:SetScript("OnClick", function()
+        PvPTracker:RequestSync()
+    end)
+    requestSyncBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Request Sync", 1, 0.8, 0)
+        GameTooltip:AddLine("Ask online guildies running WatchingMachine to", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("send their KOS data. Cooldown: 5 minutes.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    requestSyncBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    local sendSyncBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    sendSyncBtn:SetSize(90, 20)
+    sendSyncBtn:SetPoint("LEFT", requestSyncBtn, "RIGHT", 5, 0)
+    sendSyncBtn:SetText("Send List")
+    sendSyncBtn:SetScript("OnClick", function()
+        PvPTracker:SendFullSync()
+    end)
+    sendSyncBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Send List", 1, 0.8, 0)
+        GameTooltip:AddLine("Push your personal kill data to all online", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("guildies running WatchingMachine.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    sendSyncBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    local syncDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    syncDesc:SetPoint("TOPLEFT", 230, yOffset)
+    syncDesc:SetWidth(200)
+    syncDesc:SetJustifyH("LEFT")
+    syncDesc:SetText("|cFF888888Kills broadcast to guild in real-time.\nFull list syncs on login and request.|r")
+    
+    yOffset = yOffset - 32
+    
+    -- Auto-request on login toggle
+    local autoSyncCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    autoSyncCB:SetPoint("TOPLEFT", 15, yOffset)
+    autoSyncCB.Text:SetText("Auto-request sync on login")
+    autoSyncCB:SetChecked(PvPTrackerDB.syncOnLogin ~= false) -- default true when sync enabled
+    autoSyncCB:SetScript("OnClick", function(self)
+        PvPTrackerDB.syncOnLogin = self:GetChecked()
+    end)
+    
+    yOffset = yOffset - 28
     local addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     addLabel:SetPoint("TOPLEFT", 15, yOffset)
     addLabel:SetText("Add to KOS:")
@@ -619,6 +1103,16 @@ function PvPTracker:CreateUI()
     local countText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     countText:SetPoint("LEFT", listHeader, "RIGHT", 10, 0)
     frame.countText = countText
+    
+    -- Sync status tag
+    local syncStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    syncStatus:SetPoint("RIGHT", frame, "TOPRIGHT", -80, yOffset)
+    if PvPTrackerDB.guildSync then
+        syncStatus:SetText("|cFF00CC00[Sync ON]|r")
+    else
+        syncStatus:SetText("|cFF888888[Sync OFF]|r")
+    end
+    frame.syncStatus = syncStatus
     
     -- Clear all button
     local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -709,15 +1203,37 @@ function PvPTracker:RefreshList()
         table.insert(sorted, { name = name, data = data })
     end
     table.sort(sorted, function(a, b)
-        if a.data.kills ~= b.data.kills then
-            return a.data.kills > b.data.kills
+        local aTotal = PvPTracker:GetTotalKills(a.name)
+        local bTotal = PvPTracker:GetTotalKills(b.name)
+        if aTotal ~= bTotal then
+            return aTotal > bTotal
         end
         return (a.data.lastKill or 0) > (b.data.lastKill or 0)
     end)
     
     -- Update count text
     if mainFrame.countText then
-        mainFrame.countText:SetText("|cFF888888(" .. #sorted .. " enemies)|r")
+        -- Count how many have guild data
+        local guildCount = 0
+        for _, entry in ipairs(sorted) do
+            if entry.data.guildKills and next(entry.data.guildKills) then
+                guildCount = guildCount + 1
+            end
+        end
+        if guildCount > 0 then
+            mainFrame.countText:SetText("|cFF888888(" .. #sorted .. " enemies, |cFFFFCC00" .. guildCount .. " from guild|cFF888888)|r")
+        else
+            mainFrame.countText:SetText("|cFF888888(" .. #sorted .. " enemies)|r")
+        end
+    end
+    
+    -- Update sync status if visible
+    if mainFrame.syncStatus then
+        if PvPTrackerDB.guildSync then
+            mainFrame.syncStatus:SetText("|cFF00CC00[Sync ON]|r")
+        else
+            mainFrame.syncStatus:SetText("|cFF888888[Sync OFF]|r")
+        end
     end
     
     local rowHeight = 22
@@ -745,12 +1261,17 @@ function PvPTracker:RefreshList()
         nameText:SetJustifyH("LEFT")
         nameText:SetText("|cFF" .. colorCode .. name .. "|r")
         
-        -- Kill count
+        -- Kill count (total = yours + guild)
+        local totalKills = PvPTracker:GetTotalKills(name)
         local killText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         killText:SetPoint("LEFT", 158, 0)
         killText:SetWidth(38)
-        if data.kills > 0 then
-            killText:SetText("|cFFFF3333" .. data.kills .. "|r")
+        if totalKills > 0 then
+            if data.guildKills and next(data.guildKills) then
+                killText:SetText("|cFFFF3333" .. totalKills .. "|r|cFFFFCC00*|r")
+            else
+                killText:SetText("|cFFFF3333" .. totalKills .. "|r")
+            end
         else
             killText:SetText("|cFF888888-|r")
         end
@@ -799,8 +1320,25 @@ function PvPTracker:RefreshList()
                 GameTooltip:AddLine("Guild: <" .. data.guild .. ">", 0.6, 0.6, 0.6)
             end
             if data.kills > 0 then
+                GameTooltip:AddLine("Your kills: " .. data.kills, 0.9, 0.3, 0.3)
                 GameTooltip:AddLine("First killed you: " .. FormatDate(data.firstKill), 0.6, 0.6, 0.6)
                 GameTooltip:AddLine("Last killed you: " .. FormatDate(data.lastKill), 0.6, 0.6, 0.6)
+            end
+            -- Guild sync kill data
+            if data.guildKills and next(data.guildKills) then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Guild reports:", 1, 0.8, 0)
+                for reporter, rdata in pairs(data.guildKills) do
+                    local rKills = rdata.kills or 0
+                    local rZone = rdata.lastZone or ""
+                    if rZone ~= "" then
+                        GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x (last: " .. rZone .. ")", 0.7, 0.7, 0.5)
+                    else
+                        GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x", 0.7, 0.7, 0.5)
+                    end
+                end
+                local totalKills2 = PvPTracker:GetTotalKills(name)
+                GameTooltip:AddLine("Total: " .. totalKills2, 1, 0.4, 0.4)
             end
             GameTooltip:Show()
         end)
