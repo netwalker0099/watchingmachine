@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.2 | Author: Robert
+Version 2.3 | Author: Robert
 
 ## Overview
 
@@ -116,6 +116,17 @@ Track hostile players who kill you in world PvP and get proximity alerts.
   - Hover tooltip with guild, notes, and exact kill dates
   - Per-entry remove, Clear All with confirmation
   - "Manual tracking only" mode to disable auto-logging
+- **Guild Sync**: Share KOS lists with guildies running WatchingMachine
+  - Real-time kill broadcasts to guild channel on every PvP death
+  - Full list sync on login and on-demand (Request Sync / Send List buttons)
+  - Per-reporter kill tracking with merge logic (won't echo data back)
+  - Revenge announcements: guild chat message when you kill a KOS enemy reported by a guildie
+  - Configurable: enable/disable, show sync messages, auto-request on login
+- **KOS Leaderboard**: Compete with guildies for most KOS kills
+  - 1 point per KOS-listed enemy killed, synced across guild
+  - Separate leaderboard window with ranked list, bar graph, gold/silver/bronze medals
+  - Three announcement modes: Off, Hourly (top 3 to guild chat), On Lead Change (new #1 alert)
+  - Reset button to wipe leaderboard data
 - Error-resilient: pcall-protected event handlers with auto-disable on repeated failures
 
 ### 9. Recruiting Tool *(Officers Only)*
@@ -190,6 +201,16 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.3
+- PvP Tracker: Guild Sync UI controls (enable, show messages, auto-request, send/request buttons)
+- PvP Tracker: revenge kill announcements ("X has slain Y! Z has been avenged!")
+- PvP Tracker: KOS Leaderboard with point system (1pt per KOS kill, synced across guild)
+- PvP Tracker: leaderboard window with ranked list, bar graph, gold/silver/bronze medals
+- PvP Tracker: three announcement modes (Off, Hourly top 3, On Lead Change)
+- PvP Tracker: outgoing kill detection via PARTY_KILL and damage attribution
+- PvP Tracker: leaderboard points included in Hello handshake on login
+- Guild Invite: ignore player's own messages (won't self-invite when typing trigger words)
 
 ### Version 2.2
 - Debuff Tracker: raid composition auto-detection with talent spec awareness
