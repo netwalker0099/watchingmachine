@@ -119,14 +119,13 @@ function GuildInvite:InviteToRaid(playerName, source)
     if not GuildInviteDB then return end
     if not GuildInviteDB.enabled then return end
     
-    -- Check if we need to convert to raid
+    -- Convert to raid only when party is full and we're trying to invite a 6th
     if IsInGroup() and not IsInRaid() then
         if UnitIsGroupLeader("player") then
             local numGroupMembers = GetNumGroupMembers()
-            -- Convert to raid if party is at 5 members (full) or close to full
-            if numGroupMembers >= 4 then
+            if numGroupMembers >= 5 then
                 if SafeConvertToRaid() then
-                    self:Print("Auto-converted to raid (party full)")
+                    self:Print("Auto-converted to raid (6th member incoming)")
                 end
             end
         end
@@ -267,15 +266,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         GuildInvite:UpdateGuildRoster()
         
     elseif event == "GROUP_ROSTER_UPDATE" then
-        -- Auto-convert when party reaches 5 members and more invites pending
-        if IsInGroup() and not IsInRaid() and UnitIsGroupLeader("player") then
-            local numGroupMembers = GetNumGroupMembers()
-            if numGroupMembers >= 5 then
-                if SafeConvertToRaid() then
-                    GuildInvite:Print("Auto-converted to raid (party full)")
-                end
-            end
-        end
+        -- No auto-convert here; only convert when a 6th invite triggers it in InviteToRaid
     end
 end)
 
@@ -387,7 +378,7 @@ function GuildInvite:CreateUI()
     infoText:SetPoint("TOPLEFT", 20, yOffset)
     infoText:SetWidth(360)
     infoText:SetJustifyH("LEFT")
-    infoText:SetText("|cFFFFFF00Triggers:|r Say trigger word in guild/whisper/party to get invited.\nSay \"raid\" or \"raid convert\" in party/guild to convert to raid.\nAuto-converts to raid when party reaches 5 members.")
+    infoText:SetText("|cFFFFFF00Triggers:|r Say trigger word in guild/whisper/party to get invited.\nSay \"raid\" or \"raid convert\" in party/guild to convert to raid.\nAuto-converts to raid when a 6th member is invited.")
     
     yOffset = yOffset - 45
     
