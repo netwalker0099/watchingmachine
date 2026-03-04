@@ -470,6 +470,33 @@ function DebuffTracker:SendAlert(categoryName, debuffNames)
     alertCooldowns[categoryName] = GetTime()
 end
 
+-- Check if unit is a boss (TBC-compatible, no global IsBossUnit in Classic)
+local function IsBossUnit(unit)
+    if not unit or not UnitExists(unit) then return false end
+    
+    -- Check classification
+    local classification = UnitClassification(unit)
+    if classification == "worldboss" or classification == "raidboss" then
+        return true
+    end
+    
+    -- Check level (boss level is -1 or very high)
+    local level = UnitLevel(unit)
+    if level == -1 or level == "??" then
+        return true
+    end
+    
+    -- Check if it's a dungeon/raid boss by checking for skull
+    if level and level >= 0 then
+        local playerLevel = UnitLevel("player")
+        if level >= playerLevel + 3 and classification == "elite" then
+            return true
+        end
+    end
+    
+    return false
+end
+
 function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
@@ -592,33 +619,6 @@ end
 
 function DebuffTracker:Print(msg)
     WM:ModulePrint("DebuffTracker", msg)
-end
-
--- Check if unit is a boss
-local function IsBossUnit(unit)
-    if not unit or not UnitExists(unit) then return false end
-    
-    -- Check classification
-    local classification = UnitClassification(unit)
-    if classification == "worldboss" or classification == "raidboss" then
-        return true
-    end
-    
-    -- Check level (boss level is -1 or very high)
-    local level = UnitLevel(unit)
-    if level == -1 or level == "??" then
-        return true
-    end
-    
-    -- Check if it's a dungeon/raid boss by checking for skull
-    if level and level >= 0 then
-        local playerLevel = UnitLevel("player")
-        if level >= playerLevel + 3 and classification == "elite" then
-            return true
-        end
-    end
-    
-    return false
 end
 
 -- Find active debuff from a category on unit
