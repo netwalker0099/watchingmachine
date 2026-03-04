@@ -21,14 +21,14 @@ local defaults = {
     alertCooldown = 30,     -- seconds between repeated alerts for same player
     trackManualOnly = false, -- if true, only track manually added names
     -- Guild sync settings
-    guildSync = false,       -- Enable guild sync (off by default)
+    guildSync = true,        -- Enable guild sync
     syncAnnounce = true,     -- Show sync messages in chat
     syncOnLogin = true,      -- Auto-request sync from guild on login
     announceRevenge = true,  -- Announce revenge kills to guild chat
     -- Leaderboard settings
     leaderboard = {},        -- leaderboard["PlayerName"] = { points=N, lastUpdate=time }
     myKOSKills = 0,          -- Local player's KOS kill count (= points)
-    leaderboardEnabled = false, -- Enable leaderboard tracking (off by default)
+    leaderboardEnabled = true,  -- Enable leaderboard tracking
     leaderboardAnnounce = "off", -- "off", "hourly", "onchange"
 }
 
@@ -507,13 +507,13 @@ function PvPTracker:InitDB()
         end
     end
     -- Ensure sync fields exist for existing installs
-    if PvPTrackerDB.guildSync == nil then PvPTrackerDB.guildSync = false end
+    if PvPTrackerDB.guildSync == nil then PvPTrackerDB.guildSync = true end
     if PvPTrackerDB.syncAnnounce == nil then PvPTrackerDB.syncAnnounce = true end
     if PvPTrackerDB.syncOnLogin == nil then PvPTrackerDB.syncOnLogin = true end
     if PvPTrackerDB.announceRevenge == nil then PvPTrackerDB.announceRevenge = true end
     if PvPTrackerDB.leaderboard == nil then PvPTrackerDB.leaderboard = {} end
     if PvPTrackerDB.myKOSKills == nil then PvPTrackerDB.myKOSKills = 0 end
-    if PvPTrackerDB.leaderboardEnabled == nil then PvPTrackerDB.leaderboardEnabled = false end
+    if PvPTrackerDB.leaderboardEnabled == nil then PvPTrackerDB.leaderboardEnabled = true end
     if PvPTrackerDB.leaderboardAnnounce == nil then PvPTrackerDB.leaderboardAnnounce = "off" end
 end
 
