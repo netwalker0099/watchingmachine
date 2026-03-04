@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local DebuffTracker = {}
 WM:RegisterModule("DebuffTracker", DebuffTracker)
 
-DebuffTracker.version = "2.2"
+DebuffTracker.version = "2.3.1"
 
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)

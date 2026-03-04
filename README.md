@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.3 | Author: Robert
+Version 2.3.1 | Author: Robert
 
 ## Overview
 
@@ -201,6 +201,16 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.3.1 (Hotfix)
+- DebuffTracker: fixed IsBossUnit crash when targeting bosses in TBC Classic (e.g. Gruul)
+  - IsBossUnit() is a retail-only global that doesn't exist in TBC Classic
+  - Local replacement function was defined after its first call site (line 598 vs line 478)
+  - Lua resolves locals top-to-bottom at load time, so CheckAlerts called the non-existent global
+  - Moved local IsBossUnit definition above CheckAlerts to fix scope ordering
+- Full addon audit: verified no other forward-reference or retail-only API issues remain
+  - All C_ namespace calls use nil-guard + global fallback pattern
+  - No other local functions referenced before definition
 
 ### Version 2.3
 - PvP Tracker: Guild Sync UI controls (enable, show messages, auto-request, send/request buttons)
