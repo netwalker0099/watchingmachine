@@ -226,6 +226,8 @@ local SPEC_SCAN_INTERVAL = 5 -- Scan specs every 5 seconds
 local missingTimers = {}     -- missingTimers["Armor"] = GetTime() when first noticed missing
 local alertCooldowns = {}    -- alertCooldowns["Armor"] = GetTime() of last alert sent
 local alertedThisPull = {}   -- alertedThisPull["Armor"] = true if already alerted this encounter
+local deadCasterCache = {}   -- deadCasterCache["Armor"] = { alive=bool, time=GetTime() }
+local DEAD_CASTER_CHECK_INTERVAL = 2  -- Re-check alive status every 2 seconds
 local inCombat = false       -- Tracked via PLAYER_REGEN events
 local bossEngaged = false    -- True when target boss is in combat (not just player)
 local bossDeadGUID = nil     -- GUID of boss that died (suppress alerts until combat drop)
@@ -376,6 +378,83 @@ function DebuffTracker:IsCategoryCoverable(category)
             return true
         end
     end
+    return false
+end
+
+-- Check if at least one ALIVE raid member can cast a debuff in this category
+-- Used mid-combat to suppress alerts when all casters are dead
+function DebuffTracker:HasAliveCaster(category)
+    if not category or not category.debuffs then return false end
+    
+    -- Build set of class+spec combos that can provide this debuff
+    local neededClasses = {}  -- neededClasses["WARRIOR"] = { [nil]=true } or { ["Arms"]=true }
+    local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs[category.name]
+    
+    for _, debuff in ipairs(category.debuffs) do
+        -- Only consider debuffs that are enabled in settings
+        if not debuffToggles or debuffToggles[debuff.name] ~= false then
+            if debuff.class then
+                if not neededClasses[debuff.class] then
+                    neededClasses[debuff.class] = {}
+                end
+                -- nil spec means any spec of that class can do it
+                neededClasses[debuff.class][debuff.spec or "ANY"] = true
+            end
+        end
+    end
+    
+    -- No classes needed (shouldn't happen, but guard)
+    if not next(neededClasses) then return false end
+    
+    -- Scan raid for alive members matching those classes
+    local function CheckUnit(unit)
+        if not UnitExists(unit) then return false end
+        if UnitIsDead(unit) or UnitIsGhost(unit) then return false end
+        
+        local _, class = UnitClass(unit)
+        if not class then return false end
+        
+        local specs = neededClasses[class]
+        if not specs then return false end
+        
+        -- If any entry allows ANY spec, this alive member qualifies
+        if specs["ANY"] then return true end
+        
+        -- Need a specific spec — check if this unit has it
+        local unitSpec = DetectUnitSpec(unit, class)
+        if unitSpec and specs[unitSpec] then
+            return true
+        end
+        
+        -- Can't confirm spec but class matches — if spec detection isn't
+        -- possible for this class, give benefit of the doubt
+        if not unitSpec then
+            local detectable = DETECTABLE_SPECS[class]
+            for specName in pairs(specs) do
+                if specName ~= "ANY" and (not detectable or not detectable[specName]) then
+                    -- Can't detect this spec via buffs, class is alive, assume possible
+                    return true
+                end
+            end
+        end
+        
+        return false
+    end
+    
+    -- Check player
+    if CheckUnit("player") then return true end
+    
+    -- Check group
+    if IsInRaid() then
+        for i = 1, 40 do
+            if CheckUnit("raid" .. i) then return true end
+        end
+    elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
+        for i = 1, 4 do
+            if CheckUnit("party" .. i) then return true end
+        end
+    end
+    
     return false
 end
 
@@ -549,8 +628,20 @@ function DebuffTracker:CheckAlerts(unit)
                 -- Debuff present - reset timer
                 missingTimers[category.name] = nil
             else
-                -- Debuff missing — but skip if already alerted this pull
-                if alertedThisPull[category.name] then
+                -- Debuff missing — check if anyone alive can even cast it
+                local cached = deadCasterCache[category.name]
+                local hasAlive
+                if cached and (now - cached.time) < DEAD_CASTER_CHECK_INTERVAL then
+                    hasAlive = cached.alive
+                else
+                    hasAlive = self:HasAliveCaster(category)
+                    deadCasterCache[category.name] = { alive = hasAlive, time = now }
+                end
+                
+                if not hasAlive then
+                    -- All casters for this category are dead — suppress silently
+                    missingTimers[category.name] = nil
+                elseif alertedThisPull[category.name] then
                     -- Already sent an alert for this category this encounter
                     -- Don't re-alert; just keep the timer ticking silently
                 elseif not missingTimers[category.name] then
@@ -950,6 +1041,7 @@ function DebuffTracker:CreateTrackerFrame()
             missingTimers = {}
             alertCooldowns = {}
             alertedThisPull = {}
+            deadCasterCache = {}
             bossEngaged = false
             bossDeadGUID = nil
             return
@@ -959,6 +1051,7 @@ function DebuffTracker:CreateTrackerFrame()
             missingTimers = {}
             alertCooldowns = {}
             alertedThisPull = {}
+            deadCasterCache = {}
             bossEngaged = false
             bossDeadGUID = nil
             return
