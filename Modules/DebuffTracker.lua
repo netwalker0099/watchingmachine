@@ -225,7 +225,10 @@ local SPEC_SCAN_INTERVAL = 5 -- Scan specs every 5 seconds
 -- Alert state
 local missingTimers = {}     -- missingTimers["Armor"] = GetTime() when first noticed missing
 local alertCooldowns = {}    -- alertCooldowns["Armor"] = GetTime() of last alert sent
+local alertedThisPull = {}   -- alertedThisPull["Armor"] = true if already alerted this encounter
 local inCombat = false       -- Tracked via PLAYER_REGEN events
+local bossEngaged = false    -- True when target boss is in combat (not just player)
+local bossDeadGUID = nil     -- GUID of boss that died (suppress alerts until combat drop)
 
 -- ============================================
 -- RAID COMPOSITION + SPEC SCANNING
@@ -502,18 +505,38 @@ function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
     
-    -- Don't alert if not in combat (prevents pre-pull alerts)
+    -- Gate 1: Player must be in combat
     if not inCombat then return end
     
-    -- Don't alert on dead targets (prevents post-kill spam)
-    if unit and UnitExists(unit) and UnitIsDead(unit) then
+    -- Gate 2: Boss must be dead-checked (suppress after kill)
+    if bossDeadGUID then return end
+    
+    -- Gate 3: Target must exist and not be dead
+    if not unit or not UnitExists(unit) then return end
+    if UnitIsDead(unit) then
+        -- Boss just died — mark as dead so we stop alerting for this encounter
+        if IsBossUnit(unit) then
+            bossDeadGUID = UnitGUID(unit)
+        end
         return
     end
     
-    -- Only alert on boss if setting is on
+    -- Gate 4: Only alert on boss if setting is on
     if DebuffTrackerDB.alertOnlyOnBoss and not IsBossUnit(unit) then
         return
     end
+    
+    -- Gate 5: The TARGET must be in combat too (not just the player)
+    -- This prevents alerts when you're fighting trash but targeting an unengaged boss
+    if not UnitAffectingCombat(unit) then
+        -- Boss not engaged yet — clear any started timers so they don't
+        -- fire the instant the pull happens
+        missingTimers = {}
+        return
+    end
+    
+    -- Mark boss as engaged (used to track encounter state)
+    bossEngaged = true
     
     local now = GetTime()
     local delay = DebuffTrackerDB.alertDelay or 5
@@ -526,8 +549,11 @@ function DebuffTracker:CheckAlerts(unit)
                 -- Debuff present - reset timer
                 missingTimers[category.name] = nil
             else
-                -- Debuff missing
-                if not missingTimers[category.name] then
+                -- Debuff missing — but skip if already alerted this pull
+                if alertedThisPull[category.name] then
+                    -- Already sent an alert for this category this encounter
+                    -- Don't re-alert; just keep the timer ticking silently
+                elseif not missingTimers[category.name] then
                     -- Start timer
                     missingTimers[category.name] = now
                 elseif (now - missingTimers[category.name]) >= delay then
@@ -542,7 +568,8 @@ function DebuffTracker:CheckAlerts(unit)
                             end
                         end
                         self:SendAlert(category.name, table.concat(names, "/"))
-                        -- Reset the missing timer so it has to be missing another full delay
+                        -- Mark as alerted for this encounter — won't re-fire until combat drops
+                        alertedThisPull[category.name] = true
                         missingTimers[category.name] = now
                     end
                 end
@@ -919,12 +946,21 @@ function DebuffTracker:CreateTrackerFrame()
     frame:SetScript("OnEvent", function(self, event)
         if event == "PLAYER_REGEN_DISABLED" then
             inCombat = true
+            -- Fresh encounter: reset all alert state
+            missingTimers = {}
+            alertCooldowns = {}
+            alertedThisPull = {}
+            bossEngaged = false
+            bossDeadGUID = nil
             return
         elseif event == "PLAYER_REGEN_ENABLED" then
             inCombat = false
             -- Clean slate for next pull
             missingTimers = {}
             alertCooldowns = {}
+            alertedThisPull = {}
+            bossEngaged = false
+            bossDeadGUID = nil
             return
         end
         if event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
@@ -1189,12 +1225,12 @@ function DebuffTracker:UpdateDebuffs()
             catFrame.stackText:SetText("")
             catFrame.currentDebuff = nil
         end
-        -- missingTimers persist across target switches so alerts
-        -- don't re-fire when re-targeting the same boss mid-fight
+        -- missingTimers persist across target switches so delay doesn't restart.
+        -- alertedThisPull prevents re-firing for the entire encounter.
         return
     end
     
-    -- Dead target: clear indicators, don't check alerts
+    -- Dead target: clear indicators, suppress alerts
     if UnitIsDead(unit) then
         for _, catFrame in ipairs(categoryFrames) do
             catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
@@ -1202,6 +1238,10 @@ function DebuffTracker:UpdateDebuffs()
             catFrame.status:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-NotReady")
             catFrame.stackText:SetText("")
             catFrame.currentDebuff = nil
+        end
+        -- Mark boss as dead so alerts don't fire even if retargeted
+        if IsBossUnit(unit) then
+            bossDeadGUID = UnitGUID(unit)
         end
         return
     end
