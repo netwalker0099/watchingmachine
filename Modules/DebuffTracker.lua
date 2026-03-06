@@ -225,6 +225,7 @@ local SPEC_SCAN_INTERVAL = 5 -- Scan specs every 5 seconds
 -- Alert state
 local missingTimers = {}     -- missingTimers["Armor"] = GetTime() when first noticed missing
 local alertCooldowns = {}    -- alertCooldowns["Armor"] = GetTime() of last alert sent
+local inCombat = false       -- Tracked via PLAYER_REGEN events
 
 -- ============================================
 -- RAID COMPOSITION + SPEC SCANNING
@@ -501,10 +502,16 @@ function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
     
+    -- Don't alert if not in combat (prevents pre-pull alerts)
+    if not inCombat then return end
+    
+    -- Don't alert on dead targets (prevents post-kill spam)
+    if unit and UnitExists(unit) and UnitIsDead(unit) then
+        return
+    end
+    
     -- Only alert on boss if setting is on
     if DebuffTrackerDB.alertOnlyOnBoss and not IsBossUnit(unit) then
-        -- Clear timers when not on boss
-        missingTimers = {}
         return
     end
     
@@ -551,6 +558,8 @@ end
 function DebuffTracker:Initialize()
     self:InitDB()
     self:CreateTrackerFrame()
+    -- Sync combat state (handles /reload mid-fight)
+    inCombat = UnitAffectingCombat("player") or false
     -- Initial raid scan after a short delay (roster may not be ready yet)
     WM.RunAfter(2, function()
         DebuffTracker:ScanRaidComposition()
@@ -905,7 +914,19 @@ function DebuffTracker:CreateTrackerFrame()
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
     frame:RegisterEvent("GROUP_ROSTER_UPDATE")
     frame:RegisterEvent("RAID_ROSTER_UPDATE")
+    frame:RegisterEvent("PLAYER_REGEN_DISABLED")  -- Enter combat
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED")   -- Leave combat
     frame:SetScript("OnEvent", function(self, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            inCombat = true
+            return
+        elseif event == "PLAYER_REGEN_ENABLED" then
+            inCombat = false
+            -- Clean slate for next pull
+            missingTimers = {}
+            alertCooldowns = {}
+            return
+        end
         if event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
             raidScanDirty = true
         end
@@ -1168,8 +1189,20 @@ function DebuffTracker:UpdateDebuffs()
             catFrame.stackText:SetText("")
             catFrame.currentDebuff = nil
         end
-        -- Clear missing timers when no target
-        missingTimers = {}
+        -- missingTimers persist across target switches so alerts
+        -- don't re-fire when re-targeting the same boss mid-fight
+        return
+    end
+    
+    -- Dead target: clear indicators, don't check alerts
+    if UnitIsDead(unit) then
+        for _, catFrame in ipairs(categoryFrames) do
+            catFrame:SetBackdropBorderColor(unpack(ti.inactiveColor))
+            catFrame.icon:SetTexture(nil)
+            catFrame.status:SetTexture("Interface\\RAIDFRAME\\ReadyCheck-NotReady")
+            catFrame.stackText:SetText("")
+            catFrame.currentDebuff = nil
+        end
         return
     end
     
