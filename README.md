@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.3.1 | Author: Robert
+Version 2.4 | Author: Robert
 
 ## Overview
 
@@ -202,15 +202,25 @@ Built-in error capture system for debugging.
 
 ## Changelog
 
-### Version 2.3.1 (Hotfix)
-- DebuffTracker: fixed IsBossUnit crash when targeting bosses in TBC Classic (e.g. Gruul)
-  - IsBossUnit() is a retail-only global that doesn't exist in TBC Classic
-  - Local replacement function was defined after its first call site (line 598 vs line 478)
-  - Lua resolves locals top-to-bottom at load time, so CheckAlerts called the non-existent global
-  - Moved local IsBossUnit definition above CheckAlerts to fix scope ordering
-- Full addon audit: verified no other forward-reference or retail-only API issues remain
-  - All C_ namespace calls use nil-guard + global fallback pattern
-  - No other local functions referenced before definition
+### Version 2.4
+- DebuffTracker: alert coordination — only raid leader announces to chat (prevents duplicate spam)
+  - "Assistants can announce" checkbox for raids where leader doesn't have the addon
+  - All players still see alerts locally regardless of role
+- DebuffTracker: encounter-aware alerts — fixed pre-pull, post-kill, and retarget re-fire issues
+  - Checks UnitAffectingCombat(target) so unengaged bosses don't trigger alerts
+  - Tracks bossDeadGUID to suppress alerts after boss dies
+  - alertedThisPull prevents same category from re-firing during an encounter
+- DebuffTracker: dead caster suppression — silences alerts when all casters for a debuff are dead
+  - Scans raid for alive members matching class+spec needed for each debuff category
+  - 2-second cache to avoid scanning 40 members every tick
+  - Battle rez resumes alerts within 2 seconds
+- DebuffTracker: raid alerts force-disabled on upgrade (re-enable in settings)
+- DebuffTracker: fixed IsBossUnit crash when targeting bosses in TBC Classic
+  - IsBossUnit() is a retail-only global; local function was defined after first call site
+- GuildInvite: explicit leader/assist permission check before processing invite requests
+  - Solo: can invite; Party: must be leader; Raid: must be leader or assistant
+- PvP Tracker: guild sync and leaderboard now default to on for new installs
+- Full addon audit: verified no forward-reference or retail-only API issues across all 10 files
 
 ### Version 2.3
 - PvP Tracker: Guild Sync UI controls (enable, show messages, auto-request, send/request buttons)
