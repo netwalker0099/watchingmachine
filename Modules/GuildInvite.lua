@@ -114,10 +114,48 @@ end
 -- INVITE FUNCTIONALITY
 -- ============================================
 
+-- Check if we have permission to invite (leader, assist, or solo/party leader)
+local function CanInvite()
+    if IsInRaid() then
+        -- In raid: need leader or assist
+        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+    elseif IsInGroup() then
+        -- In party: need leader
+        return UnitIsGroupLeader("player")
+    end
+    -- Solo: can always invite (creates a new group)
+    return true
+end
+
+-- Check if the player has permission to invite
+-- Solo: can always invite (forms a new party)
+-- Party: must be leader
+-- Raid: must be leader or assistant
+local function HasInvitePermission()
+    if not IsInGroup() then
+        -- Solo — can always invite to form a new group
+        return true
+    end
+    if IsInRaid() then
+        -- Raid — need leader or assist
+        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+    end
+    -- Party — need leader
+    return UnitIsGroupLeader("player")
+end
+
 function GuildInvite:InviteToRaid(playerName, source)
     if not playerName or playerName == "" then return end
     if not GuildInviteDB then return end
     if not GuildInviteDB.enabled then return end
+    
+    -- Must have invite permissions (leader/assist or solo)
+    if not HasInvitePermission() then
+        if GuildInviteDB.announceInvites then
+            self:Print("Ignoring invite request from " .. playerName .. " (not leader/assist)")
+        end
+        return
+    end
     
     -- Convert to raid only when party is full and we're trying to invite a 6th
     if IsInGroup() and not IsInRaid() then

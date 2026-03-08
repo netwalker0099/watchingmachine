@@ -199,6 +199,7 @@ local defaults = {
     alertDelay = 5,          -- Seconds a debuff must be missing before alerting
     alertCooldown = 30,      -- Seconds between repeat alerts for same category
     alertOnlyOnBoss = true,  -- Only alert for boss targets
+    assistCanAnnounce = false, -- Allow raid assistants to announce (off to prevent duplicates)
 }
 
 -- Initialize tracked categories and per-debuff defaults (all enabled)
@@ -527,8 +528,45 @@ end
 -- MISSING DEBUFF RAID ALERTS
 -- ============================================
 
+-- Determine if this player should be the one announcing alerts to chat
+-- Only ONE person should announce to avoid spam from multiple addon users.
+-- Rule: Raid leader announces. If not in a raid, party leader announces.
+-- Raid assistants can be given announce rights via a setting.
+local function ShouldAnnounce()
+    if not IsInRaid() then
+        -- Party or solo: leader (or solo player) announces
+        if not IsInGroup() then return true end
+        return UnitIsGroupLeader("player")
+    end
+    
+    -- In raid: leader always announces
+    if UnitIsGroupLeader("player") then return true end
+    
+    -- Assistants: only announce if the setting allows it
+    -- Default off to prevent duplicate alerts from multiple addon users
+    if UnitIsGroupAssistant("player") then
+        return DebuffTrackerDB and DebuffTrackerDB.assistCanAnnounce
+    end
+    
+    -- Regular raid member: never announce to chat
+    return false
+end
+
 function DebuffTracker:SendAlert(categoryName, debuffNames)
     local channel = nil
+    local chatAnnounce = ShouldAnnounce()
+    
+    -- Build the alert message
+    local msg = "[WM] Missing: " .. categoryName
+    if debuffNames and debuffNames ~= "" then
+        msg = msg .. " (" .. debuffNames .. ")"
+    end
+    
+    -- Always show locally regardless of role
+    self:Print("|cFFFF6600" .. msg .. "|r")
+    
+    -- Only send to chat if we're the designated announcer
+    if not chatAnnounce then return end
     
     -- Determine best channel
     if IsInRaid() then
@@ -544,12 +582,7 @@ function DebuffTracker:SendAlert(categoryName, debuffNames)
     
     if not channel then return end
     
-    local msg = "[WM] Missing: " .. categoryName
-    if debuffNames and debuffNames ~= "" then
-        msg = msg .. " (" .. debuffNames .. ")"
-    end
-    
-    SendChatMessage(msg, channel)
+    pcall(SendChatMessage, msg, channel)
     alertCooldowns[categoryName] = GetTime()
 end
 
@@ -737,6 +770,9 @@ function DebuffTracker:InitDB()
     end
     if DebuffTrackerDB.alertOnlyOnBoss == nil then
         DebuffTrackerDB.alertOnlyOnBoss = true
+    end
+    if DebuffTrackerDB.assistCanAnnounce == nil then
+        DebuffTrackerDB.assistCanAnnounce = false
     end
 end
 
@@ -1600,6 +1636,25 @@ function DebuffTracker:CreateUI()
     alertBossCB:SetScript("OnClick", function(self)
         DebuffTrackerDB.alertOnlyOnBoss = self:GetChecked()
     end)
+    
+    -- Assist can announce checkbox (same row, right side)
+    local assistCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    assistCB:SetPoint("TOPLEFT", 220, yOffset)
+    assistCB.Text:SetText("Assistants can announce")
+    assistCB:SetChecked(DebuffTrackerDB.assistCanAnnounce)
+    assistCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.assistCanAnnounce = self:GetChecked()
+    end)
+    assistCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Assistant Announcements", 1, 0.8, 0)
+        GameTooltip:AddLine("By default only the raid leader sends", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("missing debuff alerts to chat. Enable this", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("if the raid leader doesn't have the addon", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and you want assistants to announce.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    assistCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
     yOffset = yOffset - 24
     
