@@ -792,6 +792,10 @@ function DebuffTracker:Print(msg)
     WM:ModulePrint("DebuffTracker", msg)
 end
 
+function DebuffTracker:VerbosePrint(msg)
+    WM:VerbosePrint("DebuffTracker", msg)
+end
+
 -- Find active debuff from a category on unit
 local function GetActiveDebuff(unit, category)
     if not UnitExists(unit) then return nil end
@@ -1599,7 +1603,7 @@ function DebuffTracker:CreateUI()
         if frame.compText then
             frame.compText:SetText(DebuffTracker:GetRaidCompositionString())
         end
-        DebuffTracker:Print("Raid scanned: " .. DebuffTracker:GetRaidCompositionString())
+        DebuffTracker:VerbosePrint("Raid scanned: " .. DebuffTracker:GetRaidCompositionString())
     end)
     frame.scanBtn = scanBtn
     

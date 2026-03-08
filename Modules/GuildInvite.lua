@@ -81,6 +81,10 @@ function GuildInvite:Print(msg)
     WM:ModulePrint("GuildInvite", msg)
 end
 
+function GuildInvite:VerbosePrint(msg)
+    WM:VerbosePrint("GuildInvite", msg)
+end
+
 local function GetTimestamp()
     return date("%H:%M:%S")
 end
@@ -152,7 +156,7 @@ function GuildInvite:InviteToRaid(playerName, source)
     -- Must have invite permissions (leader/assist or solo)
     if not HasInvitePermission() then
         if GuildInviteDB.announceInvites then
-            self:Print("Ignoring invite request from " .. playerName .. " (not leader/assist)")
+            self:VerbosePrint("Ignoring invite request from " .. playerName .. " (not leader/assist)")
         end
         return
     end
@@ -472,7 +476,7 @@ function GuildInvite:CreateUI()
         GuildInvite:UpdateGuildRoster()
         local count = 0
         for _ in pairs(guildRoster) do count = count + 1 end
-        GuildInvite:Print("Guild roster updated (" .. math.floor(count/2) .. " members)")
+        GuildInvite:VerbosePrint("Guild roster updated (" .. math.floor(count/2) .. " members)")
     end)
     
     -- Status text

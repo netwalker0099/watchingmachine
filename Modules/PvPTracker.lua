@@ -222,13 +222,13 @@ function PvPTracker:RequestSync()
     
     local now = GetTime()
     if now - lastSyncRequest < SYNC_REQUEST_COOLDOWN then
-        self:Print("Sync request on cooldown. Try again in " .. math.ceil(SYNC_REQUEST_COOLDOWN - (now - lastSyncRequest)) .. "s.")
+        self:VerbosePrint("Sync request on cooldown. Try again in " .. math.ceil(SYNC_REQUEST_COOLDOWN - (now - lastSyncRequest)) .. "s.")
         return
     end
     lastSyncRequest = now
     
     SafeSendAddonMessage(SYNC_PREFIX, "R", "GUILD")
-    self:Print("Requested sync from online guild members.")
+    self:VerbosePrint("Requested sync from online guild members.")
 end
 
 -- Send our full enemy list (queued/throttled)
@@ -245,8 +245,8 @@ function PvPTracker:SendFullSync()
         end
     end
     
-    if PvPTrackerDB.syncAnnounce and count > 0 then
-        self:Print("Queued " .. count .. " enemies for guild sync.")
+    if count > 0 then
+        self:VerbosePrint("Queued " .. count .. " enemies for guild sync.")
     end
 end
 
@@ -383,11 +383,9 @@ function PvPTracker:HandleKillBroadcast(sender, enemyName, class, level, guild, 
     if guild and guild ~= "" then enemy.guild = guild end
     if zone and zone ~= "" then enemy.lastZone = zone end
     
-    -- Alert if enabled
-    if PvPTrackerDB.syncAnnounce then
-        local colorCode = CLASS_COLORS[enemy.class] or "FF3333"
-        self:Print("|cFFFFCC00[Guild Sync]|r " .. sender .. " killed by |cFF" .. colorCode .. enemyName .. "|r in " .. (zone or "?"))
-    end
+    -- Verbose alert
+    local colorCode = CLASS_COLORS[enemy.class] or "FF3333"
+    self:VerbosePrint("[Guild Sync] " .. sender .. " killed by " .. enemyName .. " in " .. (zone or "?"))
     
     -- Refresh UI if open
     if mainFrame and mainFrame:IsShown() then
@@ -437,22 +435,18 @@ function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
         end
         peerSyncTimestamps[senderName] = now
         
-        if PvPTrackerDB.syncAnnounce then
-            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " requested sync. Sending data...")
-        end
+        self:VerbosePrint("[Guild Sync] " .. senderName .. " requested sync. Sending data...")
         self:SendFullSync()
         
     elseif msgType == "H" and #parts >= 2 then
         -- Hello: peer logged in with N enemies (optionally with points)
         local peerCount = tonumber(parts[2]) or 0
         local peerPoints = tonumber(parts[4]) or 0  -- H:count:version:points
-        if PvPTrackerDB.syncAnnounce then
-            local pointStr = ""
-            if peerPoints > 0 and PvPTrackerDB.leaderboardEnabled then
-                pointStr = ", " .. peerPoints .. " KOS pts"
-            end
-            self:Print("|cFFFFCC00[Guild Sync]|r " .. senderName .. " online (" .. peerCount .. " enemies" .. pointStr .. ")")
+        local pointStr = ""
+        if peerPoints > 0 and PvPTrackerDB.leaderboardEnabled then
+            pointStr = ", " .. peerPoints .. " KOS pts"
         end
+        self:VerbosePrint("[Guild Sync] " .. senderName .. " online (" .. peerCount .. " enemies" .. pointStr .. ")")
         -- Update leaderboard from hello
         if peerPoints > 0 and PvPTrackerDB.leaderboardEnabled then
             if not PvPTrackerDB.leaderboard then PvPTrackerDB.leaderboard = {} end
@@ -566,7 +560,7 @@ function PvPTracker:Initialize()
     -- Init leaderboard state
     lastLeader = self:GetLeader()
     lastAnnounceTime = GetTime()  -- Don't announce immediately on login
-    self:Print("Loaded. Tracking " .. self:GetEnemyCount() .. " enemies.")
+    self:VerbosePrint("Loaded. Tracking " .. self:GetEnemyCount() .. " enemies.")
 end
 
 -- ============================================
@@ -575,6 +569,10 @@ end
 
 function PvPTracker:Print(msg)
     WM:ModulePrint("PvPTracker", msg)
+end
+
+function PvPTracker:VerbosePrint(msg)
+    WM:VerbosePrint("PvPTracker", msg)
 end
 
 function PvPTracker:GetEnemyCount()
@@ -993,8 +991,8 @@ function PvPTracker:HandlePointsBroadcast(senderName, points, enemyName)
             lastUpdate = time(),
         }
         
-        if PvPTrackerDB.syncAnnounce and enemyName and enemyName ~= "" then
-            self:Print("|cFFFFCC00[Leaderboard]|r " .. senderName .. " scored a KOS kill (" .. enemyName .. ") — " .. points .. " pts")
+        if enemyName and enemyName ~= "" then
+            self:VerbosePrint("[Leaderboard] " .. senderName .. " scored a KOS kill (" .. enemyName .. ") — " .. points .. " pts")
         end
         
         -- Check if this changed the leader
@@ -1328,14 +1326,6 @@ function PvPTracker:CreateUI()
         if PvPTrackerDB.guildSync then
             PvPTracker:SendHello()
         end
-    end)
-    
-    local announceCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    announceCB:SetPoint("TOPLEFT", 220, yOffset)
-    announceCB.Text:SetText("Show sync messages")
-    announceCB:SetChecked(PvPTrackerDB.syncAnnounce)
-    announceCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.syncAnnounce = self:GetChecked()
     end)
     
     yOffset = yOffset - 24

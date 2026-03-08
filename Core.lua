@@ -139,6 +139,24 @@ function WM:ModulePrint(moduleName, msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cFF" .. color .. "[WM:" .. moduleName .. "]|r " .. msg)
 end
 
+-- Verbose/diagnostic print — only shows when verbose mode is enabled
+function WM:VerbosePrint(moduleName, msg)
+    if not WatchingMachineDB or not WatchingMachineDB.verboseChat then return end
+    local colors = {
+        AutoLogger = "00FF00",
+        KeywordMonitor = "FFAA00",
+        MailLogger = "FF69B4",
+        ServicesParser = "00CCFF",
+        WhisperLogs = "CC80FF",
+        Recruiter = "FFD700",
+        GuildInvite = "00FF00",
+        DebuffTracker = "FFCC00",
+        PvPTracker = "FF3333",
+    }
+    local color = colors[moduleName] or "FFFFFF"
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF888888[WM:" .. moduleName .. "] " .. msg .. "|r")
+end
+
 -- Register a module
 function WM:RegisterModule(name, module)
     self.modules[name] = module
@@ -466,6 +484,7 @@ local coreDefaults = {
     minimapHidden = false,
     dashboardPos = nil,
     theme = "Default",
+    verboseChat = false,    -- Show diagnostic/sync messages in chat
     moduleStates = {
         AutoLogger = true,
         KeywordMonitor = true,
@@ -989,7 +1008,7 @@ function WM:CreateSettingsPanel()
     local theme = self:GetTheme()
     
     local frame = CreateFrame("Frame", "WM_SettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(320, 200)
+    frame:SetSize(320, 230)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1095,6 +1114,29 @@ function WM:CreateSettingsPanel()
     desc:SetText("|cFF888888Theme applies to the dashboard, all module panels, and the debuff tracker. ElvUI theme uses pixel-perfect borders matching Tukui/ElvUI style.|r")
     
     yOffset = yOffset - 55
+    
+    -- Verbose chat toggle
+    local verboseCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    verboseCB:SetPoint("TOPLEFT", 20, yOffset)
+    verboseCB.Text:SetText("Verbose chat (show sync/diagnostic messages)")
+    verboseCB:SetChecked(WatchingMachineDB and WatchingMachineDB.verboseChat)
+    verboseCB:SetScript("OnClick", function(self)
+        if WatchingMachineDB then
+            WatchingMachineDB.verboseChat = self:GetChecked()
+        end
+    end)
+    verboseCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Verbose Chat Mode", 1, 0.8, 0)
+        GameTooltip:AddLine("Shows low-priority messages like guild sync", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("status, leaderboard updates, roster refreshes,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and other backend activity. Useful for", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("diagnostics. Off by default to reduce chat noise.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    verboseCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    yOffset = yOffset - 28
     
     -- Current theme indicator
     local currentLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
