@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.4 | Author: Robert
+Version 2.5 | Author: Robert
 
 ## Overview
 
@@ -201,6 +201,23 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.5
+- Global verbose chat mode: low-priority messages hidden by default, toggle in WM Settings
+  - Sync status, roster updates, leaderboard ticks, and diagnostics moved to VerbosePrint
+  - High-priority alerts (revenge kills, enemy detected, kill notifications, errors) always visible
+  - Verbose messages render in gray to distinguish from important alerts
+- DebuffTracker: alert coordination — only raid leader announces missing debuffs to chat
+  - "Assistants can announce" checkbox for raids where leader doesn't have addon
+  - All players still see alerts locally regardless of role
+- DebuffTracker: encounter-aware alerts — fixed pre-pull, post-kill, and retarget re-fire bugs
+- DebuffTracker: dead caster suppression — silences alerts when all casters for a debuff are dead
+- DebuffTracker: raid alerts force-disabled on upgrade (re-enable in settings after updating)
+- DebuffTracker: fixed IsBossUnit crash when targeting bosses in TBC Classic
+- GuildInvite: explicit leader/assist permission check before processing invite requests
+- PvP Tracker: guild sync and leaderboard now default to on for new installs
+- PvP Tracker: removed per-module "Show sync messages" checkbox (replaced by global verbose mode)
+- Full addon audit: verified no forward-reference or retail-only API issues across all 10 files
 
 ### Version 2.4
 - DebuffTracker: alert coordination — only raid leader announces to chat (prevents duplicate spam)

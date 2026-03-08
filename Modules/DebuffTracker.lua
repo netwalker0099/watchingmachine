@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local DebuffTracker = {}
 WM:RegisterModule("DebuffTracker", DebuffTracker)
 
-DebuffTracker.version = "2.4"
+DebuffTracker.version = "2.5"
 
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)
@@ -778,9 +778,9 @@ function DebuffTracker:InitDB()
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
     -- The alert system was overhauled (encounter-aware, dead caster suppression,
     -- leader-only coordination). Reset so users consciously re-enable it.
-    if not DebuffTrackerDB.alertResetV24 then
+    if not DebuffTrackerDB.alertResetV25 then
         DebuffTrackerDB.raidAlerts = false
-        DebuffTrackerDB.alertResetV24 = true
+        DebuffTrackerDB.alertResetV25 = true
     end
 end
 
