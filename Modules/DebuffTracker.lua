@@ -774,6 +774,14 @@ function DebuffTracker:InitDB()
     if DebuffTrackerDB.assistCanAnnounce == nil then
         DebuffTrackerDB.assistCanAnnounce = false
     end
+    
+    -- v2.3.1 migration: force-disable raid alerts once on upgrade.
+    -- The alert system was overhauled (encounter-aware, dead caster suppression,
+    -- leader-only coordination). Reset so users consciously re-enable it.
+    if not DebuffTrackerDB.alertResetV231 then
+        DebuffTrackerDB.raidAlerts = false
+        DebuffTrackerDB.alertResetV231 = true
+    end
 end
 
 -- ============================================
