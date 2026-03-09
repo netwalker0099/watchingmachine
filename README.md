@@ -8,14 +8,6 @@ Version 2.6 | Author: Robert
 
 Watching Machine combines nine powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition.
 
-## Security
-
-This addon is restricted to **<Socks and Sandals>** guild members only.
-
-- **Non-members**: Addon will not load, minimap button hidden, slash commands disabled
-- **Guild Members**: Full access to all monitoring modules
-- **Officers/GM Only**: Recruiting Tool is restricted to guild officers and the guild master
-
 ## Modules
 
 ### 1. Auto Logger
@@ -55,7 +47,8 @@ Track whispers and quickly look up players on Warcraft Logs.
 ### 6. Guild Invite
 Auto-invite guild members to raid when they say the trigger word.
 - Responds to trigger word (default: "inv") in guild chat or whispers
-- Verifies guild membership before inviting
+- Verifies guild membership before inviting whisper requests
+- Requires party/raid leader or raid assist to process invites
 - Auto-converts party to raid only when a 6th member is invited (won't convert legitimate 5-man parties)
 - Say "raid" or "raid convert" in party/guild to manually convert
 - TBC-compatible API calls with pcall protection (safe during arena/BG transitions)
@@ -129,7 +122,7 @@ Track hostile players who kill you in world PvP and get proximity alerts.
   - Reset button to wipe leaderboard data
 - Error-resilient: pcall-protected event handlers with auto-disable on repeated failures
 
-### 9. Recruiting Tool *(Officers Only)*
+### 9. Recruiting Tool
 Automated guild recruiting system.
 - Scan unguilded players by class and level range (1-70 for TBC)
 - Customizable message with %GUILD% placeholder
@@ -153,7 +146,7 @@ Addon-wide theme support accessible via `/wmachine settings` or the Settings but
 Built-in error capture system for debugging.
 - Captures all WatchingMachine-related errors with timestamps and stack traces
 - Stored in SavedVariables (persists across sessions, max 200 entries)
-- `/wmachine errors` - show last 20 errors in chat (works even if not authorized)
+- `/wmachine errors` - show last 20 errors in chat
 - `/wmachine clearerrors` - clear the error log
 
 ## Installation
@@ -175,7 +168,7 @@ Built-in error capture system for debugging.
 - `/wmachine ginvite` - Open Guild Invite
 - `/wmachine debuff` - Open Debuff Tracker settings
 - `/wmachine pvp` - Open PvP Enemy Tracker
-- `/wmachine recruit` - Open Recruiting Tool (Officers only)
+- `/wmachine recruit` - Open Recruiting Tool
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
