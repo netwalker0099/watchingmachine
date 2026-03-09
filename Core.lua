@@ -66,14 +66,14 @@ seterrorhandler(function(msg)
     end
 end)
 
--- Security Configuration
-local REQUIRED_GUILD = "Socks and Sandals"
+-- Security Configuration (guild restriction removed — open to all)
+local REQUIRED_GUILD = nil
 local OFFICER_RANK_THRESHOLD = 1  -- Rank index 0 = GM, 1 = Officer only
 
--- Security State
-local isAuthorized = false
-local isOfficer = false
-local securityCheckComplete = false
+-- Security State (always authorized)
+local isAuthorized = true
+local isOfficer = true
+local securityCheckComplete = true
 
 -- ============================================
 -- CLASSIC-COMPATIBLE TIMER FUNCTIONS
@@ -393,39 +393,11 @@ end
 -- ============================================
 
 function WM:CheckGuildSecurity()
-    if not IsInGuild() then
-        isAuthorized = false
-        isOfficer = false
-        securityCheckComplete = true
-        return false
-    end
-    
-    local guildName, guildRankName, guildRankIndex = GetGuildInfo("player")
-    
-    if not guildName then
-        -- Guild info not loaded yet, try again later
-        return nil
-    end
-    
+    -- Guild restriction removed — always authorized
+    isAuthorized = true
+    isOfficer = true
     securityCheckComplete = true
-    
-    -- Check guild name (case-insensitive)
-    if guildName:lower() == REQUIRED_GUILD:lower() then
-        isAuthorized = true
-        
-        -- Check officer status (GM = 0, Officer = 1)
-        if guildRankIndex and guildRankIndex <= OFFICER_RANK_THRESHOLD then
-            isOfficer = true
-        else
-            isOfficer = false
-        end
-        
-        return true
-    else
-        isAuthorized = false
-        isOfficer = false
-        return false
-    end
+    return true
 end
 
 function WM:IsAuthorized()
@@ -457,21 +429,16 @@ function WM:OnSecurityCheckPassed()
     
     self:Print("Loaded v" .. self.version .. ". Type /wmachine to open dashboard.")
     
-    -- Initialize authorized modules
+    -- Initialize modules
     for name, module in pairs(self.modules) do
-        -- Skip Recruiter for non-officers
-        if name == "Recruiter" and not isOfficer then
-            -- Don't initialize
-        elseif module.Initialize then
+        if module.Initialize then
             module:Initialize()
         end
     end
     
     -- Start dashboard update timer
     RunTicker(2, function()
-        if isAuthorized then
-            self:UpdateDashboard()
-        end
+        self:UpdateDashboard()
     end)
 end
 
@@ -635,10 +602,6 @@ local function CreateMinimapButton()
     button:SetScript("OnClick", function(self, btn)
         if isDragging then return end
         if btn == "LeftButton" or btn == "RightButton" then
-            if not isAuthorized then
-                WM:Print("Not authorized. You must be a member of <" .. REQUIRED_GUILD .. ">.")
-                return
-            end
             WM:ToggleDashboard()
         end
     end)
@@ -648,27 +611,14 @@ local function CreateMinimapButton()
         if isDragging then return end
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Watching Machine", 1, 1, 1)
+        GameTooltip:AddLine("Left-click: Toggle Dashboard", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Drag: Move button anywhere", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(" ")
         
-        if not isAuthorized then
-            GameTooltip:AddLine("|cFFFF0000Not Authorized|r", 1, 0, 0)
-            GameTooltip:AddLine("Requires <" .. REQUIRED_GUILD .. "> membership", 0.7, 0.7, 0.7)
-        else
-            if isOfficer then
-                GameTooltip:AddLine("|cFFFFD700Officer Access|r", 0.7, 0.7, 0.7)
-            else
-                GameTooltip:AddLine("|cFF00FF00Authorized|r", 0.7, 0.7, 0.7)
-            end
-            GameTooltip:AddLine("Left-click: Toggle Dashboard", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine("Drag: Move button anywhere", 0.7, 0.7, 0.7)
-            GameTooltip:AddLine(" ")
-            
-            for name, module in pairs(WM.modules) do
-                if name == "Recruiter" and not isOfficer then
-                    -- Skip
-                elseif module.GetQuickStatus then
-                    local status = module:GetQuickStatus()
-                    GameTooltip:AddLine(name .. ": " .. status, 0.8, 0.8, 0.8)
-                end
+        for name, module in pairs(WM.modules) do
+            if module.GetQuickStatus then
+                local status = module:GetQuickStatus()
+                GameTooltip:AddLine(name .. ": " .. status, 0.8, 0.8, 0.8)
             end
         end
         
@@ -897,10 +847,6 @@ function WM:CreateModuleCards()
     }
     
     for _, moduleName in ipairs(moduleOrder) do
-        -- Skip Recruiter for non-officers
-        if moduleName == "Recruiter" and not isOfficer then
-            -- Don't create card for Recruiter
-        else
             local info = moduleInfo[moduleName]
             local module = self.modules[moduleName]
         
@@ -952,7 +898,6 @@ function WM:CreateModuleCards()
         dashboard.moduleCards[moduleName] = card
         
         yOffset = yOffset + cardHeight + cardSpacing
-        end -- end of officer check if
     end
 end
 
@@ -960,25 +905,16 @@ function WM:UpdateDashboard()
     if not dashboard or not dashboard:IsShown() then return end
     
     for moduleName, card in pairs(dashboard.moduleCards) do
-        -- Skip if card shouldn't exist (Recruiter for non-officers)
-        if moduleName == "Recruiter" and not isOfficer then
-            -- Skip
+        local module = self.modules[moduleName]
+        if module and module.GetQuickStatus then
+            card.statusText:SetText(module:GetQuickStatus())
         else
-            local module = self.modules[moduleName]
-            if module and module.GetQuickStatus then
-                card.statusText:SetText(module:GetQuickStatus())
-            else
-                card.statusText:SetText("|cFF888888Module not loaded|r")
-            end
+            card.statusText:SetText("|cFF888888Module not loaded|r")
         end
     end
 end
 
 function WM:ToggleDashboard()
-    if not isAuthorized then
-        return
-    end
-    
     if not dashboard then
         self:CreateDashboard()
     end
@@ -1212,14 +1148,11 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
     print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")
-    if isOfficer then
-        print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool |cFFFFD700(Officers)|r")
-    end
+    print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
-    print("|cFFFFFF00/wmachine debug|r - Show security debug info")
-    print("|cFFFFFF00/wmachine recheck|r - Force security recheck")
+    print("|cFFFFFF00/wmachine debug|r - Show debug info")
     print("|cFFFFFF00/wmachine errors|r - Show captured error log")
     print("|cFFFFFF00/wmachine clearerrors|r - Clear error log")
     print("|cFFFFFF00/wmachine help|r - Show this help")
@@ -1236,33 +1169,18 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     msg = msg or ""
     local cmd = strtrim(msg:lower())
     
-    -- Debug command always available
+    -- Debug command
     if cmd == "debug" then
         WM:Print("=== Debug Info ===")
-        WM:Print("securityCheckComplete: " .. tostring(securityCheckComplete))
-        WM:Print("isAuthorized: " .. tostring(isAuthorized))
-        WM:Print("isOfficer: " .. tostring(isOfficer))
+        WM:Print("Version: " .. WM.version)
         WM:Print("IsInGuild: " .. tostring(IsInGuild()))
         local guildName, rankName, rankIndex = GetGuildInfo("player")
         WM:Print("GuildInfo: name='" .. tostring(guildName) .. "' rank='" .. tostring(rankName) .. "' index=" .. tostring(rankIndex))
-        WM:Print("REQUIRED_GUILD: '" .. REQUIRED_GUILD .. "'")
+        WM:Print("Verbose: " .. tostring(WatchingMachineDB and WatchingMachineDB.verboseChat))
         return
     end
     
-    -- Force recheck command
-    if cmd == "recheck" then
-        WM:Print("Forcing security recheck...")
-        securityCheckComplete = false
-        isAuthorized = false
-        isOfficer = false
-        WM:CheckGuildSecurity()
-        if isAuthorized then
-            WM:OnSecurityCheckPassed()
-        end
-        return
-    end
-    
-    -- Error log commands (always available, even if not authorized)
+    -- Error log commands
     if cmd == "errors" or cmd == "errorlog" or cmd == "err" then
         local log = WatchingMachineDB and WatchingMachineDB.errorLog or WM._errorLog
         if not log or #log == 0 then
@@ -1287,12 +1205,6 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             WM._errorLog = WatchingMachineDB.errorLog
         end
         WM:Print("Error log cleared.")
-        return
-    end
-    
-    -- Security check for all other commands
-    if not isAuthorized then
-        WM:Print("|cFFFF0000Not authorized. Use /wmachine debug to check status.|r")
         return
     end
     
@@ -1332,11 +1244,6 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
         
     elseif cmd == "recruit" or cmd == "recruiter" or cmd == "guild" then
-        -- Officer-only command
-        if not isOfficer then
-            WM:Print("Recruiting Tool is restricted to officers.")
-            return
-        end
         local module = WM.modules.Recruiter
         if module and module.ToggleUI then
             module:ToggleUI()
@@ -1400,10 +1307,7 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "status" then
         WM:Print("=== Module Status ===")
         for name, module in pairs(WM.modules) do
-            -- Skip Recruiter for non-officers
-            if name == "Recruiter" and not isOfficer then
-                -- Don't show
-            elseif module.GetQuickStatus then
+            if module.GetQuickStatus then
                 print("  " .. name .. ": " .. module:GetQuickStatus())
             else
                 print("  " .. name .. ": |cFF888888Loaded|r")
@@ -1451,12 +1355,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         InitCoreDB()
         
     elseif event == "PLAYER_LOGIN" then
-        -- Reset security state for new character
-        isAuthorized = false
-        isOfficer = false
-        securityCheckComplete = false
-        retryCount = 0
-        
         -- Hide dashboard if it exists from previous session
         if dashboard then
             dashboard:Hide()
@@ -1466,7 +1364,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         CreateMinimapButton()
         
         -- Hook Minimap OnShow to restore our button when minimap becomes visible
-        -- This catches cases where the minimap is hidden/shown during zone transitions
         if Minimap and not Minimap.wmHooked then
             Minimap:HookScript("OnShow", function()
                 RunAfter(0.1, function()
@@ -1476,7 +1373,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             Minimap.wmHooked = true
         end
         
-        -- Request guild roster to ensure we have current data
+        -- Request guild roster for modules that need it
         if IsInGuild() then
             if C_GuildInfo and C_GuildInfo.GuildRoster then
                 C_GuildInfo.GuildRoster()
@@ -1485,42 +1382,23 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             end
         end
         
-        -- Try initial security check with increasing delays
-        local function TrySecurityCheck()
-            if securityCheckComplete then return end
-            
-            retryCount = retryCount + 1
-            
-            if not PerformSecurityCheck() and retryCount < maxRetries then
-                RunAfter(2, TrySecurityCheck)
-            end
-        end
-        
-        RunAfter(1, TrySecurityCheck)
+        -- Initialize immediately (no guild check needed)
+        RunAfter(1, function()
+            PerformSecurityCheck()
+        end)
         
     elseif event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
-        -- Re-check security when guild info updates
-        if not securityCheckComplete then
-            PerformSecurityCheck()
-        end
+        -- Guild roster updated (modules may need this data)
         
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Restore minimap button after zone change with a small delay
-        -- Some addons/UI elements may manipulate minimap during zone transitions
         RunAfter(0.5, function()
             WM:RestoreMinimapButton()
         end)
-        -- Also restore immediately in case the delay isn't needed
         WM:RestoreMinimapButton()
         
     elseif event == "PLAYER_LEAVING_WORLD" then
-        -- Reset security state when leaving (character switch/logout)
-        isAuthorized = false
-        isOfficer = false
-        securityCheckComplete = false
-        retryCount = 0
-        
-        -- Hide dashboard (minimap button persists based on user preference)
+        -- Hide dashboard on logout/character switch
         if dashboard then
             dashboard:Hide()
         end
