@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.5 | Author: Robert
+Version 2.6 | Author: Robert
 
 ## Overview
 
@@ -201,6 +201,14 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.6
+- Removed guild restriction — addon is now open to all players
+  - No longer requires "Socks and Sandals" guild membership
+  - Officer rank gating removed — all modules including Recruiter available to everyone
+  - Removed security check retry loop, /wmachine recheck command
+  - Simplified login flow: modules initialize immediately (no guild info wait)
+  - 160 lines of security scaffolding removed
 
 ### Version 2.5
 - Global verbose chat mode: low-priority messages hidden by default, toggle in WM Settings
