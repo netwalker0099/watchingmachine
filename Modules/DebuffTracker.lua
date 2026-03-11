@@ -86,11 +86,12 @@ local DEBUFF_CATEGORIES = {
             { name = "Curse of Weakness", spellIDs = {27224, 11708, 11707, 7646, 6205, 702, 1108}, priority = 80, class = "WARLOCK" },
         }
     },
-    -- Healing Reduction
+    -- Healing Reduction (optional — not auto-enabled, enable manually if needed)
     {
         name = "Healing Debuff",
         shortName = "Heal-",
         color = {0, 0.6, 0.3},  -- Green
+        optional = true,         -- Auto-detect won't enable this; user must opt in
         debuffs = {
             { name = "Mortal Strike", spellIDs = {30330, 21553, 21552, 21551, 12294}, priority = 100, class = "WARRIOR", spec = "Arms" },
             { name = "Wound Poison", spellIDs = {27189, 13224, 13223, 13222, 13221, 13220, 13219, 13218}, priority = 80, class = "ROGUE" },
@@ -467,14 +468,26 @@ function DebuffTracker:ApplyAutoDetect()
     
     for _, category in ipairs(DEBUFF_CATEGORIES) do
         local hasCoverage = self:IsCategoryCoverable(category)
+        local skipDebuffs = false
         
-        -- Auto-enable/disable the category
-        if DebuffTrackerDB.trackedCategories[category.name] ~= hasCoverage then
-            DebuffTrackerDB.trackedCategories[category.name] = hasCoverage
-            changed = true
+        -- Optional categories (e.g. Healing Debuff) are never auto-enabled.
+        -- If the user manually enabled one, still auto-configure its individual debuffs.
+        if category.optional then
+            if not DebuffTrackerDB.trackedCategories[category.name] then
+                -- User hasn't enabled it — skip entirely
+                skipDebuffs = true
+            end
+            -- Don't touch the category toggle — leave it as the user set it
+        else
+            -- Auto-enable/disable the category
+            if DebuffTrackerDB.trackedCategories[category.name] ~= hasCoverage then
+                DebuffTrackerDB.trackedCategories[category.name] = hasCoverage
+                changed = true
+            end
         end
         
         -- Within category, enable debuffs whose class+spec is available, disable others
+        if not skipDebuffs then
         if not DebuffTrackerDB.trackedDebuffs[category.name] then
             DebuffTrackerDB.trackedDebuffs[category.name] = {}
         end
@@ -486,6 +499,7 @@ function DebuffTracker:ApplyAutoDetect()
                 changed = true
             end
         end
+        end -- if not skipDebuffs
     end
     
     if changed then
@@ -1781,7 +1795,9 @@ function DebuffTracker:CreateUI()
         
         -- Show coverage indicator in category name
         local coverageTag = ""
-        if DebuffTrackerDB.autoDetect then
+        if category.optional then
+            coverageTag = " |cFFAAAA00(optional)|r"
+        elseif DebuffTrackerDB.autoDetect then
             if catCoverable then
                 coverageTag = " |cFF00FF00(available)|r"
             else
@@ -1943,8 +1959,8 @@ function DebuffTracker:CreateUI()
             DebuffTracker:UpdateDebuffs()
         end)
         
-        -- Also disable category CB when auto-detect is on
-        if DebuffTrackerDB.autoDetect then
+        -- Disable category CB when auto-detect is on (except optional categories)
+        if DebuffTrackerDB.autoDetect and not category.optional then
             catCB:Disable()
             catCB:SetAlpha(0.6)
         end
