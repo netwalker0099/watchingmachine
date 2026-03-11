@@ -668,6 +668,9 @@ function PvPTracker:RecordKill(killerName, killerGUID)
     if IsInBattleground() then return end
     if PvPTrackerDB.trackManualOnly then return end
     
+    -- Must be an actual player (GUID starts with "Player-"), not an NPC/creature
+    if killerGUID and not IsPlayerGUID(killerGUID) then return end
+    
     -- Determine class from GUID if possible
     local killerClass = nil
     local killerLevel = nil
@@ -761,6 +764,12 @@ function PvPTracker:CheckUnit(unit)
     if not unit or not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
     if UnitIsFriend("player", unit) then return end
+    -- Faction check: must be opposite faction (not just hostile NPC)
+    if UnitFactionGroup then
+        local myFaction = UnitFactionGroup("player")
+        local theirFaction = UnitFactionGroup(unit)
+        if myFaction and theirFaction and myFaction == theirFaction then return end
+    end
     
     local name = UnitName(unit)
     if not name then return end
@@ -777,14 +786,20 @@ function PvPTracker:ScanNameplates()
     -- Clear old detections
     detectedEnemies = {}
     
+    local myFaction = UnitFactionGroup and UnitFactionGroup("player")
+    
     -- Scan all nameplate units
     for i = 1, 40 do
         local unit = "nameplate" .. i
         if UnitExists(unit) and UnitIsPlayer(unit) and not UnitIsFriend("player", unit) then
-            local name = UnitName(unit)
-            if name and PvPTrackerDB.enemies[name] then
-                detectedEnemies[name] = true
-                self:TriggerAlert(name, unit)
+            -- Faction check: skip same-faction players
+            local theirFaction = UnitFactionGroup and UnitFactionGroup(unit)
+            if not myFaction or not theirFaction or myFaction ~= theirFaction then
+                local name = UnitName(unit)
+                if name and PvPTrackerDB.enemies[name] then
+                    detectedEnemies[name] = true
+                    self:TriggerAlert(name, unit)
+                end
             end
         end
     end
@@ -1062,17 +1077,34 @@ end
 -- Safe flag check - handles nil constants gracefully
 local PLAYER_FLAG = COMBATLOG_OBJECT_TYPE_PLAYER or 0x0400
 local HOSTILE_FLAG = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x0040
+local NPC_CONTROL = COMBATLOG_OBJECT_CONTROL_NPC or 0x0200
 
-local function IsHostilePlayer(flags)
-    if not flags or flags == 0 then return false end
-    if not bit or not bit.band then return false end
-    return bit.band(flags, PLAYER_FLAG) > 0 and bit.band(flags, HOSTILE_FLAG) > 0
+-- Check GUID to confirm it's an actual player (not NPC/creature/pet)
+local function IsPlayerGUID(guid)
+    if not guid then return false end
+    return guid:match("^Player%-") ~= nil
 end
 
-local function IsPlayerFlag(flags)
+local function IsHostilePlayer(flags, guid)
     if not flags or flags == 0 then return false end
     if not bit or not bit.band then return false end
-    return bit.band(flags, PLAYER_FLAG) > 0
+    -- Must have player type flag AND hostile reaction
+    if bit.band(flags, PLAYER_FLAG) == 0 then return false end
+    if bit.band(flags, HOSTILE_FLAG) == 0 then return false end
+    -- Reject NPC-controlled entities (boss pets, mind controlled units)
+    if bit.band(flags, NPC_CONTROL) > 0 then return false end
+    -- GUID check: definitive — player GUIDs always start with "Player-"
+    if guid and not IsPlayerGUID(guid) then return false end
+    return true
+end
+
+local function IsPlayerFlag(flags, guid)
+    if not flags or flags == 0 then return false end
+    if not bit or not bit.band then return false end
+    if bit.band(flags, PLAYER_FLAG) == 0 then return false end
+    -- GUID check if available
+    if guid and not IsPlayerGUID(guid) then return false end
+    return true
 end
 
 function PvPTracker:ProcessCombatLog()
@@ -1086,7 +1118,7 @@ function PvPTracker:ProcessCombatLog()
     
     -- Track damage sources hitting the player (for kill attribution)
     if destGUID and destGUID == playerGUID and sourceGUID and sourceName then
-        if IsHostilePlayer(sourceFlags) then
+        if IsHostilePlayer(sourceFlags, sourceGUID) then
             if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
                subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
                subevent == "SPELL_INSTAKILL" then
@@ -1109,14 +1141,14 @@ function PvPTracker:ProcessCombatLog()
     
     -- Also catch PARTY_KILL where we are the victim
     if subevent == "PARTY_KILL" and destGUID == playerGUID then
-        if sourceName and IsPlayerFlag(sourceFlags) then
+        if sourceName and IsPlayerFlag(sourceFlags, sourceGUID) then
             self:RecordKill(sourceName, sourceGUID)
         end
     end
     
     -- Track outgoing damage from us to hostile players (for revenge detection)
     if sourceGUID and sourceGUID == playerGUID and destGUID and destName then
-        if IsHostilePlayer(destFlags) then
+        if IsHostilePlayer(destFlags, destGUID) then
             if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
                subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
                subevent == "SPELL_INSTAKILL" then
@@ -1130,7 +1162,7 @@ function PvPTracker:ProcessCombatLog()
     
     -- Detect PARTY_KILL where we are the killer (works in groups)
     if subevent == "PARTY_KILL" and sourceGUID == playerGUID then
-        if destName and IsHostilePlayer(destFlags) then
+        if destName and IsHostilePlayer(destFlags, destGUID) then
             self:CheckKOSKill(destName)
         end
     end
@@ -1145,7 +1177,7 @@ function PvPTracker:ProcessCombatLog()
     
     -- Proximity: check if any combat log source is a tracked enemy
     if sourceName and PvPTrackerDB.enemies and PvPTrackerDB.enemies[sourceName] then
-        if IsPlayerFlag(sourceFlags) then
+        if IsPlayerFlag(sourceFlags, sourceGUID) then
             self:TriggerAlert(sourceName, nil)
         end
     end
