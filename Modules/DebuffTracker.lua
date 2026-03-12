@@ -201,6 +201,9 @@ local defaults = {
     alertCooldown = 30,      -- Seconds between repeat alerts for same category
     alertOnlyOnBoss = true,  -- Only alert for boss targets
     assistCanAnnounce = false, -- Allow raid assistants to announce (off to prevent duplicates)
+    -- Pull announce settings
+    pullAnnounce = false,        -- Announce who pulled the boss
+    pullAnnounceChannel = "SAY", -- Channel: SAY, PARTY, RAID, RAID_WARNING
 }
 
 -- Initialize tracked categories and per-debuff defaults (all enabled)
@@ -233,6 +236,11 @@ local DEAD_CASTER_CHECK_INTERVAL = 2  -- Re-check alive status every 2 seconds
 local inCombat = false       -- Tracked via PLAYER_REGEN events
 local bossEngaged = false    -- True when target boss is in combat (not just player)
 local bossDeadGUID = nil     -- GUID of boss that died (suppress alerts until combat drop)
+
+-- Pull detection state
+local pullAnnounced = false      -- Already announced this pull
+local trackedBossGUIDs = {}      -- GUIDs of bosses we've seen: trackedBossGUIDs[guid] = name
+local pullDetectFrame = nil      -- Separate frame for combat log events
 
 -- ============================================
 -- RAID COMPOSITION + SPEC SCANNING
@@ -538,6 +546,7 @@ function DebuffTracker:GetRaidCompositionString()
     return table.concat(parts, ", ")
 end
 
+
 -- ============================================
 -- MISSING DEBUFF RAID ALERTS
 -- ============================================
@@ -627,6 +636,135 @@ local function IsBossUnit(unit)
     return false
 end
 
+-- ============================================
+-- BOSS PULL DETECTION
+-- ============================================
+
+-- Track a boss GUID from a unit (called when targeting a boss)
+function DebuffTracker:TrackBossGUID(unit)
+    if not unit or not UnitExists(unit) then return end
+    if not IsBossUnit(unit) then return end
+    if UnitIsDead(unit) then return end
+    
+    local guid = UnitGUID(unit)
+    local name = UnitName(unit)
+    if guid and name then
+        trackedBossGUIDs[guid] = name
+    end
+end
+
+-- Check if a GUID belongs to a tracked boss
+local function IsBossGUID(guid)
+    return guid and trackedBossGUIDs[guid] ~= nil
+end
+
+-- Check if a GUID belongs to someone in our raid/party
+local function IsInOurGroup(guid)
+    if not guid then return false end
+    -- Check player
+    if guid == UnitGUID("player") then return true end
+    -- Check raid
+    if IsInRaid() then
+        for i = 1, 40 do
+            local unit = "raid" .. i
+            if UnitExists(unit) and UnitGUID(unit) == guid then
+                return true
+            end
+        end
+    elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
+        for i = 1, 4 do
+            local unit = "party" .. i
+            if UnitExists(unit) and UnitGUID(unit) == guid then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Subevents that indicate a player attacked/engaged a mob
+local PULL_SUBEVENTS = {
+    SWING_DAMAGE = true,
+    RANGE_DAMAGE = true,
+    SPELL_DAMAGE = true,
+    SPELL_PERIODIC_DAMAGE = true,
+    SPELL_CAST_SUCCESS = true,
+    SPELL_AURA_APPLIED = true,
+    SPELL_AURA_APPLIED_DOSE = true,
+    SPELL_INSTAKILL = true,
+}
+
+function DebuffTracker:ProcessPullDetection()
+    if not DebuffTrackerDB or not DebuffTrackerDB.pullAnnounce then return end
+    if pullAnnounced then return end
+    if not inCombat then return end
+    if not CombatLogGetCurrentEventInfo then return end
+    
+    local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags = CombatLogGetCurrentEventInfo()
+    
+    if not subevent or not PULL_SUBEVENTS[subevent] then return end
+    if not sourceGUID or not destGUID then return end
+    
+    -- Dest must be a tracked boss
+    if not IsBossGUID(destGUID) then return end
+    
+    -- Source must be a player in our group
+    if not sourceName then return end
+    if not IsInOurGroup(sourceGUID) then return end
+    
+    -- This is the puller!
+    pullAnnounced = true
+    self:AnnouncePull(sourceName, trackedBossGUIDs[destGUID])
+end
+
+function DebuffTracker:AnnouncePull(pullerName, bossName)
+    if not pullerName then return end
+    
+    local msg = "First hit: " .. pullerName
+    if bossName then
+        msg = msg .. " on " .. bossName
+    end
+    
+    -- Local alert always
+    self:Print("|cFFFF8800" .. msg .. "|r")
+    
+    -- Only the announcer sends to chat
+    if not ShouldAnnounce() then return end
+    
+    local channel = DebuffTrackerDB.pullAnnounceChannel or "SAY"
+    
+    -- Validate channel
+    if channel == "RAID_WARNING" then
+        if not IsInRaid() then channel = "SAY"
+        elseif not UnitIsGroupLeader("player") and not UnitIsGroupAssistant("player") then
+            channel = "RAID"
+        end
+    elseif channel == "RAID" then
+        if not IsInRaid() then channel = "PARTY" end
+    elseif channel == "PARTY" then
+        if not IsInGroup() then channel = "SAY" end
+    end
+    
+    pcall(SendChatMessage, msg, channel)
+end
+
+function DebuffTracker:RegisterPullDetection()
+    if pullDetectFrame then return end
+    
+    pullDetectFrame = CreateFrame("Frame")
+    pullDetectFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    pullDetectFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    pullDetectFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+    pullDetectFrame:SetScript("OnEvent", function(self, event)
+        if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+            pcall(DebuffTracker.ProcessPullDetection, DebuffTracker)
+        elseif event == "PLAYER_TARGET_CHANGED" then
+            pcall(DebuffTracker.TrackBossGUID, DebuffTracker, "target")
+        elseif event == "UPDATE_MOUSEOVER_UNIT" then
+            pcall(DebuffTracker.TrackBossGUID, DebuffTracker, "mouseover")
+        end
+    end)
+end
 function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
@@ -723,6 +861,7 @@ end
 function DebuffTracker:Initialize()
     self:InitDB()
     self:CreateTrackerFrame()
+    self:RegisterPullDetection()
     -- Sync combat state (handles /reload mid-fight)
     inCombat = UnitAffectingCombat("player") or false
     -- Initial raid scan after a short delay (roster may not be ready yet)
@@ -787,6 +926,12 @@ function DebuffTracker:InitDB()
     end
     if DebuffTrackerDB.assistCanAnnounce == nil then
         DebuffTrackerDB.assistCanAnnounce = false
+    end
+    if DebuffTrackerDB.pullAnnounce == nil then
+        DebuffTrackerDB.pullAnnounce = false
+    end
+    if DebuffTrackerDB.pullAnnounceChannel == nil then
+        DebuffTrackerDB.pullAnnounceChannel = "SAY"
     end
     
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
@@ -1106,6 +1251,7 @@ function DebuffTracker:CreateTrackerFrame()
             deadCasterCache = {}
             bossEngaged = false
             bossDeadGUID = nil
+            pullAnnounced = false
             return
         elseif event == "PLAYER_REGEN_ENABLED" then
             inCombat = false
@@ -1116,6 +1262,8 @@ function DebuffTracker:CreateTrackerFrame()
             deadCasterCache = {}
             bossEngaged = false
             bossDeadGUID = nil
+            pullAnnounced = false
+            trackedBossGUIDs = {}
             return
         end
         if event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
@@ -1384,6 +1532,9 @@ function DebuffTracker:UpdateDebuffs()
         -- alertedThisPull prevents re-firing for the entire encounter.
         return
     end
+    
+    -- Track boss GUIDs for pull detection
+    self:TrackBossGUID(unit)
     
     -- Dead target: clear indicators, suppress alerts
     if UnitIsDead(unit) then
@@ -1741,7 +1892,66 @@ function DebuffTracker:CreateUI()
     alertDesc:SetJustifyH("LEFT")
     alertDesc:SetText("|cFF888888Uses /rw if you have assist, otherwise /raid. Only alerts for enabled categories.|r")
     
-    yOffset = yOffset - 18
+    yOffset = yOffset - 22
+    
+    -- ========================================
+    -- PULL ANNOUNCE SECTION
+    -- ========================================
+    
+    local pullCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    pullCB:SetPoint("TOPLEFT", 20, yOffset)
+    pullCB.Text:SetText("Announce who pulled the boss")
+    pullCB:SetChecked(DebuffTrackerDB.pullAnnounce)
+    pullCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.pullAnnounce = self:GetChecked()
+    end)
+    pullCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Pull Announce", 1, 0.8, 0)
+        GameTooltip:AddLine("Detects the first player in your group to", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("hit a boss and announces it to chat.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Example: First hit: Playername on Gruul", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    pullCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    -- Channel selector
+    local chanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    chanLabel:SetPoint("TOPLEFT", 220, yOffset - 2)
+    chanLabel:SetText("|cFF888888Channel:|r")
+    
+    local channels = { "SAY", "PARTY", "RAID", "RAID_WARNING" }
+    local channelLabels = { SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw" }
+    
+    local currentChannel = DebuffTrackerDB.pullAnnounceChannel or "SAY"
+    
+    local chanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    chanBtn:SetSize(55, 18)
+    chanBtn:SetPoint("LEFT", chanLabel, "RIGHT", 5, 0)
+    chanBtn:SetText(channelLabels[currentChannel] or currentChannel)
+    chanBtn:SetScript("OnClick", function(self)
+        -- Cycle through channels
+        local cur = DebuffTrackerDB.pullAnnounceChannel or "SAY"
+        local nextIdx = 1
+        for i, ch in ipairs(channels) do
+            if ch == cur then
+                nextIdx = (i % #channels) + 1
+                break
+            end
+        end
+        DebuffTrackerDB.pullAnnounceChannel = channels[nextIdx]
+        self:SetText(channelLabels[channels[nextIdx]] or channels[nextIdx])
+    end)
+    chanBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Announce Channel", 1, 0.8, 0)
+        GameTooltip:AddLine("Click to cycle: Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("/rw falls back to Raid if no assist.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    chanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    
+    yOffset = yOffset - 22
     
     -- Separator
     local alertSep = frame:CreateTexture(nil, "ARTWORK")
