@@ -6,7 +6,7 @@
 ## Title: Watching Machine
 ## Notes: Comprehensive monitoring suite - Keywords, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker
 ## Author: Robert
-## Version: 2.6
+## Version: 2.7
 ## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB
 
 Core.lua

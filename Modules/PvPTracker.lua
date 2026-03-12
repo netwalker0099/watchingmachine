@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local PvPTracker = {}
 WM:RegisterModule("PvPTracker", PvPTracker)
 
-PvPTracker.version = "2.6"
+PvPTracker.version = "2.7"
 
 -- ============================================
 -- DEFAULT SETTINGS

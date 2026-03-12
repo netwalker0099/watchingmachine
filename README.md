@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.6 | Author: Robert
+Version 2.7 | Author: Robert
 
 ## Overview
 
@@ -194,6 +194,21 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 
 ## Changelog
+
+### Version 2.7
+- DebuffTracker: Boss pull announce — "First hit: Playername on Gruul"
+  - Detects first player in group to hit a boss via combat log
+  - Configurable channel: Say, Party, Raid, /rw (cycles on click)
+  - Follows leader-only announcement rules (no duplicate spam)
+  - Resets per encounter
+- DebuffTracker: Healing Debuff category marked optional in auto-detect
+  - Auto-detect won't enable it; user must opt in manually
+  - Shows "(optional)" tag in settings, checkbox stays interactive
+- PvP Tracker: GUID-based player validation + faction checks
+  - Fixed boss abilities (e.g. Shade of Aran Flame Wreath) being logged as PvP kills
+  - Player GUIDs validated via "Player-" prefix (NPCs start with "Creature-")
+  - NPC-controlled entities rejected via COMBATLOG_OBJECT_CONTROL_NPC flag
+  - UnitFactionGroup check on unit detection and nameplate scanning
 
 ### Version 2.6
 - Removed guild restriction — addon is now open to all players
