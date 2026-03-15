@@ -662,6 +662,12 @@ local CLASS_COLORS = {
 -- KILL TRACKING
 -- ============================================
 
+-- Check GUID to confirm it's an actual player (not NPC/creature/pet)
+local function IsPlayerGUID(guid)
+    if not guid then return false end
+    return guid:match("^Player%-") ~= nil
+end
+
 function PvPTracker:RecordKill(killerName, killerGUID)
     if not PvPTrackerDB.enabled then return end
     if not killerName or killerName == "" then return end
@@ -1078,12 +1084,6 @@ end
 local PLAYER_FLAG = COMBATLOG_OBJECT_TYPE_PLAYER or 0x0400
 local HOSTILE_FLAG = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x0040
 local NPC_CONTROL = COMBATLOG_OBJECT_CONTROL_NPC or 0x0200
-
--- Check GUID to confirm it's an actual player (not NPC/creature/pet)
-local function IsPlayerGUID(guid)
-    if not guid then return false end
-    return guid:match("^Player%-") ~= nil
-end
 
 local function IsHostilePlayer(flags, guid)
     if not flags or flags == 0 then return false end
