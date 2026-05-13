@@ -19,7 +19,7 @@ local defaults = {
     currentClass = 1,
     currentLetter = 1,
     scanDelay = 5,
-    whisperDelay = 2,
+    whisperDelay = 6,
     cooldownDays = 7,
     activityLog = {},
     maxLogEntries = 100,
@@ -38,6 +38,7 @@ local isScanning = false
 local scanTimer = 0
 local whisperQueue = {}
 local whisperTimer = 0
+local whisperBackoff = 0
 local currentWhoQuery = ""
 local waitingForContinue = false
 local mainFrame = nil
@@ -286,22 +287,38 @@ end
 
 function Recruiter:SendNextWhisper()
     if #whisperQueue == 0 then return end
-    
-    local target = table.remove(whisperQueue, 1)
-    
-    SendChatMessage(self:GetFormattedMessage(), "WHISPER", nil, target.name)
-    
-    local logMsg = "Whispered " .. target.name .. " (L" .. target.level .. ")"
-    
+
+    -- Peek the queue; only remove on confirmed send so we can retry on throttle
+    local target = whisperQueue[1]
+
+    local ok, err = pcall(SendChatMessage, self:GetFormattedMessage(), "WHISPER", nil, target.name)
+
+    if not ok then
+        -- Most likely cause: "Chat message limits exceeded" from client-side throttle.
+        -- Apply exponential backoff (5s -> 60s cap) on top of the configured whisperDelay.
+        whisperBackoff = math.min((whisperBackoff > 0 and whisperBackoff * 2) or 5, 60)
+        whisperTimer = RecruitingToolDB.whisperDelay + whisperBackoff
+        self:Print("|cFFFF8800Chat throttle hit|r - backing off " .. whisperBackoff .. "s (" .. #whisperQueue .. " queued)")
+        self:AddLog("Throttled, backoff " .. whisperBackoff .. "s")
+        self:UpdateUI()
+        return
+    end
+
+    -- Success - remove from queue and reset backoff
+    table.remove(whisperQueue, 1)
+    whisperBackoff = 0
+
+    local logMsg = "Whispered " .. target.name .. " (L" .. tostring(target.level) .. ")"
+
     if RecruitingToolDB.autoInvite then
         GuildInvite(target.name)
         logMsg = logMsg .. " + Invited"
     end
-    
+
     RecruitingToolDB.whispered[target.name] = time()
     self:AddLog(logMsg)
     self:Print("Messaged " .. target.name .. " - " .. #whisperQueue .. " remaining")
-    
+
     whisperTimer = RecruitingToolDB.whisperDelay
     self:UpdateUI()
 end
