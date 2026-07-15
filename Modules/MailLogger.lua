@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local MailLogger = {}
 WM:RegisterModule("MailLogger", MailLogger)
 
-MailLogger.version = "2.0"
+MailLogger.version = "2.8"
 
 -- Default settings
 local globalDefaults = {

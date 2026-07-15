@@ -1322,7 +1322,7 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
         
     else
-        WM:Print("Unknown command. Type /wm help for available commands.")
+        WM:Print("Unknown command. Type /wmachine help for available commands.")
     end
 end
 

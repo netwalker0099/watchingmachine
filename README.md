@@ -28,6 +28,8 @@ Long-term logging of items and gold received via mail and trades.
 - Logs gold, items, and auction house transactions
 - Multi-character support with character selector
 - Filter by Gold, Items, AH Sales, AH Buys, Expired
+- Duplicate-proof bulk mail pulling (Postal-style addons and retry-spam handled)
+- "Open All Mail" button pulls are logged too
 
 ### 4. Services Parser
 Parse services channel for boost advertisements by dungeon.
@@ -40,7 +42,7 @@ Track whispers and quickly look up players on Warcraft Logs.
 - **Auto-detects your server** via GetRealmName() and injects it into WCL URLs
 - **Per-player realm tracking**: Cross-server whispers and group members get their correct server in the URL, not yours
 - Parses full "Player-Realm" format from whisper events and group roster
-- Generates correct classic.warcraftlogs.com URLs per region (US/EU/KR/TW/CN)
+- Generates correct fresh.warcraftlogs.com URLs per region (US/EU/KR/TW/CN) — the Warcraft Logs partition for Anniversary realms; saved entries from older versions are migrated automatically
 - "Scan Raid/Party" button to add all group members with correct realms
 - Shows detected server in UI header, cross-server players tagged with realm name
 - Click to copy URL, right-click to remove
@@ -151,7 +153,7 @@ Addon-wide theme support accessible via `/wmachine settings` or the Settings but
 
 ### Theme Coverage
 - Dashboard and all module cards
-- All module settings panels (8 modules)
+- All module settings panels (all 10 modules)
 - Debuff Tracker overlay and indicators
 - Live re-skinning: theme changes apply immediately without /reload
 
@@ -213,6 +215,8 @@ Built-in error capture system for debugging.
 
 ### Version 2.8
 - Updated for TBC Classic Anniversary patch 2.5.6 (Interface 20506, Classic Era 11508)
+- Removed stale Wrath/Cata interface declarations from the TOC (those clients no longer exist)
+- WhisperLogs: WCL URLs now point at fresh.warcraftlogs.com — the partition for Anniversary realms (classic.warcraftlogs.com is the old 2021 progression era); previously saved entries are migrated on login
 - MailLogger: fixed duplicate log entries when bulk-pulling mail
   - Take hooks logged on every ATTEMPT — bulk-pull addons retry the same slot until the server responds, creating one entry per retry
   - Mail data was read from a snapshot cache that went stale when mail deletion shifted inbox indices, logging the wrong (already-logged) mail's data

@@ -5,11 +5,13 @@ local AddonName, WM = ...
 local WhisperLogs = {}
 WM:RegisterModule("WhisperLogs", WhisperLogs)
 
-WhisperLogs.version = "2.2"
+WhisperLogs.version = "2.8"
 
 -- Configuration
--- TBC Anniversary uses classic.warcraftlogs.com
-local WCL_BASE_URL = "https://classic.warcraftlogs.com/character"
+-- Anniversary (Fresh) realms — including their TBC continuation — are hosted
+-- on fresh.warcraftlogs.com, not classic.warcraftlogs.com (that partition is
+-- the old 2021 progression era).
+local WCL_BASE_URL = "https://fresh.warcraftlogs.com/character"
 local DEFAULT_REGION = "us"
 
 -- State
@@ -71,6 +73,12 @@ end
 function WhisperLogs:Initialize()
     self:InitDB()
     self:DetectServer()
+    -- One-time migration: rebuild URLs saved with an old base
+    -- (e.g. classic.warcraftlogs.com from before the Anniversary move)
+    if WhisperLogsDB.urlBase ~= WCL_BASE_URL then
+        WhisperLogsDB.urlBase = WCL_BASE_URL
+        self:RebuildAllURLs()
+    end
 end
 
 function WhisperLogs:DetectServer()
