@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.7 | Author: Robert
+Version 2.8 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines nine powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition.
+Watching Machine combines ten powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -15,6 +15,7 @@ Automatically manages chat and combat logging.
 - Enables chat logging on login
 - Automatically enables combat logging in raid instances (10/25-man for TBC)
 - Optional logging in 5-man dungeons
+- **Advanced Combat Logging guard**: verifies the `advancedCombatLogging` CVar on login and when entering a raid, and re-enables it if it was turned off (required for complete Warcraft Logs uploads); toggleable in settings
 
 ### 2. Keyword Monitor
 Monitor public channels for specific keywords with duplicate detection.
@@ -127,6 +128,18 @@ Automated guild recruiting system.
 - Scan unguilded players by class and level range (1-70 for TBC)
 - Customizable message with %GUILD% placeholder
 
+### 10. Buff Check
+Full raid buff audit that runs automatically on every ready check.
+- **You start the ready check** → missing buffs are announced to raid/party chat ("Missing Fortitude: Player1, Player2")
+- **Someone else starts it** → the same report prints locally where only you can see it
+- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks — each individually toggleable
+- Class buffs are only checked when the providing class is actually in the group (no priest = no Fortitude nag)
+- Only classes a buff applies to are checked (rogues aren't flagged for missing Intellect)
+- Offline and dead players are skipped (listed separately in the local report)
+- Long reports are split to respect the chat message length cap
+- "Run Check Now" button for manual local checks any time
+- Optional "all buffs up!" confirmation message
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -169,6 +182,7 @@ Built-in error capture system for debugging.
 - `/wmachine debuff` - Open Debuff Tracker settings
 - `/wmachine pvp` - Open PvP Enemy Tracker
 - `/wmachine recruit` - Open Recruiting Tool
+- `/wmachine buffcheck` - Open Buff Check settings
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
@@ -192,8 +206,28 @@ Built-in error capture system for debugging.
 - `DebuffTrackerDB` - Debuff Tracker settings
 - `PvPTrackerDB` - PvP Enemy Tracker data and enemy list
 - `RecruitingToolDB` - Recruiting Tool data
+- `BuffCheckDB` - Buff Check settings
 
 ## Changelog
+
+### Version 2.8
+- Updated for TBC Classic Anniversary patch 2.5.6 (Interface 20506, Classic Era 11508)
+- **New module: Buff Check** — full raid buff audit on every ready check
+  - Announces missing buffs to raid chat when YOU start the ready check
+  - Reports locally (only you see it) when someone else starts it
+  - Checks Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings, and optional Divine Spirit, Shadow Protection, Well Fed, and Flask auras
+  - Skips buffs whose providing class isn't in the group; skips offline/dead players
+- AutoLogger: Advanced Combat Logging guard
+  - Verifies the advancedCombatLogging CVar on login and when entering raids
+  - Re-enables it automatically if it got turned off (WCL uploads need it)
+  - New settings checkbox + live CVar status in the panel
+- Performance pass across the addon:
+  - KeywordMonitor: result rows are now pooled and reused — previously every row was recreated once per second while the window was open, permanently leaking frames
+  - WhisperLogs: entry rows pooled and reused instead of recreated on every whisper/refresh
+  - MailLogger: inbox re-cache now uses a single debounced timer instead of creating a new frame on every MAIL_INBOX_UPDATE event
+  - DebuffTracker: target debuff scanning now uses precomputed name/spellID lookup tables instead of nested linear searches (runs 5x/second)
+  - Core: module color table hoisted out of the print functions (was rebuilt on every chat message)
+- AutoLogger: fixed local variable shadowing the global `type` in instance detection
 
 ### Version 2.7
 - DebuffTracker: Boss pull announce — "First hit: Playername on Gruul"

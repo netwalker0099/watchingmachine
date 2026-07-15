@@ -410,39 +410,102 @@ function WhisperLogs:CreateMainFrame()
     return frame
 end
 
+-- Create one pooled entry row. Data is attached as frame fields so the
+-- frame can be reused across refreshes instead of recreated (frames are
+-- never garbage-collected in WoW).
+local function CreateEntryFrame(scrollChild)
+    local entryFrame = CreateFrame("Button", nil, scrollChild)
+    entryFrame:SetSize(430, 45)
+
+    local bg = entryFrame:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    entryFrame.bg = bg
+
+    local nameText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    nameText:SetPoint("TOPLEFT", 5, -5)
+    entryFrame.nameText = nameText
+
+    local urlText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    urlText:SetPoint("TOPLEFT", 5, -22)
+    entryFrame.urlText = urlText
+
+    local timeText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    timeText:SetPoint("TOPRIGHT", -5, -5)
+    entryFrame.timeText = timeText
+
+    entryFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    entryFrame:SetScript("OnClick", function(self, btn)
+        if not self.data then return end
+        if btn == "RightButton" then
+            WhisperLogs:RemoveWhisper(self.index)
+        else
+            local editBox = ChatFrame1EditBox or ChatEdit_GetActiveWindow()
+            if editBox then
+                editBox:SetText(self.data.url)
+                editBox:HighlightText()
+                editBox:Show()
+                editBox:SetFocus()
+                WhisperLogs:Print("URL copied to chat box - press Ctrl+C to copy, Escape to cancel")
+            end
+        end
+    end)
+
+    entryFrame:SetScript("OnEnter", function(self)
+        if not self.data then return end
+        local data = self.data
+        self.bg:SetColorTexture(0.2, 0.3, 0.2, 0.9)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(data.name, 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Server: " .. (data.realmRaw or data.realmSlug or "Unknown"), 0.4, 0.8, 1)
+        if data.isGroupMember then
+            GameTooltip:AddLine("Source: Group/Raid scan", 0.7, 0.7, 0.7)
+        else
+            GameTooltip:AddLine("Last whisper:", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(data.lastMessage or "N/A", 1, 1, 1, true)
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Left-click: Copy URL to chat box", 0, 1, 0)
+        GameTooltip:AddLine("Right-click: Remove from list", 1, 0, 0)
+        GameTooltip:Show()
+    end)
+
+    entryFrame:SetScript("OnLeave", function(self)
+        if self.index and self.index % 2 == 0 then
+            self.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
+        else
+            self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
+        end
+        GameTooltip:Hide()
+    end)
+
+    return entryFrame
+end
+
 function WhisperLogs:RefreshDisplay()
     if not mainFrame or not mainFrame:IsVisible() then return end
 
     local scrollChild = mainFrame.scrollChild
-
-    -- Clear existing entries
-    for _, entry in ipairs(mainFrame.entries) do
-        entry:Hide()
-        entry:SetParent(nil)
-    end
-    mainFrame.entries = {}
-
     local yOffset = 0
     local entryHeight = 50
 
     for i, data in ipairs(whisperList) do
-        local entryFrame = CreateFrame("Button", nil, scrollChild)
-        entryFrame:SetSize(430, entryHeight - 5)
+        local entryFrame = mainFrame.entries[i]
+        if not entryFrame then
+            entryFrame = CreateEntryFrame(scrollChild)
+            mainFrame.entries[i] = entryFrame
+        end
+
+        entryFrame.data = data
+        entryFrame.index = i
+        entryFrame:ClearAllPoints()
         entryFrame:SetPoint("TOPLEFT", 0, -yOffset)
 
-        -- Background
-        local bg = entryFrame:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
         if i % 2 == 0 then
-            bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
+            entryFrame.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
         else
-            bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
+            entryFrame.bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
         end
-        entryFrame.bg = bg
-
-        -- Player name with realm tag if cross-server
-        local nameText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("TOPLEFT", 5, -5)
 
         local realmTag = ""
         if data.realmSlug and data.realmSlug ~= playerRealm then
@@ -450,67 +513,22 @@ function WhisperLogs:RefreshDisplay()
         end
 
         if data.isGroupMember then
-            nameText:SetText("|cFFFFFFFF" .. data.name .. "|r" .. realmTag .. " |cFF00FF00[Group]|r")
+            entryFrame.nameText:SetText("|cFFFFFFFF" .. data.name .. "|r" .. realmTag .. " |cFF00FF00[Group]|r")
         else
-            nameText:SetText("|cFFFFFFFF" .. data.name .. "|r" .. realmTag .. " |cFF888888(" .. (data.count or 1) .. " whispers)|r")
+            entryFrame.nameText:SetText("|cFFFFFFFF" .. data.name .. "|r" .. realmTag .. " |cFF888888(" .. (data.count or 1) .. " whispers)|r")
         end
 
-        -- URL
-        local urlText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        urlText:SetPoint("TOPLEFT", 5, -22)
-        urlText:SetText("|cFF00BFFF" .. data.url .. "|r")
+        entryFrame.urlText:SetText("|cFF00BFFF" .. data.url .. "|r")
+        entryFrame.timeText:SetText("|cFF888888" .. (data.lastWhisper or "") .. "|r")
+        entryFrame:Show()
 
-        -- Time
-        local timeText = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        timeText:SetPoint("TOPRIGHT", -5, -5)
-        timeText:SetText("|cFF888888" .. (data.lastWhisper or "") .. "|r")
-
-        -- Click handlers
-        entryFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        entryFrame:SetScript("OnClick", function(self, btn)
-            if btn == "RightButton" then
-                WhisperLogs:RemoveWhisper(i)
-            else
-                local editBox = ChatFrame1EditBox or ChatEdit_GetActiveWindow()
-                if editBox then
-                    editBox:SetText(data.url)
-                    editBox:HighlightText()
-                    editBox:Show()
-                    editBox:SetFocus()
-                    WhisperLogs:Print("URL copied to chat box - press Ctrl+C to copy, Escape to cancel")
-                end
-            end
-        end)
-
-        entryFrame:SetScript("OnEnter", function(self)
-            self.bg:SetColorTexture(0.2, 0.3, 0.2, 0.9)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(data.name, 1, 1, 1)
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Server: " .. (data.realmRaw or data.realmSlug or "Unknown"), 0.4, 0.8, 1)
-            if data.isGroupMember then
-                GameTooltip:AddLine("Source: Group/Raid scan", 0.7, 0.7, 0.7)
-            else
-                GameTooltip:AddLine("Last whisper:", 0.7, 0.7, 0.7)
-                GameTooltip:AddLine(data.lastMessage or "N/A", 1, 1, 1, true)
-            end
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Left-click: Copy URL to chat box", 0, 1, 0)
-            GameTooltip:AddLine("Right-click: Remove from list", 1, 0, 0)
-            GameTooltip:Show()
-        end)
-
-        entryFrame:SetScript("OnLeave", function(self)
-            if i % 2 == 0 then
-                self.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
-            else
-                self.bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
-            end
-            GameTooltip:Hide()
-        end)
-
-        table.insert(mainFrame.entries, entryFrame)
         yOffset = yOffset + entryHeight
+    end
+
+    -- Hide leftover pooled frames
+    for i = #whisperList + 1, #mainFrame.entries do
+        mainFrame.entries[i]:Hide()
+        mainFrame.entries[i].data = nil
     end
 
     scrollChild:SetHeight(math.max(yOffset, 1))

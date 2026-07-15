@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "2.7"
+WM.version = "2.8"
 WM.modules = {}
 
 -- ============================================
@@ -18,7 +18,7 @@ local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "MailLogger", "ServicesParser",
-    "Recruiter", "WhisperLogs", "GuildInvite",
+    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -123,37 +123,28 @@ function WM:Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00CCFF[WatchingMachine]|r " .. msg)
 end
 
+-- Shared module color map (hoisted — was rebuilt on every print call)
+local MODULE_COLORS = {
+    AutoLogger = "00FF00",
+    KeywordMonitor = "FFAA00",
+    MailLogger = "FF69B4",
+    ServicesParser = "00CCFF",
+    WhisperLogs = "CC80FF",
+    Recruiter = "FFD700",
+    GuildInvite = "00FF00",
+    DebuffTracker = "FFCC00",
+    PvPTracker = "FF3333",
+    BuffCheck = "33FF99",
+}
+
 function WM:ModulePrint(moduleName, msg)
-    local colors = {
-        AutoLogger = "00FF00",
-        KeywordMonitor = "FFAA00",
-        MailLogger = "FF69B4",
-        ServicesParser = "00CCFF",
-        WhisperLogs = "CC80FF",
-        Recruiter = "FFD700",
-        GuildInvite = "00FF00",
-        DebuffTracker = "FFCC00",
-        PvPTracker = "FF3333",
-    }
-    local color = colors[moduleName] or "FFFFFF"
+    local color = MODULE_COLORS[moduleName] or "FFFFFF"
     DEFAULT_CHAT_FRAME:AddMessage("|cFF" .. color .. "[WM:" .. moduleName .. "]|r " .. msg)
 end
 
 -- Verbose/diagnostic print — only shows when verbose mode is enabled
 function WM:VerbosePrint(moduleName, msg)
     if not WatchingMachineDB or not WatchingMachineDB.verboseChat then return end
-    local colors = {
-        AutoLogger = "00FF00",
-        KeywordMonitor = "FFAA00",
-        MailLogger = "FF69B4",
-        ServicesParser = "00CCFF",
-        WhisperLogs = "CC80FF",
-        Recruiter = "FFD700",
-        GuildInvite = "00FF00",
-        DebuffTracker = "FFCC00",
-        PvPTracker = "FF3333",
-    }
-    local color = colors[moduleName] or "FFFFFF"
     DEFAULT_CHAT_FRAME:AddMessage("|cFF888888[WM:" .. moduleName .. "] " .. msg .. "|r")
 end
 
@@ -462,6 +453,7 @@ local coreDefaults = {
         DebuffTracker = true,
         PvPTracker = true,
         Recruiter = true,
+        BuffCheck = true,
     },
 }
 
@@ -673,7 +665,7 @@ function WM:CreateDashboard()
     if dashboard then return end
     
     local frame = CreateFrame("Frame", "WatchingMachineDashboard", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 640)
+    frame:SetSize(420, 675)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -785,10 +777,10 @@ function WM:CreateModuleCards()
     
     local container = dashboard.cardsContainer
     local yOffset = 0
-    local cardHeight = 55
-    local cardSpacing = 6
-    
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter"}
+    local cardHeight = 50
+    local cardSpacing = 5
+
+    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck"}
     local moduleInfo = {
         AutoLogger = {
             title = "Auto Logger",
@@ -843,6 +835,12 @@ function WM:CreateModuleCards()
             desc = "Automated guild recruiting",
             color = {1, 0.84, 0},
             icon = "Interface\\Icons\\INV_Misc_GroupLooking",
+        },
+        BuffCheck = {
+            title = "Buff Check",
+            desc = "Ready-check raid buff audit",
+            color = {0.2, 1, 0.6},
+            icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
         },
     }
     
@@ -1149,6 +1147,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
     print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
+    print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
@@ -1282,7 +1281,15 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         else
             WM:Print("PvPTracker module not available")
         end
-        
+
+    elseif cmd == "buffcheck" or cmd == "buffs" or cmd == "bc" then
+        local module = WM.modules.BuffCheck
+        if module and module.Toggle then
+            module:Toggle()
+        else
+            WM:Print("BuffCheck module not available")
+        end
+
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then
         WM:ToggleSettings()
         

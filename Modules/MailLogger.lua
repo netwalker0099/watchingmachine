@@ -907,26 +907,27 @@ eventFrame:RegisterEvent("TRADE_ACCEPT_UPDATE")
 eventFrame:RegisterEvent("UI_INFO_MESSAGE")
 
 local tradeSuccessful = false
+local inboxCachePending = false
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "MAIL_SHOW" then
         isMailboxOpen = true
         MailLogger:CacheInbox()
-        
+
     elseif event == "MAIL_INBOX_UPDATE" then
-        if isMailboxOpen then
-            -- Use a simple delayed call approach
-            local delayFrame = CreateFrame("Frame")
-            local elapsed = 0
-            delayFrame:SetScript("OnUpdate", function(self, delta)
-                elapsed = elapsed + delta
-                if elapsed >= 0.1 then
-                    self:SetScript("OnUpdate", nil)
+        -- Debounced re-cache. The old code created a brand-new frame per
+        -- event (frames are never garbage-collected), and this event fires
+        -- rapidly while looting mail.
+        if isMailboxOpen and not inboxCachePending then
+            inboxCachePending = true
+            WM.RunAfter(0.1, function()
+                inboxCachePending = false
+                if isMailboxOpen then
                     MailLogger:CacheInbox()
                 end
             end)
         end
-        
+
     elseif event == "MAIL_CLOSED" then
         isMailboxOpen = false
         

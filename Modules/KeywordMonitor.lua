@@ -287,38 +287,44 @@ end
 
 function KeywordMonitor:UpdateResultsDisplay()
     if not self.resultsScrollChild then return end
-    
+
     CleanupOldResults()
-    
-    -- Clear existing frames
-    if self.resultFrames then
-        for _, frame in ipairs(self.resultFrames) do
-            frame:Hide()
-            frame:SetParent(nil)
-        end
-    end
-    self.resultFrames = {}
-    
+
+    -- Reuse pooled frames — WoW frames are never garbage-collected, so
+    -- recreating them every refresh (this runs once per second while the
+    -- window is open) leaks memory permanently.
+    self.resultFrames = self.resultFrames or {}
+
     local yOffset = 0
     local frameHeight = 45
     local spacing = 3
-    
+
     for i, result in ipairs(KeywordMonitorDB.results) do
-        local frame = self:CreateResultFrame(result)
-        frame:SetParent(self.resultsScrollChild)
+        local frame = self.resultFrames[i]
+        if not frame then
+            frame = self:CreateResultFrame()
+            self.resultFrames[i] = frame
+        end
+
+        frame:ClearAllPoints()
         frame:SetPoint("TOPLEFT", 0, -yOffset)
         frame:SetPoint("RIGHT", 0, 0)
+        frame:UpdateResult(result)
         frame:Show()
-        
-        table.insert(self.resultFrames, frame)
+
         yOffset = yOffset + frameHeight + spacing
     end
-    
+
+    -- Hide any leftover pooled frames beyond the current result count
+    for i = #KeywordMonitorDB.results + 1, #self.resultFrames do
+        self.resultFrames[i]:Hide()
+    end
+
     self.resultsScrollChild:SetHeight(math.max(yOffset, 1))
 end
 
-function KeywordMonitor:CreateResultFrame(result)
-    local frame = CreateFrame("Button", nil, nil, "BackdropTemplate")
+function KeywordMonitor:CreateResultFrame()
+    local frame = CreateFrame("Button", nil, self.resultsScrollChild, "BackdropTemplate")
     frame:SetHeight(45)
     frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -328,12 +334,13 @@ function KeywordMonitor:CreateResultFrame(result)
     })
     frame:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
     frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
-    
+
     -- Hover highlight
     frame:SetScript("OnEnter", function(self)
+        if not self.result then return end
         self:SetBackdropColor(0.25, 0.25, 0.25, 0.95)
         GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-        GameTooltip:AddLine("Left-click: Whisper " .. result.sender, 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Left-click: Whisper " .. self.result.sender, 0.7, 0.7, 0.7)
         GameTooltip:AddLine("Right-click: Copy message", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
@@ -341,25 +348,24 @@ function KeywordMonitor:CreateResultFrame(result)
         self:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
         GameTooltip:Hide()
     end)
-    
+
     frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     frame:SetScript("OnClick", function(self, button)
+        if not self.result then return end
         if button == "LeftButton" then
-            ChatFrame_OpenChat("/w " .. result.sender .. " ", DEFAULT_CHAT_FRAME)
+            ChatFrame_OpenChat("/w " .. self.result.sender .. " ", DEFAULT_CHAT_FRAME)
         elseif button == "RightButton" then
-            ChatFrame_OpenChat(result.message, DEFAULT_CHAT_FRAME)
+            ChatFrame_OpenChat(self.result.message, DEFAULT_CHAT_FRAME)
         end
     end)
-    
+
     -- Header
     local headerText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     headerText:SetPoint("TOPLEFT", 5, -5)
     headerText:SetPoint("RIGHT", -5, 0)
     headerText:SetJustifyH("LEFT")
-    
-    local timeAgo = FormatTimeAgo(result.timestamp)
-    headerText:SetText("|cff888888" .. timeAgo .. "|r  |cff4488ff[" .. result.channel .. "]|r  |cffffff00" .. result.sender .. "|r  |cff00ff00<" .. result.keyword .. ">|r")
-    
+    frame.headerText = headerText
+
     -- Message
     local messageText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     messageText:SetPoint("TOPLEFT", 5, -20)
@@ -368,8 +374,16 @@ function KeywordMonitor:CreateResultFrame(result)
     messageText:SetJustifyV("TOP")
     messageText:SetWordWrap(true)
     messageText:SetMaxLines(2)
-    messageText:SetText(result.message)
-    
+    frame.messageText = messageText
+
+    -- Fill in data for a specific result (called on every refresh)
+    frame.UpdateResult = function(self, result)
+        self.result = result
+        local timeAgo = FormatTimeAgo(result.timestamp)
+        self.headerText:SetText("|cff888888" .. timeAgo .. "|r  |cff4488ff[" .. result.channel .. "]|r  |cffffff00" .. result.sender .. "|r  |cff00ff00<" .. result.keyword .. ">|r")
+        self.messageText:SetText(result.message)
+    end
+
     return frame
 end
 

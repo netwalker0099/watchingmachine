@@ -10,6 +10,7 @@ local defaults = {
     enableChatLog = true,
     enableCombatLog = true,
     enableInDungeons = false,
+    enableAdvancedLogging = true,  -- keep advancedCombatLogging CVar on (required for WCL uploads)
     debugMode = false,
 }
 
@@ -24,6 +25,8 @@ local chatLogEnabled = false
 function AutoLogger:Initialize()
     self:InitDB()
     self:EnableChatLog()
+    -- Verify advanced combat logging on login, not just when entering a raid
+    self:EnsureAdvancedLogging("login check")
     self:UpdateCombatLog()
 end
 
@@ -60,6 +63,27 @@ function AutoLogger:EnableChatLog()
     end
 end
 
+-- Check the advancedCombatLogging CVar and turn it on if it got disabled.
+-- WCL uploads are incomplete without it (no gear, no per-target resource data).
+function AutoLogger:IsAdvancedLoggingEnabled()
+    local value = GetCVar and GetCVar("advancedCombatLogging")
+    return value == "1"
+end
+
+function AutoLogger:EnsureAdvancedLogging(context)
+    if not AutoLoggerDB or not AutoLoggerDB.enableCombatLog or not AutoLoggerDB.enableAdvancedLogging then
+        return
+    end
+    if not SetCVar then return end
+
+    if not self:IsAdvancedLoggingEnabled() then
+        SetCVar("advancedCombatLogging", "1")
+        self:Print("Advanced combat logging was OFF - re-enabled it (" .. (context or "check") .. ")")
+    else
+        self:DebugPrint("Advanced combat logging verified on (" .. (context or "check") .. ")")
+    end
+end
+
 function AutoLogger:ShouldEnableCombatLog()
     local inInstance, instanceType = IsInInstance()
     
@@ -67,10 +91,10 @@ function AutoLogger:ShouldEnableCombatLog()
         return false
     end
     
-    local name, type, difficultyID, difficultyName, maxPlayers = GetInstanceInfo()
-    
-    self:DebugPrint(string.format("Instance: %s, Type: %s, Difficulty: %s, MaxPlayers: %d", 
-        tostring(name), tostring(type), tostring(difficultyName), tostring(maxPlayers)))
+    local name, _, difficultyID, difficultyName, maxPlayers = GetInstanceInfo()
+
+    self:DebugPrint(string.format("Instance: %s, Type: %s, Difficulty: %s, MaxPlayers: %d",
+        tostring(name), tostring(instanceType), tostring(difficultyName), tostring(maxPlayers)))
     
     -- Enable for raids
     if instanceType == "raid" then
@@ -93,8 +117,10 @@ function AutoLogger:UpdateCombatLog()
     end
     
     local shouldLog = self:ShouldEnableCombatLog()
-    
+
     if shouldLog and not currentlyLogging then
+        -- Make sure advanced logging is on before combat logging starts
+        self:EnsureAdvancedLogging("entering instance")
         LoggingCombat(1)
         currentlyLogging = true
         self:Print("Combat logging enabled - Raid instance detected")
@@ -147,7 +173,7 @@ function AutoLogger:CreateSettingsUI()
     if settingsPanel then return settingsPanel end
     
     local frame = CreateFrame("Frame", "WM_AutoLoggerSettings", UIParent, "BackdropTemplate")
-    frame:SetSize(350, 320)
+    frame:SetSize(350, 400)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -220,6 +246,19 @@ function AutoLogger:CreateSettingsUI()
             AutoLoggerDB.enableInDungeons = self:GetChecked()
             AutoLogger:UpdateCombatLog()
         end)
+
+    -- Advanced Combat Logging
+    yOffset = yOffset - 30
+    CreateCheckBox("AdvancedLog", "Keep Advanced Combat Logging On",
+        "Checks the advancedCombatLogging setting on login and when entering raids, and re-enables it if it was turned off. Required for complete Warcraft Logs uploads.", yOffset,
+        function(self)
+            AutoLoggerDB.enableAdvancedLogging = self:GetChecked()
+            if AutoLoggerDB.enableAdvancedLogging then
+                AutoLogger:EnsureAdvancedLogging("settings toggle")
+            else
+                AutoLogger:Print("Advanced logging check disabled (CVar left as-is)")
+            end
+        end)
     
     -- Debug Mode
     yOffset = yOffset - 30
@@ -241,14 +280,14 @@ function AutoLogger:CreateSettingsUI()
     frame.statusText = statusText
     
     -- Info text
-    yOffset = yOffset - 80
+    yOffset = yOffset - 95
     local infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     infoText:SetPoint("TOPLEFT", 20, yOffset)
     infoText:SetWidth(310)
     infoText:SetJustifyH("LEFT")
     infoText:SetText(
-        "|cFFFFAA00Log Files:|r World of Warcraft\\_classic_\\Logs\\\n\n" ..
-        "Combat logs are required for Warcraft Logs uploads."
+        "|cFFFFAA00Log Files:|r World of Warcraft\\_classic_anniversary_\\Logs\\\n\n" ..
+        "Combat logs (with Advanced enabled) are required for Warcraft Logs uploads."
     )
     
     -- Refresh function
@@ -256,18 +295,20 @@ function AutoLogger:CreateSettingsUI()
         checkboxes.ChatLog:SetChecked(AutoLoggerDB.enableChatLog)
         checkboxes.CombatLog:SetChecked(AutoLoggerDB.enableCombatLog)
         checkboxes.DungeonLog:SetChecked(AutoLoggerDB.enableInDungeons)
+        checkboxes.AdvancedLog:SetChecked(AutoLoggerDB.enableAdvancedLogging)
         checkboxes.Debug:SetChecked(AutoLoggerDB.debugMode)
-        
+
         local inInstance, instanceType = IsInInstance()
         local name = GetInstanceInfo()
-        
+
         local status = "Outside Instances"
         if inInstance then
             status = "In: " .. (name or "Unknown") .. " (" .. (instanceType or "?") .. ")"
         end
-        
+
         local combatStatus = currentlyLogging and "|cFF00FF00Logging|r" or "|cFFFF0000Not Logging|r"
-        statusText:SetText(status .. "\nCombat Log: " .. combatStatus)
+        local advStatus = AutoLogger:IsAdvancedLoggingEnabled() and "|cFF00FF00On|r" or "|cFFFF0000Off|r"
+        statusText:SetText(status .. "\nCombat Log: " .. combatStatus .. "\nAdvanced Logging: " .. advStatus)
     end
     
     frame:SetScript("OnShow", frame.Refresh)

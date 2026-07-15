@@ -109,6 +109,24 @@ local DEBUFF_CATEGORIES = {
     },
 }
 
+-- Build per-category lookup tables once at load so the 5x/second target scan
+-- does hash lookups instead of nested linear searches over every definition.
+for _, cat in ipairs(DEBUFF_CATEGORIES) do
+    cat.byName = {}
+    cat.bySpellID = {}
+    for _, debuff in ipairs(cat.debuffs) do
+        cat.byName[debuff.name] = debuff
+        for _, id in ipairs(debuff.spellIDs) do
+            -- Multiple definitions can share a spellID (e.g. Improved Expose
+            -- Armor vs Expose Armor) — keep a list to preserve priority rules
+            if not cat.bySpellID[id] then
+                cat.bySpellID[id] = {}
+            end
+            table.insert(cat.bySpellID[id], debuff)
+        end
+    end
+end
+
 -- ============================================
 -- SPEC DETECTION via Raid Member Buffs (TBC)
 -- ============================================
@@ -958,62 +976,50 @@ end
 -- Find active debuff from a category on unit
 local function GetActiveDebuff(unit, category)
     if not UnitExists(unit) then return nil end
-    
+
     local bestDebuff = nil
     local bestPriority = 0
-    
+
     -- Get the per-debuff enable/disable table for this category
     local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs and DebuffTrackerDB.trackedDebuffs[category.name]
-    
+
     for i = 1, 40 do
-        local name, icon, count, debuffType, duration, expirationTime, source, isStealable, 
+        local name, icon, count, debuffType, duration, expirationTime, source, isStealable,
               nameplateShowPersonal, spellId = UnitDebuff(unit, i)
-        
+
         if not name then break end
-        
-        -- Check against category debuffs
-        for _, debuff in ipairs(category.debuffs) do
-            -- Skip if this specific debuff is disabled in options
-            if not debuffToggles or debuffToggles[debuff.name] ~= false then
-                -- Check by name (more reliable in Classic)
-                if name == debuff.name then
-                    if debuff.priority > bestPriority then
-                        bestDebuff = {
-                            name = name,
-                            icon = icon,
-                            count = count,
-                            duration = duration,
-                            expirationTime = expirationTime,
-                            priority = debuff.priority,
-                            definition = debuff,
-                        }
-                        bestPriority = debuff.priority
-                    end
-                end
-                
-                -- Also check by spellID if available
-                if spellId then
-                    for _, id in ipairs(debuff.spellIDs) do
-                        if spellId == id then
-                            if debuff.priority > bestPriority then
-                                bestDebuff = {
-                                    name = name,
-                                    icon = icon,
-                                    count = count,
-                                    duration = duration,
-                                    expirationTime = expirationTime,
-                                    priority = debuff.priority,
-                                    definition = debuff,
-                                }
-                                bestPriority = debuff.priority
-                            end
-                        end
-                    end
+
+        -- Match by name (more reliable in Classic), then by spellID; pick
+        -- the highest-priority enabled definition among the matches
+        local candidate = category.byName[name]
+        if candidate and debuffToggles and debuffToggles[candidate.name] == false then
+            candidate = nil
+        end
+
+        local spellMatches = spellId and category.bySpellID[spellId]
+        if spellMatches then
+            for _, debuff in ipairs(spellMatches) do
+                if (not debuffToggles or debuffToggles[debuff.name] ~= false)
+                    and (not candidate or debuff.priority > candidate.priority) then
+                    candidate = debuff
                 end
             end
         end
+
+        if candidate and candidate.priority > bestPriority then
+            bestDebuff = {
+                name = name,
+                icon = icon,
+                count = count,
+                duration = duration,
+                expirationTime = expirationTime,
+                priority = candidate.priority,
+                definition = candidate,
+            }
+            bestPriority = candidate.priority
+        end
     end
-    
+
     return bestDebuff
 end
 
