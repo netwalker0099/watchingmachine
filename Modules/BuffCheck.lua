@@ -119,6 +119,7 @@ local defaults = {
     enabled = true,
     announceToRaid = true,     -- announce when the player initiated the ready check
     reportAllBuffed = true,    -- also report when nothing is missing
+    usePallyPower = true,      -- check assigned blessings from PallyPower when available
     checkedGroups = {},        -- per-group enable, filled below
 }
 
@@ -216,6 +217,98 @@ local function UnitHasGroupBuff(buffSet, group)
     return false
 end
 
+-- ============================================
+-- PALLYPOWER INTEGRATION
+-- ============================================
+-- When PallyPower is running and paladins in the group have blessing
+-- assignments, check each player against their ASSIGNED blessings instead of
+-- the generic "has any blessing" check. Reads PallyPower's own runtime tables
+-- (ClassID / Spells / GSpells) so the mapping stays correct across PallyPower
+-- versions and localized clients.
+--
+-- PallyPower data model:
+--   PallyPower_Assignments[pallyName][classIndex] = blessingIndex   (class-wide)
+--   PallyPower_NormalAssignments[pallyName][classIndex][playerName] = blessingIndex
+--   PallyPower.ClassID[classIndex] = "WARRIOR" etc.
+--   PallyPower.Spells[blessingIndex] / PallyPower.GSpells[blessingIndex] = aura names
+
+-- Returns nil when PallyPower isn't usable (not loaded, no assignments from
+-- paladins actually in the group) — caller falls back to the generic check.
+local function GetPallyPowerData(units)
+    local pp = _G.PallyPower
+    local assignments = _G.PallyPower_Assignments
+    if not pp or not assignments or not pp.ClassID or not pp.Spells then
+        return nil
+    end
+
+    -- Only honor assignments from paladins actually in the group; the
+    -- assignments table can carry entries for offline/absent paladins
+    local groupPallys = {}
+    for _, unit in ipairs(units) do
+        local _, class = UnitClass(unit)
+        if class == "PALADIN" and UnitIsConnected(unit) then
+            local name = UnitName(unit)
+            if name then
+                groupPallys[name] = true
+            end
+        end
+    end
+
+    local classBlessings = {}   -- classToken -> { blessingIndex = true }
+    local playerBlessings = {}  -- playerName -> { blessingIndex = true }
+    local found = false
+
+    for pallyName, classTable in pairs(assignments) do
+        if groupPallys[pallyName] and type(classTable) == "table" then
+            for classIndex, blessingID in pairs(classTable) do
+                local classToken = pp.ClassID[classIndex]
+                if classToken and type(blessingID) == "number" and blessingID > 0 then
+                    if not classBlessings[classToken] then
+                        classBlessings[classToken] = {}
+                    end
+                    classBlessings[classToken][blessingID] = true
+                    found = true
+                end
+            end
+        end
+    end
+
+    local normals = _G.PallyPower_NormalAssignments
+    if normals then
+        for pallyName, classTable in pairs(normals) do
+            if groupPallys[pallyName] and type(classTable) == "table" then
+                for _, players in pairs(classTable) do
+                    if type(players) == "table" then
+                        for playerName, blessingID in pairs(players) do
+                            if type(blessingID) == "number" and blessingID > 0 then
+                                if not playerBlessings[playerName] then
+                                    playerBlessings[playerName] = {}
+                                end
+                                playerBlessings[playerName][blessingID] = true
+                                found = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if not found then return nil end
+
+    return {
+        classBlessings = classBlessings,
+        playerBlessings = playerBlessings,
+        spells = pp.Spells,
+        gspells = pp.GSpells,
+    }
+end
+
+-- Is PallyPower loaded at all? (for UI status display)
+function BuffCheck:IsPallyPowerAvailable()
+    return (_G.PallyPower and _G.PallyPower_Assignments) and true or false
+end
+
 -- Run the full scan.
 -- Returns: lines (array of report strings), missingCount, skipped (array of offline/dead names)
 function BuffCheck:ScanGroup()
@@ -230,17 +323,27 @@ function BuffCheck:ScanGroup()
         end
     end
 
-    -- Which groups are actually checkable right now
+    -- PallyPower assignments (nil = not usable, fall back to generic check)
+    local ppData = nil
+    if BuffCheckDB.checkedGroups.blessing and BuffCheckDB.usePallyPower then
+        ppData = GetPallyPowerData(units)
+    end
+
+    -- Which groups are actually checkable right now. When PallyPower data is
+    -- available the generic "any blessing" group is replaced by per-assignment
+    -- checks below.
     local activeGroups = {}
     for _, group in ipairs(BUFF_GROUPS) do
         if BuffCheckDB.checkedGroups[group.key]
-            and (not group.providerClass or classesPresent[group.providerClass]) then
+            and (not group.providerClass or classesPresent[group.providerClass])
+            and not (group.key == "blessing" and ppData) then
             activeGroups[#activeGroups + 1] = group
         end
     end
 
     -- Second pass: per-unit buff check
-    local missingByGroup = {}  -- group.key -> { playerName, ... }
+    local missingByGroup = {}     -- group.key -> { playerName, ... }
+    local missingBlessings = {}   -- blessingIndex -> { playerName, ... } (PallyPower mode)
     local skipped = {}
     local missingCount = 0
 
@@ -260,6 +363,37 @@ function BuffCheck:ScanGroup()
                         missingCount = missingCount + 1
                     end
                 end
+
+                -- PallyPower mode: expected = class assignments + per-player singles
+                if ppData then
+                    local expected = {}
+                    if ppData.classBlessings[class] then
+                        for blessingID in pairs(ppData.classBlessings[class]) do
+                            expected[blessingID] = true
+                        end
+                    end
+                    if ppData.playerBlessings[name] then
+                        for blessingID in pairs(ppData.playerBlessings[name]) do
+                            expected[blessingID] = true
+                        end
+                    end
+
+                    for blessingID in pairs(expected) do
+                        local normalName = ppData.spells and ppData.spells[blessingID]
+                        local greaterName = ppData.gspells and ppData.gspells[blessingID]
+                        -- Either the normal or greater version satisfies the assignment
+                        local has = (normalName and normalName ~= "" and buffSet[normalName])
+                            or (greaterName and greaterName ~= "" and buffSet[greaterName])
+                        if not has and (normalName or greaterName) then
+                            if not missingBlessings[blessingID] then
+                                missingBlessings[blessingID] = {}
+                            end
+                            local list = missingBlessings[blessingID]
+                            list[#list + 1] = name
+                            missingCount = missingCount + 1
+                        end
+                    end
+                end
             end
         else
             local name = UnitName(unit)
@@ -275,6 +409,21 @@ function BuffCheck:ScanGroup()
         local list = missingByGroup[group.key]
         if list then
             lines[#lines + 1] = "Missing " .. group.name .. ": " .. table.concat(list, ", ")
+        end
+    end
+
+    -- PallyPower lines, sorted by blessing index for stable output
+    if ppData then
+        local ids = {}
+        for blessingID in pairs(missingBlessings) do
+            ids[#ids + 1] = blessingID
+        end
+        table.sort(ids)
+        for _, blessingID in ipairs(ids) do
+            local label = (ppData.spells and ppData.spells[blessingID] ~= "" and ppData.spells[blessingID])
+                or (ppData.gspells and ppData.gspells[blessingID])
+                or ("Blessing #" .. blessingID)
+            lines[#lines + 1] = "Missing " .. label .. ": " .. table.concat(missingBlessings[blessingID], ", ")
         end
     end
 
@@ -397,8 +546,9 @@ function BuffCheck:GetQuickStatus()
     end
 
     local announceTag = BuffCheckDB.announceToRaid and " |cFFFFCC00[Announce]|r" or " |cFF888888[Local only]|r"
+    local ppTag = (BuffCheckDB.usePallyPower and self:IsPallyPowerAvailable()) and " |cFFF58CBA[PallyPower]|r" or ""
     local lastTag = lastReportTime and (" last: " .. lastReportTime) or ""
-    return "|cFF00FF00Active|r (" .. enabledCount .. " buffs)" .. announceTag .. lastTag
+    return "|cFF00FF00Active|r (" .. enabledCount .. " buffs)" .. announceTag .. ppTag .. lastTag
 end
 
 -- ============================================
@@ -411,7 +561,7 @@ function BuffCheck:CreateUI()
     local theme = WM:GetTheme()
 
     local frame = CreateFrame("Frame", "WM_BuffCheckFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(360, 480)
+    frame:SetSize(360, 535)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -477,7 +627,46 @@ function BuffCheck:CreateUI()
         BuffCheckDB.reportAllBuffed = self:GetChecked()
     end)
 
-    yOffset = yOffset - 34
+    yOffset = yOffset - 26
+
+    -- PallyPower integration checkbox
+    local ppCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    ppCB:SetPoint("TOPLEFT", 20, yOffset)
+    ppCB.Text:SetText("Use PallyPower blessing assignments")
+    ppCB:SetChecked(BuffCheckDB.usePallyPower)
+    ppCB:SetScript("OnClick", function(self)
+        BuffCheckDB.usePallyPower = self:GetChecked()
+    end)
+    ppCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("PallyPower Integration", 1, 0.8, 0)
+        GameTooltip:AddLine("When PallyPower is running and paladins in your", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("group have blessing assignments, each player is", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("checked against their ASSIGNED blessings (class", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("assignments + single-target assignments), and the", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("report names the exact missing blessing.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Greater and normal versions both count.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Falls back to 'any blessing' when PallyPower is", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("missing or has no assignments configured.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    ppCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 22
+
+    -- PallyPower detection status (refreshed every time the panel opens)
+    local ppStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ppStatus:SetPoint("TOPLEFT", 45, yOffset)
+    frame.ppStatus = ppStatus
+    frame:SetScript("OnShow", function(self)
+        if BuffCheck:IsPallyPowerAvailable() then
+            self.ppStatus:SetText("|cFF00FF00PallyPower detected|r")
+        else
+            self.ppStatus:SetText("|cFF888888PallyPower not detected — using generic blessing check|r")
+        end
+    end)
+
+    yOffset = yOffset - 26
 
     -- Buff selection header
     local buffHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")

@@ -133,6 +133,7 @@ Full raid buff audit that runs automatically on every ready check.
 - **You start the ready check** → missing buffs are announced to raid/party chat ("Missing Fortitude: Player1, Player2")
 - **Someone else starts it** → the same report prints locally where only you can see it
 - Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks — each individually toggleable
+- **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings (class assignments + single-target assignments) and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
 - Class buffs are only checked when the providing class is actually in the group (no priest = no Fortitude nag)
 - Only classes a buff applies to are checked (rogues aren't flagged for missing Intellect)
 - Offline and dead players are skipped (listed separately in the local report)
@@ -222,6 +223,7 @@ Built-in error capture system for debugging.
   - Reports locally (only you see it) when someone else starts it
   - Checks Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings, and optional Divine Spirit, Shadow Protection, Well Fed, and Flask auras
   - Skips buffs whose providing class isn't in the group; skips offline/dead players
+  - PallyPower integration: checks each player against their assigned blessings (class + single-target) when PallyPower is configured, reading PallyPower's own runtime tables so it tracks that addon's versions and localization; graceful fallback to the generic check otherwise
 - AutoLogger: Advanced Combat Logging guard
   - Verifies the advancedCombatLogging CVar on login and when entering raids
   - Re-enables it automatically if it got turned off (WCL uploads need it)
