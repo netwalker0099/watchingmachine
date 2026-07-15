@@ -212,6 +212,11 @@ Built-in error capture system for debugging.
 
 ### Version 2.8
 - Updated for TBC Classic Anniversary patch 2.5.6 (Interface 20506, Classic Era 11508)
+- MailLogger: fixed duplicate log entries when bulk-pulling mail
+  - Take hooks logged on every ATTEMPT — bulk-pull addons retry the same slot until the server responds, creating one entry per retry
+  - Mail data was read from a snapshot cache that went stale when mail deletion shifted inbox indices, logging the wrong (already-logged) mail's data
+  - Hooks now read the inbox live at take time, with a per-slot dedupe fingerprint that resets whenever the inbox actually changes — identical mails from the same sender still all log correctly
+  - "Open All Mail" button (AutoLootMailItem) is now hooked too; those pulls were previously never logged
 - **New module: Buff Check** — full raid buff audit on every ready check
   - Announces missing buffs to raid chat when YOU start the ready check
   - Reports locally (only you see it) when someone else starts it

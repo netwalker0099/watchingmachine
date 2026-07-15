@@ -23,8 +23,13 @@ local charDefaults = {
 }
 
 -- State
-local inboxCache = {}
 local isMailboxOpen = false
+-- Dedupe guard: fingerprints of takes already logged for the CURRENT inbox
+-- state. Wiped on MAIL_INBOX_UPDATE (i.e. whenever the inbox actually
+-- changes). Bulk-pull addons retry TakeInboxItem/TakeInboxMoney for the same
+-- slot until the server confirms — without this, every retry logged a
+-- duplicate entry.
+local loggedTakes = {}
 local currentCharKey = nil
 local selectedCharKey = nil
 local tradeCache = {}
@@ -228,127 +233,129 @@ end
 -- ============================================
 -- MAIL HOOKS
 -- ============================================
+-- Mail data is read LIVE at hook time (the hook runs before the take request
+-- goes to the server, so the inbox APIs still return the mail's contents).
+-- The old approach used a snapshot cache refreshed 0.1s after
+-- MAIL_INBOX_UPDATE — during bulk pulls, mail deletion shifts every index,
+-- so takes landed on stale cache entries and logged the wrong (duplicate)
+-- mail's data.
 
-function MailLogger:CacheInbox()
-    inboxCache = {}
-    local numItems = GetInboxNumItems()
-    
-    for i = 1, numItems do
-        local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead = GetInboxHeaderInfo(i)
-        
-        local mailEntry = {
-            index = i,
+-- Clear the dedupe guard whenever the inbox state changes
+function MailLogger:ResetTakeGuard()
+    wipe(loggedTakes)
+end
+
+-- Log the gold attached to a mail (called from the take hooks)
+function MailLogger:LogMoneyTake(index)
+    if not MailLoggerDB or not MailLoggerDB.logGold then return end
+
+    local _, _, sender, subject, money = GetInboxHeaderInfo(index)
+    if not money or money <= 0 then return end
+
+    -- Dedupe: same slot + same content = a retry of the same take
+    local key = "money:" .. index .. ":" .. (sender or "?") .. ":" .. (subject or "?") .. ":" .. money
+    if loggedTakes[key] then return end
+    loggedTakes[key] = true
+
+    local invoiceType, invoiceItemName, invoicePlayerName = GetInboxInvoiceInfo(index)
+
+    if invoiceType == "seller" or invoiceType == "seller_temp_invoice" then
+        if MailLoggerDB.logAuctionHouse then
+            self:AddLogEntry("ah_sale", {
+                sender = sender,
+                subject = subject,
+                amount = money,
+                itemName = invoiceItemName,
+                buyer = invoicePlayerName,
+            })
+        end
+    else
+        self:AddLogEntry("gold", {
             sender = sender,
-            subject = subject or "",
-            money = money or 0,
-            CODAmount = CODAmount or 0,
-            hasItem = hasItem,
-            items = {}
-        }
-        
-        if hasItem then
-            for j = 1, ATTACHMENTS_MAX_RECEIVE or 16 do
-                -- TBC Anniversary API: name, itemID, texture, count, quality, canUse
-                local name, itemID, itemTexture, count, quality, canUse = GetInboxItem(i, j)
-                if name then
-                    local itemLink = GetInboxItemLink(i, j)
-                    mailEntry.items[j] = {
-                        name = name,
-                        count = count or 1,
-                        quality = quality,
-                        itemLink = itemLink
-                    }
-                end
-            end
-        end
-        
-        local invoiceType, itemName, playerName, bid, buyout, deposit, consignment = GetInboxInvoiceInfo(i)
-        if invoiceType then
-            mailEntry.invoiceType = invoiceType
-            mailEntry.invoiceItemName = itemName
-            mailEntry.invoicePlayerName = playerName
-            mailEntry.invoiceBid = bid
-            mailEntry.invoiceBuyout = buyout
-            mailEntry.invoiceDeposit = deposit
-            mailEntry.invoiceConsignment = consignment
-        end
-        
-        inboxCache[i] = mailEntry
+            subject = subject,
+            amount = money
+        })
     end
 end
 
-function MailLogger:GetCachedMail(index)
-    return inboxCache[index]
+-- Log one attachment slot of a mail (called from the take hooks)
+function MailLogger:LogItemTake(mailIndex, itemIndex)
+    if not MailLoggerDB or not MailLoggerDB.logItems then return end
+
+    -- TBC Anniversary API: name, itemID, texture, count, quality, canUse
+    local name, _, _, count, quality = GetInboxItem(mailIndex, itemIndex)
+    if not name then return end
+    count = count or 1
+
+    local _, _, sender, subject = GetInboxHeaderInfo(mailIndex)
+
+    local key = "item:" .. mailIndex .. ":" .. itemIndex .. ":" .. (sender or "?") .. ":" .. (subject or "?") .. ":" .. name .. ":" .. count
+    if loggedTakes[key] then return end
+    loggedTakes[key] = true
+
+    local itemLink = GetInboxItemLink(mailIndex, itemIndex)
+    local invoiceType = GetInboxInvoiceInfo(mailIndex)
+
+    if invoiceType == "buyer" then
+        if MailLoggerDB.logAuctionHouse then
+            self:AddLogEntry("ah_purchase", {
+                sender = sender,
+                itemName = name,
+                itemLink = itemLink,
+                count = count,
+            })
+        end
+    elseif subject and subject:find("Auction expired") then
+        if MailLoggerDB.logAuctionHouse then
+            self:AddLogEntry("ah_expired", {
+                itemName = name,
+                itemLink = itemLink,
+                count = count
+            })
+        end
+    else
+        self:AddLogEntry("item", {
+            sender = sender,
+            subject = subject,
+            itemName = name,
+            itemLink = itemLink,
+            count = count,
+            quality = quality
+        })
+    end
 end
 
 -- Hook TakeInboxMoney
 local originalTakeInboxMoney = TakeInboxMoney
 function TakeInboxMoney(index, ...)
-    local cachedMail = MailLogger:GetCachedMail(index)
-    
-    if cachedMail and cachedMail.money and cachedMail.money > 0 and MailLoggerDB.logGold then
-        if cachedMail.invoiceType == "seller" or cachedMail.invoiceType == "seller_temp_invoice" then
-            if MailLoggerDB.logAuctionHouse then
-                MailLogger:AddLogEntry("ah_sale", {
-                    sender = cachedMail.sender,
-                    subject = cachedMail.subject,
-                    amount = cachedMail.money,
-                    itemName = cachedMail.invoiceItemName,
-                    buyer = cachedMail.invoicePlayerName,
-                })
-            end
-        else
-            MailLogger:AddLogEntry("gold", {
-                sender = cachedMail.sender,
-                subject = cachedMail.subject,
-                amount = cachedMail.money
-            })
-        end
-    end
-    
+    pcall(MailLogger.LogMoneyTake, MailLogger, index)
     return originalTakeInboxMoney(index, ...)
 end
 
 -- Hook TakeInboxItem
 local originalTakeInboxItem = TakeInboxItem
 function TakeInboxItem(mailIndex, itemIndex, ...)
-    local cachedMail = MailLogger:GetCachedMail(mailIndex)
-    
-    if cachedMail and MailLoggerDB.logItems then
-        local cachedItem = cachedMail.items and cachedMail.items[itemIndex]
-        
-        if cachedItem then
-            if cachedMail.invoiceType == "buyer" then
-                if MailLoggerDB.logAuctionHouse then
-                    MailLogger:AddLogEntry("ah_purchase", {
-                        sender = cachedMail.sender,
-                        itemName = cachedItem.name,
-                        itemLink = cachedItem.itemLink,
-                        count = cachedItem.count,
-                    })
-                end
-            elseif cachedMail.subject and cachedMail.subject:find("Auction expired") then
-                if MailLoggerDB.logAuctionHouse then
-                    MailLogger:AddLogEntry("ah_expired", {
-                        itemName = cachedItem.name,
-                        itemLink = cachedItem.itemLink,
-                        count = cachedItem.count
-                    })
-                end
-            else
-                MailLogger:AddLogEntry("item", {
-                    sender = cachedMail.sender,
-                    subject = cachedMail.subject,
-                    itemName = cachedItem.name,
-                    itemLink = cachedItem.itemLink,
-                    count = cachedItem.count,
-                    quality = cachedItem.quality
-                })
-            end
-        end
-    end
-    
+    pcall(MailLogger.LogItemTake, MailLogger, mailIndex, itemIndex)
     return originalTakeInboxItem(mailIndex, itemIndex, ...)
+end
+
+-- Hook AutoLootMailItem — the Anniversary client's "Open All Mail" button
+-- loots through this function, not TakeInboxItem, so those pulls were
+-- previously never logged.
+if AutoLootMailItem then
+    local originalAutoLootMailItem = AutoLootMailItem
+    function AutoLootMailItem(index, ...)
+        pcall(function()
+            MailLogger:LogMoneyTake(index)
+            local _, _, _, _, _, _, _, hasItem = GetInboxHeaderInfo(index)
+            if hasItem then
+                for j = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
+                    MailLogger:LogItemTake(index, j)
+                end
+            end
+        end)
+        return originalAutoLootMailItem(index, ...)
+    end
 end
 
 -- ============================================
@@ -907,30 +914,21 @@ eventFrame:RegisterEvent("TRADE_ACCEPT_UPDATE")
 eventFrame:RegisterEvent("UI_INFO_MESSAGE")
 
 local tradeSuccessful = false
-local inboxCachePending = false
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "MAIL_SHOW" then
         isMailboxOpen = true
-        MailLogger:CacheInbox()
+        MailLogger:ResetTakeGuard()
 
     elseif event == "MAIL_INBOX_UPDATE" then
-        -- Debounced re-cache. The old code created a brand-new frame per
-        -- event (frames are never garbage-collected), and this event fires
-        -- rapidly while looting mail.
-        if isMailboxOpen and not inboxCachePending then
-            inboxCachePending = true
-            WM.RunAfter(0.1, function()
-                inboxCachePending = false
-                if isMailboxOpen then
-                    MailLogger:CacheInbox()
-                end
-            end)
-        end
+        -- Inbox contents changed (mail looted/deleted, indices shifted) —
+        -- previously-seen slot fingerprints no longer describe the same mail
+        MailLogger:ResetTakeGuard()
 
     elseif event == "MAIL_CLOSED" then
         isMailboxOpen = false
-        
+        MailLogger:ResetTakeGuard()
+
     elseif event == "TRADE_SHOW" then
         isTrading = true
         tradeSuccessful = false
