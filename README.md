@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.8 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 2.9 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines ten powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines eleven powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -143,6 +143,19 @@ Full raid buff audit that runs automatically on every ready check.
 - "Run Check Now" button for manual local checks any time
 - Optional "all buffs up!" confirmation message
 
+### 11. ArmorySnap
+Passive raid gear & talent archive (integrated from the standalone ArmorySnap addon, keeping its fast v1.2 scanner).
+- **Passively snapshots every raid member's gear** while you're in a raid instance — enchants and gems included (TBC item links embed both)
+- **Fast event-chained scanning**: the next inspect fires the moment the previous one resolves; a full 25-man with everyone in range captures in roughly 15–20 seconds
+- Out-of-range members retried every 15 seconds; new joiners picked up within 10 seconds
+- **Paper-doll browser**: pick a snapshot, pick a member, see their gear laid out like the character frame with native tooltips; Shift-click to link items
+- Talent tree capture (full detail for yourself; tree names/icons for inspected players — the Anniversary API doesn't expose inspected point counts to any addon)
+- Enchant/gem count summary per character
+- Zone-aware sessions labeled timestamp + zone; snapshots retained 1/7/14/30 days (dropdown)
+- Manual snapshots via `/as snap [label]`; optional scanning in 5-man/world groups
+- **Migrates your existing archive**: uses the same `ArmorySnapDB` saved variable as the standalone addon; if the standalone addon is still enabled, the module stands down and tells you (disable one or the other)
+- Keeps the standalone `/as` slash commands; also `/wmachine armory`
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -153,7 +166,7 @@ Addon-wide theme support accessible via `/wmachine settings` or the Settings but
 
 ### Theme Coverage
 - Dashboard and all module cards
-- All module settings panels (all 10 modules)
+- All module settings panels (ArmorySnap ships its own ElvUI toggle instead, carried over from the standalone addon)
 - Debuff Tracker overlay and indicators
 - Live re-skinning: theme changes apply immediately without /reload
 
@@ -186,6 +199,7 @@ Built-in error capture system for debugging.
 - `/wmachine pvp` - Open PvP Enemy Tracker
 - `/wmachine recruit` - Open Recruiting Tool
 - `/wmachine buffcheck` - Open Buff Check settings
+- `/wmachine armory` - Open ArmorySnap gear browser (also `/as`, `/as snap`, `/as list`, ...)
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
@@ -210,8 +224,17 @@ Built-in error capture system for debugging.
 - `PvPTrackerDB` - PvP Enemy Tracker data and enemy list
 - `RecruitingToolDB` - Recruiting Tool data
 - `BuffCheckDB` - Buff Check settings
+- `ArmorySnapDB` - ArmorySnap snapshots and options (shared with the standalone addon — existing archives carry over)
 
 ## Changelog
+
+### Version 2.9
+- **New module: ArmorySnap** — the standalone ArmorySnap addon is now integrated as a Watching Machine module
+  - Passive raid gear/talent snapshots with a paper-doll browser, snapshot retention dropdown, and manual snapshots
+  - Includes the v1.2 scan-speed overhaul: event-chained inspects capture a full 25-man in ~15–20s (the old fixed-tick scanner took 75+ seconds); out-of-range retry 120s → 15s
+  - Reuses `ArmorySnapDB`, so archives from the standalone addon appear automatically
+  - Detects the standalone addon and disables itself if both are running (prevents inspect conflicts)
+  - Standalone `/as` commands kept; minimap button dropped in favor of the WM dashboard
 
 ### Version 2.8
 - Updated for TBC Classic Anniversary patch 2.5.6 (Interface 20506, Classic Era 11508)

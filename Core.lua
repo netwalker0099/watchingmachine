@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "2.8"
+WM.version = "2.9"
 WM.modules = {}
 
 -- ============================================
@@ -18,7 +18,7 @@ local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "MailLogger", "ServicesParser",
-    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck",
+    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -135,6 +135,7 @@ local MODULE_COLORS = {
     DebuffTracker = "FFCC00",
     PvPTracker = "FF3333",
     BuffCheck = "33FF99",
+    ArmorySnap = "66AAFF",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -454,6 +455,7 @@ local coreDefaults = {
         PvPTracker = true,
         Recruiter = true,
         BuffCheck = true,
+        ArmorySnap = true,
     },
 }
 
@@ -665,7 +667,7 @@ function WM:CreateDashboard()
     if dashboard then return end
     
     local frame = CreateFrame("Frame", "WatchingMachineDashboard", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 675)
+    frame:SetSize(420, 685)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -777,10 +779,10 @@ function WM:CreateModuleCards()
     
     local container = dashboard.cardsContainer
     local yOffset = 0
-    local cardHeight = 50
-    local cardSpacing = 5
+    local cardHeight = 48
+    local cardSpacing = 4
 
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck"}
+    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap"}
     local moduleInfo = {
         AutoLogger = {
             title = "Auto Logger",
@@ -841,6 +843,12 @@ function WM:CreateModuleCards()
             desc = "Ready-check raid buff audit",
             color = {0.2, 1, 0.6},
             icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
+        },
+        ArmorySnap = {
+            title = "ArmorySnap",
+            desc = "Raid gear & talent snapshots",
+            color = {0.4, 0.67, 1},
+            icon = "Interface\\Icons\\INV_Chest_Chain_09",
         },
     }
     
@@ -1148,6 +1156,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
+    print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
@@ -1288,6 +1297,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("BuffCheck module not available")
+        end
+
+    elseif cmd == "armory" or cmd == "armorysnap" or cmd == "gear" or cmd == "snap" then
+        local module = WM.modules.ArmorySnap
+        if module and module.Toggle then
+            module:Toggle()
+        else
+            WM:Print("ArmorySnap module not available")
         end
 
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then
