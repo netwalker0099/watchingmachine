@@ -250,6 +250,10 @@ Built-in error capture system for debugging.
 
 ## Changelog
 
+Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
+Copy-paste release announcements for Discord and CurseForge are in
+[`docs/RELEASE-NOTES-v3.1.md`](docs/RELEASE-NOTES-v3.1.md).
+
 ### Version 3.1
 - DebuffTracker: eliminated boss-detection false positives
   - Root cause: the old check treated any mob at `level >= playerLevel + 3` with elite classification as a boss. TBC raid trash is level 72–73 elite, identical to real bosses, so trash like Magtheridon's Hellfire Warders was flagged. Display names couldn't separate them either, since some trash shares names with encounter mobs
