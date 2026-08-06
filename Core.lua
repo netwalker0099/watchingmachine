@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "2.9"
+WM.version = "3.0"
 WM.modules = {}
 
 -- ============================================
@@ -18,7 +18,7 @@ local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "MailLogger", "ServicesParser",
-    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap",
+    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -136,6 +136,7 @@ local MODULE_COLORS = {
     PvPTracker = "FF3333",
     BuffCheck = "33FF99",
     ArmorySnap = "66AAFF",
+    AuraRange = "FFFF66",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -456,6 +457,7 @@ local coreDefaults = {
         Recruiter = true,
         BuffCheck = true,
         ArmorySnap = true,
+        AuraRange = true,
     },
 }
 
@@ -667,7 +669,7 @@ function WM:CreateDashboard()
     if dashboard then return end
     
     local frame = CreateFrame("Frame", "WatchingMachineDashboard", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 685)
+    frame:SetSize(420, 700)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -779,10 +781,10 @@ function WM:CreateModuleCards()
     
     local container = dashboard.cardsContainer
     local yOffset = 0
-    local cardHeight = 48
-    local cardSpacing = 4
+    local cardHeight = 46
+    local cardSpacing = 3
 
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap"}
+    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap", "AuraRange"}
     local moduleInfo = {
         AutoLogger = {
             title = "Auto Logger",
@@ -849,6 +851,12 @@ function WM:CreateModuleCards()
             desc = "Raid gear & talent snapshots",
             color = {0.4, 0.67, 1},
             icon = "Interface\\Icons\\INV_Chest_Chain_09",
+        },
+        AuraRange = {
+            title = "Aura Range",
+            desc = "Totem/aura out-of-range alerts",
+            color = {1, 1, 0.4},
+            icon = "Interface\\Icons\\Spell_Nature_StoneSkinTotem",
         },
     }
     
@@ -1157,6 +1165,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
+    print("|cFFFFFF00/wmachine range|r - Open Aura Range alert settings")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
@@ -1305,6 +1314,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "range" or cmd == "aurarange" or cmd == "totem" or cmd == "aura" then
+        local module = WM.modules.AuraRange
+        if module and module.Toggle then
+            module:Toggle()
+        else
+            WM:Print("AuraRange module not available")
         end
 
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then

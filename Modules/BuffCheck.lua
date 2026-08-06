@@ -99,10 +99,50 @@ local BUFF_GROUPS = {
         name = "Flask",
         providerClass = nil,  -- consumable
         buffs = {},
-        prefix = "Flask of",
+        prefixes = { "Flask of", "Shattrath Flask of" },
         appliesTo = ALL_CLASSES,
         default = false,
-        note = "Any 'Flask of ...' aura",
+        note = "Any flask aura",
+    },
+    {
+        key = "battleelixir",
+        name = "Battle Elixir",
+        providerClass = nil,  -- consumable
+        buffs = {
+            -- TBC battle elixirs
+            "Elixir of Major Strength", "Elixir of Major Agility",
+            "Elixir of Major Shadow Power", "Elixir of Major Firepower",
+            "Elixir of Major Frost Power", "Adept's Elixir",
+            "Onslaught Elixir", "Elixir of Mastery",
+            "Elixir of Healing Power", "Fel Strength Elixir",
+            "Elixir of Empowerment", "Elixir of Demonslaying",
+            -- Classic-era battle elixirs still in use
+            "Elixir of the Mongoose", "Greater Arcane Elixir",
+            "Elixir of Shadow Power", "Elixir of Greater Firepower",
+        },
+        -- Flasks occupy both elixir slots in TBC
+        prefixes = { "Flask of", "Shattrath Flask of" },
+        appliesTo = ALL_CLASSES,
+        default = false,
+        note = "Flask counts too",
+    },
+    {
+        key = "guardianelixir",
+        name = "Guardian Elixir",
+        providerClass = nil,  -- consumable
+        buffs = {
+            -- TBC guardian elixirs
+            "Elixir of Major Fortitude", "Elixir of Major Defense",
+            "Elixir of Ironskin", "Elixir of Draenic Wisdom",
+            "Elixir of Major Mageblood", "Earthen Elixir",
+            -- Classic-era guardian elixirs still in use
+            "Elixir of Superior Defense", "Elixir of Fortitude",
+            "Gift of Arthas", "Elixir of Greater Defense",
+        },
+        prefixes = { "Flask of", "Shattrath Flask of" },
+        appliesTo = ALL_CLASSES,
+        default = false,
+        note = "Flask counts too",
     },
 }
 
@@ -210,8 +250,12 @@ local function UnitHasGroupBuff(buffSet, group)
         if group.buffSet[buffName] then
             return true
         end
-        if group.prefix and buffName:sub(1, #group.prefix) == group.prefix then
-            return true
+        if group.prefixes then
+            for _, prefix in ipairs(group.prefixes) do
+                if buffName:sub(1, #prefix) == prefix then
+                    return true
+                end
+            end
         end
     end
     return false
@@ -561,7 +605,7 @@ function BuffCheck:CreateUI()
     local theme = WM:GetTheme()
 
     local frame = CreateFrame("Frame", "WM_BuffCheckFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(360, 535)
+    frame:SetSize(360, 585)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)

@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 2.9 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.0 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines eleven powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines twelve powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -134,7 +134,8 @@ Automated guild recruiting system.
 Full raid buff audit that runs automatically on every ready check.
 - **You start the ready check** → missing buffs are announced to raid/party chat ("Missing Fortitude: Player1, Player2")
 - **Someone else starts it** → the same report prints locally where only you can see it
-- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks — each individually toggleable
+- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
+- Elixir checks know the TBC rules: a flask satisfies both the Battle and Guardian elixir slots
 - **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings (class assignments + single-target assignments) and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
 - Class buffs are only checked when the providing class is actually in the group (no priest = no Fortitude nag)
 - Only classes a buff applies to are checked (rogues aren't flagged for missing Intellect)
@@ -155,6 +156,14 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - Manual snapshots via `/as snap [label]`; optional scanning in 5-man/world groups
 - **Migrates your existing archive**: uses the same `ArmorySnapDB` saved variable as the standalone addon; if the standalone addon is still enabled, the module stands down and tells you (disable one or the other)
 - Keeps the standalone `/as` slash commands; also `/wmachine armory`
+
+### 12. Aura Range
+Visual and audio alerts when you drift out of range of party auras and shaman totems.
+- **Watches your own buffs**: party auras (Moonkin Aura, Leader of the Pack, Trueshot Aura, Tree of Life, Paladin auras) and totem buffs (Strength of Earth, Grace of Air, Wrath of Air, Totem of Wrath, Mana Spring, and more) drop off the moment you leave their radius — the module catches the drop instantly via UNIT_AURA, no polling
+- **Movable on-screen alert** with pulsing red border listing exactly which auras you've walked away from, plus an optional raid-warning sound
+- Alert clears the moment you step back into range
+- **False-alarm guards**: no alerts while dead (death wipes buffs), when the provider (moonkin/shaman/etc.) is dead or gone, on zone transitions, or after leaving a group; stale alerts auto-expire (configurable 5–30s) to cover totems that simply expired or were destroyed
+- Per-aura toggles, sound toggle, lockable alert frame, test button
 
 ## Global Theme System
 
@@ -200,6 +209,7 @@ Built-in error capture system for debugging.
 - `/wmachine recruit` - Open Recruiting Tool
 - `/wmachine buffcheck` - Open Buff Check settings
 - `/wmachine armory` - Open ArmorySnap gear browser (also `/as`, `/as snap`, `/as list`, ...)
+- `/wmachine range` - Open Aura Range alert settings
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
@@ -225,8 +235,18 @@ Built-in error capture system for debugging.
 - `RecruitingToolDB` - Recruiting Tool data
 - `BuffCheckDB` - Buff Check settings
 - `ArmorySnapDB` - ArmorySnap snapshots and options (shared with the standalone addon — existing archives carry over)
+- `AuraRangeDB` - Aura Range settings
 
 ## Changelog
+
+### Version 3.0
+- **New module: Aura Range** — out-of-range alerts for party auras and shaman totems
+  - Detects the instant Moonkin Aura, Trueshot Aura, Leader of the Pack, Tree of Life, paladin auras, or totem buffs drop off you while their provider is alive in your group
+  - Movable pulsing alert frame + optional sound; clears when you walk back in range
+  - Suppresses false alarms from death, provider death, zoning, leaving group; stale alerts auto-expire
+- Buff Check: Battle Elixir and Guardian Elixir detection (off by default, toggle in settings)
+  - TBC-accurate elixir lists for both categories, including classic-era holdovers
+  - Flasks correctly satisfy both elixir slots
 
 ### Version 2.9
 - **New module: ArmorySnap** — the standalone ArmorySnap addon is now integrated as a Watching Machine module
