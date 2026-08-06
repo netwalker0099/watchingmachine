@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local DebuffTracker = {}
 WM:RegisterModule("DebuffTracker", DebuffTracker)
 
-DebuffTracker.version = "2.8"
+DebuffTracker.version = "3.1"
 
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)
@@ -222,6 +222,10 @@ local defaults = {
     -- Pull announce settings
     pullAnnounce = false,        -- Announce who pulled the boss
     pullAnnounceChannel = "SAY", -- Channel: SAY, PARTY, RAID, RAID_WARNING
+    -- False-positive controls
+    bossMinHealth = 150000,   -- Minimum max-HP for a mob to count as a boss (0 = off)
+    focusTracking = true,     -- Only alert for the mob taking the most raid damage
+    excludedNPCs = {},        -- [tostring(npcID)] = "Name" — never treated as a boss
 }
 
 -- Initialize tracked categories and per-debuff defaults (all enabled)
@@ -259,6 +263,17 @@ local bossDeadGUID = nil     -- GUID of boss that died (suppress alerts until co
 local pullAnnounced = false      -- Already announced this pull
 local trackedBossGUIDs = {}      -- GUIDs of bosses we've seen: trackedBossGUIDs[guid] = name
 local pullDetectFrame = nil      -- Separate frame for combat log events
+
+-- Focus-target state (multi-boss encounters: Karathress, Illidari Council, ...)
+-- The raid's real kill target is whichever hostile GUID is taking the most
+-- group damage in a rolling window. This adapts to any kill order without
+-- hardcoding, so alerts follow the raid instead of your current target.
+local damageWindow = {}          -- guid -> { amount = n, last = GetTime(), name = str }
+local FOCUS_WINDOW = 6           -- seconds of damage history that counts
+local focusGUID = nil            -- current best kill-target GUID
+local focusName = nil
+local lastFocusEval = 0
+local FOCUS_EVAL_INTERVAL = 1    -- recompute focus at most once per second
 
 -- ============================================
 -- RAID COMPOSITION + SPEC SCANNING
@@ -627,30 +642,166 @@ function DebuffTracker:SendAlert(categoryName, debuffNames)
     alertCooldowns[categoryName] = GetTime()
 end
 
+-- ============================================
+-- MOB IDENTITY (NPC ID)
+-- ============================================
+-- TBC Classic creature GUIDs look like:
+--   Creature-0-<server>-<instance>-<zoneUID>-<npcID>-<spawnUID>
+-- Field 6 is the npcID, which is stable and unique per creature type — the
+-- only reliable way to tell apart mobs that SHARE A DISPLAY NAME (e.g.
+-- Magtheridon's room channelers vs identically-named trash outside).
+-- Names and levels can't distinguish those; npcIDs always can.
+
+local function GetNPCID(guid)
+    if not guid then return nil end
+    local unitType, _, _, _, _, npcID = strsplit("-", guid)
+    if unitType ~= "Creature" and unitType ~= "Vehicle" then return nil end
+    return tonumber(npcID)
+end
+DebuffTracker.GetNPCID = GetNPCID
+
+-- Resolve a readable name for an npcID from what we've seen this session
+local seenNPCNames = {}          -- npcID -> last seen name
+
+function DebuffTracker:IsNPCExcluded(npcID)
+    if not npcID or not DebuffTrackerDB then return false end
+    local list = DebuffTrackerDB.excludedNPCs
+    return list and list[tostring(npcID)] ~= nil
+end
+
 -- Check if unit is a boss (TBC-compatible, no global IsBossUnit in Classic)
+--
+-- Layered so trash can't slip through on the old "high level + elite"
+-- heuristic alone, which flagged every level 72/73 elite raid trash mob
+-- (Magtheridon's Hellfire Warders, SSC/TK trash) as a boss:
+--   1. User exclusion list by npcID  -> never a boss
+--   2. Health pool floor             -> trash filtered out regardless of level
+--   3. Classification / level        -> original heuristic, now gated by (2)
 local function IsBossUnit(unit)
     if not unit or not UnitExists(unit) then return false end
-    
-    -- Check classification
+    if not UnitCanAttack("player", unit) then return false end
+
+    -- (1) Explicit user exclusions win over everything
+    local guid = UnitGUID(unit)
+    local npcID = GetNPCID(guid)
+    if npcID then
+        seenNPCNames[npcID] = UnitName(unit) or seenNPCNames[npcID]
+        if DebuffTracker:IsNPCExcluded(npcID) then
+            return false
+        end
+    end
+
     local classification = UnitClassification(unit)
+    local level = UnitLevel(unit)
+
+    -- (2) Health-pool floor. TBC raid bosses and encounter adds carry
+    -- hundreds of thousands of HP; raid trash is an order of magnitude
+    -- lower even when it's the same level and elite.
+    local minHealth = (DebuffTrackerDB and DebuffTrackerDB.bossMinHealth) or 150000
+    if minHealth > 0 then
+        local maxHP = UnitHealthMax(unit) or 0
+        -- Health can read 0 briefly before the unit is fully known; don't
+        -- reject in that case, fall through to the classification checks.
+        if maxHP > 0 and maxHP < minHealth then
+            return false
+        end
+    end
+
+    -- (3) Classification / level heuristics
     if classification == "worldboss" or classification == "raidboss" then
         return true
     end
-    
-    -- Check level (boss level is -1 or very high)
-    local level = UnitLevel(unit)
+
     if level == -1 or level == "??" then
         return true
     end
-    
-    -- Check if it's a dungeon/raid boss by checking for skull
+
     if level and level >= 0 then
         local playerLevel = UnitLevel("player")
         if level >= playerLevel + 3 and classification == "elite" then
             return true
         end
     end
-    
+
+    return false
+end
+
+-- ============================================
+-- FOCUS TARGET (adaptive kill-order detection)
+-- ============================================
+-- On multi-boss encounters (Fathom-Lord Karathress, Illidari Council, ...)
+-- only one mob is actually being killed at a time. Rather than hardcoding a
+-- kill order, we watch which hostile GUID is absorbing the most group damage
+-- over a rolling window — that's the raid's real target, whatever strat is
+-- being run. Alerts fire only for that mob, so targeting an ignored add
+-- (Fathom-Guard Caribdis) no longer sets the alerts off.
+
+local DAMAGE_SUBEVENTS = {
+    SWING_DAMAGE = true,
+    RANGE_DAMAGE = true,
+    SPELL_DAMAGE = true,
+    SPELL_PERIODIC_DAMAGE = true,
+    DAMAGE_SHIELD = true,
+    DAMAGE_SPLIT = true,
+}
+
+-- Record a damage event against a hostile GUID
+local function RecordDamage(destGUID, destName, amount)
+    if not destGUID or not amount or amount <= 0 then return end
+    local now = GetTime()
+    local entry = damageWindow[destGUID]
+    if not entry or (now - entry.last) > FOCUS_WINDOW then
+        -- Stale or new: start a fresh accumulation
+        damageWindow[destGUID] = { amount = amount, last = now, name = destName }
+    else
+        entry.amount = entry.amount + amount
+        entry.last = now
+        entry.name = destName or entry.name
+    end
+end
+
+-- Recompute which GUID the raid is actually killing
+local function EvaluateFocus()
+    local now = GetTime()
+    if (now - lastFocusEval) < FOCUS_EVAL_INTERVAL then return end
+    lastFocusEval = now
+
+    local bestGUID, bestName, bestAmount = nil, nil, 0
+    for guid, entry in pairs(damageWindow) do
+        if (now - entry.last) > FOCUS_WINDOW then
+            damageWindow[guid] = nil
+        elseif entry.amount > bestAmount then
+            bestGUID, bestName, bestAmount = guid, entry.name, entry.amount
+        end
+    end
+
+    focusGUID = bestGUID
+    focusName = bestName
+end
+
+function DebuffTracker:GetFocusInfo()
+    return focusGUID, focusName
+end
+
+-- Is this unit the raid's current kill target?
+-- Returns true when focus tracking is off, when no focus is established yet,
+-- or when the unit IS the focus — i.e. it only ever suppresses alerts when
+-- we're confident the raid is killing something else.
+local function IsFocusTarget(unit)
+    if not DebuffTrackerDB or not DebuffTrackerDB.focusTracking then return true end
+    if not focusGUID then return true end
+
+    local guid = UnitGUID(unit)
+    if not guid then return true end
+    if guid == focusGUID then return true end
+
+    -- Focus exists and it isn't this unit. Only suppress if the focus is
+    -- still actually being hit (stale focus shouldn't silence everything).
+    local entry = damageWindow[focusGUID]
+    if not entry or (GetTime() - entry.last) > FOCUS_WINDOW then
+        return true
+    end
+
     return false
 end
 
@@ -676,28 +827,53 @@ local function IsBossGUID(guid)
     return guid and trackedBossGUIDs[guid] ~= nil
 end
 
--- Check if a GUID belongs to someone in our raid/party
-local function IsInOurGroup(guid)
-    if not guid then return false end
-    -- Check player
-    if guid == UnitGUID("player") then return true end
-    -- Check raid
+-- Cached set of group member GUIDs. The old implementation walked up to 40
+-- raid units on every lookup; damage tracking calls this for every combat log
+-- damage event, so it has to be a hash lookup.
+local groupGUIDs = {}
+local groupGUIDStamp = 0
+local GROUP_GUID_TTL = 3
+
+local function RefreshGroupGUIDs()
+    wipe(groupGUIDs)
+    local pguid = UnitGUID("player")
+    if pguid then groupGUIDs[pguid] = true end
+
     if IsInRaid() then
         for i = 1, 40 do
             local unit = "raid" .. i
-            if UnitExists(unit) and UnitGUID(unit) == guid then
-                return true
+            if UnitExists(unit) then
+                local g = UnitGUID(unit)
+                if g then groupGUIDs[g] = true end
+                -- Pets contribute raid damage too
+                local pg = UnitGUID("raidpet" .. i)
+                if pg then groupGUIDs[pg] = true end
             end
         end
     elseif GetNumGroupMembers and GetNumGroupMembers() > 0 then
         for i = 1, 4 do
             local unit = "party" .. i
-            if UnitExists(unit) and UnitGUID(unit) == guid then
-                return true
+            if UnitExists(unit) then
+                local g = UnitGUID(unit)
+                if g then groupGUIDs[g] = true end
+                local pg = UnitGUID("partypet" .. i)
+                if pg then groupGUIDs[pg] = true end
             end
         end
     end
-    return false
+    local ownPet = UnitGUID("pet")
+    if ownPet then groupGUIDs[ownPet] = true end
+
+    groupGUIDStamp = GetTime()
+end
+
+-- Check if a GUID belongs to someone in our raid/party (or their pets)
+local function IsInOurGroup(guid)
+    if not guid then return false end
+    if (GetTime() - groupGUIDStamp) > GROUP_GUID_TTL then
+        RefreshGroupGUIDs()
+    end
+    return groupGUIDs[guid] == true
 end
 
 -- Subevents that indicate a player attacked/engaged a mob
@@ -712,27 +888,44 @@ local PULL_SUBEVENTS = {
     SPELL_INSTAKILL = true,
 }
 
-function DebuffTracker:ProcessPullDetection()
+-- Single combat-log entry point: parses the event once and feeds both the
+-- damage window (focus tracking) and pull detection.
+function DebuffTracker:ProcessCombatLog()
+    if not CombatLogGetCurrentEventInfo then return end
+    if not inCombat then return end
+
+    local _, subevent, _, sourceGUID, sourceName, _, _, destGUID, destName, _, _,
+          p12, p13, p14, p15 = CombatLogGetCurrentEventInfo()
+
+    if not subevent or not sourceGUID or not destGUID then return end
+
+    -- --- Focus tracking: accumulate group damage per hostile GUID ---
+    if DebuffTrackerDB and DebuffTrackerDB.focusTracking and DAMAGE_SUBEVENTS[subevent] then
+        if IsInOurGroup(sourceGUID) and not IsInOurGroup(destGUID) then
+            -- SWING_DAMAGE has no spell payload, so amount sits at 12;
+            -- every other damage subevent puts spellId/name/school first.
+            local amount = (subevent == "SWING_DAMAGE") and p12 or p15
+            if type(amount) == "number" then
+                RecordDamage(destGUID, destName, amount)
+            end
+        end
+    end
+
+    -- --- Pull detection ---
     if not DebuffTrackerDB or not DebuffTrackerDB.pullAnnounce then return end
     if pullAnnounced then return end
-    if not inCombat then return end
-    if not CombatLogGetCurrentEventInfo then return end
-    
-    local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags = CombatLogGetCurrentEventInfo()
-    
-    if not subevent or not PULL_SUBEVENTS[subevent] then return end
-    if not sourceGUID or not destGUID then return end
-    
-    -- Dest must be a tracked boss
+    if not PULL_SUBEVENTS[subevent] then return end
     if not IsBossGUID(destGUID) then return end
-    
-    -- Source must be a player in our group
     if not sourceName then return end
     if not IsInOurGroup(sourceGUID) then return end
-    
-    -- This is the puller!
+
     pullAnnounced = true
     self:AnnouncePull(sourceName, trackedBossGUIDs[destGUID])
+end
+
+-- Back-compat alias (older call sites / user macros)
+function DebuffTracker:ProcessPullDetection()
+    return self:ProcessCombatLog()
 end
 
 function DebuffTracker:AnnouncePull(pullerName, bossName)
@@ -775,7 +968,7 @@ function DebuffTracker:RegisterPullDetection()
     pullDetectFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     pullDetectFrame:SetScript("OnEvent", function(self, event)
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-            pcall(DebuffTracker.ProcessPullDetection, DebuffTracker)
+            pcall(DebuffTracker.ProcessCombatLog, DebuffTracker)
         elseif event == "PLAYER_TARGET_CHANGED" then
             pcall(DebuffTracker.TrackBossGUID, DebuffTracker, "target")
         elseif event == "UPDATE_MOUSEOVER_UNIT" then
@@ -816,7 +1009,17 @@ function DebuffTracker:CheckAlerts(unit)
         missingTimers = {}
         return
     end
-    
+
+    -- Gate 6: On multi-boss encounters, only alert for the mob the raid is
+    -- actually killing. Targeting an add the raid is ignoring (e.g. a
+    -- Fathom-Guard that isn't next in the kill order) must stay silent.
+    EvaluateFocus()
+    if not IsFocusTarget(unit) then
+        -- Don't accumulate "missing" time against a mob we aren't killing
+        missingTimers = {}
+        return
+    end
+
     -- Mark boss as engaged (used to track encounter state)
     bossEngaged = true
     
@@ -869,6 +1072,96 @@ function DebuffTracker:CheckAlerts(unit)
                 end
             end
         end
+    end
+end
+
+-- ============================================
+-- NPC EXCLUSION MANAGEMENT (user-facing)
+-- ============================================
+-- Escape hatch for any mob the heuristics still get wrong: target it, run
+-- the command, and that exact creature type is never treated as a boss
+-- again. Keyed on npcID so same-named mobs elsewhere are unaffected.
+
+function DebuffTracker:ExcludeTarget()
+    if not UnitExists("target") then
+        self:Print("No target. Target the mob you want excluded, then run this again.")
+        return
+    end
+    local guid = UnitGUID("target")
+    local npcID = GetNPCID(guid)
+    if not npcID then
+        self:Print("Target isn't a creature (players can't be excluded).")
+        return
+    end
+    local name = UnitName("target") or ("NPC " .. npcID)
+    DebuffTrackerDB.excludedNPCs[tostring(npcID)] = name
+    self:Print("Excluded |cFFFFCC00" .. name .. "|r (npcID " .. npcID
+        .. ") — it will no longer trigger boss alerts.")
+    self:UpdateVisibility()
+end
+
+function DebuffTracker:UnexcludeTarget()
+    if not UnitExists("target") then
+        self:Print("No target.")
+        return
+    end
+    local npcID = GetNPCID(UnitGUID("target"))
+    if not npcID then return end
+    local key = tostring(npcID)
+    if DebuffTrackerDB.excludedNPCs[key] then
+        local name = DebuffTrackerDB.excludedNPCs[key]
+        DebuffTrackerDB.excludedNPCs[key] = nil
+        self:Print("Removed |cFFFFCC00" .. name .. "|r from the exclusion list.")
+    else
+        self:Print((UnitName("target") or "Target") .. " is not excluded.")
+    end
+end
+
+function DebuffTracker:ListExclusions()
+    local list = DebuffTrackerDB and DebuffTrackerDB.excludedNPCs
+    if not list or not next(list) then
+        self:Print("No excluded NPCs. Target a mob and use /wmachine exclude to add one.")
+        return
+    end
+    self:Print("=== Excluded NPCs (never treated as bosses) ===")
+    for npcID, name in pairs(list) do
+        print("  |cFFFFCC00" .. tostring(name) .. "|r (npcID " .. npcID .. ")")
+    end
+    self:Print("Use /wmachine unexclude with the mob targeted to remove one.")
+end
+
+function DebuffTracker:ClearExclusions()
+    if DebuffTrackerDB then
+        DebuffTrackerDB.excludedNPCs = {}
+    end
+    self:Print("Exclusion list cleared.")
+end
+
+-- Diagnostic: what does the tracker think about the current target?
+function DebuffTracker:ExplainTarget()
+    if not UnitExists("target") then
+        self:Print("No target.")
+        return
+    end
+    local guid = UnitGUID("target")
+    local npcID = GetNPCID(guid)
+    local name = UnitName("target") or "?"
+    self:Print("=== Target analysis: " .. name .. " ===")
+    print("  npcID: " .. tostring(npcID or "n/a (player?)"))
+    print("  classification: " .. tostring(UnitClassification("target"))
+        .. "   level: " .. tostring(UnitLevel("target")))
+    print("  max health: " .. tostring(UnitHealthMax("target"))
+        .. "  (boss floor: " .. tostring(DebuffTrackerDB.bossMinHealth) .. ")")
+    print("  excluded: " .. (self:IsNPCExcluded(npcID) and "|cFFFF4444YES|r" or "no"))
+    print("  counts as boss: " .. (IsBossUnit("target") and "|cFF00FF00YES|r" or "|cFFFF4444no|r"))
+    EvaluateFocus()
+    local fGUID, fName = self:GetFocusInfo()
+    if DebuffTrackerDB.focusTracking then
+        print("  raid focus: " .. tostring(fName or "none yet")
+            .. (fGUID == guid and " |cFF00FF00(this target)|r" or ""))
+        print("  would alert: " .. (IsFocusTarget("target") and "|cFF00FF00YES|r" or "|cFFFF4444no — raid is killing something else|r"))
+    else
+        print("  focus tracking: |cFF888888off|r")
     end
 end
 
@@ -950,6 +1243,15 @@ function DebuffTracker:InitDB()
     end
     if DebuffTrackerDB.pullAnnounceChannel == nil then
         DebuffTrackerDB.pullAnnounceChannel = "SAY"
+    end
+    if DebuffTrackerDB.bossMinHealth == nil then
+        DebuffTrackerDB.bossMinHealth = 150000
+    end
+    if DebuffTrackerDB.focusTracking == nil then
+        DebuffTrackerDB.focusTracking = true
+    end
+    if type(DebuffTrackerDB.excludedNPCs) ~= "table" then
+        DebuffTrackerDB.excludedNPCs = {}
     end
     
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
@@ -1258,6 +1560,9 @@ function DebuffTracker:CreateTrackerFrame()
             bossEngaged = false
             bossDeadGUID = nil
             pullAnnounced = false
+            wipe(damageWindow)
+            focusGUID, focusName = nil, nil
+            RefreshGroupGUIDs()
             return
         elseif event == "PLAYER_REGEN_ENABLED" then
             inCombat = false
@@ -1269,6 +1574,9 @@ function DebuffTracker:CreateTrackerFrame()
             bossEngaged = false
             bossDeadGUID = nil
             pullAnnounced = false
+            wipe(damageWindow)
+            focusGUID, focusName = nil, nil
+            RefreshGroupGUIDs()
             trackedBossGUIDs = {}
             return
         end
@@ -1647,7 +1955,7 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 700)
+    frame:SetSize(420, 800)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1957,8 +2265,105 @@ function DebuffTracker:CreateUI()
     end)
     chanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
+    yOffset = yOffset - 24
+
+    -- ========================================
+    -- FALSE-POSITIVE CONTROLS
+    -- ========================================
+
+    local fpHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fpHeader:SetPoint("TOPLEFT", 20, yOffset)
+    fpHeader:SetText("Target Filtering:")
+    fpHeader:SetTextColor(unpack(theme.headerColor))
+
     yOffset = yOffset - 22
-    
+
+    -- Focus tracking
+    local focusCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    focusCB:SetPoint("TOPLEFT", 20, yOffset)
+    focusCB.Text:SetText("Only alert for the raid's actual kill target")
+    focusCB:SetChecked(DebuffTrackerDB.focusTracking)
+    focusCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.focusTracking = self:GetChecked()
+    end)
+    focusCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Focus Target Tracking", 1, 0.8, 0)
+        GameTooltip:AddLine("On multi-boss fights (Fathom-Lord Karathress,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Illidari Council) the addon watches which mob is", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("taking the most raid damage and only alerts for", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("that one. Target an add the raid is ignoring and", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("it stays quiet. Adapts to any kill order — no", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("configuration needed if you change strategy.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    focusCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 26
+
+    -- Boss min health slider
+    local hpLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    hpLabel:SetPoint("TOPLEFT", 25, yOffset)
+    hpLabel:SetText("Min boss health:")
+
+    local hpValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hpValue:SetPoint("LEFT", hpLabel, "RIGHT", 5, 0)
+    local function FormatHP(v)
+        if v <= 0 then return "off" end
+        return string.format("%dk", math.floor(v / 1000))
+    end
+    hpValue:SetText(FormatHP(DebuffTrackerDB.bossMinHealth))
+
+    local hpSlider = CreateFrame("Slider", "WM_DebuffBossHPSlider", frame, "OptionsSliderTemplate")
+    hpSlider:SetPoint("TOPLEFT", 25, yOffset - 18)
+    hpSlider:SetSize(170, 16)
+    hpSlider:SetMinMaxValues(0, 400000)
+    hpSlider:SetValueStep(25000)
+    hpSlider:SetObeyStepOnDrag(true)
+    hpSlider:SetValue(DebuffTrackerDB.bossMinHealth or 150000)
+    hpSlider.Low:SetText("off")
+    hpSlider.High:SetText("400k")
+    hpSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 25000 + 0.5) * 25000
+        DebuffTrackerDB.bossMinHealth = value
+        hpValue:SetText(FormatHP(value))
+    end)
+    hpSlider:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Minimum Boss Health", 1, 0.8, 0)
+        GameTooltip:AddLine("Mobs below this max health are never treated as", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("bosses. Raid trash is level 72-73 elite just like", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("real bosses, so level alone can't tell them apart —", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("health pool can. Lower it if a real boss is being", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("missed; raise it if trash still triggers alerts.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    hpSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Exclude target button
+    local excludeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    excludeBtn:SetSize(115, 20)
+    excludeBtn:SetPoint("TOPRIGHT", -20, yOffset - 4)
+    excludeBtn:SetText("Exclude Target")
+    excludeBtn:SetScript("OnClick", function()
+        DebuffTracker:ExcludeTarget()
+    end)
+    excludeBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Exclude Target", 1, 0.8, 0)
+        GameTooltip:AddLine("Permanently stop treating your current target's", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("creature type as a boss. Matched by npcID, so", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("mobs that merely share a display name elsewhere", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("are unaffected.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("/wmachine exclusions to review the list", 0.6, 0.8, 1)
+        GameTooltip:AddLine("/wmachine whyboss to diagnose a target", 0.6, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    excludeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 42
+
     -- Separator
     local alertSep = frame:CreateTexture(nil, "ARTWORK")
     alertSep:SetHeight(1)

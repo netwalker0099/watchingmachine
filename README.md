@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.0 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -85,6 +85,12 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - **AP Reduction**: Demoralizing Shout/Roar, Curse of Weakness
   - **Healing Debuff**: Mortal Strike, Wound Poison, Aimed Shot (MM Hunter)
   - **Hunter's Mark**
+- **False-positive filtering** (v3.1):
+  - **NPC-ID identity**: mobs are identified by the npcID embedded in their GUID, not their display name — so same-named mobs in different places are distinguishable
+  - **Health-pool floor** (default 150k, slider): raid trash is level 72–73 elite exactly like real bosses, so level alone can't separate them; health pool can. Stops Magtheridon's Hellfire Warders and similar trash from registering as bosses
+  - **Focus target tracking**: on multi-boss fights (Fathom-Lord Karathress, Illidari Council) the addon watches which mob is absorbing the most raid damage in a rolling 6-second window and only alerts for that one. Target an add the raid is ignoring (a Fathom-Guard that isn't next in the kill order) and it stays silent. Adapts automatically to any kill order — swap to burning Karathress directly and alerts follow, no configuration
+  - **Manual exclusions**: `/wmachine exclude` with a mob targeted permanently stops that creature type triggering boss alerts (keyed on npcID, so same-named mobs elsewhere are unaffected)
+  - **`/wmachine whyboss`** diagnostic prints exactly how the tracker sees your target: npcID, classification, level, health vs. the floor, exclusion state, current raid focus, and whether it would alert
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 
@@ -211,6 +217,10 @@ Built-in error capture system for debugging.
 - `/wmachine buffcheck` - Open Buff Check settings
 - `/wmachine armory` - Open ArmorySnap gear browser (also `/as`, `/as snap`, `/as list`, ...)
 - `/wmachine range` - Open Aura Range alert settings
+- `/wmachine exclude` - Stop the debuff tracker treating your target as a boss
+- `/wmachine unexclude` - Undo an exclusion for your target
+- `/wmachine exclusions` - List excluded NPCs
+- `/wmachine whyboss` - Explain how the debuff tracker sees your target
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
@@ -239,6 +249,15 @@ Built-in error capture system for debugging.
 - `AuraRangeDB` - Aura Range settings
 
 ## Changelog
+
+### Version 3.1
+- DebuffTracker: eliminated boss-detection false positives
+  - Root cause: the old check treated any mob at `level >= playerLevel + 3` with elite classification as a boss. TBC raid trash is level 72–73 elite, identical to real bosses, so trash like Magtheridon's Hellfire Warders was flagged. Display names couldn't separate them either, since some trash shares names with encounter mobs
+  - Mobs are now identified by **npcID** extracted from their GUID (unique per creature type even when names collide), gated behind a **health-pool floor** (default 150k, adjustable) that separates trash from bosses regardless of level
+  - **Focus target tracking**: on multi-boss encounters, alerts only fire for the mob taking the most raid damage in a rolling 6s window. Targeting an add the raid is ignoring no longer triggers alerts, and the focus follows the raid automatically when the kill order or strategy changes. Fails open — a stale focus never silences alerts permanently
+  - Manual npcID exclusion list with `/wmachine exclude` / `unexclude` / `exclusions`
+  - New `/wmachine whyboss` diagnostic explaining the tracker's view of your target
+  - Group-membership lookups for combat log processing are now a cached hash set instead of a 40-unit scan per event
 
 ### Version 3.0
 - **New module: Aura Range** — out-of-range alerts for party auras and shaman totems

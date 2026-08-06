@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.0"
+WM.version = "3.1"
 WM.modules = {}
 
 -- ============================================
@@ -1166,6 +1166,10 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
     print("|cFFFFFF00/wmachine range|r - Open Aura Range alert settings")
+    print("|cFFFFFF00/wmachine exclude|r - Stop the debuff tracker treating your target as a boss")
+    print("|cFFFFFF00/wmachine unexclude|r - Undo an exclusion for your target")
+    print("|cFFFFFF00/wmachine exclusions|r - List excluded NPCs")
+    print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
@@ -1314,6 +1318,25 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "exclude" or cmd == "unexclude" or cmd == "exclusions"
+        or cmd == "excludelist" or cmd == "clearexclusions" or cmd == "whyboss" then
+        local module = WM.modules.DebuffTracker
+        if not module then
+            WM:Print("DebuffTracker module not available")
+            return
+        end
+        if cmd == "exclude" then
+            module:ExcludeTarget()
+        elseif cmd == "unexclude" then
+            module:UnexcludeTarget()
+        elseif cmd == "clearexclusions" then
+            module:ClearExclusions()
+        elseif cmd == "whyboss" then
+            module:ExplainTarget()
+        else
+            module:ListExclusions()
         end
 
     elseif cmd == "range" or cmd == "aurarange" or cmd == "totem" or cmd == "aura" then
