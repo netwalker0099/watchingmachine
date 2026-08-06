@@ -136,7 +136,8 @@ Full raid buff audit that runs automatically on every ready check.
 - **Someone else starts it** → the same report prints locally where only you can see it
 - Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
 - Elixir checks know the TBC rules: a flask satisfies both the Battle and Guardian elixir slots
-- **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings (class assignments + single-target assignments) and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
+- **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
+- **Single-target assignments override correctly**: a player with a single-target assignment (e.g. a feral tank assigned single Might) is *not* expected to have that paladin's class-wide blessing (Salvation) — but still owes class blessings from the *other* paladins
 - Class buffs are only checked when the providing class is actually in the group (no priest = no Fortitude nag)
 - Only classes a buff applies to are checked (rogues aren't flagged for missing Intellect)
 - Offline and dead players are skipped (listed separately in the local report)
@@ -247,6 +248,9 @@ Built-in error capture system for debugging.
 - Buff Check: Battle Elixir and Guardian Elixir detection (off by default, toggle in settings)
   - TBC-accurate elixir lists for both categories, including classic-era holdovers
   - Flasks correctly satisfy both elixir slots
+- Buff Check: PallyPower single-target assignments now override that paladin's class blessing per player
+  - Previously the expectation was the union of both, so a feral tank with a single Might assignment was falsely flagged for missing the class-wide Salvation
+  - Expectations are now computed per paladin: the single-target assignment replaces that paladin's class blessing for that player, while other paladins' class blessings still apply
 
 ### Version 2.9
 - **New module: ArmorySnap** — the standalone ArmorySnap addon is now integrated as a Watching Machine module

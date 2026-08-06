@@ -235,6 +235,7 @@ end
 
 -- Fill a reusable set with every buff name on a unit
 local buffScratch = {}
+local expectedScratch = {}
 local function GetUnitBuffSet(unit)
     wipe(buffScratch)
     for i = 1, 40 do
@@ -278,6 +279,12 @@ end
 
 -- Returns nil when PallyPower isn't usable (not loaded, no assignments from
 -- paladins actually in the group) — caller falls back to the generic check.
+--
+-- Assignments are kept PER PALADIN because PallyPower's single-target
+-- (normal) assignments OVERRIDE that same paladin's class-wide blessing for
+-- that player: a feral tank with a single Might assigned does NOT also get
+-- that paladin's Greater Salvation. A different paladin's class assignment
+-- still applies to the tank as usual.
 local function GetPallyPowerData(units)
     local pp = _G.PallyPower
     local assignments = _G.PallyPower_Assignments
@@ -298,8 +305,11 @@ local function GetPallyPowerData(units)
         end
     end
 
-    local classBlessings = {}   -- classToken -> { blessingIndex = true }
-    local playerBlessings = {}  -- playerName -> { blessingIndex = true }
+    -- pallys[pallyName] = {
+    --   classes = { classToken -> blessingIndex },   (class-wide greater blessing)
+    --   players = { playerName -> blessingIndex },   (single-target override)
+    -- }
+    local pallys = {}
     local found = false
 
     for pallyName, classTable in pairs(assignments) do
@@ -307,10 +317,10 @@ local function GetPallyPowerData(units)
             for classIndex, blessingID in pairs(classTable) do
                 local classToken = pp.ClassID[classIndex]
                 if classToken and type(blessingID) == "number" and blessingID > 0 then
-                    if not classBlessings[classToken] then
-                        classBlessings[classToken] = {}
+                    if not pallys[pallyName] then
+                        pallys[pallyName] = { classes = {}, players = {} }
                     end
-                    classBlessings[classToken][blessingID] = true
+                    pallys[pallyName].classes[classToken] = blessingID
                     found = true
                 end
             end
@@ -325,10 +335,10 @@ local function GetPallyPowerData(units)
                     if type(players) == "table" then
                         for playerName, blessingID in pairs(players) do
                             if type(blessingID) == "number" and blessingID > 0 then
-                                if not playerBlessings[playerName] then
-                                    playerBlessings[playerName] = {}
+                                if not pallys[pallyName] then
+                                    pallys[pallyName] = { classes = {}, players = {} }
                                 end
-                                playerBlessings[playerName][blessingID] = true
+                                pallys[pallyName].players[playerName] = blessingID
                                 found = true
                             end
                         end
@@ -341,11 +351,29 @@ local function GetPallyPowerData(units)
     if not found then return nil end
 
     return {
-        classBlessings = classBlessings,
-        playerBlessings = playerBlessings,
+        pallys = pallys,
         spells = pp.Spells,
         gspells = pp.GSpells,
     }
+end
+
+-- Expected blessing set for one player: for each paladin, the single-target
+-- override wins over that paladin's class-wide assignment; contributions
+-- from different paladins stack.
+local function GetExpectedBlessings(ppData, playerName, classToken, out)
+    wipe(out)
+    for _, pally in pairs(ppData.pallys) do
+        local override = pally.players[playerName]
+        if override then
+            out[override] = true
+        else
+            local classBlessing = pally.classes[classToken]
+            if classBlessing then
+                out[classBlessing] = true
+            end
+        end
+    end
+    return out
 end
 
 -- Is PallyPower loaded at all? (for UI status display)
@@ -408,19 +436,11 @@ function BuffCheck:ScanGroup()
                     end
                 end
 
-                -- PallyPower mode: expected = class assignments + per-player singles
+                -- PallyPower mode: per-paladin expectations — a single-target
+                -- assignment replaces that paladin's class blessing for this
+                -- player (e.g. feral tank gets single Might, not class Salv)
                 if ppData then
-                    local expected = {}
-                    if ppData.classBlessings[class] then
-                        for blessingID in pairs(ppData.classBlessings[class]) do
-                            expected[blessingID] = true
-                        end
-                    end
-                    if ppData.playerBlessings[name] then
-                        for blessingID in pairs(ppData.playerBlessings[name]) do
-                            expected[blessingID] = true
-                        end
-                    end
+                    local expected = GetExpectedBlessings(ppData, name, class, expectedScratch)
 
                     for blessingID in pairs(expected) do
                         local normalName = ppData.spells and ppData.spells[blessingID]
@@ -686,9 +706,11 @@ function BuffCheck:CreateUI()
         GameTooltip:AddLine("PallyPower Integration", 1, 0.8, 0)
         GameTooltip:AddLine("When PallyPower is running and paladins in your", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("group have blessing assignments, each player is", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("checked against their ASSIGNED blessings (class", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("assignments + single-target assignments), and the", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("checked against their ASSIGNED blessings, and the", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("report names the exact missing blessing.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Single-target assignments override that paladin's", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("class blessing for that player (a tank assigned", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("single Might isn't expected to have class Salv).", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("Greater and normal versions both count.", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("Falls back to 'any blessing' when PallyPower is", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("missing or has no assignments configured.", 0.8, 0.8, 0.8, true)
