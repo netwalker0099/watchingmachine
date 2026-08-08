@@ -99,7 +99,10 @@ local BUFF_GROUPS = {
         name = "Flask",
         providerClass = nil,  -- consumable
         buffs = {},
-        prefixes = { "Flask of", "Shattrath Flask of" },
+        -- Substring (not prefix) match: TBC's Zul'Aman-era flasks are named
+        -- "Unstable Flask of the Beast" / "...of the Sorcerer", so anchoring
+        -- to the start of the name would miss them.
+        contains = { "Flask of" },
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Any flask aura",
@@ -112,16 +115,19 @@ local BUFF_GROUPS = {
             -- TBC battle elixirs
             "Elixir of Major Strength", "Elixir of Major Agility",
             "Elixir of Major Shadow Power", "Elixir of Major Firepower",
-            "Elixir of Major Frost Power", "Adept's Elixir",
-            "Onslaught Elixir", "Elixir of Mastery",
+            "Elixir of Major Frost Power", "Elixir of Major Defense",
+            "Adept's Elixir", "Onslaught Elixir", "Elixir of Mastery",
             "Elixir of Healing Power", "Fel Strength Elixir",
-            "Elixir of Empowerment", "Elixir of Demonslaying",
+            "Elixir of Demonslaying", "Elixir of Camouflage",
             -- Classic-era battle elixirs still in use
             "Elixir of the Mongoose", "Greater Arcane Elixir",
-            "Elixir of Shadow Power", "Elixir of Greater Firepower",
+            "Arcane Elixir", "Elixir of Shadow Power",
+            "Elixir of Greater Firepower", "Elixir of Frost Power",
+            "Elixir of Giants", "Elixir of Greater Agility",
+            "Winterfall Firewater", "Juju Might", "Juju Power",
         },
         -- Flasks occupy both elixir slots in TBC
-        prefixes = { "Flask of", "Shattrath Flask of" },
+        contains = { "Flask of" },
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Flask counts too",
@@ -132,14 +138,17 @@ local BUFF_GROUPS = {
         providerClass = nil,  -- consumable
         buffs = {
             -- TBC guardian elixirs
-            "Elixir of Major Fortitude", "Elixir of Major Defense",
-            "Elixir of Ironskin", "Elixir of Draenic Wisdom",
-            "Elixir of Major Mageblood", "Earthen Elixir",
+            "Elixir of Major Fortitude", "Elixir of Ironskin",
+            "Elixir of Draenic Wisdom", "Elixir of Major Mageblood",
+            "Earthen Elixir", "Elixir of Empowerment",
             -- Classic-era guardian elixirs still in use
             "Elixir of Superior Defense", "Elixir of Fortitude",
             "Gift of Arthas", "Elixir of Greater Defense",
+            "Elixir of the Sages", "Mageblood Potion",
+            "Elixir of Poison Resistance", "Greater Nature Protection",
+            "Juju Ember", "Juju Chill",
         },
-        prefixes = { "Flask of", "Shattrath Flask of" },
+        contains = { "Flask of" },
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Flask counts too",
@@ -246,17 +255,27 @@ local function GetUnitBuffSet(unit)
     return buffScratch
 end
 
+-- Does this single aura name satisfy the group? Returns the reason it
+-- matched (for diagnostics) or nil.
+local function BuffMatchesGroup(buffName, group)
+    if group.buffSet[buffName] then
+        return "exact"
+    end
+    if group.contains then
+        for _, needle in ipairs(group.contains) do
+            -- plain=true: these are literal strings, not patterns
+            if buffName:find(needle, 1, true) then
+                return "contains '" .. needle .. "'"
+            end
+        end
+    end
+    return nil
+end
+
 local function UnitHasGroupBuff(buffSet, group)
     for buffName in pairs(buffSet) do
-        if group.buffSet[buffName] then
+        if BuffMatchesGroup(buffName, group) then
             return true
-        end
-        if group.prefixes then
-            for _, prefix in ipairs(group.prefixes) do
-                if buffName:sub(1, #prefix) == prefix then
-                    return true
-                end
-            end
         end
     end
     return false
@@ -567,6 +586,75 @@ function BuffCheck:RunCheck(selfInitiated)
 
     local announce = selfInitiated and BuffCheckDB.announceToRaid
     self:Report(lines, missingCount, skipped, announce)
+end
+
+-- ============================================
+-- DIAGNOSTIC
+-- ============================================
+-- Shows every buff on a unit and which check (if any) it satisfies.
+-- Consumable auras are frequently named differently from the item that
+-- applies them, and new/unlisted consumables show up as unmatched here —
+-- which is exactly the information needed to add them.
+
+function BuffCheck:ExplainUnit(unit)
+    unit = unit or "player"
+    if not UnitExists(unit) then
+        self:Print("No " .. unit .. ".")
+        return
+    end
+
+    local name = UnitName(unit) or unit
+    local _, class = UnitClass(unit)
+    self:Print("=== Buffs on " .. name .. " (" .. tostring(class) .. ") ===")
+
+    local matched, unmatched = {}, {}
+    local anyBuff = false
+
+    for i = 1, 40 do
+        local buffName = UnitBuff(unit, i)
+        if not buffName then break end
+        anyBuff = true
+
+        local hits = {}
+        for _, group in ipairs(BUFF_GROUPS) do
+            local why = BuffMatchesGroup(buffName, group)
+            if why then
+                local state = BuffCheckDB.checkedGroups[group.key] and "on" or "|cFF888888off|r"
+                hits[#hits + 1] = group.name .. " [" .. state .. ", " .. why .. "]"
+            end
+        end
+
+        if #hits > 0 then
+            matched[#matched + 1] = "  |cFF00FF00" .. buffName .. "|r -> " .. table.concat(hits, ", ")
+        else
+            unmatched[#unmatched + 1] = "  |cFF888888" .. buffName .. "|r"
+        end
+    end
+
+    if not anyBuff then
+        print("  (no buffs)")
+    end
+
+    for _, line in ipairs(matched) do print(line) end
+
+    if #unmatched > 0 then
+        self:Print("Not matched by any check:")
+        for _, line in ipairs(unmatched) do print(line) end
+        print("|cFF888888If a consumable you expect to be checked is listed here,"
+            .. " its aura name differs from the item name — report the exact"
+            .. " name above and it can be added.|r")
+    end
+
+    -- Which checks are currently enabled at all
+    local enabled = {}
+    for _, group in ipairs(BUFF_GROUPS) do
+        if BuffCheckDB.checkedGroups[group.key] then
+            enabled[#enabled + 1] = group.name
+        end
+    end
+    self:Print("Checks enabled: " .. (#enabled > 0
+        and table.concat(enabled, ", ")
+        or "|cFFFF4444none|r — nothing will ever be reported"))
 end
 
 -- ============================================

@@ -1170,6 +1170,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine unexclude|r - Undo an exclusion for your target")
     print("|cFFFFFF00/wmachine exclusions|r - List excluded NPCs")
     print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
+    print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
@@ -1318,6 +1319,15 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "whybuff" or cmd == "buffdebug" then
+        local module = WM.modules.BuffCheck
+        if module and module.ExplainUnit then
+            -- Inspect your target if you have one, otherwise yourself
+            module:ExplainUnit(UnitExists("target") and "target" or "player")
+        else
+            WM:Print("BuffCheck module not available")
         end
 
     elseif cmd == "exclude" or cmd == "unexclude" or cmd == "exclusions"
