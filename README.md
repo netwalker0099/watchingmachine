@@ -255,11 +255,11 @@ Built-in error capture system for debugging.
 
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
-[`docs/RELEASE-NOTES-v3.1.md`](docs/RELEASE-NOTES-v3.1.md).
+[`docs/RELEASE-NOTES-v3.2.md`](docs/RELEASE-NOTES-v3.2.md).
 
 ### Version 3.2
 - DebuffTracker: Illidan Doom warning — `/rw CAST DOOM NOW` at 68% (toggle in settings, on by default)
-- Buff Check: Elixir of Empowerment reclassified as Guardian; Unstable Flasks now detected; expanded elixir lists
+- Buff Check: Elixir of Empowerment and Elixir of Major Defense classed as Guardian; Unstable Flasks now detected; expanded elixir lists
 - New `/wmachine whybuff` diagnostic for Buff Check
 
 ### Version 3.1

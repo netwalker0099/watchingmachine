@@ -28,6 +28,8 @@ Current release: **3.2** — TBC Classic Anniversary patch 2.5.6 (Interface `205
 
 **Fixed**
 - Elixir of Empowerment is now classed as a Guardian elixir (was Battle).
+- Elixir of Major Defense is classed as a Guardian elixir (it had been put in the
+  Battle list, so tanks pairing it with a battle elixir were flagged).
 - Flask matching is substring-based, so "Unstable Flask of the Beast/Sorcerer"
   now counts for the flask and both elixir slots.
 - Expanded the Battle/Guardian elixir lists with missing TBC and classic-era entries.

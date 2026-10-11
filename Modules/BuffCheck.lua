@@ -115,7 +115,7 @@ local BUFF_GROUPS = {
             -- TBC battle elixirs
             "Elixir of Major Strength", "Elixir of Major Agility",
             "Elixir of Major Shadow Power", "Elixir of Major Firepower",
-            "Elixir of Major Frost Power", "Elixir of Major Defense",
+            "Elixir of Major Frost Power",
             "Adept's Elixir", "Onslaught Elixir", "Elixir of Mastery",
             "Elixir of Healing Power", "Fel Strength Elixir",
             "Elixir of Demonslaying", "Elixir of Camouflage",
@@ -138,7 +138,8 @@ local BUFF_GROUPS = {
         providerClass = nil,  -- consumable
         buffs = {
             -- TBC guardian elixirs
-            "Elixir of Major Fortitude", "Elixir of Ironskin",
+            "Elixir of Major Fortitude", "Elixir of Major Defense",
+            "Elixir of Ironskin",
             "Elixir of Draenic Wisdom", "Elixir of Major Mageblood",
             "Earthen Elixir", "Elixir of Empowerment",
             -- Classic-era guardian elixirs still in use
