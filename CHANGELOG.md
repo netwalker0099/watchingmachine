@@ -2,7 +2,39 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.2
+
+### Debuff Tracker — Illidan Doom warning
+
+**Added**
+- Sends **CAST DOOM NOW** as a raid warning when Illidan Stormrage (npcID 22917)
+  drops to 68%, so warlocks land Curse of Doom before he lifts off at 65%.
+- New checkbox in Debuff Tracker settings: *Illidan 68%: raid warn "CAST DOOM NOW"*
+  (on by default).
+- Fires once per pull. Illidan is found through any unit pointing at him (boss
+  frames, target, focus, raid targets, nameplates), so you don't have to be
+  targeting him.
+- Follows the existing announcer rule: the raid leader sends it (assistants only when
+  "Assistants can announce" is on); everyone else gets a local chat line. Falls
+  back to /raid if the sender has no assist.
+- Skipped if Illidan is already below 60% when first seen (for example after a
+  /reload mid-fight).
+
+### Buff Check — elixir and flask fixes
+
+**Fixed**
+- Elixir of Empowerment is now classed as a Guardian elixir (was Battle).
+- Flask matching is substring-based, so "Unstable Flask of the Beast/Sorcerer"
+  now counts for the flask and both elixir slots.
+- Expanded the Battle/Guardian elixir lists with missing TBC and classic-era entries.
+
+**Added**
+- `/wmachine whybuff` (alias `buffdebug`): lists every aura on your target or
+  yourself and which check each one satisfies.
 
 ---
 

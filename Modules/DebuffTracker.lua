@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local DebuffTracker = {}
 WM:RegisterModule("DebuffTracker", DebuffTracker)
 
-DebuffTracker.version = "3.1"
+DebuffTracker.version = "3.2"
 
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)
@@ -222,6 +222,8 @@ local defaults = {
     -- Pull announce settings
     pullAnnounce = false,        -- Announce who pulled the boss
     pullAnnounceChannel = "SAY", -- Channel: SAY, PARTY, RAID, RAID_WARNING
+    -- Encounter callouts
+    illidanDoomWarning = true,   -- /rw "CAST DOOM NOW" when Illidan hits 68%
     -- False-positive controls
     bossMinHealth = 150000,   -- Minimum max-HP for a mob to count as a boss (0 = off)
     focusTracking = true,     -- Only alert for the mob taking the most raid damage
@@ -976,6 +978,75 @@ function DebuffTracker:RegisterPullDetection()
         end
     end)
 end
+
+-- ============================================
+-- ILLIDAN DOOM WARNING
+-- ============================================
+-- Raid-warns "CAST DOOM NOW" when Illidan Stormrage drops to 68%. Curse of
+-- Doom lands its 60s tick just as he lifts off at 65% for Phase 2. Fires once
+-- per pull; only the designated announcer sends it (same rule as alerts).
+
+local ILLIDAN_NPC_ID = 22917
+local DOOM_THRESHOLD = 0.68
+local DOOM_FLOOR = 0.60          -- below this the window has passed (e.g. /reload mid-fight)
+local DOOM_MESSAGE = "CAST DOOM NOW"
+local DOOM_POLL_INTERVAL = 0.25
+
+local doomWarned = false
+local doomFrame = nil
+local doomUnits = { "boss1", "boss2", "boss3", "boss4", "boss5", "target", "focus", "mouseover" }
+for i = 1, 40 do doomUnits[#doomUnits + 1] = "raid" .. i .. "target" end
+for i = 1, 40 do doomUnits[#doomUnits + 1] = "nameplate" .. i end
+
+-- Health fraction of Illidan from any unit token that currently points at him
+local function FindIllidanHealth()
+    for _, unit in ipairs(doomUnits) do
+        local guid = UnitGUID(unit)
+        if guid and GetNPCID(guid) == ILLIDAN_NPC_ID and not UnitIsDead(unit) then
+            local maxHP = UnitHealthMax(unit) or 0
+            if maxHP > 0 then
+                return (UnitHealth(unit) or 0) / maxHP
+            end
+        end
+    end
+    return nil
+end
+
+function DebuffTracker:ResetDoomWarning()
+    doomWarned = false
+end
+
+function DebuffTracker:CheckDoomWarning()
+    if doomWarned or not inCombat then return end
+    if not DebuffTrackerDB or not DebuffTrackerDB.illidanDoomWarning then return end
+    if not IsInRaid() then return end
+
+    local pct = FindIllidanHealth()
+    if not pct or pct > DOOM_THRESHOLD then return end
+
+    doomWarned = true
+    if pct < DOOM_FLOOR then return end
+
+    self:Print("|cFFFF2020" .. DOOM_MESSAGE .. "|r (Illidan at "
+        .. math.floor(pct * 100 + 0.5) .. "%)")
+
+    if not ShouldAnnounce() then return end
+    local channel = (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player"))
+        and "RAID_WARNING" or "RAID"
+    pcall(SendChatMessage, DOOM_MESSAGE, channel)
+end
+
+function DebuffTracker:RegisterDoomWarning()
+    if doomFrame then return end
+    doomFrame = CreateFrame("Frame")
+    local elapsedSince = 0
+    doomFrame:SetScript("OnUpdate", function(_, elapsed)
+        elapsedSince = elapsedSince + elapsed
+        if elapsedSince < DOOM_POLL_INTERVAL then return end
+        elapsedSince = 0
+        pcall(DebuffTracker.CheckDoomWarning, DebuffTracker)
+    end)
+end
 function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
@@ -1173,6 +1244,7 @@ function DebuffTracker:Initialize()
     self:InitDB()
     self:CreateTrackerFrame()
     self:RegisterPullDetection()
+    self:RegisterDoomWarning()
     -- Sync combat state (handles /reload mid-fight)
     inCombat = UnitAffectingCombat("player") or false
     -- Initial raid scan after a short delay (roster may not be ready yet)
@@ -1560,6 +1632,7 @@ function DebuffTracker:CreateTrackerFrame()
             bossEngaged = false
             bossDeadGUID = nil
             pullAnnounced = false
+            DebuffTracker:ResetDoomWarning()
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -1574,6 +1647,7 @@ function DebuffTracker:CreateTrackerFrame()
             bossEngaged = false
             bossDeadGUID = nil
             pullAnnounced = false
+            DebuffTracker:ResetDoomWarning()
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -1955,7 +2029,7 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 800)
+    frame:SetSize(420, 824)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -2264,7 +2338,30 @@ function DebuffTracker:CreateUI()
         GameTooltip:Show()
     end)
     chanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
+
+    yOffset = yOffset - 24
+
+    -- Illidan Doom warning
+    local doomCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    doomCB:SetPoint("TOPLEFT", 20, yOffset)
+    doomCB.Text:SetText("Illidan 68%: raid warn \"CAST DOOM NOW\"")
+    doomCB:SetChecked(DebuffTrackerDB.illidanDoomWarning)
+    doomCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.illidanDoomWarning = self:GetChecked()
+    end)
+    doomCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Illidan Doom Warning", 1, 0.8, 0)
+        GameTooltip:AddLine("When Illidan Stormrage reaches 68% health, sends", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("CAST DOOM NOW as a raid warning so warlocks land", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Curse of Doom before he lifts off at 65%.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Fires once per pull. Sent by the raid leader (or", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("assistants if allowed above); others see it locally.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    doomCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     yOffset = yOffset - 24
 
     -- ========================================
