@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -91,6 +91,9 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - **Focus target tracking**: on multi-boss fights (Fathom-Lord Karathress, Illidari Council) the addon watches which mob is absorbing the most raid damage in a rolling 6-second window and only alerts for that one. Target an add the raid is ignoring (a Fathom-Guard that isn't next in the kill order) and it stays silent. Adapts automatically to any kill order — swap to burning Karathress directly and alerts follow, no configuration
   - **Manual exclusions**: `/wmachine exclude` with a mob targeted permanently stops that creature type triggering boss alerts (keyed on npcID, so same-named mobs elsewhere are unaffected)
   - **`/wmachine whyboss`** diagnostic prints exactly how the tracker sees your target: npcID, classification, level, health vs. the floor, exclusion state, current raid focus, and whether it would alert
+- **Illidan Doom warning** (v3.2): raid-warns **CAST DOOM NOW** when Illidan Stormrage hits 68%, so warlocks land Curse of Doom before he lifts off at 65%
+  - Toggle in Debuff Tracker settings (on by default); fires once per pull
+  - Sent by the raid leader (or assistants if "Assistants can announce" is on) so multiple addon users don't duplicate it
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 
@@ -253,6 +256,11 @@ Built-in error capture system for debugging.
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.1.md`](docs/RELEASE-NOTES-v3.1.md).
+
+### Version 3.2
+- DebuffTracker: Illidan Doom warning — `/rw CAST DOOM NOW` at 68% (toggle in settings, on by default)
+- Buff Check: Elixir of Empowerment reclassified as Guardian; Unstable Flasks now detected; expanded elixir lists
+- New `/wmachine whybuff` diagnostic for Buff Check
 
 ### Version 3.1
 - DebuffTracker: eliminated boss-detection false positives
