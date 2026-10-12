@@ -94,6 +94,15 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
 - **Illidan Doom warning** (v3.2): raid-warns **CAST DOOM NOW** when Illidan Stormrage hits 68%, so warlocks land Curse of Doom before he lifts off at 65%
   - Toggle in Debuff Tracker settings (on by default); fires once per pull
   - Sent by the raid leader (or assistants if "Assistants can announce" is on) so multiple addon users don't duplicate it
+- **Illidan Shear monitor**: calls out Shear on the main tank during Illidan's ground phases
+  - Shear cuts the tank's max health by ~60% and can be dodged/parried/blocked, so damage meters miss it: the hit is a max-health debuff, and an avoided Shear deals no damage at all
+  - Watches every subevent a Shear can produce (cast start, damage, aura applied/refreshed, and all avoidance results), plus a raid-aura sweep as a backup if a combat-log event is dropped
+  - Matches by spell ID *and* localized spell name, so an unexpected ID still registers
+  - One call per cast — the cast/aura/damage events a single Shear generates are deduped
+  - Announces hits to raid chat by default; avoided Shears are counted but not announced (toggleable), with a channel picker and optional throttle
+  - Optional local cast warning (~1.5s window to use Shield Block / Holy Shield)
+  - Per-pull summary on combat end: total, hit vs avoided, per-tank breakdown, and avoidance types
+  - `/wmachine shear` for status and tallies, `/wmachine shear on|off` to toggle
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 

@@ -8,6 +8,44 @@ Current release: **3.2** — TBC Classic Anniversary patch 2.5.6 (Interface `205
 
 ## 3.2
 
+### Debuff Tracker — Illidan Shear monitor
+
+Tracks Shear on Illidan's main tank and calls it out, with a toggle in the
+Debuff Tracker settings (on by default).
+
+Shear cuts the main tank's maximum health by roughly 60% for a few seconds,
+cannot miss, but can be dodged, parried or blocked. Damage meters under-report
+it for two reasons: the damaging part is a max-health debuff rather than a
+normal hit, and an avoided Shear produces only a miss event with no damage at
+all. So the monitor is deliberately aggressive:
+
+- Watches every subevent a Shear can produce — `SPELL_CAST_START`,
+  `SPELL_DAMAGE`, `SPELL_AURA_APPLIED`, `SPELL_AURA_REFRESH` and
+  `SPELL_MISSED` (dodge / parry / block / immune / absorb).
+- Matches on spell ID **and** localized spell name, so an unexpected or
+  unlisted ID still registers, and non-English clients work.
+- Sweeps raid auras on `UNIT_AURA` as a backup, catching a landed Shear even
+  if its combat-log event is dropped. Only active once Illidan or a Shear has
+  been seen in the pull, so it costs nothing elsewhere.
+- Deduplicates per cast: the several events one Shear generates produce a
+  single call, not three.
+- Ignores anything sourced from your own group, so nothing else can spoof it.
+
+Reporting:
+
+- Hits are announced to raid chat by default; avoided Shears are counted but
+  not announced (Shear repeats every ~10s, so calling both outcomes doubles the
+  chat). Both are always shown locally.
+- Channel picker: Me only / Say / Party / Raid / `/rw`, plus an optional
+  throttle for the minimum gap between chat calls.
+- Optional local cast warning on `SPELL_CAST_START` — the ~1.5s window to use
+  Shield Block or Holy Shield. Never sent to chat.
+- Per-pull summary when combat ends: total, hit vs avoided, a per-tank
+  breakdown (so tank swaps are visible), and which avoidance types occurred.
+- Uses the existing announcer rule, so only the raid leader (or assistants, if
+  allowed) sends to chat and multiple addon users don't duplicate it.
+- `/wmachine shear` shows status and tallies; `/wmachine shear on|off` toggles.
+
 ### Debuff Tracker — Illidan Doom warning
 
 **Added**

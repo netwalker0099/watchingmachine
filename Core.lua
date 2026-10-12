@@ -1170,6 +1170,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine unexclude|r - Undo an exclusion for your target")
     print("|cFFFFFF00/wmachine exclusions|r - List excluded NPCs")
     print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
+    print("|cFFFFFF00/wmachine shear|r - Illidan Shear monitor status and tallies")
+    print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
@@ -1319,6 +1321,24 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "shear" or cmd == "shear on" or cmd == "shear off"
+        or cmd == "shearstats" then
+        local module = WM.modules.DebuffTracker
+        if not module then
+            WM:Print("DebuffTracker module not available")
+            return
+        end
+        if cmd == "shear on" or cmd == "shear off" then
+            local want = (cmd == "shear on")
+            if DebuffTrackerDB and DebuffTrackerDB.shearMonitor ~= want then
+                module:ToggleShearMonitor()
+            else
+                WM:Print("Shear monitor already " .. (want and "on" or "off"))
+            end
+        else
+            module:ShowShearStatus()
         end
 
     elseif cmd == "whybuff" or cmd == "buffdebug" then

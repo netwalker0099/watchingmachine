@@ -224,6 +224,14 @@ local defaults = {
     pullAnnounceChannel = "SAY", -- Channel: SAY, PARTY, RAID, RAID_WARNING
     -- Encounter callouts
     illidanDoomWarning = true,   -- /rw "CAST DOOM NOW" when Illidan hits 68%
+    -- Illidan Shear monitor
+    shearMonitor = true,         -- Watch Illidan's Shear on the main tank
+    shearAnnounce = true,        -- Send Shear calls to chat (local line always shows)
+    shearChannel = "RAID",       -- LOCAL, SAY, PARTY, RAID, RAID_WARNING
+    shearAnnounceAvoided = false,-- Also announce dodged/parried/blocked Shears
+    shearPreWarn = false,        -- Local "Shear incoming..." on cast start
+    shearThrottle = 0,           -- Min seconds between chat announcements (0 = every one)
+    shearSummary = true,         -- Print a per-pull summary when combat ends
     -- False-positive controls
     bossMinHealth = 150000,   -- Minimum max-HP for a mob to count as a boss (0 = off)
     focusTracking = true,     -- Only alert for the mob taking the most raid damage
@@ -899,7 +907,15 @@ function DebuffTracker:ProcessCombatLog()
     local _, subevent, _, sourceGUID, sourceName, _, _, destGUID, destName, _, _,
           p12, p13, p14, p15 = CombatLogGetCurrentEventInfo()
 
-    if not subevent or not sourceGUID or not destGUID then return end
+    if not subevent then return end
+
+    -- Shear monitor runs first: cast events can arrive without a destination,
+    -- so it must not be gated behind the destGUID guard below.
+    if DebuffTrackerDB and DebuffTrackerDB.shearMonitor then
+        pcall(self.HandleShearCombatLog, self, subevent, sourceGUID, destGUID, destName, p12, p13, p15)
+    end
+
+    if not sourceGUID or not destGUID then return end
 
     -- --- Focus tracking: accumulate group damage per hostile GUID ---
     if DebuffTrackerDB and DebuffTrackerDB.focusTracking and DAMAGE_SUBEVENTS[subevent] then
@@ -968,13 +984,17 @@ function DebuffTracker:RegisterPullDetection()
     pullDetectFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     pullDetectFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     pullDetectFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-    pullDetectFrame:SetScript("OnEvent", function(self, event)
+    pullDetectFrame:RegisterEvent("UNIT_AURA")
+    pullDetectFrame:SetScript("OnEvent", function(self, event, unitArg)
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
             pcall(DebuffTracker.ProcessCombatLog, DebuffTracker)
         elseif event == "PLAYER_TARGET_CHANGED" then
             pcall(DebuffTracker.TrackBossGUID, DebuffTracker, "target")
         elseif event == "UPDATE_MOUSEOVER_UNIT" then
             pcall(DebuffTracker.TrackBossGUID, DebuffTracker, "mouseover")
+        elseif event == "UNIT_AURA" then
+            -- Backup Shear detection; no-ops unless Illidan/Shear is live
+            pcall(DebuffTracker.SweepShearAura, DebuffTracker, unitArg)
         end
     end)
 end
@@ -1047,6 +1067,238 @@ function DebuffTracker:RegisterDoomWarning()
         pcall(DebuffTracker.CheckDoomWarning, DebuffTracker)
     end)
 end
+
+-- ============================================
+-- ILLIDAN SHEAR MONITOR
+-- ============================================
+-- Shear is Illidan's main-tank ability during the ground phases (1/3/5): a
+-- ~1.5s cast, roughly every 10s, that cuts the tank's maximum health by about
+-- 60% for a few seconds. It cannot miss, but it CAN be dodged, parried or
+-- blocked — which is why tanks stack avoidance for it.
+--
+-- Why it needs a dedicated monitor: damage meters record damage events. Shear's
+-- bite is a max-health debuff, and an avoided Shear produces only a
+-- SPELL_MISSED with no damage at all. Neither shows up reliably in Details!.
+-- So we watch every subevent a Shear can produce, and additionally sweep raid
+-- auras as a backup in case a combat-log event is dropped.
+
+local SHEAR_SPELL_IDS = { [41032] = true, [41033] = true }
+local SHEAR_FALLBACK_NAME = "Shear"
+local shearName = SHEAR_FALLBACK_NAME  -- replaced with the localized name at init
+
+-- Subevents meaning the Shear connected
+local SHEAR_LANDED_EVENTS = {
+    SPELL_DAMAGE = true,
+    SPELL_AURA_APPLIED = true,
+    SPELL_AURA_REFRESH = true,
+}
+
+local SHEAR_DEDUPE_WINDOW = 1.0  -- one announcement per cast, not per subevent
+
+local shearArmed = false         -- a Shear or Illidan has been seen this pull
+local shearLastResolve = {}      -- destGUID -> GetTime() of the last counted Shear
+local shearLastAnnounce = 0
+local shearStats, shearLastFight
+
+local function NewShearStats()
+    return { total = 0, landed = 0, avoided = 0, byOutcome = {}, byTank = {} }
+end
+shearStats = NewShearStats()
+
+local function IsShearSpell(spellID, spellNameArg)
+    if spellID and SHEAR_SPELL_IDS[spellID] then return true end
+    if spellNameArg and (spellNameArg == shearName or spellNameArg == SHEAR_FALLBACK_NAME) then
+        return true
+    end
+    return false
+end
+
+local function ShearOutcomeLabel(missType)
+    if not missType then return "AVOIDED" end
+    local m = tostring(missType):upper()
+    if m == "DODGE"  then return "DODGED"   end
+    if m == "PARRY"  then return "PARRIED"  end
+    if m == "BLOCK"  then return "BLOCKED"  end
+    if m == "MISS"   then return "MISSED"   end
+    if m == "IMMUNE" then return "IMMUNE"   end
+    if m == "ABSORB" then return "ABSORBED" end
+    return m
+end
+
+function DebuffTracker:ResetShearMonitor(keepSnapshot)
+    if keepSnapshot and shearStats and shearStats.total > 0 then
+        shearLastFight = shearStats
+    end
+    shearArmed = false
+    wipe(shearLastResolve)
+    shearLastAnnounce = 0
+    shearStats = NewShearStats()
+end
+
+function DebuffTracker:AnnounceShear(destName, outcome, isLanded)
+    local who = destName or "the tank"
+    local msg = isLanded and ("Shear HIT " .. who)
+                          or ("Shear " .. outcome .. " by " .. who)
+
+    -- Local line always, regardless of announce settings or announcer rules
+    self:Print((isLanded and "|cFFFF4040" or "|cFF40FF40") .. msg .. "|r")
+
+    if not DebuffTrackerDB.shearAnnounce then return end
+    if not isLanded and not DebuffTrackerDB.shearAnnounceAvoided then return end
+
+    local channel = DebuffTrackerDB.shearChannel or "RAID"
+    if channel == "LOCAL" then return end
+
+    local throttle = DebuffTrackerDB.shearThrottle or 0
+    local now = GetTime()
+    if throttle > 0 and (now - shearLastAnnounce) < throttle then return end
+
+    if not IsInGroup() and not IsInRaid() then return end
+    -- Same announcer rule as the other callouts: only one person talks
+    if not ShouldAnnounce() then return end
+
+    if channel == "RAID_WARNING" then
+        if not IsInRaid() then
+            channel = "PARTY"
+        elseif not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
+            channel = "RAID"
+        end
+    elseif channel == "RAID" then
+        if not IsInRaid() then channel = "PARTY" end
+    end
+
+    shearLastAnnounce = now
+    pcall(SendChatMessage, msg, channel)
+end
+
+-- Count and announce one Shear. Deduped per target so the several subevents a
+-- single cast generates (cast success + aura + damage) only report once.
+function DebuffTracker:ResolveShear(destGUID, destName, isLanded, outcome)
+    local now = GetTime()
+    local last = destGUID and shearLastResolve[destGUID]
+    if last and (now - last) < SHEAR_DEDUPE_WINDOW then return end
+    if destGUID then shearLastResolve[destGUID] = now end
+
+    shearArmed = true
+    shearStats.total = shearStats.total + 1
+    if isLanded then
+        shearStats.landed = shearStats.landed + 1
+    else
+        shearStats.avoided = shearStats.avoided + 1
+    end
+
+    local key = isLanded and "HIT" or outcome
+    shearStats.byOutcome[key] = (shearStats.byOutcome[key] or 0) + 1
+
+    if destName then
+        local t = shearStats.byTank[destName]
+        if not t then
+            t = { hit = 0, avoided = 0 }
+            shearStats.byTank[destName] = t
+        end
+        if isLanded then t.hit = t.hit + 1 else t.avoided = t.avoided + 1 end
+    end
+
+    self:AnnounceShear(destName, outcome, isLanded)
+end
+
+-- Combat-log path. Called for every event before the stricter guards in
+-- ProcessCombatLog, because cast events can arrive without a destination.
+function DebuffTracker:HandleShearCombatLog(subevent, sourceGUID, destGUID, destName, spellID, spellNameArg, p15)
+    if not DebuffTrackerDB or not DebuffTrackerDB.shearMonitor then return end
+    if not IsShearSpell(spellID, spellNameArg) then return end
+    -- Must come from something hostile, never from one of our own
+    if sourceGUID and IsInOurGroup(sourceGUID) then return end
+
+    shearArmed = true
+
+    if subevent == "SPELL_CAST_START" then
+        if DebuffTrackerDB.shearPreWarn then
+            self:Print("|cFFFFCC00Shear incoming...|r")
+        end
+        return
+    end
+
+    if SHEAR_LANDED_EVENTS[subevent] then
+        self:ResolveShear(destGUID, destName, true, "HIT")
+    elseif subevent == "SPELL_MISSED" then
+        self:ResolveShear(destGUID, destName, false, ShearOutcomeLabel(p15))
+    end
+    -- SPELL_CAST_SUCCESS is deliberately ignored: the resolution arrives as a
+    -- damage, aura or missed event, and counting the cast too would double up.
+end
+
+-- Backup detector: if a combat-log event is ever dropped, the debuff itself is
+-- still on the tank. Only runs while Illidan/Shear has been seen this pull.
+function DebuffTracker:SweepShearAura(unit)
+    if not shearArmed then return end
+    if not DebuffTrackerDB or not DebuffTrackerDB.shearMonitor then return end
+    if not unit or not UnitExists(unit) then return end
+
+    for i = 1, 40 do
+        local name, _, _, _, _, _, _, _, _, spellID = UnitDebuff(unit, i)
+        if not name then break end
+        if IsShearSpell(spellID, name) then
+            self:ResolveShear(UnitGUID(unit), UnitName(unit), true, "HIT")
+            return
+        end
+    end
+end
+
+function DebuffTracker:ReportShearSummary()
+    if not DebuffTrackerDB or not DebuffTrackerDB.shearSummary then return end
+    if not shearStats or shearStats.total == 0 then return end
+
+    self:Print(string.format(
+        "Shear summary: %d total - |cFFFF4040%d hit|r, |cFF40FF40%d avoided|r",
+        shearStats.total, shearStats.landed, shearStats.avoided))
+
+    for tank, t in pairs(shearStats.byTank) do
+        print(string.format("  %s: %d hit, %d avoided", tank, t.hit, t.avoided))
+    end
+
+    local parts = {}
+    for outcome, n in pairs(shearStats.byOutcome) do
+        if outcome ~= "HIT" then
+            parts[#parts + 1] = outcome .. " x" .. n
+        end
+    end
+    if #parts > 0 then
+        print("  avoided by: " .. table.concat(parts, ", "))
+    end
+end
+
+-- /wmachine shear
+function DebuffTracker:ShowShearStatus()
+    local on = DebuffTrackerDB and DebuffTrackerDB.shearMonitor
+    self:Print("Shear monitor: " .. (on and "|cFF00FF00ON|r" or "|cFFFF4444OFF|r")
+        .. "  (tracking \"" .. tostring(shearName) .. "\")")
+    if on then
+        print("  announce: " .. (DebuffTrackerDB.shearAnnounce and "yes" or "no")
+            .. " to " .. tostring(DebuffTrackerDB.shearChannel)
+            .. ", avoided: " .. (DebuffTrackerDB.shearAnnounceAvoided and "yes" or "no")
+            .. ", throttle: " .. tostring(DebuffTrackerDB.shearThrottle or 0) .. "s")
+    end
+
+    local s = (shearStats and shearStats.total > 0) and shearStats or shearLastFight
+    local label = (shearStats and shearStats.total > 0) and "This pull" or "Last pull"
+    if not s or s.total == 0 then
+        print("  no Shears recorded yet")
+        return
+    end
+    print(string.format("  %s: %d total, %d hit, %d avoided", label, s.total, s.landed, s.avoided))
+    for tank, t in pairs(s.byTank) do
+        print(string.format("    %s: %d hit, %d avoided", tank, t.hit, t.avoided))
+    end
+end
+
+function DebuffTracker:ToggleShearMonitor()
+    if not DebuffTrackerDB then return end
+    DebuffTrackerDB.shearMonitor = not DebuffTrackerDB.shearMonitor
+    self:Print("Shear monitor " .. (DebuffTrackerDB.shearMonitor
+        and "|cFF00FF00enabled|r" or "|cFFFF4444disabled|r"))
+end
+
 function DebuffTracker:CheckAlerts(unit)
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
@@ -1245,6 +1497,11 @@ function DebuffTracker:Initialize()
     self:CreateTrackerFrame()
     self:RegisterPullDetection()
     self:RegisterDoomWarning()
+    -- Resolve Shear's localized name so non-English clients match by name too
+    if GetSpellInfo then
+        local n = GetSpellInfo(41032)
+        if n and n ~= "" then shearName = n end
+    end
     -- Sync combat state (handles /reload mid-fight)
     inCombat = UnitAffectingCombat("player") or false
     -- Initial raid scan after a short delay (roster may not be ready yet)
@@ -1325,6 +1582,13 @@ function DebuffTracker:InitDB()
     if type(DebuffTrackerDB.excludedNPCs) ~= "table" then
         DebuffTrackerDB.excludedNPCs = {}
     end
+    if DebuffTrackerDB.shearMonitor == nil then DebuffTrackerDB.shearMonitor = true end
+    if DebuffTrackerDB.shearAnnounce == nil then DebuffTrackerDB.shearAnnounce = true end
+    if DebuffTrackerDB.shearChannel == nil then DebuffTrackerDB.shearChannel = "RAID" end
+    if DebuffTrackerDB.shearAnnounceAvoided == nil then DebuffTrackerDB.shearAnnounceAvoided = false end
+    if DebuffTrackerDB.shearPreWarn == nil then DebuffTrackerDB.shearPreWarn = false end
+    if DebuffTrackerDB.shearThrottle == nil then DebuffTrackerDB.shearThrottle = 0 end
+    if DebuffTrackerDB.shearSummary == nil then DebuffTrackerDB.shearSummary = true end
     
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
     -- The alert system was overhauled (encounter-aware, dead caster suppression,
@@ -1633,6 +1897,7 @@ function DebuffTracker:CreateTrackerFrame()
             bossDeadGUID = nil
             pullAnnounced = false
             DebuffTracker:ResetDoomWarning()
+            DebuffTracker:ResetShearMonitor(false)
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -1648,6 +1913,9 @@ function DebuffTracker:CreateTrackerFrame()
             bossDeadGUID = nil
             pullAnnounced = false
             DebuffTracker:ResetDoomWarning()
+            -- Report the pull's Shear tally before clearing it
+            DebuffTracker:ReportShearSummary()
+            DebuffTracker:ResetShearMonitor(true)
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -2029,7 +2297,7 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 824)
+    frame:SetSize(420, 904)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -2361,6 +2629,108 @@ function DebuffTracker:CreateUI()
         GameTooltip:Show()
     end)
     doomCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 24
+
+    -- Illidan Shear monitor
+    local shearCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearCB:SetPoint("TOPLEFT", 20, yOffset)
+    shearCB.Text:SetText("Illidan: call out Shear on the main tank")
+    shearCB:SetChecked(DebuffTrackerDB.shearMonitor)
+    shearCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearMonitor = self:GetChecked()
+    end)
+    shearCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Illidan Shear Monitor", 1, 0.8, 0)
+        GameTooltip:AddLine("Shear cuts the main tank's maximum health by about", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("60% and can be dodged, parried or blocked.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Damage meters miss it: the hit is a max-health debuff", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and an avoided Shear deals no damage at all. This", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("watches every cast, hit, aura and avoidance event,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and sweeps raid auras as a backup.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("A summary prints when the pull ends.", 0.6, 0.8, 1)
+        GameTooltip:AddLine("/wmachine shear - status and tallies", 0.6, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    shearCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Shear announce channel cycle
+    local shearChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    shearChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
+    shearChanLabel:SetText("|cFF888888To:|r")
+
+    local shearChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
+    local shearChannelLabels = {
+        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
+    }
+    local shearChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    shearChanBtn:SetSize(66, 18)
+    shearChanBtn:SetPoint("LEFT", shearChanLabel, "RIGHT", 4, 0)
+    local function RefreshShearChanText()
+        local cur = DebuffTrackerDB.shearChannel or "RAID"
+        shearChanBtn:SetText(shearChannelLabels[cur] or cur)
+    end
+    RefreshShearChanText()
+    shearChanBtn:SetScript("OnClick", function()
+        local cur = DebuffTrackerDB.shearChannel or "RAID"
+        local nextIdx = 1
+        for i, ch in ipairs(shearChannels) do
+            if ch == cur then nextIdx = (i % #shearChannels) + 1 break end
+        end
+        DebuffTrackerDB.shearChannel = shearChannels[nextIdx]
+        RefreshShearChanText()
+    end)
+    shearChanBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Announce Channel", 1, 0.8, 0)
+        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("You always see a local line regardless.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Chat is sent by the raid leader (or assistants if", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("allowed above) so only one person calls it.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 22
+
+    -- Announce avoided Shears too
+    local shearAvoidCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearAvoidCB:SetPoint("TOPLEFT", 35, yOffset)
+    shearAvoidCB.Text:SetText("Also call dodged / parried / blocked")
+    shearAvoidCB:SetChecked(DebuffTrackerDB.shearAnnounceAvoided)
+    shearAvoidCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearAnnounceAvoided = self:GetChecked()
+    end)
+    shearAvoidCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Avoided Shears", 1, 0.8, 0)
+        GameTooltip:AddLine("Off by default: Shear repeats every ~10s, so calling", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("both outcomes doubles the chat. Avoided Shears are", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("still counted and appear in the pull summary.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearAvoidCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Local pre-warning on cast start
+    local shearWarnCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearWarnCB:SetPoint("TOPLEFT", 262, yOffset)
+    shearWarnCB.Text:SetText("Cast warning")
+    shearWarnCB:SetChecked(DebuffTrackerDB.shearPreWarn)
+    shearWarnCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearPreWarn = self:GetChecked()
+    end)
+    shearWarnCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Cast Warning", 1, 0.8, 0)
+        GameTooltip:AddLine("Shear has a ~1.5s cast. This prints a local heads-up", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("the moment it starts - the window to use Shield", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Block or Holy Shield. Never sent to chat.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearWarnCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     yOffset = yOffset - 24
 
