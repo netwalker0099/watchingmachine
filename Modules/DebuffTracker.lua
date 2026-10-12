@@ -1082,7 +1082,10 @@ end
 -- So we watch every subevent a Shear can produce, and additionally sweep raid
 -- auras as a backup in case a combat-log event is dropped.
 
-local SHEAR_SPELL_IDS = { [41032] = true, [41033] = true }
+-- 41032 is Shear (confirmed on Wowhead). Only verified IDs belong here: an
+-- unverified ID would silently misreport some other ability as a Shear, and
+-- the name match below already catches any variant or separate debuff ID.
+local SHEAR_SPELL_IDS = { [41032] = true }
 local SHEAR_FALLBACK_NAME = "Shear"
 local shearName = SHEAR_FALLBACK_NAME  -- replaced with the localized name at init
 
