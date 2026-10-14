@@ -1,12 +1,89 @@
 # Release announcement — Watching Machine 3.3
 
-Copy-paste ready text for CurseForge. The canonical, full-detail changelog
-lives in [`CHANGELOG.md`](../CHANGELOG.md).
+Copy-paste ready text for Discord and CurseForge. The canonical, full-detail
+changelog lives in [`CHANGELOG.md`](../CHANGELOG.md).
 
 > **Note:** the Illidan Shear monitor is listed here as new. It landed after the
 > 3.2 notes were written and was never announced, so it is new to anyone
 > upgrading. If you published a 3.2 build that already contained it, move that
 > section into the 3.2 notes instead.
+
+---
+
+# ═══════════════  DISCORD  ═══════════════
+
+Discord caps messages at 2000 characters, so this is split into three posts.
+Send them in order — each is self-contained and under the limit. Discord
+markdown supports `#`/`##`/`###` headers, `**bold**`, `` `code` `` and lists,
+but **not** tables.
+
+---
+
+## ▸ Discord post 1 of 3
+
+```
+# 🔧 Watching Machine 3.3 is out
+
+Two Black Temple helpers, plus a fix for settings that were running off the bottom of your screen.
+
+## 🗡️ New: Illidan Shear monitor
+Shear cuts the main tank's max health by ~60%. It can't miss, but it **can** be dodged, parried or blocked.
+
+**Your damage meter can't show you this, and that's the point.** The hit is a max-health debuff, not normal damage — and an avoided Shear deals no damage at all. Details! has nothing to display either way.
+
+So this watches *everything* a Shear can produce: the cast, the hit, the debuff, and every avoidance result. It also sweeps raid auras as a backup in case a combat-log event gets dropped.
+
+- Calls each Shear on the tank: `Shear HIT Maintank`
+- Avoided ones are **counted but not announced** by default — Shear repeats every ~10s, so calling both would double the chat. You still see them locally
+- Channel picker (Me only / Say / Party / Raid / /rw) and a throttle
+- Optional cast warning — Shear has a ~1.5s cast, which is the window for Shield Block or Holy Shield
+- **Pull summary** at the end: total, hit vs avoided, per-tank breakdown. The record Details can't give you
+- Only the raid leader talks, so no duplicate spam
+
+`/wmachine shear`
+```
+
+---
+
+## ▸ Discord post 2 of 3
+
+```
+## 🛡️ New: Shadow resist gear check (after Mother)
+
+Mother Shahraz is the only BT fight that wants SR gear. Staying in it afterwards is an easy and expensive mistake.
+
+- Warns you if the set is **still on** when you pull the Grand Promenade constructs — Shadowmoon Reaver, Promenade Sentinel, and the Illidari packs
+- Arms when Mother dies **and** when you engage one of those mobs, so a `/reload` after she's down still works
+- Reads **equipped gear only** — Shadow Protection and Shadow Resistance Aura can't trigger a false alarm
+- Warns **you** privately by default: chat line, screen flash, sound. Nothing goes to raid chat unless you want it to
+- Every player warns themselves — unlike the other callouts this isn't leader-only, since it's about your own gear
+- Ignores an odd piece with incidental resistance (a Mother set is 200+ SR)
+
+`/wmachine srcheck` shows exactly what it reads off each slot.
+```
+
+---
+
+## ▸ Discord post 3 of 3
+
+```
+## 🔧 Fixed: settings were off the bottom of the screen
+
+The Debuff Tracker settings panel had grown from 700px to 948px as features piled up — but the WoW UI is only ~768px tall at default scale. The lowest controls were genuinely unreachable.
+
+Per-boss callouts (Illidan Doom warning, Shear monitor, shadow resist check) now live in their own window, and the main panel fits again.
+
+`/wmachine encounters` — or the **Encounter Callouts...** button in Debuff Tracker settings.
+
+## ⬆️ Upgrading
+- Settings carry over, no reset needed
+- **The Shear monitor is on and talks in raid chat by default.** Want it quieter? Set its channel to *Me only*, raise the throttle, or untick it
+- The shadow resist check is on but **private** — it adds nothing to raid chat
+- **Your encounter settings moved** out of the main panel → `/wmachine encounters`
+- Worth doing once: put your Mother set on and run `/wmachine srcheck` to confirm it reads your gear right
+
+⬇️ CurseForge or GitHub. Full changelog in the repo.
+```
 
 ---
 
