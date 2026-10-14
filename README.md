@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.3 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -103,6 +103,13 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - Optional local cast warning (~1.5s window to use Shield Block / Holy Shield)
   - Per-pull summary on combat end: total, hit vs avoided, per-tank breakdown, and avoidance types
   - `/wmachine shear` for status and tallies, `/wmachine shear on|off` to toggle
+- **Black Temple shadow resist gear check**: warns if you're still in SR gear after Mother Shahraz
+  - Arms when Mother Shahraz dies, and also the moment you engage a Grand Promenade pull (Shadowmoon Reaver, Promenade Sentinel, Illidari Archon/Assassin/Battle-mage/Blood Lord), so a mid-raid `/reload` still works
+  - Reads **equipped gear only**, so Shadow Protection and Shadow Resistance Aura can't cause a false warning
+  - Configurable threshold (default 60 gear SR) so an odd piece with incidental resistance is ignored
+  - Warns you locally with a screen flash and sound by default; optional Say/Party/Raid/`/rw` announce. Unlike the other callouts this is **not** limited to the raid leader, since it's about your own gear
+  - One warning per pull (20s cooldown), `/wmachine srcheck` to see exactly what it detects per slot
+- **Encounter callouts** (Doom warning, Shear monitor, SR check) live in their own window via `/wmachine encounters` or the button in Debuff Tracker settings
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 

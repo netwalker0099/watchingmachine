@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.2"
+WM.version = "3.3"
 WM.modules = {}
 
 -- ============================================
@@ -1172,6 +1172,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
     print("|cFFFFFF00/wmachine shear|r - Illidan Shear monitor status and tallies")
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
+    print("|cFFFFFF00/wmachine encounters|r - Per-boss callout settings")
+    print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
@@ -1321,6 +1323,22 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "encounters" or cmd == "callouts" then
+        local module = WM.modules.DebuffTracker
+        if module and module.ToggleEncounterUI then
+            module:ToggleEncounterUI()
+        else
+            WM:Print("DebuffTracker module not available")
+        end
+
+    elseif cmd == "srcheck" or cmd == "sr" or cmd == "resist" then
+        local module = WM.modules.DebuffTracker
+        if module and module.ExplainShadowResist then
+            module:ExplainShadowResist()
+        else
+            WM:Print("DebuffTracker module not available")
         end
 
     elseif cmd == "shear" or cmd == "shear on" or cmd == "shear off"

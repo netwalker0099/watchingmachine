@@ -2,9 +2,52 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.3
+
+### Debuff Tracker — Black Temple shadow resist gear check
+
+Mother Shahraz is the only Black Temple fight that wants shadow resist gear, and
+staying in it for the rest of the raid is an easy and costly mistake.
+
+- Arms when Mother Shahraz dies, **and** the moment you engage one of the Grand
+  Promenade pulls (Shadowmoon Reaver, Promenade Sentinel, Illidari Archon /
+  Assassin / Battle-mage / Blood Lord) — so a `/reload` after Mother is already
+  down still works.
+- Reads **equipped gear only** via item stats, never `UnitResistance`, so Shadow
+  Protection or a Shadow Resistance Aura can't produce a false warning.
+  Matches both item-stat key conventions, since they differ between clients.
+- Configurable threshold (default 60 gear SR) so a single piece with incidental
+  resistance is ignored; a Mother set runs well over 200.
+- Warns locally with a raid-warning flash and a sound; optional Say / Party /
+  Raid / `/rw` announce. Deliberately **not** gated by the leader-announcer rule
+  used elsewhere, because it concerns the individual player's own gear.
+- One warning per pull (20s cooldown). Disarms on zone change.
+- `/wmachine srcheck` lists every equipped piece carrying shadow resistance, the
+  total against the threshold, whether it is armed, and cross-checks the
+  character sheet so a broken item API is obvious rather than silent.
+
+### Debuff Tracker — settings panel split (fixes clipped controls)
+
+The settings panel had grown from its original 700px to 948px as features were
+added. WoW's UIParent is only about 768px tall at UI scale 1.0, so the lowest
+controls were off-screen and unreachable.
+
+- Encounter callouts (Illidan Doom warning, Illidan Shear monitor, shadow resist
+  check) moved into their own window, opened with `/wmachine encounters` or the
+  **Encounter Callouts...** button in Debuff Tracker settings.
+- The main panel is back to 742px and fits on screen again.
+
+### Debuff Tracker — Shear settings completed
+
+- Added the missing **chat throttle** slider (0–30s; throttled Shears are still
+  counted and still shown locally, only the chat line is skipped).
+- Added the missing **pull summary** checkbox.
+- Removed the redundant `shearAnnounce` flag — the *Me only* channel option
+  already does the same thing.
 
 ## 3.2
 

@@ -226,12 +226,15 @@ local defaults = {
     illidanDoomWarning = true,   -- /rw "CAST DOOM NOW" when Illidan hits 68%
     -- Illidan Shear monitor
     shearMonitor = true,         -- Watch Illidan's Shear on the main tank
-    shearAnnounce = true,        -- Send Shear calls to chat (local line always shows)
     shearChannel = "RAID",       -- LOCAL, SAY, PARTY, RAID, RAID_WARNING
     shearAnnounceAvoided = false,-- Also announce dodged/parried/blocked Shears
     shearPreWarn = false,        -- Local "Shear incoming..." on cast start
     shearThrottle = 0,           -- Min seconds between chat announcements (0 = every one)
     shearSummary = true,         -- Print a per-pull summary when combat ends
+    -- Black Temple shadow resist gear check (post-Mother Shahraz)
+    srCheck = true,              -- Warn if still wearing SR gear after Mother
+    srCheckThreshold = 60,       -- Gear-only shadow resist that counts as "still on"
+    srCheckChannel = "LOCAL",    -- LOCAL, SAY, PARTY, RAID, RAID_WARNING
     -- False-positive controls
     bossMinHealth = 150000,   -- Minimum max-HP for a mob to count as a boss (0 = off)
     focusTracking = true,     -- Only alert for the mob taking the most raid damage
@@ -915,6 +918,12 @@ function DebuffTracker:ProcessCombatLog()
         pcall(self.HandleShearCombatLog, self, subevent, sourceGUID, destGUID, destName, p12, p13, p15)
     end
 
+    -- Shadow resist gear check: arms on Mother's death, fires on engaging the
+    -- Grand Promenade pulls. UNIT_DIED has no source, so it runs here too.
+    if DebuffTrackerDB and DebuffTrackerDB.srCheck then
+        pcall(self.HandleShadowResistCombatLog, self, subevent, sourceName, destName)
+    end
+
     if not sourceGUID or not destGUID then return end
 
     -- --- Focus tracking: accumulate group damage per hostile GUID ---
@@ -1146,7 +1155,6 @@ function DebuffTracker:AnnounceShear(destName, outcome, isLanded)
     -- Local line always, regardless of announce settings or announcer rules
     self:Print((isLanded and "|cFFFF4040" or "|cFF40FF40") .. msg .. "|r")
 
-    if not DebuffTrackerDB.shearAnnounce then return end
     if not isLanded and not DebuffTrackerDB.shearAnnounceAvoided then return end
 
     local channel = DebuffTrackerDB.shearChannel or "RAID"
@@ -1277,10 +1285,10 @@ function DebuffTracker:ShowShearStatus()
     self:Print("Shear monitor: " .. (on and "|cFF00FF00ON|r" or "|cFFFF4444OFF|r")
         .. "  (tracking \"" .. tostring(shearName) .. "\")")
     if on then
-        print("  announce: " .. (DebuffTrackerDB.shearAnnounce and "yes" or "no")
-            .. " to " .. tostring(DebuffTrackerDB.shearChannel)
+        print("  announce to: " .. tostring(DebuffTrackerDB.shearChannel)
             .. ", avoided: " .. (DebuffTrackerDB.shearAnnounceAvoided and "yes" or "no")
-            .. ", throttle: " .. tostring(DebuffTrackerDB.shearThrottle or 0) .. "s")
+            .. ", throttle: " .. tostring(DebuffTrackerDB.shearThrottle or 0) .. "s"
+            .. ", summary: " .. (DebuffTrackerDB.shearSummary and "yes" or "no"))
     end
 
     local s = (shearStats and shearStats.total > 0) and shearStats or shearLastFight
@@ -1300,6 +1308,188 @@ function DebuffTracker:ToggleShearMonitor()
     DebuffTrackerDB.shearMonitor = not DebuffTrackerDB.shearMonitor
     self:Print("Shear monitor " .. (DebuffTrackerDB.shearMonitor
         and "|cFF00FF00enabled|r" or "|cFFFF4444disabled|r"))
+end
+
+
+-- ============================================
+-- SHADOW RESIST GEAR CHECK (post-Mother Shahraz)
+-- ============================================
+-- Mother Shahraz is the only Black Temple fight that wants shadow resist gear.
+-- Staying in it for the Grand Promenade constructs afterwards costs a lot of
+-- stats, and it is easy to forget. This arms when Mother dies (or the moment
+-- you engage one of the trigger mobs, so a /reload still works) and warns on
+-- your next pull if the set is still on.
+--
+-- Detection reads EQUIPPED GEAR only, never UnitResistance, so Shadow
+-- Protection and Shadow Resistance Aura can't trigger a false warning.
+
+-- Mobs that mean "you are past Mother" — the Grand Promenade pulls.
+local SR_TRIGGER_MOBS = {}
+for _, n in ipairs({
+    "Shadowmoon Reaver", "Promenade Sentinel",
+    "Illidari Archon", "Illidari Assassin",
+    "Illidari Battle-mage", "Illidari Blood Lord",
+}) do
+    SR_TRIGGER_MOBS[n:lower()] = true
+end
+
+local MOTHER_NAME = "Mother Shahraz"
+local SR_WARN_COOLDOWN = 20   -- seconds between warnings, so one pull warns once
+
+local srArmed = false
+local srLastWarn = 0
+
+-- Total shadow resistance contributed by equipped items.
+-- GetItemStats keys differ between clients (ITEM_MOD_SHADOW_RESISTANCE_SHORT
+-- vs RESISTANCE5_NAME), so match either shape rather than one literal key.
+local function SlotShadowResist(link)
+    if not link or not GetItemStats then return 0 end
+    local ok, stats = pcall(GetItemStats, link)
+    if not ok or type(stats) ~= "table" then return 0 end
+    local sr = 0
+    for k, v in pairs(stats) do
+        if type(v) == "number" and v > 0 then
+            local K = tostring(k):upper()
+            if K:find("SHADOW_RESISTANCE", 1, true) or K == "RESISTANCE5_NAME" then
+                sr = sr + v
+            end
+        end
+    end
+    return sr
+end
+
+-- Returns total, pieceCount, detail[] = { slot, link, sr }
+function DebuffTracker:GetGearShadowResist()
+    local total, pieces, detail = 0, 0, {}
+    for slot = 1, 19 do
+        local link = GetInventoryItemLink("player", slot)
+        if link then
+            local sr = SlotShadowResist(link)
+            if sr > 0 then
+                total = total + sr
+                pieces = pieces + 1
+                detail[#detail + 1] = { slot = slot, link = link, sr = sr }
+            end
+        end
+    end
+    return total, pieces, detail
+end
+
+function DebuffTracker:ResetShadowResistCheck()
+    srArmed = false
+    srLastWarn = 0
+end
+
+function DebuffTracker:ArmShadowResistCheck()
+    srArmed = true
+end
+
+function DebuffTracker:IsShadowResistArmed()
+    return srArmed
+end
+
+function DebuffTracker:WarnShadowResist(total, pieces)
+    local now = GetTime()
+    if (now - srLastWarn) < SR_WARN_COOLDOWN then return end
+    srLastWarn = now
+
+    local msg = "STILL IN SHADOW RESIST GEAR (" .. total .. " SR across "
+        .. pieces .. " piece" .. (pieces == 1 and "" or "s") .. ") - swap out!"
+
+    -- Always tell the player, loudly
+    self:Print("|cFFFF2020" .. msg .. "|r")
+    if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
+        pcall(RaidNotice_AddMessage, RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
+    end
+    pcall(PlaySound, 8959, "Master")
+
+    local channel = DebuffTrackerDB.srCheckChannel or "LOCAL"
+    if channel == "LOCAL" then return end
+    if not IsInGroup() and not IsInRaid() then return end
+
+    -- Deliberately NOT gated by ShouldAnnounce: this is about the individual
+    -- player's own gear, so everyone needs to warn for themselves.
+    if channel == "RAID_WARNING" then
+        if not IsInRaid() then
+            channel = "PARTY"
+        elseif not (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
+            channel = "RAID"
+        end
+    elseif channel == "RAID" then
+        if not IsInRaid() then channel = "PARTY" end
+    end
+
+    pcall(SendChatMessage, msg, channel)
+end
+
+-- Evaluate now; called on engage and on entering combat while armed
+function DebuffTracker:CheckShadowResistGear()
+    if not DebuffTrackerDB or not DebuffTrackerDB.srCheck then return end
+    if not srArmed then return end
+
+    local total, pieces = self:GetGearShadowResist()
+    local threshold = DebuffTrackerDB.srCheckThreshold or 60
+    if total >= threshold then
+        self:WarnShadowResist(total, pieces)
+    end
+end
+
+-- Combat-log path: arms on Mother's death, and arms+fires on engaging a
+-- Grand Promenade mob (covers reloading after Mother is already dead).
+function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destName)
+    if not DebuffTrackerDB or not DebuffTrackerDB.srCheck then return end
+
+    if subevent == "UNIT_DIED" then
+        if destName and destName == MOTHER_NAME then
+            srArmed = true
+        end
+        return
+    end
+
+    if srArmed then return end  -- already armed; combat entry handles the rest
+
+    local a = sourceName and SR_TRIGGER_MOBS[sourceName:lower()]
+    local b = destName and SR_TRIGGER_MOBS[destName:lower()]
+    if a or b then
+        srArmed = true
+        self:CheckShadowResistGear()
+    end
+end
+
+-- /wmachine srcheck
+function DebuffTracker:ExplainShadowResist()
+    local total, pieces, detail = self:GetGearShadowResist()
+    local threshold = DebuffTrackerDB and DebuffTrackerDB.srCheckThreshold or 60
+
+    self:Print("=== Shadow resist gear ===")
+    if pieces == 0 then
+        print("  no equipped item reports shadow resistance")
+    else
+        for _, d in ipairs(detail) do
+            print(string.format("  slot %d: +%d SR  %s", d.slot, d.sr, d.link))
+        end
+    end
+    print(string.format("  gear total: %d SR across %d piece(s)   threshold: %d",
+        total, pieces, threshold))
+    print("  would warn: " .. (total >= threshold
+        and "|cFFFF4444YES|r" or "|cFF00FF00no|r"))
+    print("  check enabled: " .. ((DebuffTrackerDB and DebuffTrackerDB.srCheck)
+        and "yes" or "|cFFFF4444no|r")
+        .. "   armed (past Mother): " .. (srArmed and "yes" or "no"))
+
+    -- Cross-check so a broken GetItemStats is obvious rather than silent
+    if UnitResistance then
+        local _, totalRes = UnitResistance("player", 5)
+        if totalRes then
+            print("  |cFF888888character sheet shadow resist (gear + buffs): "
+                .. totalRes .. "|r")
+            if pieces == 0 and totalRes > 0 then
+                print("  |cFFFFCC00Gear scan found nothing but the character sheet shows"
+                    .. " resistance. If you ARE wearing SR gear, report this - the item"
+                    .. " API may not expose resistances on this client.|r")
+            end
+        end
+    end
 end
 
 function DebuffTracker:CheckAlerts(unit)
@@ -1586,12 +1776,14 @@ function DebuffTracker:InitDB()
         DebuffTrackerDB.excludedNPCs = {}
     end
     if DebuffTrackerDB.shearMonitor == nil then DebuffTrackerDB.shearMonitor = true end
-    if DebuffTrackerDB.shearAnnounce == nil then DebuffTrackerDB.shearAnnounce = true end
     if DebuffTrackerDB.shearChannel == nil then DebuffTrackerDB.shearChannel = "RAID" end
     if DebuffTrackerDB.shearAnnounceAvoided == nil then DebuffTrackerDB.shearAnnounceAvoided = false end
     if DebuffTrackerDB.shearPreWarn == nil then DebuffTrackerDB.shearPreWarn = false end
     if DebuffTrackerDB.shearThrottle == nil then DebuffTrackerDB.shearThrottle = 0 end
     if DebuffTrackerDB.shearSummary == nil then DebuffTrackerDB.shearSummary = true end
+    if DebuffTrackerDB.srCheck == nil then DebuffTrackerDB.srCheck = true end
+    if DebuffTrackerDB.srCheckThreshold == nil then DebuffTrackerDB.srCheckThreshold = 60 end
+    if DebuffTrackerDB.srCheckChannel == nil then DebuffTrackerDB.srCheckChannel = "LOCAL" end
     
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
     -- The alert system was overhauled (encounter-aware, dead caster suppression,
@@ -1901,6 +2093,7 @@ function DebuffTracker:CreateTrackerFrame()
             pullAnnounced = false
             DebuffTracker:ResetDoomWarning()
             DebuffTracker:ResetShearMonitor(false)
+            DebuffTracker:CheckShadowResistGear()
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -1927,6 +2120,11 @@ function DebuffTracker:CreateTrackerFrame()
         end
         if event == "GROUP_ROSTER_UPDATE" or event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
             raidScanDirty = true
+        end
+        if event == "PLAYER_ENTERING_WORLD" then
+            -- Left the instance (or reloaded): disarm. Engaging a Grand
+            -- Promenade mob re-arms it, so a mid-raid reload still works.
+            DebuffTracker:ResetShadowResistCheck()
         end
         DebuffTracker:UpdateVisibility()
         DebuffTracker:UpdateDebuffs()
@@ -2294,13 +2492,384 @@ end
 -- SETTINGS UI
 -- ============================================
 
+
+-- ============================================
+-- ENCOUNTER CALLOUTS WINDOW
+-- ============================================
+-- Split out of the main settings panel: that frame had grown taller than
+-- UIParent (~768px at UI scale 1.0), so its lowest controls were unreachable.
+
+local encounterFrame = nil
+
+function DebuffTracker:CreateEncounterUI()
+    if encounterFrame then return encounterFrame end
+
+    local theme = GetTheme()
+
+    local frame = CreateFrame("Frame", "WM_DebuffEncounterFrame", UIParent, "BackdropTemplate")
+    frame:SetSize(420, 500)
+    frame:SetPoint("CENTER")
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetClampedToScreen(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetFrameStrata("DIALOG")
+    frame:Hide()
+
+    WM:SkinPanel(frame)
+    WM:RegisterSkinnedPanel(frame)
+
+    local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleText:SetPoint("TOP", 0, -15)
+    titleText:SetText("Encounter Callouts")
+    titleText:SetTextColor(unpack(theme.headerColor))
+
+    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+
+    local yOffset = -45
+
+    -- Illidan Doom warning
+    local doomCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    doomCB:SetPoint("TOPLEFT", 20, yOffset)
+    doomCB.Text:SetText("Illidan 68%: raid warn \"CAST DOOM NOW\"")
+    doomCB:SetChecked(DebuffTrackerDB.illidanDoomWarning)
+    doomCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.illidanDoomWarning = self:GetChecked()
+    end)
+    doomCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Illidan Doom Warning", 1, 0.8, 0)
+        GameTooltip:AddLine("When Illidan Stormrage reaches 68% health, sends", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("CAST DOOM NOW as a raid warning so warlocks land", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Curse of Doom before he lifts off at 65%.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Fires once per pull. Sent by the raid leader (or", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("assistants if allowed above); others see it locally.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    doomCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 24
+
+    -- Illidan Shear monitor
+    local shearCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearCB:SetPoint("TOPLEFT", 20, yOffset)
+    shearCB.Text:SetText("Illidan: call out Shear on the main tank")
+    shearCB:SetChecked(DebuffTrackerDB.shearMonitor)
+    shearCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearMonitor = self:GetChecked()
+    end)
+    shearCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Illidan Shear Monitor", 1, 0.8, 0)
+        GameTooltip:AddLine("Shear cuts the main tank's maximum health by about", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("60% and can be dodged, parried or blocked.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Damage meters miss it: the hit is a max-health debuff", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and an avoided Shear deals no damage at all. This", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("watches every cast, hit, aura and avoidance event,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("and sweeps raid auras as a backup.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("A summary prints when the pull ends.", 0.6, 0.8, 1)
+        GameTooltip:AddLine("/wmachine shear - status and tallies", 0.6, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    shearCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Shear announce channel cycle
+    local shearChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    shearChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
+    shearChanLabel:SetText("|cFF888888To:|r")
+
+    local shearChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
+    local shearChannelLabels = {
+        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
+    }
+    local shearChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    shearChanBtn:SetSize(66, 18)
+    shearChanBtn:SetPoint("LEFT", shearChanLabel, "RIGHT", 4, 0)
+    local function RefreshShearChanText()
+        local cur = DebuffTrackerDB.shearChannel or "RAID"
+        shearChanBtn:SetText(shearChannelLabels[cur] or cur)
+    end
+    RefreshShearChanText()
+    shearChanBtn:SetScript("OnClick", function()
+        local cur = DebuffTrackerDB.shearChannel or "RAID"
+        local nextIdx = 1
+        for i, ch in ipairs(shearChannels) do
+            if ch == cur then nextIdx = (i % #shearChannels) + 1 break end
+        end
+        DebuffTrackerDB.shearChannel = shearChannels[nextIdx]
+        RefreshShearChanText()
+    end)
+    shearChanBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Announce Channel", 1, 0.8, 0)
+        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("You always see a local line regardless.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Chat is sent by the raid leader (or assistants if", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("allowed above) so only one person calls it.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 22
+
+    -- Announce avoided Shears too
+    local shearAvoidCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearAvoidCB:SetPoint("TOPLEFT", 35, yOffset)
+    shearAvoidCB.Text:SetText("Also call dodged / parried / blocked")
+    shearAvoidCB:SetChecked(DebuffTrackerDB.shearAnnounceAvoided)
+    shearAvoidCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearAnnounceAvoided = self:GetChecked()
+    end)
+    shearAvoidCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Avoided Shears", 1, 0.8, 0)
+        GameTooltip:AddLine("Off by default: Shear repeats every ~10s, so calling", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("both outcomes doubles the chat. Avoided Shears are", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("still counted and appear in the pull summary.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearAvoidCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Local pre-warning on cast start
+    local shearWarnCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearWarnCB:SetPoint("TOPLEFT", 262, yOffset)
+    shearWarnCB.Text:SetText("Cast warning")
+    shearWarnCB:SetChecked(DebuffTrackerDB.shearPreWarn)
+    shearWarnCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearPreWarn = self:GetChecked()
+    end)
+    shearWarnCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Cast Warning", 1, 0.8, 0)
+        GameTooltip:AddLine("Shear has a ~1.5s cast. This prints a local heads-up", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("the moment it starts - the window to use Shield", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Block or Holy Shield. Never sent to chat.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearWarnCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 26
+
+    -- Shear chat throttle
+    local shearThrLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    shearThrLabel:SetPoint("TOPLEFT", 35, yOffset)
+    shearThrLabel:SetText("Min gap between calls:")
+
+    local shearThrValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    shearThrValue:SetPoint("LEFT", shearThrLabel, "RIGHT", 5, 0)
+    local function FormatThrottle(v)
+        if v <= 0 then return "every one" end
+        return v .. "s"
+    end
+    shearThrValue:SetText(FormatThrottle(DebuffTrackerDB.shearThrottle or 0))
+
+    local shearThrSlider = CreateFrame("Slider", "WM_DebuffShearThrottleSlider", frame, "OptionsSliderTemplate")
+    shearThrSlider:SetPoint("TOPLEFT", 38, yOffset - 18)
+    shearThrSlider:SetSize(165, 16)
+    shearThrSlider:SetMinMaxValues(0, 30)
+    shearThrSlider:SetValueStep(1)
+    shearThrSlider:SetObeyStepOnDrag(true)
+    shearThrSlider:SetValue(DebuffTrackerDB.shearThrottle or 0)
+    shearThrSlider.Low:SetText("all")
+    shearThrSlider.High:SetText("30s")
+    shearThrSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value + 0.5)
+        DebuffTrackerDB.shearThrottle = value
+        shearThrValue:SetText(FormatThrottle(value))
+    end)
+    shearThrSlider:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Chat Throttle", 1, 0.8, 0)
+        GameTooltip:AddLine("Shear repeats roughly every 10s across three ground", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("phases, so calling every one is a lot of raid chat.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("This sets the minimum gap between CHAT calls.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Throttled Shears are still counted and still shown", 0.6, 0.8, 1)
+        GameTooltip:AddLine("to you locally - only the chat line is skipped.", 0.6, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    shearThrSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Per-pull summary
+    local shearSumCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    shearSumCB:SetPoint("TOPLEFT", 262, yOffset - 4)
+    shearSumCB.Text:SetText("Pull summary")
+    shearSumCB:SetChecked(DebuffTrackerDB.shearSummary)
+    shearSumCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.shearSummary = self:GetChecked()
+    end)
+    shearSumCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shear Pull Summary", 1, 0.8, 0)
+        GameTooltip:AddLine("When combat ends, prints the pull's tally: total,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("hit vs avoided, a per-tank breakdown so swaps are", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("visible, and which avoidance types occurred.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Local only, never sent to chat.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    shearSumCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 42
+
+    -- ========================================
+    -- SHADOW RESIST GEAR CHECK (post-Mother Shahraz)
+    -- ========================================
+
+    local srHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    srHeader:SetPoint("TOPLEFT", 20, yOffset)
+    srHeader:SetText("Black Temple: shadow resist gear")
+    srHeader:SetTextColor(unpack(theme.headerColor))
+
+    yOffset = yOffset - 22
+
+    local srCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
+    srCB:SetPoint("TOPLEFT", 20, yOffset)
+    srCB.Text:SetText("Warn if still in SR gear after Mother")
+    srCB:SetChecked(DebuffTrackerDB.srCheck)
+    srCB:SetScript("OnClick", function(self)
+        DebuffTrackerDB.srCheck = self:GetChecked()
+    end)
+    srCB:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shadow Resist Gear Check", 1, 0.8, 0)
+        GameTooltip:AddLine("Mother Shahraz is the only fight in Black Temple that", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("wants shadow resist gear. This warns you if you pull", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("the Grand Promenade constructs after her while still", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("wearing it.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Arms when Mother dies, or the moment you engage one", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("of the trigger mobs (so a /reload still works).", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("/wmachine srcheck - see exactly what it detects", 0.6, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    srCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Channel for the SR warning
+    local srChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    srChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
+    srChanLabel:SetText("|cFF888888To:|r")
+
+    local srChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
+    local srChannelLabels = {
+        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
+    }
+    local srChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    srChanBtn:SetSize(66, 18)
+    srChanBtn:SetPoint("LEFT", srChanLabel, "RIGHT", 4, 0)
+    local function RefreshSRChanText()
+        local cur = DebuffTrackerDB.srCheckChannel or "LOCAL"
+        srChanBtn:SetText(srChannelLabels[cur] or cur)
+    end
+    RefreshSRChanText()
+    srChanBtn:SetScript("OnClick", function()
+        local cur = DebuffTrackerDB.srCheckChannel or "LOCAL"
+        local nextIdx = 1
+        for i, ch in ipairs(srChannels) do
+            if ch == cur then nextIdx = (i % #srChannels) + 1 break end
+        end
+        DebuffTrackerDB.srCheckChannel = srChannels[nextIdx]
+        RefreshSRChanText()
+    end)
+    srChanBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("SR Warning Channel", 1, 0.8, 0)
+        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("This one is about YOUR gear, so unlike the other", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("callouts every player warns themselves - it is not", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("limited to the raid leader.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    srChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 26
+
+    -- Threshold
+    local srThrLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    srThrLabel:SetPoint("TOPLEFT", 35, yOffset)
+    srThrLabel:SetText("Warn at gear SR of:")
+
+    local srThrValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    srThrValue:SetPoint("LEFT", srThrLabel, "RIGHT", 5, 0)
+    srThrValue:SetText(tostring(DebuffTrackerDB.srCheckThreshold or 60))
+
+    local srThrSlider = CreateFrame("Slider", "WM_DebuffSRThresholdSlider", frame, "OptionsSliderTemplate")
+    srThrSlider:SetPoint("TOPLEFT", 38, yOffset - 18)
+    srThrSlider:SetSize(165, 16)
+    srThrSlider:SetMinMaxValues(10, 250)
+    srThrSlider:SetValueStep(10)
+    srThrSlider:SetObeyStepOnDrag(true)
+    srThrSlider:SetValue(DebuffTrackerDB.srCheckThreshold or 60)
+    srThrSlider.Low:SetText("10")
+    srThrSlider.High:SetText("250")
+    srThrSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 10 + 0.5) * 10
+        DebuffTrackerDB.srCheckThreshold = value
+        srThrValue:SetText(tostring(value))
+    end)
+    srThrSlider:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Shadow Resist Threshold", 1, 0.8, 0)
+        GameTooltip:AddLine("Total shadow resistance from EQUIPPED GEAR that counts", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("as still wearing the set. Buffs and auras are ignored.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("A Mother set runs well over 200. Raise this if an odd", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("piece with incidental SR sets it off.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    srThrSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Diagnostic button
+    local srTestBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    srTestBtn:SetSize(110, 20)
+    srTestBtn:SetPoint("TOPLEFT", 262, yOffset - 4)
+    srTestBtn:SetText("Check My Gear")
+    srTestBtn:SetScript("OnClick", function() DebuffTracker:ExplainShadowResist() end)
+    srTestBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Check My Gear", 1, 0.8, 0)
+        GameTooltip:AddLine("Lists every equipped piece carrying shadow resistance,", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("the gear total against the threshold, and whether the", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("check is currently armed.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    srTestBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    yOffset = yOffset - 44
+
+    local srNote = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    srNote:SetPoint("TOPLEFT", 20, yOffset)
+    srNote:SetWidth(380)
+    srNote:SetJustifyH("LEFT")
+    srNote:SetText("|cFF888888Trigger mobs: Shadowmoon Reaver, Promenade Sentinel and the "
+        .. "Illidari packs on the Grand Promenade. Use Check My Gear to confirm detection "
+        .. "works on your client before relying on it.|r")
+
+    frame:SetHeight(math.abs(yOffset) + 70)
+
+    encounterFrame = frame
+    self.encounterFrame = frame
+    return frame
+end
+
+function DebuffTracker:ToggleEncounterUI()
+    local f = self:CreateEncounterUI()
+    if f:IsShown() then f:Hide() else f:Show() end
+end
+
 function DebuffTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 904)
+    frame:SetSize(420, 742)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -2612,130 +3181,25 @@ function DebuffTracker:CreateUI()
 
     yOffset = yOffset - 24
 
-    -- Illidan Doom warning
-    local doomCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    doomCB:SetPoint("TOPLEFT", 20, yOffset)
-    doomCB.Text:SetText("Illidan 68%: raid warn \"CAST DOOM NOW\"")
-    doomCB:SetChecked(DebuffTrackerDB.illidanDoomWarning)
-    doomCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.illidanDoomWarning = self:GetChecked()
-    end)
-    doomCB:SetScript("OnEnter", function(self)
+    -- Encounter callouts live in their own window: this panel had grown past
+    -- the ~768px UIParent height, which clipped the controls at the bottom.
+    local encBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    encBtn:SetSize(190, 22)
+    encBtn:SetPoint("TOPLEFT", 20, yOffset)
+    encBtn:SetText("Encounter Callouts...")
+    encBtn:SetScript("OnClick", function() DebuffTracker:ToggleEncounterUI() end)
+    encBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Illidan Doom Warning", 1, 0.8, 0)
-        GameTooltip:AddLine("When Illidan Stormrage reaches 68% health, sends", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("CAST DOOM NOW as a raid warning so warlocks land", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Curse of Doom before he lifts off at 65%.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Encounter Callouts", 1, 0.8, 0)
+        GameTooltip:AddLine("Per-boss helpers: Illidan Doom warning, Illidan Shear", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("monitor, and the post-Mother shadow resist gear check.", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Fires once per pull. Sent by the raid leader (or", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("assistants if allowed above); others see it locally.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("/wmachine encounters", 0.6, 0.8, 1)
         GameTooltip:Show()
     end)
-    doomCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    encBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    yOffset = yOffset - 24
-
-    -- Illidan Shear monitor
-    local shearCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearCB:SetPoint("TOPLEFT", 20, yOffset)
-    shearCB.Text:SetText("Illidan: call out Shear on the main tank")
-    shearCB:SetChecked(DebuffTrackerDB.shearMonitor)
-    shearCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearMonitor = self:GetChecked()
-    end)
-    shearCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Illidan Shear Monitor", 1, 0.8, 0)
-        GameTooltip:AddLine("Shear cuts the main tank's maximum health by about", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("60% and can be dodged, parried or blocked.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Damage meters miss it: the hit is a max-health debuff", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and an avoided Shear deals no damage at all. This", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("watches every cast, hit, aura and avoidance event,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and sweeps raid auras as a backup.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("A summary prints when the pull ends.", 0.6, 0.8, 1)
-        GameTooltip:AddLine("/wmachine shear - status and tallies", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    shearCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Shear announce channel cycle
-    local shearChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    shearChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
-    shearChanLabel:SetText("|cFF888888To:|r")
-
-    local shearChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
-    local shearChannelLabels = {
-        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
-    }
-    local shearChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    shearChanBtn:SetSize(66, 18)
-    shearChanBtn:SetPoint("LEFT", shearChanLabel, "RIGHT", 4, 0)
-    local function RefreshShearChanText()
-        local cur = DebuffTrackerDB.shearChannel or "RAID"
-        shearChanBtn:SetText(shearChannelLabels[cur] or cur)
-    end
-    RefreshShearChanText()
-    shearChanBtn:SetScript("OnClick", function()
-        local cur = DebuffTrackerDB.shearChannel or "RAID"
-        local nextIdx = 1
-        for i, ch in ipairs(shearChannels) do
-            if ch == cur then nextIdx = (i % #shearChannels) + 1 break end
-        end
-        DebuffTrackerDB.shearChannel = shearChannels[nextIdx]
-        RefreshShearChanText()
-    end)
-    shearChanBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Announce Channel", 1, 0.8, 0)
-        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("You always see a local line regardless.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Chat is sent by the raid leader (or assistants if", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("allowed above) so only one person calls it.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 22
-
-    -- Announce avoided Shears too
-    local shearAvoidCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearAvoidCB:SetPoint("TOPLEFT", 35, yOffset)
-    shearAvoidCB.Text:SetText("Also call dodged / parried / blocked")
-    shearAvoidCB:SetChecked(DebuffTrackerDB.shearAnnounceAvoided)
-    shearAvoidCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearAnnounceAvoided = self:GetChecked()
-    end)
-    shearAvoidCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Avoided Shears", 1, 0.8, 0)
-        GameTooltip:AddLine("Off by default: Shear repeats every ~10s, so calling", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("both outcomes doubles the chat. Avoided Shears are", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("still counted and appear in the pull summary.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearAvoidCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Local pre-warning on cast start
-    local shearWarnCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearWarnCB:SetPoint("TOPLEFT", 262, yOffset)
-    shearWarnCB.Text:SetText("Cast warning")
-    shearWarnCB:SetChecked(DebuffTrackerDB.shearPreWarn)
-    shearWarnCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearPreWarn = self:GetChecked()
-    end)
-    shearWarnCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Cast Warning", 1, 0.8, 0)
-        GameTooltip:AddLine("Shear has a ~1.5s cast. This prints a local heads-up", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("the moment it starts - the window to use Shield", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Block or Holy Shield. Never sent to chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearWarnCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 24
+    yOffset = yOffset - 28
 
     -- ========================================
     -- FALSE-POSITIVE CONTROLS
