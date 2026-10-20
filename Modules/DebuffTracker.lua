@@ -2869,7 +2869,10 @@ function DebuffTracker:CreateUI()
     local theme = GetTheme()
     
     local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 742)
+    -- 742 fits a 768px screen; at larger UI scales the debuff tree (anchored
+    -- to the bottom) shrinks instead of the footer going off screen
+    frame:SetWidth(420)
+    WM:FitHeight(frame, 742, 640)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -3611,12 +3614,3 @@ function DebuffTracker:Toggle()
     end
 end
 
-function DebuffTracker:ToggleTracker()
-    if not trackerFrame then
-        self:CreateTrackerFrame()
-    end
-    
-    DebuffTrackerDB.enabled = not DebuffTrackerDB.enabled
-    self:UpdateVisibility()
-    self:Print(DebuffTrackerDB.enabled and "Tracker enabled" or "Tracker disabled")
-end

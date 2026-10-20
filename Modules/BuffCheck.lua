@@ -7,7 +7,7 @@ local AddonName, WM = ...
 local BuffCheck = {}
 WM:RegisterModule("BuffCheck", BuffCheck)
 
-BuffCheck.version = "2.9"
+BuffCheck.version = "3.0"
 
 -- ============================================
 -- BUFF DEFINITIONS (TBC)
@@ -91,7 +91,7 @@ local BUFF_GROUPS = {
         providerClass = nil,  -- consumable
         buffs = WM.FOOD_BUFFS,  -- shared with ClassGeneral (Core.lua)
         appliesTo = ALL_CLASSES,
-        default = false,
+        default = true,
         note = "Well Fed or Enlightened",
     },
     {
@@ -212,6 +212,13 @@ function BuffCheck:InitDB()
         if BuffCheckDB.checkedGroups[group.key] == nil then
             BuffCheckDB.checkedGroups[group.key] = group.default
         end
+    end
+    -- 3.6: the food check became on by default. Saved settings from before
+    -- hold the old default (off), so turn it on once; after that the
+    -- player's own choice sticks.
+    if not BuffCheckDB.foodDefaultOn then
+        BuffCheckDB.foodDefaultOn = true
+        BuffCheckDB.checkedGroups.wellfed = true
     end
 end
 

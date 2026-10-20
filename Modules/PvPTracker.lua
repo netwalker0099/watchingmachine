@@ -1265,7 +1265,10 @@ function PvPTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local frame = CreateFrame("Frame", "WM_PvPTrackerFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(450, 700)  -- keep under UIParent's ~768px at scale 1.0; the list absorbs it
+    -- Keep under the screen height (~768px at UI scale 1.0); the KOS list is
+    -- anchored to the bottom and absorbs the difference
+    frame:SetWidth(450)
+    WM:FitHeight(frame, 700, 460)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)

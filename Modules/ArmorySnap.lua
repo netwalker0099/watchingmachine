@@ -833,6 +833,12 @@ function AS.HandleSlash(msg)
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
         if AS.UpdateGroupCheckbox then AS.UpdateGroupCheckbox() end
 
+    elseif cmd == "auto" or cmd == "autoscan" then
+        AS.db.options.enabled = (AS.db.options.enabled == false)
+        Print("Auto-scan " .. (AS.db.options.enabled
+              and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
+        if autoCheckbox then autoCheckbox:SetChecked(AS.db.options.enabled) end
+
     elseif cmd == "elvui" or cmd == "theme" then
         AS.db.options.elvuiTheme = not AS.db.options.elvuiTheme
         Print("ElvUI theme " .. (AS.db.options.elvuiTheme
@@ -868,6 +874,7 @@ function AS.HandleSlash(msg)
         Print("  |cfffff000/as snap [label]|r   – Manual snapshot")
         Print("  |cfffff000/as list|r            – List saved snapshots")
         Print("  |cfffff000/as delete <n>|r   – Delete a snapshot")
+        Print("  |cfffff000/as auto|r            – Toggle automatic scanning")
         Print("  |cfffff000/as group|r           – Toggle group scanning")
         Print("  |cfffff000/as theme|r           – Toggle ElvUI theme")
         Print("  |cfffff000/as verbose|r         – Toggle chat output")
@@ -927,7 +934,7 @@ local talentFrame, talentIcons, talentTexts, talentSpecText
 local snapshotDropdown
 local memberScrollChild
 local scanStatusBar, scanStatusText, scanStatusPct, scanStatusBg
-local groupCheckbox, themeCheckbox, verboseCheckbox
+local groupCheckbox, themeCheckbox, verboseCheckbox, autoCheckbox
 local dollFrame, dollBg
 
 local selectedSnapshotKey = nil
@@ -1271,6 +1278,31 @@ local function CreateBrowseFrame()
         end
     end)
     verboseCheckbox = vcb
+
+    -- options.enabled gates automatic scanning; it had no control before
+    local acb = CreateFrame("CheckButton", "WM_ASAutoCB", cbRow, "UICheckButtonTemplate")
+    acb:SetPoint("LEFT", vcb, "RIGHT", 70, 0)
+    acb:SetSize(22, 22)
+    acb.text = _G[acb:GetName() .. "Text"] or acb.Text
+    if acb.text then
+        acb.text:SetText("Auto-scan")
+        acb.text:SetFontObject("GameFontNormalSmall")
+    end
+    acb:SetChecked(not (AS.db and AS.db.options and AS.db.options.enabled == false))
+    acb:SetScript("OnClick", function(self)
+        if AS.db and AS.db.options then
+            AS.db.options.enabled = self:GetChecked() and true or false
+        end
+    end)
+    acb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Auto-scan", 1, 0.8, 0)
+        GameTooltip:AddLine("Snapshot raid gear automatically in raid instances"
+            .. " (and groups, with Scan in group). Manual /as snap always works.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    acb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    autoCheckbox = acb
 
     -- Retention row
     local retRow = CreateFrame("Frame", nil, f)
@@ -1733,6 +1765,7 @@ function AS.ToggleBrowseFrame()
         if groupCheckbox then groupCheckbox:SetChecked(AS.db.options.scanGroup) end
         if themeCheckbox then themeCheckbox:SetChecked(AS.db.options.elvuiTheme) end
         if verboseCheckbox then verboseCheckbox:SetChecked(AS.db.options.verbose) end
+        if autoCheckbox then autoCheckbox:SetChecked(AS.db.options.enabled ~= false) end
         browseFrame:Show()
         AS.ApplyTheme()
         if not selectedSnapshotKey then

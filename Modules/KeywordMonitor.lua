@@ -391,7 +391,7 @@ function KeywordMonitor:CreateMainFrame()
     if self.mainFrame then return end
     
     local frame = CreateFrame("Frame", "WM_KeywordMonitorFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(500, 580)
+    frame:SetSize(500, WM:ScreenFitHeight(580, 480))
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:SetResizable(true)
@@ -434,7 +434,7 @@ function KeywordMonitor:CreateMainFrame()
     resizeBtn:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     resizeBtn:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
     resizeBtn:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
-    frame:SetResizeBounds(400, 480, 800, 800)
+    frame:SetResizeBounds(400, 480, 800, WM:ScreenFitHeight(800, 480))
     
     -- ========== Keywords Section ==========
     local keywordSection = CreateFrame("Frame", nil, frame, "BackdropTemplate")

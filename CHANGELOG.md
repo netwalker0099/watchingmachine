@@ -2,7 +2,61 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.5.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.6** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.6
+
+### Food check on by default
+
+Buff Check's **Food Buff** check (Well Fed, or Enlightened from Skullfish
+Soup) is now on by default. Saved settings from earlier versions still hold
+the old default, so 3.6 turns the check on **once** for existing installs
+(tracked by `BuffCheckDB.foodDefaultOn`). After that the player's own choice
+sticks. The Class Tools General food warning was already on by default and
+uses the same aura list.
+
+### Panels never taller than the screen
+
+New `WM:FitHeight(frame, desired, min)` / `WM:ScreenFitHeight(desired, min)`
+in `Core.lua`. A panel gets its normal height, capped at the screen height
+minus 16px, and re-fits each time it opens in case the UI scale has changed.
+Each panel's scroll list is anchored to the bottom and absorbs the
+difference.
+
+- **Debuff Tracker settings** (742px): unchanged at 768. At larger UI scales
+  the debuff tree shrinks instead of Reset Position and Test Display going
+  off screen. Minimum height 640.
+- **PvP Enemy Tracker** (700px) and the **dashboard** (700px) get the same
+  treatment.
+- **Keyword Monitor** could be resized up to 800px tall. Its maximum, and
+  its 580px opening height, are now capped at the screen.
+
+This is the first piece of the shared panel builder proposed in the UI
+review. It doesn't replace that work: Debuff Tracker settings still needs
+real scrolling to stop squeezing its debuff tree.
+
+### Settings that had no control
+
+- **ArmorySnap Auto-scan:** `ArmorySnapDB.options.enabled` gated automatic
+  scanning but had no checkbox and no command. It now has an **Auto-scan**
+  checkbox in the browser's checkbox row (with a tooltip) and `/as auto`.
+  Manual `/as snap` works either way.
+- **Mage portal lock:** `MageToolsDB.portalLocked` was saved and honoured,
+  but nothing could set it. The Mage tab now has **Lock the portal button**,
+  kept in step with the saved flag the same way General's "Only in 25-man
+  raids" is.
+- **Debuff Tracker:** `DebuffTracker:ToggleTracker()` had no caller and has
+  been removed. The Enable checkbox in the settings window is the real
+  toggle.
+
+### Tests in the repo
+
+The Lua harnesses now live in `tests/` (`test_buffcheck.lua`,
+`test_ui.lua`, and `run.sh`, which exits non-zero on any failure). They used
+to live only in session scratch space. The `.toc` doesn't list them, so the
+game never loads them.
 
 ---
 

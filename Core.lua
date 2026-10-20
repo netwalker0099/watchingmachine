@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.5.2"
+WM.version = "3.6"
 WM.modules = {}
 
 -- ============================================
@@ -411,6 +411,29 @@ function WM:RegisterSkinnedPanel(frame)
     self:RegisterEscClose(frame)
 end
 
+-- Size a panel to `desired` but never taller than the screen, so its bottom
+-- can't end up off screen at larger UI scales. Panels using this must let a
+-- scroll area absorb the difference (anchor it to the frame's bottom).
+-- Re-fits on every show, in case the UI scale changed in between.
+local SCREEN_MARGIN = 16
+
+function WM:ScreenFitHeight(desired, minHeight)
+    local screen = UIParent and UIParent:GetHeight() or 0
+    if not screen or screen <= 0 then return desired end
+    local h = math.min(desired, math.floor(screen) - SCREEN_MARGIN)
+    return math.max(h, minHeight or 0)
+end
+
+function WM:FitHeight(frame, desired, minHeight)
+    frame:SetHeight(self:ScreenFitHeight(desired, minHeight))
+    if not frame._wmFitHooked then
+        frame._wmFitHooked = true
+        frame:HookScript("OnShow", function(f)
+            f:SetHeight(WM:ScreenFitHeight(desired, minHeight))
+        end)
+    end
+end
+
 -- For panels being destroyed and rebuilt, so the stale frame isn't reskinned
 function WM:UnregisterSkinnedPanel(frame)
     if frame then self._skinnedPanels[frame] = nil end
@@ -746,7 +769,8 @@ function WM:CreateDashboard()
     if dashboard then return end
     
     local frame = CreateFrame("Frame", "WatchingMachineDashboard", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 700)
+    frame:SetWidth(420)
+    WM:FitHeight(frame, 700, 400)  -- card list scrolls; never taller than the screen
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1266,7 +1290,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
-    print("|cFFFFFF00/as snap [label]|r, |cFFFFFF00list|r, |cFFFFFF00delete <name>|r, |cFFFFFF00group|r, |cFFFFFF00status|r, |cFFFFFF00reset|r - ArmorySnap snapshots and scanner")
+    print("|cFFFFFF00/as snap [label]|r, |cFFFFFF00list|r, |cFFFFFF00delete <name>|r, |cFFFFFF00group|r, |cFFFFFF00auto|r, |cFFFFFF00status|r, |cFFFFFF00reset|r - ArmorySnap snapshots and scanner")
     print("|cFFFFFF00/wmachine range|r - Open Aura Range alert settings")
     print("|cFFFFFF00/wmachine exclude|r - Stop the debuff tracker treating your target as a boss")
     print("|cFFFFFF00/wmachine unexclude|r - Undo an exclusion for your target")

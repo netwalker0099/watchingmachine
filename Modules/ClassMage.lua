@@ -287,6 +287,18 @@ function Mage:Initialize()
         default = true,
         onToggle = function() Mage:UpdatePortalButtonVisibility() end,
     })
+    tools:RegisterFeature(CLASS, {
+        key = "portalLock", name = "Lock the portal button",
+        desc = "Stops it being dragged by accident.",
+        default = false,
+        onToggle = function(v) MageToolsDB.portalLocked = v and true or false end,
+    })
+
+    -- Keep the saved flag and the feature toggle in step on load
+    local tdb = ClassToolsDB and ClassToolsDB.enabled and ClassToolsDB.enabled[CLASS]
+    if tdb and tdb.portalLock ~= nil then
+        MageToolsDB.portalLocked = tdb.portalLock and true or false
+    end
 
     tools:RegisterMonitor(Monitor)
 

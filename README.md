@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.5.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.6 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -159,7 +159,7 @@ Automated guild recruiting system.
 Full raid buff audit that runs automatically on every ready check.
 - **You start the ready check** → missing buffs are announced to raid/party chat ("Missing Fortitude: Player1, Player2")
 - **Someone else starts it** → the same report prints locally where only you can see it
-- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Food Buff (Well Fed or Enlightened), Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
+- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Food Buff (Well Fed or Enlightened — on by default), Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
 - Elixir checks know the TBC rules: a flask satisfies both the Battle and Guardian elixir slots
 - **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
 - **Single-target assignments override correctly**: a player with a single-target assignment (e.g. a feral tank assigned single Might) is *not* expected to have that paladin's class-wide blessing (Salvation) — but still owes class blessings from the *other* paladins
@@ -180,6 +180,7 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - Enchant/gem count summary per character
 - Zone-aware sessions labeled timestamp + zone; snapshots retained 1/7/14/30 days (dropdown)
 - Manual snapshots via `/as snap [label]`; optional scanning in 5-man/world groups
+- **Auto-scan** checkbox (or `/as auto`) turns automatic raid scanning off without disabling the module; manual snapshots still work
 - **Migrates your existing archive**: uses the same `ArmorySnapDB` saved variable as the standalone addon; if the standalone addon is still enabled, the module stands down and tells you (disable one or the other)
 - Keeps the standalone `/as` slash commands; also `/wmachine armory`
 
@@ -267,6 +268,7 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - The flyout deliberately **won't expand in combat**: its buttons are secure
   frames that can't be reconfigured mid-fight, and portals aren't castable in
   combat anyway
+- **Lock the portal button** option in the Mage tab stops it being dragged by accident
 - `/wmachine portals` lists what the scan found
 
 ## Global Theme System
@@ -296,6 +298,12 @@ Built-in error capture system for debugging.
 1. Extract the `WatchingMachine` folder to your WoW addons directory:
    - `World of Warcraft\_classic_anniversary_\Interface\AddOns\`
 2. Restart WoW or reload UI (`/reload`)
+
+## Tests
+
+`tests/` holds Lua 5.1 harnesses that stub the WoW API and load the real
+addon files. Run them all with `LUA=/path/to/lua5.1 tests/run.sh`. The game
+never loads them, because they aren't listed in the `.toc`.
 
 ## Usage
 
@@ -358,6 +366,14 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.6
+- Buff Check's **Food Buff** check (Well Fed or Enlightened) is now **on by default**, including for existing installs (once — turning it off afterwards sticks)
+- Debuff Tracker settings, PvP Tracker and the dashboard never grow taller than the screen; at larger UI scales their lists shrink instead of the bottom going off screen
+- Keyword Monitor can no longer be resized taller than the screen
+- ArmorySnap: new **Auto-scan** checkbox and `/as auto` for the previously hidden enabled setting
+- Mage: new **Lock the portal button** option
+- Lua test harnesses committed under `tests/`
 
 ### Version 3.5.2
 - Escape now closes every Watching Machine window, not just ArmorySnap
