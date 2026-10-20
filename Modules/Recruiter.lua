@@ -386,13 +386,6 @@ local function SetMaxLevel(text) RecruitingToolDB.maxLevel = tonumber(text) or 7
 local function SetCooldown(text) RecruitingToolDB.cooldownDays = math.min(14, tonumber(text) or 7) end
 local function SetMessage(text) RecruitingToolDB.message = text end
 
--- A panel's first open goes beside the main window instead of on top of it
-local function PlaceBeside(panel, x)
-    if panel:GetState().pos then return end
-    panel:ClearAllPoints()
-    panel:SetPoint("CENTER", UIParent, "CENTER", x, 0)
-end
-
 local function CreateLogList(fill, width)
     local scrollFrame = CreateFrame("ScrollFrame", nil, fill, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 8, 0)
@@ -432,25 +425,25 @@ function Recruiter:CreateUI()
     local row = L:Row(26)
     panel.minLvlInput = row:EditBox({
         label = "Level Range:", width = 40,
+        numeric = true,
         get = function() return tostring(RecruitingToolDB.minLevel) end,
         set = SetMinLevel,
         tooltip = { "Level Range", "Only players in this level range are searched for with /who." },
     }, 12)
     panel.maxLvlInput = row:EditBox({
         label = "to", width = 40,
+        numeric = true,
         get = function() return tostring(RecruitingToolDB.maxLevel) end,
         set = SetMaxLevel,
         tooltip = { "Level Range", "Only players in this level range are searched for with /who." },
     }, 142)
     panel.cooldownInput = row:EditBox({
         label = "Cooldown (days):", width = 40,
+        numeric = true,
         get = function() return tostring(RecruitingToolDB.cooldownDays) end,
         set = SetCooldown,
         tooltip = { "Cooldown", "A player you've messaged is left out of new scans, and listed as sent, until this many days have passed. At most 14." },
     }, 230)
-    panel.minLvlInput.editBox:SetNumeric(true)
-    panel.maxLvlInput.editBox:SetNumeric(true)
-    panel.cooldownInput.editBox:SetNumeric(true)
 
     row = L:Row(18)
     row:Text({ text = "Message (use %GUILD% for guild name):", font = "GameFontNormal" }, 12)
@@ -670,8 +663,8 @@ function Recruiter:CreateMessageFrame()
         minHeight = 300,
         scroll = false,
         onShow = function() Recruiter:UpdateMessageList() end,
+        defaultPoint = { "CENTER", 280, 0 },   -- beside the main window, not on top of it
     })
-    PlaceBeside(panel, 280)
     local L = panel.layout
 
     L:Note("Click |cFF00FF00Send|r to prefill chat with the whisper. Press Enter in chat to actually send.\nThe row marks itself sent on click; use |cFFFFAA00Unmark|r if you didn't actually send it.")
@@ -808,8 +801,8 @@ function Recruiter:ShowHistoryWindow()
             minHeight = 250,
             scroll = false,
             onShow = function() Recruiter:UpdateHistoryDisplay() end,
+            defaultPoint = { "CENTER", 250, 0 },
         })
-        PlaceBeside(panel, 250)
         local L = panel.layout
 
         -- Filled by UpdateHistoryDisplay, so not a tracked (Refresh-reset) text

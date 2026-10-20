@@ -2,7 +2,99 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.8** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.9** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.9
+
+### Every window on the panel builder
+
+3.7 built the panel builder and moved three windows onto it. 3.9 moves the
+rest. The only frames still built by hand are the on-screen warnings (Aura
+Range, the Class Tools *CHECK YOURSELF* frame, the Debuff Tracker display)
+and the dashboard's tools dropdown. Those are overlays, not windows.
+
+Every window now:
+- closes on **Escape**
+- **remembers where you put it**
+- uses the global theme
+- fits the screen, scrolling or giving a list the leftover room
+
+Saved settings are unchanged. Where a window used to save its own position
+(`dashboardPos`, `KeywordMonitorDB.position`, `WhisperLogsDB.position`),
+that position is adopted once, so nothing jumps back to the centre.
+
+| Window | Notable changes |
+|---|---|
+| **Dashboard** | Builder shell; card list in a Fill area; minimap toggle, Settings and Help in the footer |
+| **Settings** | Real dropdown for the theme; fits its content |
+| **Auto Logger** | Fits its content; the status line updates as soon as a box is ticked |
+| **Aura Range** | Fits its content; Test Alert resets its sample instead of adding a second line |
+| **Guild Invite** | The log updates live while open; the trigger word also saves when you click away, and only reports a change when there is one; roster count in the footer |
+| **Keyword Monitor** | Builder resizing (capped at the screen); Keywords / Channels / Alerts as collapsible sections; recent-keyword buttons reused |
+| **WarcraftLogs Lookup** | Builder region dropdown; the list refreshes on open |
+| **Services Parser** | Tab rows mark the current dungeon, with listing counts; the separate settings window is now a collapsed *Settings* section; edit boxes also save on focus loss, and an empty channel name is refused |
+| **Mail & Trade** | The current tab is marked; builder character dropdown; filters and settings shown on their own tab; list rows reused instead of recreated (and leaked) on every refresh |
+| **Recruiter** (main, messages, history) | Builder edit boxes that save on Enter and focus loss, with Escape to restore; full class names in the class grid; messages and history open beside the main window |
+| **Class Tools** | Scrolls when a class has many features; tabs show the current class |
+| **PvP leaderboard** | Rows reused; the empty-state text no longer stacks; columns fit the window; position saved |
+| **ArmorySnap** | Builder shell around the unchanged paper doll; builder dropdowns; position saved |
+
+**Tooltips:** Mail & Trade, Guild Invite and Recruiter had none, and most
+other windows only had some. Every control whose effect isn't obvious from
+its label now has one, written from what the code actually does.
+
+### ArmorySnap follows the global theme
+
+ArmorySnap's own "ElvUI Theme" checkbox is gone, along with the code that
+synced it to the global theme. The browser now uses the Watching Machine
+theme like every other window. The ElvUI-specific inner styling (pixel
+borders on gear slots, the status bar and the talent panel) switches live
+with the global theme. `/as theme` now says where the theme is set.
+`ArmorySnapDB.options.elvuiTheme` is left in place but unused, because
+the standalone ArmorySnap addon shares that saved variable and still reads
+it.
+
+### Theme changes restyle in place
+
+`WM:OnThemeChanged` no longer destroys and rebuilds the dashboard and the
+Settings panel. Every window, card and theme-coloured text is registered
+with the reskin, so it just re-skins them and refreshes Settings. The
+dashboard title is theme-coloured too now.
+
+### Builder additions
+
+- `Dropdown` widget (Blizzard dropdown; options can be a function, re-read
+  on open).
+- `resizable = { minW, minH, maxW, maxH }`: size grabber, saved size,
+  maximum capped at the screen, `onResize`.
+- `AddFooterText`, `onHide`.
+- `defaultPoint` for a window's first open (Recruiter messages and history,
+  PvP leaderboard).
+- `legacyPosition` adopts a position saved by an older version of the
+  window, once.
+- `numeric` edit boxes, `name` on checkboxes, and `Choice.buttons` for
+  per-option badges.
+
+### Removed
+
+- `WM:FitHeight` / `WM:ScreenFitHeight`, superseded by the builder.
+- The module theme hook `OnGlobalThemeChanged`.
+- `WM_ServicesParserSettings`, `WM_SettingsThemeMenu`, and the hand-made
+  Keyword Monitor size grabber.
+
+### Tests
+
+- New suites:
+  - `test_panels_core` (90): dashboard, Settings, Class Tools, leaderboard
+  - `test_panels_social1` (53): Auto Logger, Aura Range, Guild Invite
+  - `test_panels_social2` (93): Keyword Monitor, WarcraftLogs Lookup,
+    Services Parser
+  - `test_panels_mailrecruit` (95)
+  - `test_panels_armorysnap` (53)
+- `test_uibuilder` extended to 62 checks.
+- 654 checks across ten suites in total.
 
 ---
 

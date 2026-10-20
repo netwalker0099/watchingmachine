@@ -425,235 +425,223 @@ end
 -- ============================================
 -- UI
 -- ============================================
+-- Class tabs, the selected class's features, then the warning-frame
+-- options. The feature list is a single layout row whose contents are
+-- rebuilt for the selected class and whose height is measured on reflow,
+-- so a tab change or a late RegisterFeature only refreshes the panel, and
+-- a long list makes the panel body scroll.
 
 local mainFrame = nil
 local selectedClass = nil
-local tabButtons = {}
-local featureRows = {}
 
-local TAB_W, TAB_H = 72, 22
+local TAB_W = 72
+local tabsPerRow = 5
+local tabRows = {}        -- layout rows holding the tab buttons
+local tabChoices = {}     -- tabChoices[i] = the Choice widget in tabRows[i]
+local tabSignature = nil  -- the class list the tabs were built for
+local featureArea = nil   -- layout row the feature rows sit in
+local featureRows = {}    -- pooled checkbox + description rows
 
-local function ClearFeatureRows()
-    for _, row in ipairs(featureRows) do
-        row:Hide()
-    end
+local function CurrentClass()
+    return selectedClass or ClassTools:GetPlayerClass()
 end
 
-function ClassTools:BuildFeatureList()
-    if not mainFrame then return end
-    ClearFeatureRows()
-
-    local class = selectedClass or self:GetPlayerClass()
-    local features = self:GetFeatures(class)
-    local parent = mainFrame.content
-
-    -- Header naming the class being shown
-    local hex = class and ClassHex(class) or "ffffff"
-    local label = CLASS_LABEL[class] or "Unknown"
-    local isYours = (class == self:GetPlayerClass())
-    mainFrame.classHeader:SetText("|cFF" .. hex .. label .. "|r"
-        .. (isYours and "  |cFF00FF00(your class)|r" or ""))
-
-    if #features == 0 then
-        mainFrame.emptyText:SetText(isYours
-            and "No tools built for your class yet.\n\nWhen they are added they will appear here automatically."
-            or  "Nothing built for this class yet.")
-        mainFrame.emptyText:Show()
-        return
-    end
-    mainFrame.emptyText:Hide()
-
-    local y = 0
-    for i, f in ipairs(features) do
-        local row = featureRows[i]
-        if not row then
-            row = CreateFrame("Frame", nil, parent)
-            row:SetHeight(40)
-            row:SetPoint("LEFT", 0, 0)
-            row:SetPoint("RIGHT", 0, 0)
-
-            row.check = CreateFrame("CheckButton", nil, row, "InterfaceOptionsCheckButtonTemplate")
-            row.check:SetPoint("TOPLEFT", 0, 0)
-
-            row.desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            row.desc:SetPoint("TOPLEFT", 28, -18)
-            row.desc:SetWidth(330)
-            row.desc:SetJustifyH("LEFT")
-
-            featureRows[i] = row
-        end
-
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
-        row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -y)
-
-        row.check.Text:SetText(f.name or f.key)
-        row.check:SetChecked(self:IsEnabled(class, f.key))
-        row.check:SetScript("OnClick", function(cb)
-            ClassTools:SetEnabled(class, f.key, cb:GetChecked())
-        end)
-
-        row.desc:SetText(f.desc and ("|cFF888888" .. f.desc .. "|r") or "")
-        row:Show()
-
-        y = y + (f.desc and 40 or 26)
-    end
-end
-
-function ClassTools:RefreshTabs()
-    if not mainFrame then return end
-
-    local classes = self:GetPopulatedClasses()
-    -- Always offer the player's own class, even with nothing registered yet,
-    -- so the panel explains itself instead of looking broken.
-    local mine = self:GetPlayerClass()
+-- Every class with features, plus the player's own even with nothing
+-- registered yet, so the panel explains itself instead of looking broken.
+local function TabClasses()
+    local classes = ClassTools:GetPopulatedClasses()
+    local mine = ClassTools:GetPlayerClass()
     if mine then
         local found = false
         for _, c in ipairs(classes) do if c == mine then found = true break end end
         if not found then table.insert(classes, 1, mine) end
     end
+    return classes
+end
 
-    for _, btn in ipairs(tabButtons) do btn:Hide() end
+-- Tabs only change when a feature registers for a new class, so the Choice
+-- widgets are rebuilt then and just re-marked otherwise.
+function ClassTools:RefreshTabs()
+    if not mainFrame then return end
 
-    local x, row = 0, 0
-    for i, class in ipairs(classes) do
-        local btn = tabButtons[i]
-        if not btn then
-            btn = CreateFrame("Button", nil, mainFrame, "UIPanelButtonTemplate")
-            btn:SetSize(TAB_W, TAB_H)
-            tabButtons[i] = btn
+    local classes = TabClasses()
+    local signature = table.concat(classes, ",")
+    -- A selected class that lost its tab falls back to the player's own
+    local stillThere = false
+    for _, c in ipairs(classes) do if c == selectedClass then stillThere = true break end end
+    if not stillThere then selectedClass = nil end
+    if signature ~= tabSignature then
+        tabSignature = signature
+        for i, row in ipairs(tabRows) do
+            if tabChoices[i] then tabChoices[i]:Hide() end
+            tabChoices[i] = nil
+            local options = {}
+            for j = (i - 1) * tabsPerRow + 1, math.min(i * tabsPerRow, #classes) do
+                local class = classes[j]
+                options[#options + 1] = { value = class, text = CLASS_LABEL[class] or class, width = TAB_W }
+            end
+            row.hidden = (#options == 0)
+            if #options > 0 then
+                local choice = WM.UI.Choice(row.frame, {
+                    options = options,
+                    get = CurrentClass,
+                    set = function(class)
+                        selectedClass = class
+                        ClassTools:RefreshUI()
+                    end,
+                })
+                choice:SetPoint("LEFT", row.frame, "LEFT", 6, 0)
+                tabChoices[i] = choice
+            end
         end
-        if x + TAB_W > 380 then x, row = 0, row + 1 end
-        btn:ClearAllPoints()
-        btn:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 18 + x, -44 - row * (TAB_H + 3))
-
-        local hex = ClassHex(class)
-        local isSel = (class == (selectedClass or mine))
-        btn:SetText((isSel and "|cFFFFFFFF>|r " or "") .. "|cFF" .. hex .. (CLASS_LABEL[class] or class) .. "|r")
-        btn:SetScript("OnClick", function()
-            selectedClass = class
-            ClassTools:RefreshTabs()
-            ClassTools:BuildFeatureList()
-        end)
-        btn:Show()
-        x = x + TAB_W + 3
     end
+    for _, choice in pairs(tabChoices) do choice:Refresh() end
+end
 
-    mainFrame.tabRows = row + 1
-    mainFrame.content:ClearAllPoints()
-    mainFrame.content:SetPoint("TOPLEFT", 20, -44 - (row + 1) * (TAB_H + 3) - 28)
-    mainFrame.content:SetPoint("BOTTOMRIGHT", -20, 112)
-    mainFrame.classHeader:ClearAllPoints()
-    mainFrame.classHeader:SetPoint("TOPLEFT", 20, -44 - (row + 1) * (TAB_H + 3) - 8)
+local function NewFeatureRow(parent, class, feature)
+    local row = CreateFrame("Frame", nil, parent)
+    row.class, row.feature = class, feature
+    row.check = WM.UI.Checkbox(row, {
+        label = function() return row.feature.name or row.feature.key end,
+        get = function() return ClassTools:IsEnabled(row.class, row.feature.key) end,
+        set = function(v) ClassTools:SetEnabled(row.class, row.feature.key, v) end,
+    })
+    row.check:SetPoint("TOPLEFT", 8, 0)
+    row.desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.desc:SetPoint("TOPLEFT", 36, -18)
+    row.desc:SetWidth(330)
+    row.desc:SetJustifyH("LEFT")
+    return row
+end
+
+function ClassTools:BuildFeatureList()
+    if not mainFrame then return end
+    for _, row in ipairs(featureRows) do row:Hide() end
+
+    local class = CurrentClass()
+    local features = self:GetFeatures(class)
+    local parent = featureArea.frame
+    local emptyText = mainFrame.emptyText
+
+    if #features == 0 then
+        emptyText:SetText((class == self:GetPlayerClass())
+            and "No tools built for your class yet.\n\nWhen they are added they will appear here automatically."
+            or  "Nothing built for this class yet.")
+        emptyText:Show()
+        featureArea.listHeight = math.floor(emptyText:GetStringHeight() + 12)
+        return
+    end
+    emptyText:Hide()
+
+    local y = 0
+    for i, f in ipairs(features) do
+        local row = featureRows[i]
+        if row then
+            row.class, row.feature = class, f
+        else
+            row = NewFeatureRow(parent, class, f)
+            featureRows[i] = row
+        end
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
+        row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -y)
+        row.check:Refresh()
+        row.desc:SetText(f.desc and ("|cFF888888" .. f.desc .. "|r") or "")
+        -- Room for a description that wraps onto more lines
+        local h = f.desc and math.max(40, math.floor(18 + row.desc:GetStringHeight() + 6)) or 26
+        row:SetHeight(h)
+        row:Show()
+        y = y + h
+    end
+    featureArea.listHeight = y
 end
 
 function ClassTools:RefreshUI()
     if not mainFrame or not mainFrame:IsShown() then return end
-    self:RefreshTabs()
-    self:BuildFeatureList()
+    mainFrame:Refresh()
 end
 
 function ClassTools:CreateUI()
     if mainFrame then return mainFrame end
 
-    local theme = WM:GetTheme()
+    local panel = WM.UI:CreatePanel({
+        name = "WM_ClassToolsFrame",
+        title = "Class Tools",
+        width = 420,
+        maxHeight = 486,
+        onRefresh = function()
+            ClassTools:RefreshTabs()
+            ClassTools:BuildFeatureList()
+        end,
+    })
+    local L = panel.layout
 
-    local frame = CreateFrame("Frame", "WM_ClassToolsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 486)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
+    -- Enough tab rows for General plus every class
+    tabsPerRow = math.max(1, math.floor((L.width - 6 + 2) / (TAB_W + 2)))
+    for i = 1, math.ceil((#CLASS_ORDER + 1) / tabsPerRow) do
+        tabRows[i] = L:Row(22)
+    end
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
+    -- Header naming the class being shown
+    L:Row(24):Text({
+        font = "GameFontNormal",
+        text = function()
+            local class = CurrentClass()
+            local hex = class and ClassHex(class) or "ffffff"
+            return "|cFF" .. hex .. (CLASS_LABEL[class] or "Unknown") .. "|r"
+                .. ((class and class == ClassTools:GetPlayerClass()) and "  |cFF00FF00(your class)|r" or "")
+        end,
+    }, 8)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("Class Tools")
-    WM:ThemeText(title, "headerColor")
+    featureArea = L:Row(26)
+    featureArea.measure = function() return math.max(featureArea.listHeight or 0, 26) end
 
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local classHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    classHeader:SetPoint("TOPLEFT", 20, -100)
-    frame.classHeader = classHeader
-
-    local content = CreateFrame("Frame", nil, frame)
-    content:SetPoint("TOPLEFT", 20, -124)
-    content:SetPoint("BOTTOMRIGHT", -20, 112)
-    frame.content = content
-
-    local emptyText = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    emptyText:SetPoint("TOPLEFT", 4, -4)
-    emptyText:SetWidth(360)
+    local emptyText = featureArea.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    emptyText:SetPoint("TOPLEFT", 12, -4)
+    emptyText:SetWidth(350)
     emptyText:SetJustifyH("LEFT")
     emptyText:SetTextColor(0.6, 0.6, 0.6)
-    frame.emptyText = emptyText
+    panel.emptyText = emptyText
 
-    local divider = frame:CreateTexture(nil, "ARTWORK")
-    divider:SetColorTexture(1, 1, 1, 0.15)
-    divider:SetHeight(1)
-    divider:SetPoint("BOTTOMLEFT", 18, 104)
-    divider:SetPoint("BOTTOMRIGHT", -18, 104)
+    -- ---------- Shared warning frame ----------
+    L:Separator()
+    L:Header("Warning frame")
+    local row = L:Row(24)
+    row:Checkbox({
+        label = "Play a sound when a new warning appears",
+        get = function() return ClassToolsDB and ClassToolsDB.alertSound end,
+        set = function(v) if ClassToolsDB then ClassToolsDB.alertSound = v end end,
+        tooltip = { "Warning Sound", "Plays the raid warning sound when a warning first appears,"
+            .. " at most once every " .. ALERT_SOUND_THROTTLE .. " seconds." },
+    }, 8)
+    row:RightButton({
+        text = "Reset position", width = 100,
+        onClick = function() ClassTools:ResetAlertPosition() end,
+        tooltip = { "Reset Position", "Move the warning frame back to its default spot, just above"
+            .. " the centre of the screen." },
+    }, 6)
+    row = L:Row(24)
+    row:Checkbox({
+        label = "Lock the warning frame in place",
+        get = function() return ClassToolsDB and ClassToolsDB.alertLocked end,
+        set = function(v)
+            if ClassToolsDB then ClassToolsDB.alertLocked = v end
+            ClassTools:ApplyAlertLock()
+        end,
+        tooltip = { "Lock Warning Frame", "Stops the warning frame being dragged, and lets mouse"
+            .. " clicks pass through it." },
+    }, 8)
+    row:RightButton({
+        text = "Show example", width = 100,
+        onClick = function() ClassTools:ShowExampleAlert() end,
+        tooltip = { "Show Example", "Puts two example warnings up for a few seconds, so the frame"
+            .. " can be found and dragged into place." },
+    }, 6)
+    L:Note("Tabs appear for each class that has tools built for it. Drag the warning frame to move it.")
 
-    local optHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    optHeader:SetPoint("BOTTOMLEFT", 20, 86)
-    optHeader:SetText("Warning frame")
-
-    local soundCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    soundCB:SetPoint("BOTTOMLEFT", 18, 58)
-    soundCB.Text:SetText("Play a sound when a new warning appears")
-    soundCB:SetScript("OnClick", function(cb)
-        if ClassToolsDB then ClassToolsDB.alertSound = cb:GetChecked() and true or false end
-    end)
-    frame.soundCB = soundCB
-
-    local lockCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    lockCB:SetPoint("BOTTOMLEFT", 18, 36)
-    lockCB.Text:SetText("Lock the warning frame in place")
-    lockCB:SetScript("OnClick", function(cb)
-        if ClassToolsDB then ClassToolsDB.alertLocked = cb:GetChecked() and true or false end
-        ClassTools:ApplyAlertLock()
-    end)
-    frame.lockCB = lockCB
-
-    local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(100, 20)
-    resetBtn:SetPoint("BOTTOMRIGHT", -18, 58)
-    resetBtn:SetText("Reset position")
-    resetBtn:SetScript("OnClick", function() ClassTools:ResetAlertPosition() end)
-
-    local testBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    testBtn:SetSize(100, 20)
-    testBtn:SetPoint("BOTTOMRIGHT", -18, 36)
-    testBtn:SetText("Show example")
-    testBtn:SetScript("OnClick", function() ClassTools:ShowExampleAlert() end)
-
-    local foot = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    foot:SetPoint("BOTTOMLEFT", 20, 14)
-    foot:SetWidth(380)
-    foot:SetJustifyH("LEFT")
-    foot:SetText("|cFF888888Tabs appear for each class that has tools built for it. "
-        .. "Drag the warning frame to move it.|r")
-
-    frame:SetScript("OnShow", function()
-        selectedClass = selectedClass or ClassTools:GetPlayerClass()
-        soundCB:SetChecked(ClassToolsDB and ClassToolsDB.alertSound and true or false)
-        lockCB:SetChecked(ClassToolsDB and ClassToolsDB.alertLocked and true or false)
-        ClassTools:RefreshTabs()
-        ClassTools:BuildFeatureList()
-    end)
-
-    mainFrame = frame
-    self.mainFrame = frame
-    return frame
+    mainFrame = panel
+    self.mainFrame = panel
+    return panel:Finish()
 end
 
 function ClassTools:Toggle()

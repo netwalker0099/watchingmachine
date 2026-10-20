@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.8 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.9 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -282,7 +282,7 @@ Addon-wide theme support accessible via `/wmachine settings` or the Settings but
 ### Theme Coverage
 - Dashboard and all module cards
 - All module settings panels, including section headers and separators
-- ArmorySnap follows the global theme; its own ElvUI toggle overrides it until the next global change
+- ArmorySnap follows the global theme (its old private ElvUI toggle is retired; `/as theme` points to `/wmachine settings`)
 - Debuff Tracker overlay and indicators
 - Live re-skinning: theme changes apply immediately without /reload
 
@@ -302,7 +302,7 @@ Built-in error capture system for debugging.
 
 ## Panel Builder
 
-`UI.lua` is the shared builder for settings windows (`WM.UI:CreatePanel`).
+`UI.lua` is the shared builder for every window (`WM.UI:CreatePanel`).
 A panel is a vertical list of rows (checkbox, slider, cycle, choice, edit
 box, buttons, note, header, separator, collapsible section) instead of
 hand-placed controls. Every panel built with it gets:
@@ -315,8 +315,11 @@ hand-placed controls. Every panel built with it gets:
 - in-place refresh: controls re-read their settings, so a panel is never
   torn down and rebuilt to show new state
 
-Buff Check, Debuff Tracker and PvP Tracker use it. The other modules still
-lay out their windows by hand and move over as they are worked on.
+Every window uses it: the dashboard, Settings, and all module windows. The
+only frames still built by hand are the on-screen warnings (Aura Range,
+Class Tools, the Debuff Tracker display), which are overlays rather than
+windows. List windows put their list in a `Layout:Fill` area below the
+settings rows.
 
 ## Tests
 
@@ -412,6 +415,14 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.9
+- Every remaining window moved to the panel builder: Auto Logger, Aura Range, Guild Invite, Keyword Monitor, WarcraftLogs Lookup, Services Parser, Mail & Trade, Recruiter (all three windows), Class Tools, PvP leaderboard, ArmorySnap, Settings and the dashboard
+- Every window closes on Escape, remembers where you put it, fits the screen, and has tooltips (Mail & Trade, Guild Invite and Recruiter had none)
+- Services Parser settings are a section of its window instead of a separate one; Mail & Trade and Services Parser mark the current tab
+- ArmorySnap follows the global theme; its private ElvUI toggle is retired
+- Theme changes restyle windows in place instead of rebuilding the dashboard and Settings
+- Builder: dropdowns, resizable panels, footer text, first-open placement, adoption of old saved positions, numeric edit boxes
 
 ### Version 3.8
 - Dashboard: cards grouped into Raid, Guild & Social and Logging; hover a card for a description, its full status and its command

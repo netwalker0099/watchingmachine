@@ -140,6 +140,7 @@ return function(REPO)
     function Frame:StopMovingOrSizing() end
     function Frame:StartMoving() end
     function Frame:StartSizing() end
+    function Frame:SetNumeric(v) self._numeric = v end
     function Frame:SetResizeBounds(a, b, c, d) self._bounds = { a, b, c, d } end
 
     W.click = function(f, ...)

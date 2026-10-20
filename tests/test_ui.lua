@@ -61,6 +61,7 @@ local function load(rel)
     f("WatchingMachine", WM)
 end
 load("Core.lua")
+load("UI.lua")
 env.WatchingMachineDB = { theme = "Default" }
 
 local pass, fail = 0, 0
@@ -96,20 +97,15 @@ check("header recoloured to ElvUI", same(fs._color, WM.THEMES.ElvUI.headerColor)
 check("separator recoloured to ElvUI", same(tex._tex, WM.THEMES.ElvUI.separatorColor))
 env.WatchingMachineDB.theme = "Default"
 
--- Dashboard cards are unregistered on theme change, at any nesting depth
+-- A theme change re-skins the dashboard in place: same frame, cards kept
 WM:CreateDashboard()
 local dash = WM.dashboard
 check("dashboard created", dash ~= nil)
-local scroll = env.CreateFrame("ScrollFrame", nil, dash)
-local container = env.CreateFrame("Frame", nil, scroll)
-local card = env.CreateFrame("Frame", nil, container)
+local card = env.CreateFrame("Frame", nil, dash)
 WM:RegisterSkinnedCard(card, { 1, 1, 1 })
-local outsider = env.CreateFrame("Frame", nil, env.CreateFrame("Frame", nil, nil))
-WM:RegisterSkinnedCard(outsider, { 1, 1, 1 })
-dash:Hide()
 WM:OnThemeChanged()
-check("nested dashboard card unregistered", WM._skinnedCards[card] == nil)
-check("unrelated card kept", WM._skinnedCards[outsider] ~= nil)
+check("dashboard not rebuilt on theme change", WM.dashboard == dash)
+check("dashboard cards stay registered", WM._skinnedCards[card] ~= nil)
 
 -- OnSecurityCheckFailed hides the real dashboard and doesn't touch a nil global
 WM:CreateDashboard()
@@ -118,16 +114,13 @@ local ok = pcall(WM.OnSecurityCheckFailed, WM)
 check("security-failed handler runs", ok)
 check("security-failed hides dashboard", not WM.dashboard:IsShown())
 
--- Modules with their own theme flag get the global theme first
-local seen = {}
-WM.modules.FakeAS = {
-    OnGlobalThemeChanged = function(_, name) seen[#seen + 1] = "global:" .. name end,
-    ApplyTheme = function() seen[#seen + 1] = "apply" end,
-}
+-- Modules with theme-dependent styling restyle on a theme change
+local applied = 0
+WM.modules.FakeStyled = { ApplyTheme = function() applied = applied + 1 end }
 env.WatchingMachineDB.theme = "ElvUI"
 WM:OnThemeChanged()
-check("global theme passed before ApplyTheme", seen[1] == "global:ElvUI" and seen[2] == "apply")
-WM.modules.FakeAS = nil
+check("ApplyTheme called on theme change", applied == 1)
+WM.modules.FakeStyled = nil
 
 -- ArmorySnap follows the global theme directly now (its own flag is
 -- retired; theme behaviour is covered in test_panels_armorysnap.lua)
@@ -161,19 +154,6 @@ check("ticking lock sets portalLocked", env.MageToolsDB.portalLocked == true)
 CT:SetEnabled("MAGE", "portalLock", false)
 check("unticking clears it", env.MageToolsDB.portalLocked == false)
 
--- Panels fit the screen height
-env.UIParent = NewFrame("UIParent"); env.UIParent:SetHeight(768)
-local tall = env.CreateFrame("Frame", "WM_TallPanel", nil)
-WM:FitHeight(tall, 742, 640)
-check("742 panel fits at 768 unchanged", tall:GetHeight() == 742)
-env.UIParent:SetHeight(700)                 -- larger UI scale
-tall:Fire("OnShow")
-check("re-fits on show at a shorter screen", tall:GetHeight() == 700 - 16)
-env.UIParent:SetHeight(500)
-tall:Fire("OnShow")
-check("never below its minimum", tall:GetHeight() == 640)
-env.UIParent:SetHeight(768)
-check("ScreenFitHeight caps resize bound", WM:ScreenFitHeight(800, 480) == 752)
 
 local function src(rel) local h = assert(io.open(REPO .. "/" .. rel)); local s = h:read("*a"); h:close(); return s end
 for _, rel in ipairs({ "Core.lua", "Modules/PvPTracker.lua", "Modules/DebuffTracker.lua", "Modules/KeywordMonitor.lua" }) do

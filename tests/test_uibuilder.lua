@@ -197,5 +197,26 @@ local rp2 = UI:CreatePanel({ name = "WM_ResizePanel", title = "Resize again", sc
     width = 500, resizable = { 400, 300, 800, 900 } })
 check("saved width restored on rebuild", rp2:GetWidth() == 620)
 
+-- ---- first-open position, legacy position, numeric, named, choice buttons ----
+local fresh = UI:CreatePanel({ name = "WM_BesidePanel", title = "Beside", defaultPoint = { "CENTER", 250, 0 } })
+local pt, _, _, x = fresh:GetPoint(1)
+check("defaultPoint used on first open", pt == "CENTER" and x == 250)
+env.WatchingMachineDB.panels.WM_BesidePanel.pos = { "TOPLEFT", "TOPLEFT", 10, -10 }
+local moved = UI:CreatePanel({ name = "WM_BesidePanel", title = "Beside", defaultPoint = { "CENTER", 250, 0 } })
+check("saved position beats defaultPoint", (moved:GetPoint(1)) == "TOPLEFT")
+local legacy = UI:CreatePanel({ name = "WM_LegacyPanel", title = "Legacy",
+    legacyPosition = { "BOTTOM", "BOTTOM", 5, 60 } })
+check("legacy position adopted", env.WatchingMachineDB.panels.WM_LegacyPanel.pos[1] == "BOTTOM"
+    and (legacy:GetPoint(1)) == "BOTTOM")
+local again = UI:CreatePanel({ name = "WM_LegacyPanel", title = "Legacy",
+    legacyPosition = { "TOP", "TOP", 0, 0 } })
+check("legacy position only adopted once", (again:GetPoint(1)) == "BOTTOM")
+local nb = UI.EditBox(env.UIParent, { numeric = true, get = function() return "5" end })
+check("numeric edit box", nb.editBox._numeric == true)
+local named = UI.Checkbox(env.UIParent, { name = "WM_NamedCB", label = "n" })
+check("named checkbox", named:GetName() == "WM_NamedCB")
+local ch = UI.Choice(env.UIParent, { options = { { value = 1, text = "a" }, { value = 2, text = "b" } } })
+check("choice exposes its buttons in order", #ch.buttons == 2 and ch.buttons[2]:GetText() == "b")
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

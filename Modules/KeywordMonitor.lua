@@ -443,6 +443,7 @@ function KeywordMonitor:CreateMainFrame()
         minHeight = 480,
         scroll = false,
         resizable = { 400, 480, 800, 800 },
+        legacyPosition = KeywordMonitorDB.position,   -- saved by the old hand-built window
         onResize = function()
             KeywordMonitor:UpdateHistoryDisplay()
             KeywordMonitor:UpdateResultsDisplay()
@@ -455,14 +456,7 @@ function KeywordMonitor:CreateMainFrame()
     self.mainFrame = panel
     local L = panel.layout
 
-    -- Carry over the position saved by the old hand-built window
-    local old = KeywordMonitorDB.position
-    if old and #old >= 4 and not panel:GetState().pos then
-        panel:GetState().pos = { old[1], old[2], old[3], old[4] }
-        panel:ClearAllPoints()
-        panel:SetPoint(old[1], UIParent, old[2], old[3], old[4])
-    end
-    KeywordMonitorDB.position = nil
+    KeywordMonitorDB.position = nil   -- adopted by the panel above
 
     -- ---------- Monitoring status ----------
     local row = L:Row(26)

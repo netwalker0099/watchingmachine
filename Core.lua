@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.8"
+WM.version = "3.9"
 WM.modules = {}
 
 -- ============================================
@@ -411,29 +411,6 @@ function WM:RegisterSkinnedPanel(frame)
     self:RegisterEscClose(frame)
 end
 
--- Size a panel to `desired` but never taller than the screen, so its bottom
--- can't end up off screen at larger UI scales. Panels using this must let a
--- scroll area absorb the difference (anchor it to the frame's bottom).
--- Re-fits on every show, in case the UI scale changed in between.
-local SCREEN_MARGIN = 16
-
-function WM:ScreenFitHeight(desired, minHeight)
-    local screen = UIParent and UIParent:GetHeight() or 0
-    if not screen or screen <= 0 then return desired end
-    local h = math.min(desired, math.floor(screen) - SCREEN_MARGIN)
-    return math.max(h, minHeight or 0)
-end
-
-function WM:FitHeight(frame, desired, minHeight)
-    frame:SetHeight(self:ScreenFitHeight(desired, minHeight))
-    if not frame._wmFitHooked then
-        frame._wmFitHooked = true
-        frame:HookScript("OnShow", function(f)
-            f:SetHeight(WM:ScreenFitHeight(desired, minHeight))
-        end)
-    end
-end
-
 -- For panels being destroyed and rebuilt, so the stale frame isn't reskinned
 function WM:UnregisterSkinnedPanel(frame)
     if frame then self._skinnedPanels[frame] = nil end
@@ -541,7 +518,6 @@ end
 local coreDefaults = {
     minimapPos = 220,
     minimapHidden = false,
-    dashboardPos = nil,
     theme = "Default",
     verboseChat = false,    -- Show diagnostic/sync messages in chat
 }
@@ -764,61 +740,35 @@ local dashboard = nil
 
 function WM:CreateDashboard()
     if dashboard then return end
-    
-    local frame = CreateFrame("Frame", "WatchingMachineDashboard", UIParent, "BackdropTemplate")
-    frame:SetWidth(420)
-    WM:FitHeight(frame, 700, 400)  -- card list scrolls; never taller than the screen
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", function(f)
-        f:StopMovingOrSizing()
-        local point, _, relPoint, x, y = f:GetPoint()
-        WatchingMachineDB.dashboardPos = {point, relPoint, x, y}
-    end)
-    frame:Hide()
-    
-    -- Apply theme
-    self:SkinPanel(frame)
-    self:RegisterSkinnedPanel(frame)
-    
-    -- Restore position
-    if WatchingMachineDB.dashboardPos then
-        frame:ClearAllPoints()
-        frame:SetPoint(
-            WatchingMachineDB.dashboardPos[1],
-            UIParent,
-            WatchingMachineDB.dashboardPos[2],
-            WatchingMachineDB.dashboardPos[3],
-            WatchingMachineDB.dashboardPos[4]
-        )
-    end
-    
-    local theme = self:GetTheme()
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("Watching Machine")
-    title:SetTextColor(unpack(theme.addonTitleColor))
-    frame.titleText = title
-    
+
+    -- The card list scrolls inside the fill area; the panel is 700 tall
+    -- but never taller than the screen.
+    local frame = self.UI:CreatePanel({
+        name = "WatchingMachineDashboard",
+        title = "Watching Machine",
+        width = 420,
+        height = 700,
+        minHeight = 400,
+        scroll = false,
+        strata = "MEDIUM",
+        -- Saved as WatchingMachineDB.dashboardPos before the builder
+        legacyPosition = WatchingMachineDB and WatchingMachineDB.dashboardPos,
+    })
+    if WatchingMachineDB then WatchingMachineDB.dashboardPos = nil end
+    WM:ThemeText(frame.titleText, "addonTitleColor")
+    local L = frame.layout
+
     local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOP", title, "BOTTOM", 0, -2)
+    subtitle:SetPoint("TOP", frame.titleText, "BOTTOM", 0, -2)
     subtitle:SetText("v" .. WM.version .. "  |cFF888888-  hover a card for details, ... for tools|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
+    L:Space(12)   -- room for the subtitle below the title band
+
     -- Module cards, in a scroll frame: the list grows with every module and
     -- the panel itself can't exceed the ~768px screen height.
-    local cardsScroll = CreateFrame("ScrollFrame", "WM_DashboardCardScroll", frame, "UIPanelScrollFrameTemplate")
-    cardsScroll:SetPoint("TOPLEFT", 15, -55)
-    cardsScroll:SetPoint("BOTTOMRIGHT", -32, 60)
+    local fill = L:Fill(200)
+    local cardsScroll = CreateFrame("ScrollFrame", "WM_DashboardCardScroll", fill, "UIPanelScrollFrameTemplate")
+    cardsScroll:SetPoint("TOPLEFT", 3, 0)
+    cardsScroll:SetPoint("BOTTOMRIGHT", -20, 0)
 
     local cardsContainer = CreateFrame("Frame", nil, cardsScroll)
     cardsContainer:SetSize(370, 1)
@@ -827,41 +777,44 @@ function WM:CreateDashboard()
     frame.cardsScroll = cardsScroll
     frame.cardsContainer = cardsContainer
     frame.moduleCards = {}
-    
-    -- Bottom buttons
-    local minimapBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    minimapBtn:SetSize(120, 24)
-    minimapBtn:SetPoint("BOTTOMLEFT", 20, 20)
-    minimapBtn:SetScript("OnClick", function() 
-        WM:ToggleMinimapButton() 
-        WM:UpdateMinimapButtonText()
-    end)
-    frame.minimapBtn = minimapBtn
-    
-    -- Minimap status indicator
-    local minimapStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    minimapStatus:SetPoint("LEFT", minimapBtn, "RIGHT", 10, 0)
+
+    -- Footer: minimap toggle with its status beside it, Settings and Help
+    frame.minimapBtn = frame:AddFooterButton({
+        text = function()
+            return WatchingMachineDB and WatchingMachineDB.minimapHidden and "Show Minimap" or "Hide Minimap"
+        end,
+        width = 120, height = 24,
+        onClick = function() WM:ToggleMinimapButton() end,
+        tooltip = { "Minimap Button", "Show or hide the Watching Machine button on the minimap."
+            .. " With it hidden, /wmachine still opens the dashboard." },
+    }, "LEFT")
+    local minimapStatus = frame:AddFooterText({
+        font = "GameFontNormalSmall",
+        text = function()
+            return WatchingMachineDB and WatchingMachineDB.minimapHidden
+                and "|cFFFF0000[Hidden]|r" or "|cFF00FF00[Visible]|r"
+        end,
+    })
+    -- Footer text anchors to the panel edge; sit it beside the button instead
+    minimapStatus:ClearAllPoints()
+    minimapStatus:SetPoint("LEFT", frame.minimapBtn, "RIGHT", 10, 0)
     frame.minimapStatus = minimapStatus
-    
-    -- Settings button
-    local settingsBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    settingsBtn:SetSize(80, 24)
-    settingsBtn:SetPoint("BOTTOMRIGHT", -110, 20)
-    settingsBtn:SetText("Settings")
-    settingsBtn:SetScript("OnClick", function() WM:ToggleSettings() end)
-    
-    local helpBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    helpBtn:SetSize(80, 24)
-    helpBtn:SetPoint("BOTTOMRIGHT", -20, 20)
-    helpBtn:SetText("Help")
-    helpBtn:SetScript("OnClick", function() WM:ShowHelp() end)
-    
+
+    frame:AddFooterButton({
+        text = "Help", width = 80, height = 24,
+        onClick = function() WM:ShowHelp() end,
+        tooltip = { "Help", "Print every /wmachine command to chat." },
+    }, "RIGHT")
+    frame:AddFooterButton({
+        text = "Settings", width = 80, height = 24,
+        onClick = function() WM:ToggleSettings() end,
+        tooltip = { "Settings", "UI theme and verbose chat." },
+    }, "RIGHT")
+
+    frame:Finish()
     dashboard = frame
     WM.dashboard = frame
-    
-    -- Update minimap button text
-    WM:UpdateMinimapButtonText()
-    
+
     -- Create module cards after a short delay to ensure modules are registered
     RunAfter(0.1, function()
         WM:CreateModuleCards()
@@ -870,14 +823,8 @@ end
 
 function WM:UpdateMinimapButtonText()
     if not dashboard or not dashboard.minimapBtn or not dashboard.minimapStatus then return end
-    
-    if WatchingMachineDB and WatchingMachineDB.minimapHidden then
-        dashboard.minimapBtn:SetText("Show Minimap")
-        dashboard.minimapStatus:SetText("|cFFFF0000[Hidden]|r")
-    else
-        dashboard.minimapBtn:SetText("Hide Minimap")
-        dashboard.minimapStatus:SetText("|cFF00FF00[Visible]|r")
-    end
+    dashboard.minimapBtn:Refresh()
+    dashboard.minimapStatus:Refresh()
 end
 
 -- ============================================
@@ -1353,196 +1300,66 @@ local settingsFrame = nil
 
 function WM:CreateSettingsPanel()
     if settingsFrame then return settingsFrame end
-    
-    local theme = self:GetTheme()
-    
-    local frame = CreateFrame("Frame", "WM_SettingsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(320, 230)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("DIALOG")
-    frame:Hide()
-    
-    self:SkinPanel(frame)
-    self:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("Watching Machine Settings")
-    title:SetTextColor(unpack(theme.headerColor))
-    frame.titleText = title
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    local yOffset = -50
-    
-    -- Theme label
-    local themeLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    themeLabel:SetPoint("TOPLEFT", 25, yOffset)
-    themeLabel:SetText("UI Theme:")
-    themeLabel:SetTextColor(unpack(theme.headerColor))
-    
-    -- Theme dropdown
-    local dropdown = CreateFrame("Frame", "WM_SettingsThemeDropdown", frame, "BackdropTemplate")
-    dropdown:SetSize(160, 24)
-    dropdown:SetPoint("LEFT", themeLabel, "RIGHT", 12, 0)
-    dropdown:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+
+    local panel = self.UI:CreatePanel({
+        name = "WM_SettingsFrame",
+        title = "Watching Machine Settings",
+        width = 320,
+        strata = "DIALOG",
     })
-    dropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    dropdown:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    
-    local ddText = dropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ddText:SetPoint("LEFT", 8, 0)
-    ddText:SetText(self:GetThemeName())
-    
-    local ddArrow = dropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ddArrow:SetPoint("RIGHT", -8, 0)
-    ddArrow:SetText("v")
-    
-    -- Dropdown menu
-    local ddMenu = CreateFrame("Frame", "WM_SettingsThemeMenu", dropdown, "BackdropTemplate")
-    ddMenu:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
-    ddMenu:SetSize(160, (#self.THEME_LIST * 22) + 6)
-    ddMenu:SetFrameStrata("TOOLTIP")
-    ddMenu:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    ddMenu:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-    ddMenu:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    ddMenu:Hide()
-    
-    for idx, themeName in ipairs(self.THEME_LIST) do
-        local item = CreateFrame("Button", nil, ddMenu)
-        item:SetSize(156, 20)
-        item:SetPoint("TOPLEFT", 2, -((idx - 1) * 22) - 3)
-        
-        local itemText = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        itemText:SetPoint("LEFT", 8, 0)
-        itemText:SetText(themeName)
-        
-        local highlight = item:CreateTexture(nil, "HIGHLIGHT")
-        highlight:SetAllPoints()
-        highlight:SetColorTexture(0.3, 0.3, 0.5, 0.3)
-        
-        item:SetScript("OnClick", function()
-            WatchingMachineDB.theme = themeName
-            ddText:SetText(themeName)
-            ddMenu:Hide()
-            WM:OnThemeChanged()
-        end)
+    local L = panel.layout
+
+    local themes = {}
+    for _, themeName in ipairs(self.THEME_LIST) do
+        themes[#themes + 1] = { value = themeName, text = themeName }
     end
-    
-    dropdown:EnableMouse(true)
-    dropdown:SetScript("OnMouseDown", function()
-        if ddMenu:IsShown() then ddMenu:Hide() else ddMenu:Show() end
-    end)
-    frame:HookScript("OnHide", function() ddMenu:Hide() end)
-    
-    yOffset = yOffset - 35
-    
-    -- Description
-    local desc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    desc:SetPoint("TOPLEFT", 25, yOffset)
-    desc:SetWidth(270)
-    desc:SetJustifyH("LEFT")
-    desc:SetText("|cFF888888Applies to the dashboard, every module window, ArmorySnap and the debuff tracker. On-screen warning frames keep their own colours.|r")
-    
-    yOffset = yOffset - 55
-    
-    -- Verbose chat toggle
-    local verboseCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    verboseCB:SetPoint("TOPLEFT", 20, yOffset)
-    verboseCB.Text:SetText("Verbose chat (show sync/diagnostic messages)")
-    verboseCB:SetChecked(WatchingMachineDB and WatchingMachineDB.verboseChat)
-    verboseCB:SetScript("OnClick", function(self)
-        if WatchingMachineDB then
-            WatchingMachineDB.verboseChat = self:GetChecked()
-        end
-    end)
-    verboseCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Verbose Chat Mode", 1, 0.8, 0)
-        GameTooltip:AddLine("Shows low-priority messages like guild sync", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("status, leaderboard updates, roster refreshes,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and other backend activity. Useful for", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("diagnostics. Off by default to reduce chat noise.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    verboseCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    yOffset = yOffset - 28
-    
-    -- Current theme indicator
-    local currentLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    currentLabel:SetPoint("TOPLEFT", 25, yOffset)
-    currentLabel:SetText("Active: |cFF00FF00" .. self:GetThemeName() .. "|r")
-    frame.currentLabel = currentLabel
-    
-    settingsFrame = frame
-    return frame
+    L:Dropdown({
+        name = "WM_SettingsThemeDropdown",
+        label = "UI Theme:",
+        width = 140,
+        options = themes,
+        get = function() return WM:GetThemeName() end,
+        set = function(v)
+            WatchingMachineDB.theme = v
+            WM:OnThemeChanged()
+        end,
+        tooltip = { "UI Theme", "Default: Blizzard dialog borders. ElvUI: flat dark panels with pixel"
+            .. " borders, to sit with ElvUI or Tukui. Applied straight away." },
+    })
+    L:Note("Applies to the dashboard, every module window, ArmorySnap and the debuff tracker."
+        .. " On-screen warning frames keep their own colours.")
+    L:Checkbox({
+        label = "Verbose chat (show sync/diagnostic messages)",
+        get = function() return WatchingMachineDB and WatchingMachineDB.verboseChat end,
+        set = function(v)
+            if WatchingMachineDB then WatchingMachineDB.verboseChat = v end
+        end,
+        tooltip = { "Verbose Chat Mode", "Shows low-priority messages like guild sync status, leaderboard"
+            .. " updates, roster refreshes, and other backend activity. Useful for diagnostics."
+            .. " Off by default to reduce chat noise." },
+    })
+    L:Row(20):Text({
+        font = "GameFontNormalSmall",
+        text = function() return "Active: |cFF00FF00" .. WM:GetThemeName() .. "|r" end,
+    }, 12)
+
+    settingsFrame = panel:Finish()
+    return settingsFrame
 end
 
 function WM:OnThemeChanged()
     local themeName = self:GetThemeName()
     self:Print("Theme changed to: |cFFFFCC00" .. themeName .. "|r")
-    
-    -- Re-skin all registered frames
+
+    -- Re-skin all registered frames: panel backdrops (dashboard and settings
+    -- included), dashboard cards and theme-keyed text. Nothing needs
+    -- rebuilding; the settings panel just re-reads its controls.
     self:ReskinAll()
-    
-    -- Destroy and recreate dashboard to fully re-theme
-    if dashboard then
-        local wasShown = dashboard:IsShown()
-        dashboard:Hide()
-        -- Unregister from skinning
-        self._skinnedPanels[dashboard] = nil
-        -- Cards sit card -> container -> scroll frame -> dashboard, so walk
-        -- the whole parent chain rather than assuming a fixed depth
-        for card in pairs(self._skinnedCards) do
-            local p = card:GetParent()
-            while p and p ~= dashboard do p = p:GetParent() end
-            if p == dashboard then
-                self._skinnedCards[card] = nil
-            end
-        end
-        dashboard = nil
-        self.dashboard = nil
-        if wasShown then
-            self:CreateDashboard()
-            dashboard:Show()
-            self:UpdateDashboard()
-        end
-    end
-    
-    -- Destroy and recreate settings panel with new theme
-    if settingsFrame then
-        settingsFrame:Hide()
-        self._skinnedPanels[settingsFrame] = nil
-        settingsFrame = nil
-        self:CreateSettingsPanel()
-        settingsFrame:Show()
-    end
-    
-    -- Notify modules that have an ApplyTheme method. Modules that keep their
-    -- own theme flag (ArmorySnap) get told the new global theme first.
+    if settingsFrame and settingsFrame:IsShown() then settingsFrame:Refresh() end
+
+    -- Modules with their own theme-dependent styling (Debuff Tracker's
+    -- display, ArmorySnap's paper doll) restyle themselves
     for name, module in pairs(self.modules) do
-        if module.OnGlobalThemeChanged then
-            module:OnGlobalThemeChanged(themeName)
-        end
         if module.ApplyTheme then
             module:ApplyTheme()
         end

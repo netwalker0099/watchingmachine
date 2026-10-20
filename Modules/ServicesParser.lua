@@ -236,8 +236,7 @@ local function AddTabRow(L, tabs)
         end,
         options = options,
     }, 8)
-    -- Choice keeps its buttons to itself; they are its only child frames, in option order
-    local buttons = { choice:GetChildren() }
+    local buttons = choice.buttons
     for i, t in ipairs(tabs) do
         local btn = buttons[i]
         if type(btn) == "table" and btn.CreateFontString then
@@ -305,12 +304,12 @@ function ServicesParser:CreateMainFrame()
     })
     local durationBox = L:EditBox({
         label = "Message duration (sec):", width = 60,
+        numeric = true,
         get = function() return tostring(ServicesParserDB.messageDuration) end,
         set = function(v) ServicesParserDB.messageDuration = tonumber(v) or 60 end,
         tooltip = { "Message Duration", "How long a listing stays in the list. A repeat of the same advert"
             .. " restarts its timer; listings already shown keep their old time." },
     })
-    durationBox.editBox:SetNumeric(true)
     L:Checkbox({
         label = "Play sound on new message",
         get = function() return ServicesParserDB.playSound end,

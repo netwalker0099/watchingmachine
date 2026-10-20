@@ -293,6 +293,7 @@ function WhisperLogs:CreateMainFrame()
     local panel = WM.UI:CreatePanel({
         name = "WM_WhisperLogsFrame",
         title = "WarcraftLogs Lookup",
+        legacyPosition = WhisperLogsDB.position,   -- saved by the old hand-built window
         titleColor = "00CCFF",
         width = 500,
         height = 420,
@@ -301,14 +302,7 @@ function WhisperLogs:CreateMainFrame()
     })
     local L = panel.layout
 
-    -- Carry over the position saved by the old hand-built window
-    local old = WhisperLogsDB.position
-    if old and #old >= 4 and not panel:GetState().pos then
-        panel:GetState().pos = { old[1], old[2], old[3], old[4] }
-        panel:ClearAllPoints()
-        panel:SetPoint(old[1], UIParent, old[2], old[3], old[4])
-    end
-    WhisperLogsDB.position = nil
+    WhisperLogsDB.position = nil   -- adopted by the panel above
 
     -- Server + region
     local row = L:Row(28)

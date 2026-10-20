@@ -30,6 +30,8 @@
 --   get/set   read and write the saved value
 --   disabled  optional function; true greys the control out
 --   indent    extra left offset in a vertical layout
+--   name      optional global name (checkbox, slider, edit box, dropdown)
+--   numeric   edit boxes only: digits only
 
 local AddonName, WM = ...
 local UI = {}
@@ -103,7 +105,7 @@ end
 -- Refresh method that re-reads its value. Placement is the caller's job.
 
 function UI.Checkbox(parent, spec)
-    local cb = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
+    local cb = CreateFrame("CheckButton", spec.name, parent, "InterfaceOptionsCheckButtonTemplate")
     if spec.font then cb.Text:SetFontObject(spec.font) end
     cb:SetScript("OnClick", function(self)
         if spec.set then spec.set(self:GetChecked() and true or false) end
@@ -251,6 +253,7 @@ function UI.Choice(parent, spec)
         prev = b
     end
 
+    box.buttons = buttons   -- in option order, for badges and the like
     function box:Refresh()
         local cur = spec.get and spec.get()
         if cur == nil then cur = spec.default end
@@ -312,6 +315,7 @@ function UI.EditBox(parent, spec)
     e:SetSize(spec.width or 150, 20)
     e:SetAutoFocus(false)
     if spec.maxLetters then e:SetMaxLetters(spec.maxLetters) end
+    if spec.numeric then e:SetNumeric(true) end
     if label then
         e:SetPoint("LEFT", label, "RIGHT", 10, 0)
     else
@@ -705,10 +709,19 @@ local function SavePosition(frame)
 end
 
 local function RestorePosition(frame)
-    local pos = frame:GetState().pos
+    local state, opts = frame:GetState(), frame.opts
+    -- A position saved by the window this panel replaced is adopted once
+    if not state.pos and opts.legacyPosition and #opts.legacyPosition >= 4 then
+        local p = opts.legacyPosition
+        state.pos = { p[1], p[2], p[3], p[4] }
+    end
+    local pos = state.pos
     frame:ClearAllPoints()
     if pos then
         frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+    elseif opts.defaultPoint then
+        local d = opts.defaultPoint
+        frame:SetPoint(d[1] or "CENTER", UIParent, d[1] or "CENTER", d[2] or 0, d[3] or 0)
     else
         frame:SetPoint("CENTER")
     end
@@ -833,6 +846,11 @@ end
 --              grabber and remembers the size; for scroll = false panels,
 --              whose rows stretch to the width (maxHeight is still capped
 --              at the screen). onResize(panel) runs after a resize.
+--   defaultPoint   { point, x, y } for the first open, before the player
+--              has moved it (e.g. beside a related window)
+--   legacyPosition { point, relPoint, x, y } saved by an older version of
+--              the window; adopted once if the panel has no position yet
+--              (the caller then clears its old key)
 --   onShow     extra OnShow handler (after Refresh)
 --   onHide     OnHide handler
 --   onRefresh  called at the end of every Refresh

@@ -1679,168 +1679,155 @@ end
 -- LEADERBOARD WINDOW
 -- ============================================
 
+local LB_W = 280
+local LB_ROW_H = 24
+local LB_BAR_W = 70
+
+-- Your points and rank, above the list
+local function LeaderboardSubtitle()
+    local myPts = PvPTrackerDB and PvPTrackerDB.myKOSKills or 0
+    if myPts <= 0 then
+        return "|cFF888888No points yet — kill KOS enemies!|r"
+    end
+    local myRank = "-"
+    for i, entry in ipairs(PvPTracker:GetSortedLeaderboard()) do
+        if entry.name == playerName then
+            myRank = "#" .. i
+            break
+        end
+    end
+    return "|cFFCCCCCCYou: " .. myPts .. " pts (" .. myRank .. ")|r"
+end
+
+local function NewLeaderboardRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetHeight(LB_ROW_H)
+
+    row.rankText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.rankText:SetPoint("LEFT", 2, 0)
+    row.rankText:SetWidth(22)
+    row.rankText:SetJustifyH("RIGHT")
+
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.nameText:SetPoint("LEFT", 30, 0)
+    row.nameText:SetWidth(96)
+    row.nameText:SetJustifyH("LEFT")
+
+    row.barBg = row:CreateTexture(nil, "ARTWORK")
+    row.barBg:SetPoint("LEFT", 130, 0)
+    row.barBg:SetSize(LB_BAR_W, 12)
+    row.barBg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
+
+    row.barFill = row:CreateTexture(nil, "OVERLAY")
+    row.barFill:SetPoint("LEFT", 130, 0)
+
+    row.ptsText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.ptsText:SetPoint("LEFT", 202, 0)
+    row.ptsText:SetWidth(30)
+    row.ptsText:SetJustifyH("RIGHT")
+    return row
+end
+
+local RANK_COLORS = { "FFD700", "C0C0C0", "CD7F32" }   -- gold, silver, bronze
+
+-- Fill the list from the sorted board, reusing rows between refreshes
+local function RenderLeaderboard(lbf)
+    local scrollChild = lbf.scrollChild
+    local board = PvPTracker:GetSortedLeaderboard()
+    local maxPoints = (board[1] and board[1].points) or 1
+
+    for _, row in ipairs(lbf.rows) do row:Hide() end
+
+    local scrollY = 0
+    for i, entry in ipairs(board) do
+        local row = lbf.rows[i]
+        if not row then
+            row = NewLeaderboardRow(scrollChild)
+            lbf.rows[i] = row
+        end
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -scrollY)
+        row:SetPoint("TOPRIGHT", 0, -scrollY)
+
+        local rankColor = RANK_COLORS[i] or "888888"
+        row.rankText:SetText("|cFF" .. rankColor .. "#" .. i .. "|r")
+        local nameColor = (entry.name == playerName) and "00FF00" or "FFFFFF"
+        row.nameText:SetText("|cFF" .. nameColor .. entry.name .. "|r")
+
+        row.barFill:SetSize(math.max(2, (entry.points / maxPoints) * LB_BAR_W), 12)
+        if i == 1 then
+            row.barFill:SetColorTexture(1, 0.84, 0, 0.8)  -- Gold
+        elseif entry.name == playerName then
+            row.barFill:SetColorTexture(0, 0.8, 0, 0.7)    -- Green for you
+        else
+            row.barFill:SetColorTexture(0.8, 0.3, 0.3, 0.7) -- Red
+        end
+        row.ptsText:SetText("|cFF" .. rankColor .. entry.points .. "|r")
+
+        row:Show()
+        scrollY = scrollY + LB_ROW_H
+    end
+
+    -- Empty state
+    if #board == 0 then
+        lbf.emptyText:Show()
+        scrollY = 120
+    else
+        lbf.emptyText:Hide()
+    end
+
+    scrollChild:SetHeight(scrollY + 10)
+end
+
 function PvPTracker:CreateLeaderboard()
     if leaderboardFrame then return leaderboardFrame end
-    
-    local lbf = CreateFrame("Frame", "WM_PvPLeaderboardFrame", UIParent, "BackdropTemplate")
-    lbf:SetSize(280, 340)
-    lbf:SetPoint("CENTER", 250, 0)
-    lbf:SetMovable(true)
-    lbf:EnableMouse(true)
-    lbf:SetClampedToScreen(true)
-    lbf:RegisterForDrag("LeftButton")
-    lbf:SetScript("OnDragStart", lbf.StartMoving)
-    lbf:SetScript("OnDragStop", lbf.StopMovingOrSizing)
-    lbf:SetFrameStrata("DIALOG")
-    lbf:Hide()
-    
-    WM:SkinPanel(lbf)
-    WM:RegisterSkinnedPanel(lbf)
-    
-    local theme = WM:GetTheme()
-    
-    -- Title
-    local title = lbf:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText("KOS Leaderboard")
-    title:SetTextColor(1, 0.8, 0)
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, lbf, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
-    
-    -- Subtitle: your rank
-    local subtitle = lbf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOP", 0, -34)
+
+    local lbf = WM.UI:CreatePanel({
+        name = "WM_PvPLeaderboardFrame",
+        title = "KOS Leaderboard",
+        titleColor = "FFCC00",
+        width = LB_W,
+        height = 340,
+        scroll = false,
+        strata = "DIALOG",
+        onRefresh = RenderLeaderboard,
+        defaultPoint = { "CENTER", 250, 0 },   -- beside the tracker window until moved
+    })
+    local L = lbf.layout
+
+    local row = L:Row(18)
+    local subtitle = WM.UI.Text(row.frame, { text = LeaderboardSubtitle })
+    subtitle:SetPoint("CENTER", row.frame, "CENTER", 0, 0)
+    L:Track(subtitle)
     lbf.subtitle = subtitle
-    
-    -- Scroll area
-    local scrollFrame = CreateFrame("ScrollFrame", "WM_PvPLeaderboardScroll", lbf, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -52)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
-    
-    local scrollChild = CreateFrame("Frame")
-    scrollChild:SetSize(scrollFrame:GetWidth(), 1)
+
+    -- Ranked list in the remaining space
+    local fill = L:Fill(120)
+    local scrollFrame = CreateFrame("ScrollFrame", "WM_PvPLeaderboardScroll", fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -22, 0)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(L.width - 22, 1)
     scrollFrame:SetScrollChild(scrollChild)
-    
+
+    local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    emptyText:SetPoint("CENTER", scrollChild, "TOP", 0, -60)
+    emptyText:SetJustifyH("CENTER")
+    emptyText:SetText("|cFF888888No points scored yet.\nKill enemies on the KOS list to earn points.\nEnable guild sync to see others.|r")
+
     lbf.scrollChild = scrollChild
     lbf.scrollFrame = scrollFrame
+    lbf.emptyText = emptyText
     lbf.rows = {}
-    
-    leaderboardFrame = lbf
+
+    leaderboardFrame = lbf:Finish()
     return lbf
 end
 
 function PvPTracker:RefreshLeaderboard()
     if not leaderboardFrame then return end
-    
-    local scrollChild = leaderboardFrame.scrollChild
-    
-    -- Clean old rows
-    if leaderboardFrame.rows then
-        for _, row in ipairs(leaderboardFrame.rows) do
-            row:Hide()
-            row:SetParent(nil)
-        end
-    end
-    leaderboardFrame.rows = {}
-    
-    local board = self:GetSortedLeaderboard()
-    local maxPoints = (board[1] and board[1].points) or 1
-    
-    -- Update subtitle
-    if leaderboardFrame.subtitle then
-        local myRank = "-"
-        local myPts = PvPTrackerDB.myKOSKills or 0
-        for i, entry in ipairs(board) do
-            if entry.name == playerName then
-                myRank = "#" .. i
-                break
-            end
-        end
-        if myPts > 0 then
-            leaderboardFrame.subtitle:SetText("|cFFCCCCCCYou: " .. myPts .. " pts (" .. myRank .. ")|r")
-        else
-            leaderboardFrame.subtitle:SetText("|cFF888888No points yet — kill KOS enemies!|r")
-        end
-    end
-    
-    local rowHeight = 24
-    local scrollY = 0
-    
-    for i, entry in ipairs(board) do
-        local row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
-        row:SetSize(scrollChild:GetWidth(), rowHeight)
-        row:SetPoint("TOPLEFT", 0, -scrollY)
-        
-        -- Rank medal coloring
-        local rankColor
-        if i == 1 then rankColor = "FFD700"      -- Gold
-        elseif i == 2 then rankColor = "C0C0C0"  -- Silver
-        elseif i == 3 then rankColor = "CD7F32"   -- Bronze
-        else rankColor = "888888"
-        end
-        
-        -- Rank number
-        local rankText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        rankText:SetPoint("LEFT", 5, 0)
-        rankText:SetWidth(22)
-        rankText:SetJustifyH("RIGHT")
-        rankText:SetText("|cFF" .. rankColor .. "#" .. i .. "|r")
-        
-        -- Player name
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        nameText:SetPoint("LEFT", 32, 0)
-        nameText:SetWidth(100)
-        nameText:SetJustifyH("LEFT")
-        local nameColor = (entry.name == playerName) and "00FF00" or "FFFFFF"
-        nameText:SetText("|cFF" .. nameColor .. entry.name .. "|r")
-        
-        -- Points bar background
-        local barBg = row:CreateTexture(nil, "ARTWORK")
-        barBg:SetPoint("LEFT", 138, 0)
-        barBg:SetSize(90, 12)
-        barBg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
-        
-        -- Points bar fill
-        local barWidth = math.max(2, (entry.points / maxPoints) * 90)
-        local barFill = row:CreateTexture(nil, "OVERLAY")
-        barFill:SetPoint("LEFT", 138, 0)
-        barFill:SetSize(barWidth, 12)
-        if i == 1 then
-            barFill:SetColorTexture(1, 0.84, 0, 0.8)  -- Gold
-        elseif entry.name == playerName then
-            barFill:SetColorTexture(0, 0.8, 0, 0.7)    -- Green for you
-        else
-            barFill:SetColorTexture(0.8, 0.3, 0.3, 0.7) -- Red
-        end
-        
-        -- Points number
-        local ptsText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        ptsText:SetPoint("LEFT", 232, 0)
-        ptsText:SetWidth(30)
-        ptsText:SetJustifyH("RIGHT")
-        ptsText:SetText("|cFF" .. rankColor .. entry.points .. "|r")
-        
-        table.insert(leaderboardFrame.rows, row)
-        scrollY = scrollY + rowHeight
-    end
-    
-    -- Empty state
-    if #board == 0 then
-        local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        emptyText:SetPoint("CENTER", scrollChild, "TOP", 0, -60)
-        emptyText:SetText("|cFF888888No points scored yet.\nKill enemies on the KOS list to earn points.\nEnable guild sync to see others.|r")
-        emptyText:SetJustifyH("CENTER")
-        
-        local emptyRow = CreateFrame("Frame", nil, scrollChild)
-        emptyRow:SetSize(1, 120)
-        emptyRow._emptyText = emptyText
-        table.insert(leaderboardFrame.rows, emptyRow)
-        scrollY = 120
-    end
-    
-    scrollChild:SetHeight(scrollY + 10)
+    leaderboardFrame:Refresh()
 end
 
 function PvPTracker:ToggleLeaderboard()
@@ -1850,8 +1837,7 @@ function PvPTracker:ToggleLeaderboard()
     if leaderboardFrame:IsShown() then
         leaderboardFrame:Hide()
     else
-        self:RefreshLeaderboard()
-        leaderboardFrame:Show()
+        leaderboardFrame:Show()   -- refreshes on show
     end
 end
 
