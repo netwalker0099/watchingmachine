@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.9 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.10 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines sixteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines seventeen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -22,6 +22,7 @@ Monitor public channels for specific keywords with duplicate detection.
 - Monitor Trade, General, LFG, and other channels
 - 5-minute result retention with deduplication
 - Sound and chat alerts
+- **Chat Filter runs first**: messages hidden by Chat Filter (module 17) are never checked for keywords; the window says so at the top
 
 ### 3. Mail & Trade Logger
 Long-term logging of items and gold received via mail and trades.
@@ -271,6 +272,17 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - **Lock the portal button** option in the Mage tab stops it being dragged by accident
 - `/wmachine portals` lists what the scan found
 
+### 17. Chat Filter
+Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
+
+- Add any number of phrases; a message containing one **anywhere** is hidden from every chat frame
+- Matching ignores case, colour codes, item-link brackets and extra spaces. Phrases are plain text — no wildcards or patterns
+- **Applied before Keyword Monitor**: a hidden message is never checked for keywords, so filtered spam can't produce matches. Both windows show this warning
+- Filters public channels by default; say/yell and whispers can be ticked on
+- Your own messages are never hidden
+- Per-phrase and total counts of hidden messages for the session, in the window and the dashboard tools menu
+- `/wmachine filter` (also `/wmachine cf`), or the dashboard card's on/off switch
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -338,8 +350,8 @@ opens the dashboard. Everything the addon does can be reached from it.
   slash command.
 - The **on/off switch** on a card turns the module on or off. Only modules
   with a single on/off flag have one: Buff Check, Debuff Tracker, Aura
-  Range, ArmorySnap auto-scan, Guild Invite, PvP Tracker, and Keyword
-  Monitor (which pauses for the session). An off module's icon is greyed
+  Range, ArmorySnap auto-scan, Guild Invite, PvP Tracker, Chat Filter, and
+  Keyword Monitor (which pauses for the session). An off module's icon is greyed
   out.
 - **Open** opens the module's window.
 - **...** or **right-click** opens the module's tools: the diagnostics that
@@ -359,6 +371,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine settings` - Open theme/addon settings
 - `/wmachine logger` - Open Auto Logger settings
 - `/wmachine keyword` - Open Keyword Monitor
+- `/wmachine filter` - Open Chat Filter (hide spam phrases; applied before Keyword Monitor)
 - `/wmachine mail` - Open Mail & Trade Logger
 - `/wmachine services` - Open Services Parser
 - `/wmachine wcl` - Open Whisper Logs (WCL Lookup)
@@ -395,6 +408,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WatchingMachineDB` - Core settings, theme, error log
 - `AutoLoggerDB` - Auto Logger settings
 - `KeywordMonitorDB` - Keyword Monitor data
+- `ChatFilterDB` - Chat Filter phrases and chat types
 - `MailLoggerDB` - Mail & Trade logs
 - `ServicesParserDB` - Services Parser settings
 - `WhisperLogsDB` - Whisper Logs data
@@ -415,6 +429,10 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.9.md`](docs/RELEASE-NOTES-v3.9.md).
+
+### Version 3.10
+- **New module: Chat Filter** — hide chat messages containing phrases you choose (e.g. *Guild Loot Run*); applied before Keyword Monitor, so filtered spam is never checked for keywords. Both windows carry a warning saying so
+- Class Tools dashboard card shows your class crest (the old Wrath-era achievement icon doesn't exist in the TBC client)
 
 ### Version 3.9
 - Every remaining window moved to the panel builder: Auto Logger, Aura Range, Guild Invite, Keyword Monitor, WarcraftLogs Lookup, Services Parser, Mail & Trade, Recruiter (all three windows), Class Tools, PvP leaderboard, ArmorySnap, Settings and the dashboard

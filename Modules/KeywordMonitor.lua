@@ -215,6 +215,10 @@ end
 local function OnChatMessage(self, event, message, sender, _, _, _, _, _, _, channelName)
     if isMonitoringPaused then return end
     if not KeywordMonitorDB then return end
+
+    -- Chat Filter runs first: a message it hides is never checked here
+    local filter = WM.modules.ChatFilter
+    if filter and filter:IsFiltered(event, message, sender) then return end
     
     local isMonitored, baseName = IsChannelMonitored(channelName)
     if not isMonitored then return end
@@ -475,6 +479,20 @@ function KeywordMonitor:CreateMainFrame()
         tooltip = { "Stop / Resume", "Pause keyword matching. This lasts for this session only:"
             .. " monitoring starts again at your next login or reload." },
     }, 3)
+
+    -- Chat Filter is applied first; say so where keywords are set up
+    L:Note(function()
+        local filter = WM.modules.ChatFilter
+        if not filter then return "" end
+        local state
+        if not filter:IsModuleEnabled() then
+            state = "Chat Filter is currently off."
+        else
+            state = "Chat Filter is on with " .. #filter:GetPhrases() .. " phrase(s)."
+        end
+        return "|cFFFFAA00Chat Filter is applied before Keyword Monitor.|r Messages it hides from"
+            .. " chat are never checked for keywords. " .. state .. " (/wmachine filter)"
+    end)
 
     -- ---------- Keywords ----------
     L:Section({ key = "keywords", title = "Keywords" })

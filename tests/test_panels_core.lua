@@ -89,9 +89,9 @@ for _, card in pairs(dash.moduleCards) do
     n = n + 1
     if card:GetParent() ~= dash.cardsContainer then inside = false end
 end
-check("every module card created", n == 13)
+check("every module card created", n == 14)
 check("cards live in cardsContainer", inside)
-check("container sized to the cards", dash.cardsContainer:GetHeight() > 13 * 46)
+check("container sized to the cards", dash.cardsContainer:GetHeight() > 14 * 46)
 
 -- Footer
 check("minimap button says hide", dash.minimapBtn:GetText() == "Hide Minimap")

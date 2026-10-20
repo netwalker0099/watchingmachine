@@ -2,7 +2,66 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.9** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.10** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.10
+
+### New module — Chat Filter
+
+Hides chat spam by phrase. Add *Guild Loot Run* and every message
+containing it disappears from your chat frames.
+
+- **Phrases:** you add plain-text phrases. A message is hidden when it
+  contains one anywhere. Case, colour codes, item-link brackets (`[Item]`
+  is read as the text you see) and runs of spaces are ignored. There are no
+  wildcards: `50% off` means exactly that.
+- **Applied before Keyword Monitor.** Keyword Monitor reads channel chat
+  through its own event handler, so hiding a line from the chat frame alone
+  wouldn't stop it parsing that line. It now asks Chat Filter first and
+  skips anything Chat Filter hides, so filtered spam can't produce keyword
+  matches. The warning appears at the top of the Chat Filter window and of
+  the Keyword Monitor window. The Keyword Monitor note also says whether
+  Chat Filter is on and how many phrases it has.
+- **Where it applies:** public channels by default. Say/yell and whispers
+  can be switched on. Your own messages are never hidden.
+- **Hidden counts:** kept per phrase and in total for the session, in the
+  window and in the dashboard card's tools menu. A message shown in several
+  chat tabs is counted once.
+- **Window:** `/wmachine filter` (also `chatfilter`, `cf`), built on the
+  panel builder. It has an enable switch, the chat types, an "Add phrase"
+  box (Enter or Add), and the phrase list with per-phrase counts, Remove,
+  and a two-click Clear All.
+- **Dashboard:** a Guild & Social card with an on/off switch. Off, nothing
+  is hidden and Keyword Monitor sees every message again.
+- **Saved data:** new SavedVariable `ChatFilterDB`.
+- **Not filtered:** Services Parser still reads every advert in the
+  Services channel; the filter doesn't apply to it.
+
+### Class Tools card icon
+
+The card used `Achievement_Character_Human_Male`. Achievement icons were
+added in Wrath, so the icon doesn't exist in the TBC client. The card now
+shows your class crest, cut from the default UI's class-circles texture
+with `CLASS_ICON_TCOORDS`. If that table is missing, it falls back to
+`INV_Misc_Gear_01`. The dashboard test now rejects any `Achievement_` icon
+on a card.
+
+### Tests
+
+- `tests/test_chatfilter.lua` (39 checks) covers:
+  - normalising
+  - phrase matching, including plain text that looks like a pattern
+  - duplicate and empty phrases
+  - chat types, own messages, the on/off switch
+  - counting once per message across tabs
+  - Keyword Monitor skipping filtered messages, and seeing them again with
+    the filter off
+  - both windows' warnings
+  - the list, the add box and Remove
+- The dashboard suite covers the class crest and its fallback.
+- 716 checks in total.
 
 ---
 

@@ -33,13 +33,13 @@ for _, g in ipairs(WM.MODULE_GROUPS) do
     end
 end
 for _, name in ipairs({ "AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs",
-                        "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck",
+                        "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ChatFilter",
                         "ArmorySnap", "AuraRange", "ClassTools" }) do
     check(name .. " has exactly one card", seen[name] == 1)
     local info = WM.MODULE_INFO[name]
     check(name .. " card explains itself", info and info.about and #info.about > 20 and info.command)
 end
-check("no stray cards", total == 13)
+check("no stray cards", total == 14)
 
 -- ---- build the dashboard ----
 WM:CreateDashboard()
@@ -49,7 +49,7 @@ dash:Show()
 WM:UpdateDashboard()
 local cards = dash.moduleCards
 
-local switched = { BuffCheck = true, DebuffTracker = true, PvPTracker = true, GuildInvite = true,
+local switched = { BuffCheck = true, DebuffTracker = true, PvPTracker = true, GuildInvite = true, ChatFilter = true,
                    AuraRange = true, ArmorySnap = true, KeywordMonitor = true }
 for name, card in pairs(cards) do
     check(name .. (switched[name] and " has" or " has no") .. " an on/off switch",
@@ -57,6 +57,22 @@ for name, card in pairs(cards) do
     check(name .. " status text stops before the buttons",
         card.statusText:GetWidth() > 100 and card.statusText:GetWidth() <= 370 - 50 - 63)
     check(name .. " card has a hover tooltip", card:GetScript("OnEnter") ~= nil)
+end
+
+-- ---- Class Tools card shows the player's class crest ----
+local ctIcon = cards.ClassTools.icon
+check("class tools icon is the class-circles sheet",
+    rawget(ctIcon, "_texture") == "Interface\\TargetingFrame\\UI-Classes-Circles")
+check("cropped to the player's class (mage)", rawget(ctIcon, "_texCoord")[1] == 0.25
+    and rawget(ctIcon, "_texCoord")[2] == 0.49609375)
+local saved = env.CLASS_ICON_TCOORDS
+env.CLASS_ICON_TCOORDS = false
+WM:SetCardIcon(ctIcon, WM.MODULE_INFO.ClassTools)
+check("falls back to the gear icon without the coords table",
+    rawget(ctIcon, "_texture") == "Interface\\Icons\\INV_Misc_Gear_01" and rawget(ctIcon, "_texCoord")[2] == 1)
+env.CLASS_ICON_TCOORDS = saved
+for name, info in pairs(WM.MODULE_INFO) do
+    check(name .. " icon isn't a Wrath achievement icon", not info.icon:find("Achievement_", 1, true))
 end
 
 -- ---- switches ----

@@ -64,6 +64,7 @@ return function(REPO)
         if was then self:_fire("OnHide") end
     end
     function Frame:IsShown() return self._shown end
+    function Frame:SetShown(v) if v then self:Show() else self:Hide() end end
     function Frame:IsVisible()
         local f = self
         while f do
@@ -103,6 +104,7 @@ return function(REPO)
     function Frame:SetTextColor(r, g, b, a) self._color = { r, g, b, a } end
     function Frame:SetColorTexture(r, g, b, a) self._tex = { r, g, b, a } end
     function Frame:SetTexture(t) self._texture = t end
+    function Frame:SetTexCoord(...) self._texCoord = { ... } end
     function Frame:SetDesaturated(v) self._desaturated = v and true or false end
     function Frame:GetStringHeight()
         local t = self._text or ""
@@ -169,6 +171,14 @@ return function(REPO)
     env.UIParent:SetSize(1024, 768)
     env.GameTooltip = NewFrame("GameTooltip")
     env.GameFontNormalSmall = NewFrame()
+    -- Same layout as FrameXML's table: left, right, top, bottom per class
+    env.CLASS_ICON_TCOORDS = {
+        WARRIOR = { 0, 0.25, 0, 0.25 },   MAGE = { 0.25, 0.49609375, 0, 0.25 },
+        ROGUE = { 0.49609375, 0.7421875, 0, 0.25 }, DRUID = { 0.7421875, 0.98828125, 0, 0.25 },
+        HUNTER = { 0, 0.25, 0.25, 0.5 },  SHAMAN = { 0.25, 0.49609375, 0.25, 0.5 },
+        PRIEST = { 0.49609375, 0.7421875, 0.25, 0.5 }, WARLOCK = { 0.7421875, 0.98828125, 0.25, 0.5 },
+        PALADIN = { 0, 0.25, 0.5, 0.75 },
+    }
     env.RAID_CLASS_COLORS = setmetatable({}, { __index = function() return { r = 1, g = 1, b = 1 } end })
     env.CreateFrame = function(_, name, parent, template)
         local f = NewFrame(name, parent, template)

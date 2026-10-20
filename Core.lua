@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.9"
+WM.version = "3.10"
 WM.modules = {}
 
 -- ============================================
@@ -17,7 +17,7 @@ local MAX_ERRORS = 200
 local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
-    "KeywordMonitor", "MailLogger", "ServicesParser",
+    "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
     "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage",
 }
@@ -158,6 +158,7 @@ end
 local MODULE_COLORS = {
     AutoLogger = "00FF00",
     KeywordMonitor = "FFAA00",
+    ChatFilter = "FF7744",
     MailLogger = "FF69B4",
     ServicesParser = "00CCFF",
     WhisperLogs = "CC80FF",
@@ -871,7 +872,7 @@ end
 
 local MODULE_GROUPS = {
     { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap" } },
-    { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
+    { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger" } },
 }
 
@@ -886,6 +887,15 @@ local MODULE_INFO = {
         about = "Watches Trade, General, LFG and the other public channels for words you choose and collects every match in one list.",
         toggleNote = "Off pauses monitoring for this session, like the Stop button.",
         command = "keyword", color = {1, 0.67, 0}, icon = "Interface\\Icons\\INV_Misc_SpyGlass_03",
+    },
+    ChatFilter = {
+        title = "Chat Filter", desc = "Hide spam phrases from chat",
+        about = "Hides chat messages containing phrases you choose, such as Guild Loot Run, from your chat frames. Filters are applied before Keyword Monitor, so hidden messages are never checked for keywords.",
+        command = "filter", color = {1, 0.47, 0.27}, icon = "Interface\\Icons\\Spell_Holy_Silence",
+        tools = {
+            { text = "Hidden this session", desc = "Count of hidden messages per phrase.",
+              func = function() Call("ChatFilter", "ReportHidden") end },
+        },
     },
     MailLogger = {
         title = "Mail & Trade Logger", desc = "Log mail and trade transactions",
@@ -984,7 +994,8 @@ local MODULE_INFO = {
     ClassTools = {
         title = "Class Tools", desc = "Tools for the class you're playing",
         about = "Per-class checks and helpers (missing armor spells, soulstones, portal button) plus raid consumable warnings for everyone, in one CHECK YOURSELF frame.",
-        command = "class", color = {1, 0.6, 0.87}, icon = "Interface\\Icons\\Achievement_Character_Human_Male",
+        command = "class", color = {1, 0.6, 0.87}, icon = "Interface\\Icons\\INV_Misc_Gear_01",
+        classIcon = true,   -- the player's class crest; the gear is the fallback
         tools = {
             { text = "What the consumable checks see", desc = "Flask, food buff and weapon enchant, as the General checks read them.",
               func = function() Call("ClassGeneral", "Explain") end },
@@ -1067,6 +1078,24 @@ local function ShowCardTooltip(card)
     GameTooltip:Show()
 end
 
+-- Card icon. classIcon cards show the player's class crest, cut from the
+-- class-circles sheet the default UI ships in every client (achievement
+-- icons such as Achievement_Character_* don't exist before Wrath).
+local CLASS_CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
+
+function WM:SetCardIcon(icon, info)
+    if info.classIcon and type(CLASS_ICON_TCOORDS) == "table" then
+        local coords = CLASS_ICON_TCOORDS[PlayerClass()]
+        if type(coords) == "table" then
+            icon:SetTexture(CLASS_CIRCLES)
+            icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+            return
+        end
+    end
+    icon:SetTexture(info.icon)
+    icon:SetTexCoord(0, 1, 0, 1)
+end
+
 local CARD_H, CARD_GAP, GROUP_H = 46, 3, 20
 
 function WM:CreateModuleCards()
@@ -1098,7 +1127,7 @@ function WM:CreateModuleCards()
             local icon = card:CreateTexture(nil, "ARTWORK")
             icon:SetSize(32, 32)
             icon:SetPoint("LEFT", 10, 0)
-            icon:SetTexture(info.icon)
+            WM:SetCardIcon(icon, info)
             card.icon = icon
 
             -- Right-hand controls, laid out from the right edge
@@ -1380,6 +1409,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine|r - Toggle dashboard")
     print("|cFFFFFF00/wmachine logger|r - Open Auto Logger")
     print("|cFFFFFF00/wmachine keyword|r - Open Keyword Monitor")
+    print("|cFFFFFF00/wmachine filter|r - Open Chat Filter (hide spam phrases; applied before Keyword Monitor)")
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
@@ -1484,6 +1514,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             WM:Print("KeywordMonitor module not available")
         end
         
+    elseif cmd == "filter" or cmd == "chatfilter" or cmd == "cf" then
+        local module = WM.modules.ChatFilter
+        if module and module.ToggleUI then
+            module:ToggleUI()
+        else
+            WM:Print("ChatFilter module not available")
+        end
+
     elseif cmd == "mail" or cmd == "ml" or cmd == "trade" then
         local module = WM.modules.MailLogger
         if module and module.ToggleUI then
