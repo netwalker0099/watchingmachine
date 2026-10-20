@@ -2,7 +2,37 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.10** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.11** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.11
+
+### Chat Filter — premade filters
+
+Common advert spam can be filtered with one tick in a new **Premade
+filters** section of the Chat Filter window.
+
+| Premade | Matches |
+|---|---|
+| **GDKP** | `GDKP` |
+| **Guild Loot Run** | `Guild Loot Run` |
+| **Gear Carry** | `Gear Carry`, `Gear Carries` |
+
+- **Same matching as your own phrases:** anywhere in a message, ignoring
+  case, colours and link brackets.
+- **Applied before Keyword Monitor**, like every Chat Filter phrase.
+- **Off by default**, so updating doesn't start hiding adverts nobody
+  asked to hide.
+- **Kept apart from your own phrase list.** Switching one on doesn't add to
+  the list, and switching it off brings those messages straight back.
+- **Hidden counts:** each premade's checkbox shows how many messages it has
+  hidden this session, and the dashboard's "Hidden this session" tool
+  lists them.
+- **Saved** in `ChatFilterDB.premades`.
+- **Counting:** the dashboard status and the Keyword Monitor note now count
+  *filters* (ticked premades plus your own phrases) rather than only your
+  own phrases.
 
 ---
 

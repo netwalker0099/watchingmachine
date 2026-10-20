@@ -488,7 +488,7 @@ function KeywordMonitor:CreateMainFrame()
         if not filter:IsModuleEnabled() then
             state = "Chat Filter is currently off."
         else
-            state = "Chat Filter is on with " .. #filter:GetPhrases() .. " phrase(s)."
+            state = "Chat Filter is on with " .. filter:ActiveCount() .. " filter(s)."
         end
         return "|cFFFFAA00Chat Filter is applied before Keyword Monitor.|r Messages it hides from"
             .. " chat are never checked for keywords. " .. state .. " (/wmachine filter)"

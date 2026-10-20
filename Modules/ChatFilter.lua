@@ -26,9 +26,24 @@ for _, t in ipairs(CHAT_TYPES) do
     for _, ev in ipairs(t.events) do EVENT_TYPE[ev] = t.key end
 end
 
+-- Ready-made filters for common advert spam, switched on with one click.
+-- Kept apart from the player's own phrases so they can be turned off again
+-- without hunting through the list. Off by default: hiding adverts nobody
+-- asked to hide would be a surprise.
+local PREMADES = {
+    { key = "gdkp", label = "GDKP", phrases = { "GDKP" },
+      desc = "Gold-bid raid adverts (any message mentioning GDKP)." },
+    { key = "glr", label = "Guild Loot Run", phrases = { "Guild Loot Run" },
+      desc = "Guild loot run adverts." },
+    { key = "gearcarry", label = "Gear Carry", phrases = { "Gear Carry", "Gear Carries" },
+      desc = "Paid gear carry adverts (\"gear carry\" or \"gear carries\")." },
+}
+ChatFilter.PREMADES = PREMADES
+
 local defaults = {
     enabled = true,
     phrases = {},   -- as typed, in the order added
+    premades = {},  -- premade key -> bool, all off until ticked
     types = {},     -- chat type key -> bool, filled from CHAT_TYPES
 }
 for _, t in ipairs(CHAT_TYPES) do defaults.types[t.key] = t.default end
@@ -64,10 +79,21 @@ local compiled = {}   -- normalised phrases, rebuilt when the list changes
 
 local function Compile()
     wipe(compiled)
-    for _, p in ipairs(ChatFilterDB and ChatFilterDB.phrases or {}) do
+    local seen = {}
+    local function Add(p)
         local n = Normalise(p)
-        if n ~= "" then compiled[#compiled + 1] = n end
+        if n ~= "" and not seen[n] then
+            seen[n] = true
+            compiled[#compiled + 1] = n
+        end
     end
+    if not ChatFilterDB then return end
+    for _, pre in ipairs(PREMADES) do
+        if ChatFilterDB.premades and ChatFilterDB.premades[pre.key] then
+            for _, p in ipairs(pre.phrases) do Add(p) end
+        end
+    end
+    for _, p in ipairs(ChatFilterDB.phrases or {}) do Add(p) end
 end
 
 -- The phrase a message contains, or nil. Ignores the on/off switches.
@@ -168,15 +194,46 @@ function ChatFilter:HiddenCount(phrase)
     return hidden[Normalise(phrase)] or 0
 end
 
+function ChatFilter:IsPremadeOn(key)
+    return ChatFilterDB.premades[key] and true or false
+end
+
+function ChatFilter:SetPremade(key, on)
+    ChatFilterDB.premades[key] = on and true or false
+    Compile()
+    self:RefreshPanel()
+end
+
+-- Hidden count for a premade: the sum over its phrases
+function ChatFilter:PremadeHiddenCount(pre)
+    local n = 0
+    for _, p in ipairs(pre.phrases) do n = n + self:HiddenCount(p) end
+    return n
+end
+
+-- Active filters: ticked premades plus your own phrases
+function ChatFilter:ActiveCount()
+    local n = #ChatFilterDB.phrases
+    for _, pre in ipairs(PREMADES) do
+        if ChatFilterDB.premades[pre.key] then n = n + 1 end
+    end
+    return n
+end
+
 function ChatFilter:HiddenTotal()
     return hiddenTotal
 end
 
 function ChatFilter:ReportHidden()
     self:Print("=== Hidden this session: " .. hiddenTotal .. " ===")
-    if #ChatFilterDB.phrases == 0 then
+    if self:ActiveCount() == 0 then
         print("  (no filters)")
         return
+    end
+    for _, pre in ipairs(PREMADES) do
+        if ChatFilterDB.premades[pre.key] then
+            print(string.format("  %s (premade): %d", pre.label, self:PremadeHiddenCount(pre)))
+        end
     end
     for _, p in ipairs(ChatFilterDB.phrases) do
         print(string.format("  %s: %d", p, self:HiddenCount(p)))
@@ -191,6 +248,7 @@ function ChatFilter:InitDB()
     if not ChatFilterDB then ChatFilterDB = {} end
     if ChatFilterDB.enabled == nil then ChatFilterDB.enabled = defaults.enabled end
     if type(ChatFilterDB.phrases) ~= "table" then ChatFilterDB.phrases = {} end
+    if type(ChatFilterDB.premades) ~= "table" then ChatFilterDB.premades = {} end
     if type(ChatFilterDB.types) ~= "table" then ChatFilterDB.types = {} end
     for key, v in pairs(defaults.types) do
         if ChatFilterDB.types[key] == nil then ChatFilterDB.types[key] = v end
@@ -220,13 +278,13 @@ end
 
 function ChatFilter:GetQuickStatus()
     if not ChatFilterDB then return "|cFF888888Not initialized|r" end
-    local n = #ChatFilterDB.phrases
+    local n = self:ActiveCount()
     if not ChatFilterDB.enabled then
-        return "|cFFFF0000Disabled|r (" .. n .. " phrases)"
+        return "|cFFFF0000Disabled|r (" .. n .. " filters)"
     elseif n == 0 then
-        return "|cFFFFFF00No phrases set|r"
+        return "|cFFFFFF00No filters set|r"
     end
-    return "|cFF00FF00Active|r (" .. n .. " phrases, " .. hiddenTotal .. " hidden)"
+    return "|cFF00FF00Active|r (" .. n .. " filters, " .. hiddenTotal .. " hidden)"
 end
 
 -- ============================================
@@ -295,8 +353,8 @@ function ChatFilter:CreateUI()
         title = "Chat Filter",
         titleColor = "FF7744",
         width = 420,
-        height = 520,
-        minHeight = 380,
+        height = 620,
+        minHeight = 460,
         scroll = false,
         onRefresh = function() ChatFilter:RefreshList() end,
     })
@@ -321,7 +379,21 @@ function ChatFilter:CreateUI()
         })
     end
 
-    L:Space(4)
+    L:Header("Premade filters")
+    for _, pre in ipairs(PREMADES) do
+        L:Checkbox({
+            indent = 5,
+            label = function()
+                local n = ChatFilter:PremadeHiddenCount(pre)
+                return pre.label .. (n > 0 and (" |cFFFFCC00(" .. n .. " hidden)|r") or "")
+            end,
+            get = function() return ChatFilter:IsPremadeOn(pre.key) end,
+            set = function(v) ChatFilter:SetPremade(pre.key, v) end,
+            tooltip = { pre.label, pre.desc, "Matches: " .. table.concat(pre.phrases, ", ") },
+        })
+    end
+
+    L:Header("Your phrases")
     local row = L:Row(26)
     local addBox = row:EditBox({
         label = "Add phrase:", width = 190, maxLetters = 100,
@@ -343,7 +415,7 @@ function ChatFilter:CreateUI()
     row = L:Row(24)
     local header = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("LEFT", row.frame, "LEFT", 8, 0)
-    header:SetText("Phrases")
+    header:SetText("Your phrase list")
     WM:ThemeText(header, "headerColor")
     row:RightButton({
         text = "Clear All", width = 70, confirm = true, confirmText = "Confirm",

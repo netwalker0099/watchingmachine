@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.10 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.11 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -275,7 +275,11 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 ### 17. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
-- Add any number of phrases; a message containing one **anywhere** is hidden from every chat frame
+- **Premade filters**, one tick each (off until you turn them on):
+  - **GDKP**: matches `GDKP`
+  - **Guild Loot Run**: matches `Guild Loot Run`
+  - **Gear Carry**: matches `Gear Carry` and `Gear Carries`
+- Add any number of your own phrases; a message containing one **anywhere** is hidden from every chat frame
 - Matching ignores case, colour codes, item-link brackets and extra spaces. Phrases are plain text — no wildcards or patterns
 - **Applied before Keyword Monitor**: a hidden message is never checked for keywords, so filtered spam can't produce matches. Both windows show this warning
 - Filters public channels by default; say/yell and whispers can be ticked on
@@ -408,7 +412,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WatchingMachineDB` - Core settings, theme, error log
 - `AutoLoggerDB` - Auto Logger settings
 - `KeywordMonitorDB` - Keyword Monitor data
-- `ChatFilterDB` - Chat Filter phrases and chat types
+- `ChatFilterDB` - Chat Filter phrases, premade switches and chat types
 - `MailLoggerDB` - Mail & Trade logs
 - `ServicesParserDB` - Services Parser settings
 - `WhisperLogsDB` - Whisper Logs data
@@ -429,6 +433,9 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.9.md`](docs/RELEASE-NOTES-v3.9.md).
+
+### Version 3.11
+- Chat Filter: premade filters for **GDKP**, **Guild Loot Run** and **Gear Carry** (incl. "gear carries"), one tick each in the Chat Filter window; off until switched on
 
 ### Version 3.10
 - **New module: Chat Filter** — hide chat messages containing phrases you choose (e.g. *Guild Loot Run*); applied before Keyword Monitor, so filtered spam is never checked for keywords. Both windows carry a warning saying so

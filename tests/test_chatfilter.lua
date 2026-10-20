@@ -136,11 +136,70 @@ local kp = KM:CreateMainFrame()
 kp:Show()
 check("Keyword Monitor warns filters run first",
     NoteTexts(kp):find("Chat Filter is applied before Keyword Monitor", 1, true) ~= nil)
-check("Keyword Monitor note shows filter state", NoteTexts(kp):find("on with 2 phrase", 1, true) ~= nil)
+check("Keyword Monitor note shows filter state", NoteTexts(kp):find("on with 2 filter", 1, true) ~= nil)
 
 CF:ClearPhrases()
 check("clear removes every phrase", #CF:GetPhrases() == 0 and CF:Match("Guild Loot Run") == nil)
-check("status reflects no phrases", CF:GetQuickStatus():find("No phrases", 1, true) ~= nil)
+check("status reflects no filters", CF:GetQuickStatus():find("No filters", 1, true) ~= nil)
+
+-- ---- premade filters ----
+local keys = {}
+for _, pre in ipairs(CF.PREMADES) do keys[pre.key] = pre end
+check("premades: GDKP, Guild Loot Run, Gear Carry", keys.gdkp and keys.glr and keys.gearcarry
+    and keys.gdkp.label == "GDKP" and keys.glr.label == "Guild Loot Run" and keys.gearcarry.label == "Gear Carry")
+check("premades start off", not CF:IsPremadeOn("gdkp") and not CF:IsPremadeOn("glr")
+    and not CF:IsPremadeOn("gearcarry"))
+check("nothing matched while they're off", CF:Match("LF2M GDKP BT 25, 50k min") == nil)
+
+local lid = 100
+local function Line(msg) lid = lid + 1; return Chat("CHAT_MSG_CHANNEL", msg, "Spammer", lid) end
+CF:SetPremade("gdkp", true)
+check("GDKP premade hides GDKP adverts", Line("<Sunwell GDKP> LF all, 50k min bid") == true)
+check("GDKP premade matches any case", Line("gdkp tonight, whisper me") == true)
+check("unrelated message still shown", Line("LFM Karazhan, need tank") == false)
+check("premade isn't added to your phrase list", #CF:GetPhrases() == 0)
+check("premade counts as an active filter", CF:ActiveCount() == 1)
+
+CF:SetPremade("glr", true)
+check("Guild Loot Run premade", Line("<Fury> Guild Loot Run BT, buyers welcome") == true)
+CF:SetPremade("gearcarry", true)
+check("Gear Carry premade", Line("Selling gear carry, Kara, cheap") == true)
+check("Gear Carry premade covers the plural", Line("GEAR CARRIES available all night") == true)
+check("premade hidden counts", CF:PremadeHiddenCount(keys.gdkp) == 2
+    and CF:PremadeHiddenCount(keys.gearcarry) == 2)
+
+CF:SetPremade("gdkp", false)
+check("switching a premade off shows those messages again", Line("GDKP Sunwell") == false)
+check("others stay on", Line("guild loot run tonight") == true)
+
+-- Keyword Monitor skips premade-filtered messages too
+local before2 = #env.KeywordMonitorDB.results
+KMChat("Gear carry BT, cheap", "Seller")
+check("Keyword Monitor never sees premade-filtered spam", #env.KeywordMonitorDB.results == before2)
+
+-- a phrase you also typed yourself isn't matched twice
+CF:AddPhrase("guild loot run")
+check("own copy of a premade phrase allowed", #CF:GetPhrases() == 1)
+check("active count includes both", CF:ActiveCount() == 3)
+
+-- panel: premade checkboxes
+p:Refresh()
+local premadeCB
+for _, w in ipairs(p.layout.widgets) do
+    local t = rawget(w, "Text")
+    if t and t:GetText() and t:GetText():find("^GDKP") then premadeCB = w end
+end
+check("panel has a GDKP checkbox", premadeCB ~= nil and premadeCB:GetChecked() == false)
+check("premade label shows its hidden count", premadeCB.Text:GetText():find("2 hidden", 1, true) ~= nil)
+W.click(premadeCB)
+check("ticking it in the panel turns it on", CF:IsPremadeOn("gdkp"))
+check("premade setting saved", env.ChatFilterDB.premades.gdkp == true)
+check("filter panel fits the screen with premades", p:GetHeight() <= 700)
+
+W.printed = {}
+CF:ReportHidden()
+local report = table.concat(W.printed, "\n")
+check("hidden report lists premades", report:find("Gear Carry (premade): 2", 1, true) ~= nil)
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
