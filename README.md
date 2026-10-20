@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.5 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.5.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -159,7 +159,7 @@ Automated guild recruiting system.
 Full raid buff audit that runs automatically on every ready check.
 - **You start the ready check** → missing buffs are announced to raid/party chat ("Missing Fortitude: Player1, Player2")
 - **Someone else starts it** → the same report prints locally where only you can see it
-- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Well Fed, Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
+- Tracked buffs (TBC): Fortitude, Mark of the Wild, Arcane Intellect, Paladin Blessings (any), Divine Spirit, Shadow Protection, Food Buff (Well Fed or Enlightened), Flasks, Battle Elixirs, Guardian Elixirs — each individually toggleable
 - Elixir checks know the TBC rules: a flask satisfies both the Battle and Guardian elixir slots
 - **PallyPower integration**: when PallyPower is running and paladins in your group have assignments, each player is checked against their *assigned* blessings and the report names the exact missing blessing ("Missing Blessing of Kings: Player1"); greater and normal versions both count; falls back to the generic "any blessing" check when PallyPower is absent or unconfigured
 - **Single-target assignments override correctly**: a player with a single-target assignment (e.g. a feral tank assigned single Might) is *not* expected to have that paladin's class-wide blessing (Salvation) — but still owes class blessings from the *other* paladins
@@ -227,7 +227,7 @@ CT:RegisterFeature("SHAMAN", {
 Consumable checks that apply to everyone, shown under a **General** tab that
 always sits first.
 
-- **Flask**, **food buff** (Well Fed) and **weapon enchant** checks, running
+- **Flask**, **food buff** (Well Fed, or Enlightened from Skullfish Soup) and **weapon enchant** checks, running
   only while you're inside a raid instance — no nagging in town or while
   questing
 - **25-man only by default**, with a tick to extend it to 10-mans
@@ -358,6 +358,11 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.5.1
+- Buff Check and the General food check now accept **Enlightened** (Skullfish Soup) as a food buff, not just Well Fed
+- Food and flask aura names are shared between Buff Check and Class Tools General, so the two can't disagree
+- Buff Check's "Well Fed" check is renamed **Food Buff**; it is still off by default
 
 ### Version 3.5
 - Class Tools: first class features — Warlock (armor, Demonic Sacrifice, Soul Link, soulstone timers), Mage (armor check, expanding portal/teleport button)

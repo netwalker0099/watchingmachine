@@ -7,7 +7,7 @@ local AddonName, WM = ...
 local BuffCheck = {}
 WM:RegisterModule("BuffCheck", BuffCheck)
 
-BuffCheck.version = "2.8"
+BuffCheck.version = "2.9"
 
 -- ============================================
 -- BUFF DEFINITIONS (TBC)
@@ -87,12 +87,12 @@ local BUFF_GROUPS = {
     },
     {
         key = "wellfed",
-        name = "Well Fed",
+        name = "Food Buff",
         providerClass = nil,  -- consumable
-        buffs = { "Well Fed" },
+        buffs = WM.FOOD_BUFFS,  -- shared with ClassGeneral (Core.lua)
         appliesTo = ALL_CLASSES,
         default = false,
-        note = "Food buff",
+        note = "Well Fed or Enlightened",
     },
     {
         key = "flask",
@@ -102,7 +102,7 @@ local BUFF_GROUPS = {
         -- Substring (not prefix) match: TBC's Zul'Aman-era flasks are named
         -- "Unstable Flask of the Beast" / "...of the Sorcerer", so anchoring
         -- to the start of the name would miss them.
-        contains = { "Flask of" },
+        contains = WM.FLASK_CONTAINS,
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Any flask aura",
@@ -127,7 +127,7 @@ local BUFF_GROUPS = {
             "Winterfall Firewater", "Juju Might", "Juju Power",
         },
         -- Flasks occupy both elixir slots in TBC
-        contains = { "Flask of" },
+        contains = WM.FLASK_CONTAINS,
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Flask counts too",
@@ -149,7 +149,7 @@ local BUFF_GROUPS = {
             "Elixir of Poison Resistance", "Greater Nature Protection",
             "Juju Ember", "Juju Chill",
         },
-        contains = { "Flask of" },
+        contains = WM.FLASK_CONTAINS,
         appliesTo = ALL_CLASSES,
         default = false,
         note = "Flask counts too",

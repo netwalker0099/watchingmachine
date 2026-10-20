@@ -2,7 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.5** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.5.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.5.1
+
+### Skullfish Soup counts as food
+
+Skullfish Soup is a drink, and its buff is called **Enlightened** (20 crit
+rating and 20 Spirit for 30 minutes), not **Well Fed**. Both food checks
+matched only "Well Fed", so anyone on Skullfish Soup was reported as unfed.
+Enlightened doesn't stack with Well Fed, so either one now counts as the
+player's food buff.
+
+- **Buff Check:** the ready-check food check is renamed from *Well Fed* to
+  **Food Buff** and accepts either aura. It is still **off by default**;
+  turn it on in the Buff Check panel. The saved setting key (`wellfed`)
+  hasn't changed, so existing settings carry over.
+- **Class Tools — General:** the in-raid "no food buff" warning accepts
+  either aura too.
+- **Shared names:** food and flask aura names now live in one place in
+  `Core.lua` (`WM.FOOD_BUFFS`, `WM.FLASK_CONTAINS`, `WM:IsFoodBuff`,
+  `WM:IsFlaskBuff`). Buff Check and Class Tools General both use it, so the
+  ready-check audit and the self check can no longer disagree.
 
 ---
 

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.5"
+WM.version = "3.5.1"
 WM.modules = {}
 
 -- ============================================
@@ -115,6 +115,36 @@ end)
 -- Expose for modules
 WM.RunAfter = RunAfter
 WM.RunTicker = RunTicker
+
+-- ============================================
+-- SHARED CONSUMABLE AURA NAMES
+-- ============================================
+-- Single source for the food/flask aura names, so Buff Check (ready-check
+-- raid audit) and Class Tools General (continuous self check) always agree.
+
+-- Exact aura names that count as a food buff. Most TBC food applies
+-- "Well Fed"; Skullfish Soup is a drink and applies "Enlightened" instead
+-- (20 crit rating and 20 Spirit), which does not stack with Well Fed.
+WM.FOOD_BUFFS = { "Well Fed", "Enlightened" }
+
+-- Substrings that identify a flask aura. Substring rather than prefix so
+-- the Zul'Aman "Unstable Flask of the Beast" / "...of the Sorcerer" match.
+WM.FLASK_CONTAINS = { "Flask of" }
+
+local FOOD_BUFF_SET = {}
+for _, n in ipairs(WM.FOOD_BUFFS) do FOOD_BUFF_SET[n] = true end
+
+function WM:IsFoodBuff(name)
+    return name ~= nil and FOOD_BUFF_SET[name] == true
+end
+
+function WM:IsFlaskBuff(name)
+    if not name then return false end
+    for _, needle in ipairs(WM.FLASK_CONTAINS) do
+        if name:find(needle, 1, true) then return true end
+    end
+    return false
+end
 
 -- ============================================
 -- CORE UTILITIES

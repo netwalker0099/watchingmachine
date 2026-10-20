@@ -8,15 +8,13 @@ local AddonName, WM = ...
 local General = {}
 WM:RegisterModule("ClassGeneral", General)
 
-General.version = "3.5"
+General.version = "3.5.1"
 
 local CLASS = "GENERAL"
 
 local ICON_FLASK = "Interface\\Icons\\INV_Potion_97"
 local ICON_FOOD  = "Interface\\Icons\\INV_Misc_Food_15"
 local ICON_OIL   = "Interface\\Icons\\INV_Potion_98"
-
-local WELL_FED = "Well Fed"
 
 -- Weapon types that take a sharpening stone / weightstone rather than oil.
 -- Used only to word the warning usefully; the check itself is the same.
@@ -25,23 +23,18 @@ local MELEE_CLASSES = {
     HUNTER = true, SHAMAN = true, DRUID = true,
 }
 
-local function PlayerHasBuff(name)
+-- Food and flask names come from Core.lua, shared with Buff Check
+local function PlayerHasAura(test)
     for i = 1, 40 do
         local n = UnitBuff("player", i)
         if not n then return false end
-        if n == name then return true end
+        if test(WM, n) then return true end
     end
     return false
 end
 
-local function PlayerHasFlask()
-    for i = 1, 40 do
-        local n = UnitBuff("player", i)
-        if not n then return false end
-        if n:find("Flask of", 1, true) then return true end
-    end
-    return false
-end
+local function PlayerHasFlask() return PlayerHasAura(WM.IsFlaskBuff) end
+local function PlayerHasFood()  return PlayerHasAura(WM.IsFoodBuff) end
 
 function General:Print(msg)
     WM:ModulePrint("ClassGeneral", msg)
@@ -139,7 +132,7 @@ local function Monitor()
     end
 
     if tools:IsEnabled(CLASS, "food") then
-        if PlayerHasBuff(WELL_FED) then
+        if PlayerHasFood() then
             tools:ClearAlert("gen_food")
         else
             tools:SetAlert("gen_food", "No food buff", ICON_FOOD)
@@ -182,7 +175,7 @@ function General:Explain()
     print("  25-man only: " .. tostring(GeneralChecksDB and GeneralChecksDB.only25)
         .. "   -> checks active here: " .. tostring(ShouldCheckHere()))
     print("  flask: " .. (PlayerHasFlask() and "|cFF00FF00yes|r" or "|cFFFF4444no|r"))
-    print("  well fed: " .. (PlayerHasBuff(WELL_FED) and "|cFF00FF00yes|r" or "|cFFFF4444no|r"))
+    print("  food buff: " .. (PlayerHasFood() and "|cFF00FF00yes|r" or "|cFFFF4444no|r"))
     local hasMain, hasOff = WeaponEnchantState()
     print("  main-hand enchant: " .. (hasMain and "|cFF00FF00yes|r" or "|cFFFF4444no|r")
         .. "   off-hand: " .. (hasOff and "|cFF00FF00yes|r"
@@ -213,7 +206,7 @@ function General:Initialize()
     })
     tools:RegisterFeature(CLASS, {
         key = "food", name = "Warn if no food buff",
-        desc = "Looks for Well Fed.",
+        desc = "Looks for Well Fed, or Enlightened from Skullfish Soup.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {
