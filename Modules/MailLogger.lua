@@ -522,258 +522,192 @@ end
 
 local mainFrame = nil
 
+local TABS = {
+    { value = "mail", text = "Mail", width = 80 },
+    { value = "trades", text = "Trades", width = 80 },
+    { value = "summary", text = "Summary", width = 80 },
+    { value = "settings", text = "Settings", width = 80 },
+}
+
+local LIST_WIDTH = 640
+
+-- Filters only change what the Mail tab lists; they reset on reload
+local FILTERS = {
+    { key = "gold", label = "Gold", color = "FFD700",
+      tip = "Show gold received by mail (auction sale payments have their own filter)." },
+    { key = "items", label = "Items", color = "66C7FF",
+      tip = "Show items received by mail." },
+    { key = "ah_sale", label = "AH Sales", color = "00FF00",
+      tip = "Show auction house sale payments." },
+    { key = "ah_purchase", label = "AH Buys", color = "FF8000",
+      tip = "Show items won at auction." },
+    { key = "ah_expired", label = "Expired", color = "B3B3B3",
+      tip = "Show expired and cancelled auctions returned by mail." },
+}
+
+local SETTINGS = {
+    { key = "showNotifications", label = "Show chat notifications",
+      tip = "Print a chat line each time gold, an item, an auction sale or a trade is logged." },
+    { key = "logGold", label = "Log gold received",
+      tip = "Record gold taken from mail. Off also stops auction sale payments being logged." },
+    { key = "logItems", label = "Log items received",
+      tip = "Record items taken from mail. Off also stops auction purchases and expired auctions being logged." },
+    { key = "logAuctionHouse", label = "Log auction house transactions",
+      tip = "Record auction sales, purchases and expired auctions. Off: auction house mail isn't logged at all, not even as plain gold or items." },
+    { key = "logTrades", label = "Log trades",
+      tip = "Record completed trades: who with, and the gold and items each side gave." },
+}
+
+-- A scroll list inside a tab frame; rows are pooled and reused
+local function CreateList(parent, top)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 5, top or 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -25, 5)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(LIST_WIDTH)
+    scrollChild:SetHeight(1)
+    scrollFrame:SetScrollChild(scrollChild)
+    return scrollChild
+end
+
+local function GetListRow(scrollChild, pool, i, height, detailFont)
+    local row = pool[i]
+    if not row then
+        row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
+        row:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+
+        row.header = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.header:SetPoint("TOPLEFT", 5, -5)
+
+        row.detail = row:CreateFontString(nil, "OVERLAY", detailFont)
+        row.detail:SetPoint("TOPLEFT", 5, -20)
+        row.detail:SetWidth(LIST_WIDTH - 10)
+        row.detail:SetJustifyH("LEFT")
+        pool[i] = row
+    end
+    row:SetSize(LIST_WIDTH, height - 5)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", 0, -(i - 1) * height)
+    row:SetBackdropColor(0.1, 0.1, 0.1, (i % 2 == 0) and 0.5 or 0)
+    row:Show()
+    return row
+end
+
+local function HideRows(pool, from)
+    for i = from, #pool do pool[i]:Hide() end
+end
+
 function MailLogger:CreateUI()
     if mainFrame then return mainFrame end
-    
-    local frame = CreateFrame("Frame", "WM_MailLoggerFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(700, 500)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:Hide()
-    frame:SetFrameStrata("HIGH")
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFF69B4Mail & Trade Logger|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    -- Tab buttons
-    local tabs = {"Mail", "Trades", "Summary", "Settings"}
-    local tabButtons = {}
-    
-    for i, tabName in ipairs(tabs) do
-        local btn = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
-        btn:SetSize(80, 25)
-        if i == 1 then
-            btn:SetPoint("TOPLEFT", 20, -40)
-        else
-            btn:SetPoint("LEFT", tabButtons[i-1], "RIGHT", 5, 0)
-        end
-        btn:SetText(tabName)
-        btn:SetNormalFontObject("GameFontNormalSmall")
-        btn:SetScript("OnClick", function()
-            MailLogger:ShowTab(tabName:lower())
-        end)
-        tabButtons[i] = btn
-    end
-    
-    self.tabButtons = tabButtons
-    
-    -- Character selector
-    local charLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    charLabel:SetPoint("TOPLEFT", 20, -75)
-    charLabel:SetText("Character:")
-    
-    local charDropdown = CreateFrame("Frame", "WM_MailLoggerCharDropdown", frame, "UIDropDownMenuTemplate")
-    charDropdown:SetPoint("LEFT", charLabel, "RIGHT", -10, -2)
-    UIDropDownMenu_SetWidth(charDropdown, 150)
-    
-    local function CharDropdown_Initialize(self, level)
-        local info = UIDropDownMenu_CreateInfo()
-        local chars = MailLogger:GetCharacterList()
-        
-        for _, charKey in ipairs(chars) do
-            info.text = charKey
-            info.value = charKey
-            info.checked = (charKey == selectedCharKey)
-            info.func = function(self)
-                selectedCharKey = self.value
-                UIDropDownMenu_SetText(charDropdown, selectedCharKey)
-                MailLogger:RefreshCurrentTab()
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end
-    
-    UIDropDownMenu_Initialize(charDropdown, CharDropdown_Initialize)
-    UIDropDownMenu_SetText(charDropdown, selectedCharKey or currentCharKey or "Select")
-    self.charDropdown = charDropdown
-    
-    -- Content area
-    local contentFrame = CreateFrame("Frame", nil, frame)
-    contentFrame:SetPoint("TOPLEFT", 15, -100)
-    contentFrame:SetPoint("BOTTOMRIGHT", -15, 15)
-    self.contentFrame = contentFrame
-    
-    -- Create tab frames
-    self:CreateMailTab()
-    self:CreateTradesTab()
-    self:CreateSummaryTab()
-    self:CreateSettingsTab()
-    
-    mainFrame = frame
-    self.mainFrame = frame
-    
-    self:ShowTab("mail")
-    
-    return frame
-end
 
-function MailLogger:CreateMailTab()
-    local tab = CreateFrame("Frame", nil, self.contentFrame)
-    tab:SetAllPoints()
-    tab:Hide()
-    self.mailTab = tab
-    
-    -- Filter buttons at top
-    local filterFrame = CreateFrame("Frame", nil, tab)
-    filterFrame:SetPoint("TOPLEFT", 5, -5)
-    filterFrame:SetPoint("TOPRIGHT", -25, -5)
-    filterFrame:SetHeight(25)
-    
-    local filterLabel = filterFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    filterLabel:SetPoint("LEFT", 0, 0)
-    filterLabel:SetText("Filters:")
-    
-    local filters = {
-        {key = "gold", label = "Gold", color = {1, 0.84, 0}},
-        {key = "items", label = "Items", color = {0.4, 0.78, 1}},
-        {key = "ah_sale", label = "AH Sales", color = {0, 1, 0}},
-        {key = "ah_purchase", label = "AH Buys", color = {1, 0.5, 0}},
-        {key = "ah_expired", label = "Expired", color = {0.7, 0.7, 0.7}},
-    }
-    
-    local xOffset = 45
-    self.filterButtons = {}
-    
-    for _, filter in ipairs(filters) do
-        local btn = CreateFrame("Button", nil, filterFrame)
-        btn:SetSize(65, 20)
-        btn:SetPoint("LEFT", xOffset, 0)
-        
-        local bg = btn:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(filter.color[1] * 0.3, filter.color[2] * 0.3, filter.color[3] * 0.3, 0.8)
-        btn.bg = bg
-        btn.activeColor = filter.color
-        
-        local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        label:SetPoint("CENTER")
-        label:SetText(filter.label)
-        btn.label = label
-        
-        btn.filterKey = filter.key
-        btn.isActive = true
-        
-        btn:SetScript("OnClick", function(self)
-            self.isActive = not self.isActive
-            activeFilters[self.filterKey] = self.isActive
-            
-            -- Also toggle related ah_ filters for simplified "AH" concept
-            if self.filterKey == "ah_sale" or self.filterKey == "ah_purchase" or self.filterKey == "ah_expired" then
-                -- Individual AH filter toggled
+    -- Tab bar and character picker on top; the Mail tab's filters and the
+    -- Settings tab's checkboxes are rows shown only on their tab. The lists
+    -- and the summary share the Fill area below them.
+    local panel = WM.UI:CreatePanel({
+        name = "WM_MailLoggerFrame",
+        title = "Mail & Trade Logger",
+        titleColor = "FF69B4",
+        width = 700,
+        height = 500,
+        minHeight = 300,
+        scroll = false,
+        onShow = function() MailLogger:RefreshCurrentTab() end,
+    })
+    local L = panel.layout
+
+    local row = L:Row(30)
+    self.tabChoice = row:Choice({
+        options = TABS,
+        get = function() return MailLogger.currentTab end,
+        set = function(v) MailLogger:ShowTab(v) end,
+    }, 8)
+    self.charDropdown = row:Dropdown({
+        name = "WM_MailLoggerCharDropdown",
+        label = "Character:",
+        width = 150,
+        placeholder = "Select",
+        options = function()
+            local opts = {}
+            for _, charKey in ipairs(MailLogger:GetCharacterList()) do
+                opts[#opts + 1] = { value = charKey, text = charKey }
             end
-            
-            if self.isActive then
-                self.bg:SetColorTexture(self.activeColor[1] * 0.3, self.activeColor[2] * 0.3, self.activeColor[3] * 0.3, 0.8)
-                self.label:SetTextColor(1, 1, 1)
-            else
-                self.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
-                self.label:SetTextColor(0.5, 0.5, 0.5)
-            end
-            
-            MailLogger:RefreshMailDisplay()
-        end)
-        
-        btn:SetScript("OnEnter", function(self)
-            self.bg:SetColorTexture(self.activeColor[1] * 0.5, self.activeColor[2] * 0.5, self.activeColor[3] * 0.5, 0.9)
-        end)
-        btn:SetScript("OnLeave", function(self)
-            if self.isActive then
-                self.bg:SetColorTexture(self.activeColor[1] * 0.3, self.activeColor[2] * 0.3, self.activeColor[3] * 0.3, 0.8)
-            else
-                self.bg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
-            end
-        end)
-        
-        self.filterButtons[filter.key] = btn
-        xOffset = xOffset + 68
+            return opts
+        end,
+        get = function() return selectedCharKey or currentCharKey end,
+        set = function(v)
+            selectedCharKey = v
+            MailLogger:RefreshCurrentTab()
+        end,
+        tooltip = { "Character", "Show the logs of another of your characters. Each character's mail and trades are recorded while you play it." },
+    }, 380)
+
+    -- Mail tab: filter toggles
+    row = L:Row(26)
+    row:Text({ text = "Filters:", font = "GameFontNormalSmall" }, 8)
+    self.filterRow = row
+    self.filterCheckboxes = {}
+    for i, filter in ipairs(FILTERS) do
+        self.filterCheckboxes[filter.key] = row:Checkbox({
+            label = "|cFF" .. filter.color .. filter.label .. "|r",
+            get = function() return activeFilters[filter.key] end,
+            set = function(v)
+                activeFilters[filter.key] = v
+                MailLogger:RefreshMailLog()
+            end,
+            tooltip = { filter.label, filter.tip, { "Filters only change this list and reset when you reload." } },
+        }, 60 + (i - 1) * 105)
     end
-    
-    -- Scroll frame (moved down to account for filter bar)
-    local scrollFrame = CreateFrame("ScrollFrame", nil, tab, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 5, -35)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -25, 5)
-    
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth() - 10)
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    self.mailScrollChild = scrollChild
-end
 
-function MailLogger:CreateTradesTab()
-    local tab = CreateFrame("Frame", nil, self.contentFrame)
-    tab:SetAllPoints()
-    tab:Hide()
-    self.tradesTab = tab
-    
-    local scrollFrame = CreateFrame("ScrollFrame", nil, tab, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 5, -5)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -25, 5)
-    
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth() - 10)
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    self.tradesScrollChild = scrollChild
-end
+    -- Settings tab
+    self.settingsRows = {}
+    self.settingsCheckboxes = {}
+    for _, s in ipairs(SETTINGS) do
+        local cb, srow = L:Checkbox({
+            label = s.label,
+            get = function() return MailLoggerDB[s.key] end,
+            set = function(v) MailLoggerDB[s.key] = v end,
+            tooltip = { s.label, s.tip },
+        })
+        self.settingsCheckboxes[s.key] = cb
+        self.settingsRows[#self.settingsRows + 1] = srow
+    end
 
-function MailLogger:CreateSummaryTab()
-    local tab = CreateFrame("Frame", nil, self.contentFrame)
-    tab:SetAllPoints()
-    tab:Hide()
-    self.summaryTab = tab
-    
-    local summaryText = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- One frame per tab in the remaining space
+    local fill = L:Fill(150)
+
+    local mailTab = CreateFrame("Frame", nil, fill)
+    mailTab:SetAllPoints()
+    self.mailTab = mailTab
+    self.mailScrollChild = CreateList(mailTab)
+    self.mailRows = {}
+
+    local tradesTab = CreateFrame("Frame", nil, fill)
+    tradesTab:SetAllPoints()
+    self.tradesTab = tradesTab
+    self.tradesScrollChild = CreateList(tradesTab)
+    self.tradeRows = {}
+
+    local summaryTab = CreateFrame("Frame", nil, fill)
+    summaryTab:SetAllPoints()
+    self.summaryTab = summaryTab
+    local summaryText = summaryTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     summaryText:SetPoint("TOPLEFT", 10, -10)
     summaryText:SetJustifyH("LEFT")
     summaryText:SetWidth(650)
     self.summaryText = summaryText
-end
 
-function MailLogger:CreateSettingsTab()
-    local tab = CreateFrame("Frame", nil, self.contentFrame)
-    tab:SetAllPoints()
-    tab:Hide()
-    self.settingsTab = tab
-    
-    local yOffset = -10
-    local checkboxes = {}
-    
-    local function CreateSettingCheckbox(name, label, dbKey)
-        local cb = CreateFrame("CheckButton", nil, tab, "InterfaceOptionsCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 10, yOffset)
-        cb.Text:SetText(label)
-        cb:SetChecked(MailLoggerDB[dbKey])
-        cb:SetScript("OnClick", function(self)
-            MailLoggerDB[dbKey] = self:GetChecked()
-        end)
-        checkboxes[name] = cb
-        yOffset = yOffset - 30
-    end
-    
-    CreateSettingCheckbox("notifications", "Show chat notifications", "showNotifications")
-    CreateSettingCheckbox("gold", "Log gold received", "logGold")
-    CreateSettingCheckbox("items", "Log items received", "logItems")
-    CreateSettingCheckbox("ah", "Log auction house transactions", "logAuctionHouse")
-    CreateSettingCheckbox("trades", "Log trades", "logTrades")
-    
-    self.settingsCheckboxes = checkboxes
+    -- The settings live in rows above the Fill; this frame keeps ShowTab uniform
+    local settingsTab = CreateFrame("Frame", nil, fill)
+    settingsTab:SetAllPoints()
+    self.settingsTab = settingsTab
+
+    mainFrame = panel
+    self.mainFrame = panel
+
+    self:ShowTab("mail")
+    panel:Finish()
+    return panel
 end
 
 function MailLogger:ShowTab(tabName)
@@ -781,7 +715,13 @@ function MailLogger:ShowTab(tabName)
     self.tradesTab:Hide()
     self.summaryTab:Hide()
     self.settingsTab:Hide()
-    
+    self.currentTab = tabName
+
+    self.filterRow.hidden = tabName ~= "mail"
+    for _, row in ipairs(self.settingsRows) do
+        row.hidden = tabName ~= "settings"
+    end
+
     if tabName == "mail" then
         self.mailTab:Show()
         self:RefreshMailLog()
@@ -794,8 +734,9 @@ function MailLogger:ShowTab(tabName)
     elseif tabName == "settings" then
         self.settingsTab:Show()
     end
-    
-    self.currentTab = tabName
+
+    self.tabChoice:Refresh()
+    mainFrame:Reflow()
 end
 
 function MailLogger:RefreshCurrentTab()
@@ -806,20 +747,14 @@ end
 
 function MailLogger:RefreshMailLog()
     if not self.mailScrollChild then return end
-    
-    for _, child in ipairs({self.mailScrollChild:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-    
-    local yOffset = 0
+
     local entryHeight = 50
     local charLog = self:GetCharacterLog()
     local displayCount = 0
-    
+
     for i, entry in ipairs(charLog) do
         if displayCount > 100 then break end
-        
+
         -- Check filters
         local showEntry = false
         if entry.type == "gold" and activeFilters.gold then
@@ -835,28 +770,12 @@ function MailLogger:RefreshMailLog()
         elseif entry.type == "ah_cancelled" and activeFilters.ah_expired then
             showEntry = true
         end
-        
+
         if showEntry then
             displayCount = displayCount + 1
-            
-            local entryFrame = CreateFrame("Frame", nil, self.mailScrollChild, "BackdropTemplate")
-            entryFrame:SetSize(640, entryHeight - 5)
-            entryFrame:SetPoint("TOPLEFT", 0, -yOffset)
-            
-            if displayCount % 2 == 0 then
-                entryFrame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-                entryFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
-            end
-            
-            local timestamp = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            timestamp:SetPoint("TOPLEFT", 5, -5)
-            timestamp:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r")
-            
-            local content = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            content:SetPoint("TOPLEFT", 5, -20)
-            content:SetWidth(630)
-            content:SetJustifyH("LEFT")
-            
+            local row = GetListRow(self.mailScrollChild, self.mailRows, displayCount, entryHeight, "GameFontHighlight")
+            row.header:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r")
+
             local text = ""
             if entry.type == "gold" then
                 text = "|cFFFFD700[Gold]|r " .. FormatMoney(entry.data.amount) .. " from " .. (entry.data.sender or "Unknown")
@@ -873,53 +792,28 @@ function MailLogger:RefreshMailLog()
             elseif entry.type == "ah_expired" or entry.type == "ah_cancelled" then
                 text = "|cFFFF6600[AH Expired]|r " .. (entry.data.itemName or "Item")
             end
-            content:SetText(text)
-            
-            yOffset = yOffset + entryHeight
+            row.detail:SetText(text)
         end
     end
-    
-    self.mailScrollChild:SetHeight(math.max(yOffset, 1))
-end
 
--- Alias for filter button callback
-function MailLogger:RefreshMailDisplay()
-    self:RefreshMailLog()
+    HideRows(self.mailRows, displayCount + 1)
+    self.mailScrollChild:SetHeight(math.max(displayCount * entryHeight, 1))
 end
 
 function MailLogger:RefreshTradesLog()
     if not self.tradesScrollChild then return end
-    
-    for _, child in ipairs({self.tradesScrollChild:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-    
-    local yOffset = 0
+
     local entryHeight = 60
     local tradeLog = self:GetCharacterTradeLog()
-    
+    local shown = 0
+
     for i, entry in ipairs(tradeLog) do
         if i > 100 then break end
-        
-        local entryFrame = CreateFrame("Frame", nil, self.tradesScrollChild, "BackdropTemplate")
-        entryFrame:SetSize(640, entryHeight - 5)
-        entryFrame:SetPoint("TOPLEFT", 0, -yOffset)
-        
-        if i % 2 == 0 then
-            entryFrame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-            entryFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
-        end
-        
-        local timestamp = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        timestamp:SetPoint("TOPLEFT", 5, -5)
-        timestamp:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r Trade with |cFFFFFF00" .. (entry.partner or "Unknown") .. "|r")
-        
-        local details = entryFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        details:SetPoint("TOPLEFT", 5, -20)
-        details:SetWidth(630)
-        details:SetJustifyH("LEFT")
-        
+        shown = i
+
+        local row = GetListRow(self.tradesScrollChild, self.tradeRows, i, entryHeight, "GameFontHighlightSmall")
+        row.header:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r Trade with |cFFFFFF00" .. (entry.partner or "Unknown") .. "|r")
+
         local receivedStr = ""
         if entry.received then
             if entry.received.money > 0 then
@@ -930,7 +824,7 @@ function MailLogger:RefreshTradesLog()
                 receivedStr = receivedStr .. #entry.received.items .. " item(s)"
             end
         end
-        
+
         local givenStr = ""
         if entry.given then
             if entry.given.money > 0 then
@@ -941,19 +835,18 @@ function MailLogger:RefreshTradesLog()
                 givenStr = givenStr .. #entry.given.items .. " item(s)"
             end
         end
-        
+
         local text = ""
         if receivedStr ~= "" then text = text .. "|cFF00FF00Received:|r " .. receivedStr end
         if givenStr ~= "" then
             if text ~= "" then text = text .. "  " end
             text = text .. "|cFFFF6600Gave:|r " .. givenStr
         end
-        details:SetText(text)
-        
-        yOffset = yOffset + entryHeight
+        row.detail:SetText(text)
     end
-    
-    self.tradesScrollChild:SetHeight(math.max(yOffset, 1))
+
+    HideRows(self.tradeRows, shown + 1)
+    self.tradesScrollChild:SetHeight(math.max(shown * entryHeight, 1))
 end
 
 function MailLogger:RefreshSummary()
@@ -998,9 +891,7 @@ function MailLogger:ToggleUI()
     if frame:IsShown() then
         frame:Hide()
     else
-        frame:Show()
-        UIDropDownMenu_SetText(self.charDropdown, selectedCharKey or currentCharKey)
-        self:RefreshCurrentTab()
+        frame:Show()   -- OnShow refreshes the picker and the current tab
     end
 end
 

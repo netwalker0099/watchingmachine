@@ -354,329 +354,212 @@ end
 -- MAIN UI
 -- ============================================
 
+-- Status lines, shared by the panel's Refresh and UpdateUI
+local function StatusLine()
+    if isScanning then
+        local className = classes[RecruitingToolDB.currentClass] or "?"
+        local letter = alphabet[RecruitingToolDB.currentLetter] or "?"
+        if waitingForContinue then
+            return "|cFFFFFF00Waiting...|r " .. className .. " [" .. string.upper(letter) .. "]"
+        end
+        return "|cFF00FF00Scanning|r " .. className .. " [" .. string.upper(letter) .. "]"
+    end
+    return "|cFF888888Idle|r"
+end
+
+local function HarvestLine()
+    local sent = Recruiter:CountSentInHarvest()
+    local remaining = #harvestedPlayers - sent
+    return "Harvested: |cFFFFFF00" .. #harvestedPlayers .. "|r (|cFF00FF00" .. remaining .. "|r ready)"
+end
+
+local function WhisperedLine()
+    local count = 0
+    for _ in pairs(RecruitingToolDB.whispered) do count = count + 1 end
+    return "Total: |cFFFFFF00" .. count .. "|r messaged"
+end
+
+-- Edit box writers, also used to take what's typed when a button is clicked
+local function SetGuildName(text) RecruitingToolDB.guildName = text end
+local function SetMinLevel(text) RecruitingToolDB.minLevel = tonumber(text) or 1 end
+local function SetMaxLevel(text) RecruitingToolDB.maxLevel = tonumber(text) or 70 end
+local function SetCooldown(text) RecruitingToolDB.cooldownDays = math.min(14, tonumber(text) or 7) end
+local function SetMessage(text) RecruitingToolDB.message = text end
+
+-- A panel's first open goes beside the main window instead of on top of it
+local function PlaceBeside(panel, x)
+    if panel:GetState().pos then return end
+    panel:ClearAllPoints()
+    panel:SetPoint("CENTER", UIParent, "CENTER", x, 0)
+end
+
+local function CreateLogList(fill, width)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 8, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 0)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(width)
+    scrollChild:SetHeight(1)
+    scrollFrame:SetScrollChild(scrollChild)
+    return scrollFrame, scrollChild
+end
+
 function Recruiter:CreateUI()
     if mainFrame then return mainFrame end
 
-    local frame = CreateFrame("Frame", "WM_RecruiterFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(450, 560)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
+    -- Settings and scan controls on top, the activity log fills the rest
+    local panel = WM.UI:CreatePanel({
+        name = "WM_RecruiterFrame",
+        title = "Recruiting Tool",
+        titleColor = "FFD700",
+        width = 450,
+        height = 560,
+        minHeight = 460,
+        scroll = false,
+        onShow = function() Recruiter:UpdateUI() end,
+    })
+    panel.titleText:SetText("|cFFFFD700Recruiting Tool|r |cFF888888v" .. Recruiter.version .. "|r")
+    local L = panel.layout
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
+    panel.guildInput = L:EditBox({
+        label = "Guild Name:", width = 200,
+        get = function() return RecruitingToolDB.guildName end,
+        set = SetGuildName,
+        tooltip = { "Guild Name", "Replaces %GUILD% in the whisper message." },
+    })
 
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFD700Recruiting Tool|r |cFF888888v" .. Recruiter.version .. "|r")
+    local row = L:Row(26)
+    panel.minLvlInput = row:EditBox({
+        label = "Level Range:", width = 40,
+        get = function() return tostring(RecruitingToolDB.minLevel) end,
+        set = SetMinLevel,
+        tooltip = { "Level Range", "Only players in this level range are searched for with /who." },
+    }, 12)
+    panel.maxLvlInput = row:EditBox({
+        label = "to", width = 40,
+        get = function() return tostring(RecruitingToolDB.maxLevel) end,
+        set = SetMaxLevel,
+        tooltip = { "Level Range", "Only players in this level range are searched for with /who." },
+    }, 142)
+    panel.cooldownInput = row:EditBox({
+        label = "Cooldown (days):", width = 40,
+        get = function() return tostring(RecruitingToolDB.cooldownDays) end,
+        set = SetCooldown,
+        tooltip = { "Cooldown", "A player you've messaged is left out of new scans, and listed as sent, until this many days have passed. At most 14." },
+    }, 230)
+    panel.minLvlInput.editBox:SetNumeric(true)
+    panel.maxLvlInput.editBox:SetNumeric(true)
+    panel.cooldownInput.editBox:SetNumeric(true)
 
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    row = L:Row(18)
+    row:Text({ text = "Message (use %GUILD% for guild name):", font = "GameFontNormal" }, 12)
+    panel.msgInput = L:EditBox({
+        width = 400,
+        get = function() return RecruitingToolDB.message end,
+        set = SetMessage,
+        tooltip = { "Message", "The whisper sent to each player. %GUILD% is replaced with the guild name." },
+    })
 
-    local yOffset = -45
+    L:Checkbox({
+        label = "Hide outgoing recruitment whispers from chat",
+        get = function() return RecruitingToolDB.hideWhispers end,
+        set = function(v) RecruitingToolDB.hideWhispers = v end,
+        tooltip = { "Hide Outgoing Whispers", "Keeps your own whispers out of the chat window when their text is exactly the recruitment message." },
+    })
 
-    -- Guild Name
-    local guildLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    guildLabel:SetPoint("TOPLEFT", 20, yOffset)
-    guildLabel:SetText("Guild Name:")
-
-    local guildInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    guildInput:SetSize(200, 20)
-    guildInput:SetPoint("LEFT", guildLabel, "RIGHT", 10, 0)
-    guildInput:SetText(RecruitingToolDB.guildName)
-    guildInput:SetAutoFocus(false)
-    guildInput:SetScript("OnEnterPressed", function(self)
-        RecruitingToolDB.guildName = self:GetText()
-        self:ClearFocus()
-    end)
-    guildInput:SetScript("OnEditFocusLost", function(self)
-        RecruitingToolDB.guildName = self:GetText()
-    end)
-    frame.guildInput = guildInput
-
-    yOffset = yOffset - 30
-
-    -- Level range
-    local levelLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    levelLabel:SetPoint("TOPLEFT", 20, yOffset)
-    levelLabel:SetText("Level Range:")
-
-    local minLvlInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    minLvlInput:SetSize(40, 20)
-    minLvlInput:SetPoint("LEFT", levelLabel, "RIGHT", 10, 0)
-    minLvlInput:SetText(RecruitingToolDB.minLevel)
-    minLvlInput:SetNumeric(true)
-    minLvlInput:SetAutoFocus(false)
-    minLvlInput:SetScript("OnEnterPressed", function(self)
-        RecruitingToolDB.minLevel = tonumber(self:GetText()) or 1
-        self:ClearFocus()
-    end)
-    minLvlInput:SetScript("OnEditFocusLost", function(self)
-        RecruitingToolDB.minLevel = tonumber(self:GetText()) or 1
-    end)
-    frame.minLvlInput = minLvlInput
-
-    local toLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    toLabel:SetPoint("LEFT", minLvlInput, "RIGHT", 5, 0)
-    toLabel:SetText("to")
-
-    local maxLvlInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    maxLvlInput:SetSize(40, 20)
-    maxLvlInput:SetPoint("LEFT", toLabel, "RIGHT", 5, 0)
-    maxLvlInput:SetText(RecruitingToolDB.maxLevel)
-    maxLvlInput:SetNumeric(true)
-    maxLvlInput:SetAutoFocus(false)
-    maxLvlInput:SetScript("OnEnterPressed", function(self)
-        RecruitingToolDB.maxLevel = tonumber(self:GetText()) or 70
-        self:ClearFocus()
-    end)
-    maxLvlInput:SetScript("OnEditFocusLost", function(self)
-        RecruitingToolDB.maxLevel = tonumber(self:GetText()) or 70
-    end)
-    frame.maxLvlInput = maxLvlInput
-
-    yOffset = yOffset - 30
-
-    -- Cooldown
-    local cooldownLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cooldownLabel:SetPoint("TOPLEFT", 20, yOffset)
-    cooldownLabel:SetText("Cooldown (days):")
-
-    local cooldownInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    cooldownInput:SetSize(40, 20)
-    cooldownInput:SetPoint("LEFT", cooldownLabel, "RIGHT", 10, 0)
-    cooldownInput:SetText(RecruitingToolDB.cooldownDays)
-    cooldownInput:SetNumeric(true)
-    cooldownInput:SetAutoFocus(false)
-    cooldownInput:SetScript("OnEnterPressed", function(self)
-        RecruitingToolDB.cooldownDays = math.min(14, tonumber(self:GetText()) or 7)
-        self:ClearFocus()
-    end)
-    cooldownInput:SetScript("OnEditFocusLost", function(self)
-        RecruitingToolDB.cooldownDays = math.min(14, tonumber(self:GetText()) or 7)
-    end)
-    frame.cooldownInput = cooldownInput
-
-    yOffset = yOffset - 35
-
-    -- Message
-    local msgLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    msgLabel:SetPoint("TOPLEFT", 20, yOffset)
-    msgLabel:SetText("Message (use %GUILD% for guild name):")
-
-    yOffset = yOffset - 20
-
-    local msgInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    msgInput:SetSize(400, 20)
-    msgInput:SetPoint("TOPLEFT", 20, yOffset)
-    msgInput:SetText(RecruitingToolDB.message)
-    msgInput:SetAutoFocus(false)
-    msgInput:SetScript("OnEnterPressed", function(self)
-        RecruitingToolDB.message = self:GetText()
-        self:ClearFocus()
-    end)
-    msgInput:SetScript("OnEditFocusLost", function(self)
-        RecruitingToolDB.message = self:GetText()
-    end)
-    frame.msgInput = msgInput
-
-    yOffset = yOffset - 30
-
-    -- Hide whispers checkbox
-    local hideWhisperCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    hideWhisperCB:SetPoint("TOPLEFT", 15, yOffset)
-    hideWhisperCB.Text:SetText("Hide outgoing recruitment whispers from chat")
-    hideWhisperCB:SetChecked(RecruitingToolDB.hideWhispers)
-    hideWhisperCB:SetScript("OnClick", function(self)
-        RecruitingToolDB.hideWhispers = self:GetChecked()
-    end)
-
-    yOffset = yOffset - 35
-
-    -- Classes section
-    local classLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    classLabel:SetPoint("TOPLEFT", 20, yOffset)
-    classLabel:SetText("Classes to scan:")
-
-    yOffset = yOffset - 22
-    local xPos = 20
-    frame.classCheckboxes = {}
-
+    -- Class grid: five per row
+    L:Header("Classes to scan:")
+    panel.classCheckboxes = {}
     for i, className in ipairs(classes) do
-        local cb = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
-        cb:SetSize(24, 24)
-        cb:SetPoint("TOPLEFT", xPos, yOffset)
-        cb:SetChecked(RecruitingToolDB.enabledClasses[className])
-        cb:SetScript("OnClick", function(self)
-            RecruitingToolDB.enabledClasses[className] = self:GetChecked()
-        end)
-
-        local cbLabel = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        cbLabel:SetPoint("LEFT", cb, "RIGHT", 0, 0)
-        cbLabel:SetText(className:sub(1, 4))
-
-        frame.classCheckboxes[className] = cb
-        xPos = xPos + 48
-        if xPos > 400 then
-            xPos = 20
-            yOffset = yOffset - 22
-        end
+        if (i - 1) % 5 == 0 then row = L:Row(24) end
+        panel.classCheckboxes[className] = row:Checkbox({
+            label = className,
+            get = function() return RecruitingToolDB.enabledClasses[className] end,
+            set = function(v) RecruitingToolDB.enabledClasses[className] = v end,
+            tooltip = { className, "Include " .. className .. "s in the scan. Unticked classes are skipped." },
+        }, 8 + ((i - 1) % 5) * 84)
     end
 
-    yOffset = yOffset - 35
+    L:Space(6)
+    row = L:Row(20)
+    row:Text({ text = "Status:", font = "GameFontNormal" }, 12)
+    panel.statusText = row:Text({ text = StatusLine, font = "GameFontHighlight" }, 70)
+    row = L:Row(20)
+    panel.harvestText = row:Text({ text = HarvestLine }, 12)
+    panel.whisperedText = row:Text({ text = WhisperedLine }, 220)
 
-    -- Status
-    local statusLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    statusLabel:SetPoint("TOPLEFT", 20, yOffset)
-    statusLabel:SetText("Status:")
+    local buttons = L:Buttons({
+        { text = "Start Scan", width = 80,
+          onClick = function()
+              SetGuildName(panel.guildInput:GetText())
+              SetMinLevel(panel.minLvlInput:GetText())
+              SetMaxLevel(panel.maxLvlInput:GetText())
+              SetCooldown(panel.cooldownInput:GetText())
+              SetMessage(panel.msgInput:GetText())
+              Recruiter:StartScan()
+          end,
+          tooltip = { "Start Scan", "Runs one /who per ticked class and letter (a to z) in the level range, collecting unguilded players who aren't on cooldown. The scan pauses after each result for Continue." } },
+        { text = "Stop", width = 80,
+          onClick = function() Recruiter:StopScan() end,
+          tooltip = { "Stop", "Ends the scan. Players found so far stay in the list." } },
+        { text = "Continue", width = 80,
+          onClick = function() Recruiter:ContinueScan() end,
+          disabled = function() return not (isScanning and waitingForContinue) end,
+          tooltip = { "Continue", "Runs the next /who query of the scan." } },
+        { text = "Clear Results", width = 100,
+          onClick = function()
+              Recruiter:ClearHarvest()
+              Recruiter:Print("Harvest cleared")
+              Recruiter:UpdateUI()
+              if messageFrame and messageFrame:IsShown() then
+                  Recruiter:UpdateMessageList()
+              end
+          end,
+          tooltip = { "Clear Results", "Empties the list of harvested players. Whisper history and cooldowns are kept." } },
+    }, -4)
+    panel.startBtn, panel.stopBtn, panel.continueBtn, panel.clearHarvestBtn = buttons[1], buttons[2], buttons[3], buttons[4]
 
-    local statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    statusText:SetPoint("LEFT", statusLabel, "RIGHT", 10, 0)
-    statusText:SetText("|cFF888888Idle|r")
-    frame.statusText = statusText
+    buttons = L:Buttons({
+        { text = "|cFFFFD700Show Messages|r", width = 140,
+          onClick = function() Recruiter:ShowMessageList() end,
+          tooltip = { "Show Messages", "Opens the list of harvested players, each with a button that puts the whisper in your chat box." } },
+        { text = "Test Message", width = 100,
+          onClick = function()
+              SetGuildName(panel.guildInput:GetText())
+              SetMessage(panel.msgInput:GetText())
+              local playerName = UnitName("player")
+              Recruiter:OpenWhisperPrompt(playerName)
+              Recruiter:Print("Chat prefilled with test whisper to yourself - press Enter to send")
+          end,
+          tooltip = { "Test Message", "Puts the whisper, addressed to yourself, in the chat box. Press Enter to send it and see how it reads." } },
+    }, -4)
+    panel.showMsgBtn, panel.testBtn = buttons[1], buttons[2]
 
-    yOffset = yOffset - 20
+    row = L:Row(24)
+    row:Text({ text = "Activity Log:", font = "GameFontNormal" }, 12)
+    panel.viewHistoryBtn = row:Button({
+        text = "View History", width = 90,
+        onClick = function() Recruiter:ShowHistoryWindow() end,
+        tooltip = { "View History", "Lists every player you've messaged, newest first." },
+    }, 105)
+    row:Button({
+        text = "Clear Log", width = 80,
+        onClick = function()
+            RecruitingToolDB.activityLog = {}
+            Recruiter:UpdateLogDisplay()
+        end,
+        tooltip = { "Clear Log", "Empties the activity log below." },
+    }, 200)
 
-    local harvestText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    harvestText:SetPoint("TOPLEFT", 20, yOffset)
-    harvestText:SetText("Harvested: 0 players")
-    frame.harvestText = harvestText
+    local fill = L:Fill(80)
+    panel.logFrame, panel.logChild = CreateLogList(fill, 370)
 
-    local whisperedText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    whisperedText:SetPoint("LEFT", harvestText, "RIGHT", 30, 0)
-    whisperedText:SetText("Total: 0 messaged")
-    frame.whisperedText = whisperedText
-
-    yOffset = yOffset - 30
-
-    -- Control buttons row 1
-    local startBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    startBtn:SetSize(80, 25)
-    startBtn:SetPoint("TOPLEFT", 20, yOffset)
-    startBtn:SetText("Start Scan")
-    startBtn:SetScript("OnClick", function()
-        RecruitingToolDB.guildName = frame.guildInput:GetText()
-        RecruitingToolDB.minLevel = tonumber(frame.minLvlInput:GetText()) or 1
-        RecruitingToolDB.maxLevel = tonumber(frame.maxLvlInput:GetText()) or 70
-        RecruitingToolDB.cooldownDays = math.min(14, tonumber(frame.cooldownInput:GetText()) or 7)
-        RecruitingToolDB.message = frame.msgInput:GetText()
-        Recruiter:StartScan()
-    end)
-    frame.startBtn = startBtn
-
-    local stopBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    stopBtn:SetSize(80, 25)
-    stopBtn:SetPoint("LEFT", startBtn, "RIGHT", 10, 0)
-    stopBtn:SetText("Stop")
-    stopBtn:SetScript("OnClick", function()
-        Recruiter:StopScan()
-    end)
-    frame.stopBtn = stopBtn
-
-    local continueBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    continueBtn:SetSize(80, 25)
-    continueBtn:SetPoint("LEFT", stopBtn, "RIGHT", 10, 0)
-    continueBtn:SetText("Continue")
-    continueBtn:SetScript("OnClick", function()
-        Recruiter:ContinueScan()
-    end)
-    continueBtn:Disable()
-    frame.continueBtn = continueBtn
-
-    local clearHarvestBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearHarvestBtn:SetSize(100, 25)
-    clearHarvestBtn:SetPoint("LEFT", continueBtn, "RIGHT", 10, 0)
-    clearHarvestBtn:SetText("Clear Results")
-    clearHarvestBtn:SetScript("OnClick", function()
-        Recruiter:ClearHarvest()
-        Recruiter:Print("Harvest cleared")
-        Recruiter:UpdateUI()
-        if messageFrame and messageFrame:IsShown() then
-            Recruiter:UpdateMessageList()
-        end
-    end)
-    frame.clearHarvestBtn = clearHarvestBtn
-
-    yOffset = yOffset - 30
-
-    -- Control buttons row 2 - the new "Show Messages" button is the star here
-    local showMsgBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    showMsgBtn:SetSize(140, 25)
-    showMsgBtn:SetPoint("TOPLEFT", 20, yOffset)
-    showMsgBtn:SetText("|cFFFFD700Show Messages|r")
-    showMsgBtn:SetScript("OnClick", function()
-        Recruiter:ShowMessageList()
-    end)
-    frame.showMsgBtn = showMsgBtn
-
-    local testBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    testBtn:SetSize(100, 25)
-    testBtn:SetPoint("LEFT", showMsgBtn, "RIGHT", 10, 0)
-    testBtn:SetText("Test Message")
-    testBtn:SetScript("OnClick", function()
-        RecruitingToolDB.guildName = frame.guildInput:GetText()
-        RecruitingToolDB.message = frame.msgInput:GetText()
-        local playerName = UnitName("player")
-        Recruiter:OpenWhisperPrompt(playerName)
-        Recruiter:Print("Chat prefilled with test whisper to yourself - press Enter to send")
-    end)
-    frame.testBtn = testBtn
-
-    yOffset = yOffset - 35
-
-    -- Activity log header with buttons
-    local logLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    logLabel:SetPoint("TOPLEFT", 20, yOffset)
-    logLabel:SetText("Activity Log:")
-
-    local viewHistoryBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    viewHistoryBtn:SetSize(90, 20)
-    viewHistoryBtn:SetPoint("LEFT", logLabel, "RIGHT", 10, 0)
-    viewHistoryBtn:SetText("View History")
-    viewHistoryBtn:SetScript("OnClick", function()
-        Recruiter:ShowHistoryWindow()
-    end)
-    frame.viewHistoryBtn = viewHistoryBtn
-
-    local clearLogBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearLogBtn:SetSize(80, 20)
-    clearLogBtn:SetPoint("LEFT", viewHistoryBtn, "RIGHT", 5, 0)
-    clearLogBtn:SetText("Clear Log")
-    clearLogBtn:SetScript("OnClick", function()
-        RecruitingToolDB.activityLog = {}
-        Recruiter:UpdateLogDisplay()
-    end)
-
-    yOffset = yOffset - 20
-
-    -- Activity log scroll frame
-    local logFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    logFrame:SetPoint("TOPLEFT", 20, yOffset)
-    logFrame:SetPoint("BOTTOMRIGHT", -35, 55)
-    frame.logFrame = logFrame
-
-    local logChild = CreateFrame("Frame", nil, logFrame)
-    logChild:SetWidth(logFrame:GetWidth())
-    logChild:SetHeight(1)
-    logFrame:SetScrollChild(logChild)
-    frame.logChild = logChild
-
-    -- Clear history button (at bottom)
-    local clearHistoryBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearHistoryBtn:SetSize(100, 22)
-    clearHistoryBtn:SetPoint("BOTTOMLEFT", 20, 18)
-    clearHistoryBtn:SetText("Clear History")
-    clearHistoryBtn:SetScript("OnClick", function()
-        StaticPopup_Show("WM_RECRUITER_CLEAR_HISTORY")
-    end)
+    panel:AddFooterButton({
+        text = "Clear History", width = 100,
+        onClick = function() StaticPopup_Show("WM_RECRUITER_CLEAR_HISTORY") end,
+        tooltip = { "Clear History", "Forgets every player you've messaged, so their cooldowns end, and empties the harvest list. Asks first." },
+    })
 
     StaticPopupDialogs["WM_RECRUITER_CLEAR_HISTORY"] = {
         text = "Clear all whisper history and cooldowns?",
@@ -696,44 +579,21 @@ function Recruiter:CreateUI()
         hideOnEscape = true,
     }
 
-    mainFrame = frame
-    self.mainFrame = frame
+    panel:Finish()
 
-    return frame
+    mainFrame = panel
+    self.mainFrame = panel
+
+    return panel
 end
 
 function Recruiter:UpdateUI()
     if not mainFrame or not mainFrame:IsShown() then return end
 
-    -- Status
-    if isScanning then
-        local className = classes[RecruitingToolDB.currentClass] or "?"
-        local letter = alphabet[RecruitingToolDB.currentLetter] or "?"
-        if waitingForContinue then
-            mainFrame.statusText:SetText("|cFFFFFF00Waiting...|r " .. className .. " [" .. string.upper(letter) .. "]")
-        else
-            mainFrame.statusText:SetText("|cFF00FF00Scanning|r " .. className .. " [" .. string.upper(letter) .. "]")
-        end
-    else
-        mainFrame.statusText:SetText("|cFF888888Idle|r")
-    end
-
-    -- Harvest count
-    local sent = self:CountSentInHarvest()
-    local remaining = #harvestedPlayers - sent
-    mainFrame.harvestText:SetText("Harvested: |cFFFFFF00" .. #harvestedPlayers .. "|r (|cFF00FF00" .. remaining .. "|r ready)")
-
-    -- Whispered count
-    local count = 0
-    for _ in pairs(RecruitingToolDB.whispered) do count = count + 1 end
-    mainFrame.whisperedText:SetText("Total: |cFFFFFF00" .. count .. "|r messaged")
-
-    -- Continue button state
-    if isScanning and waitingForContinue then
-        mainFrame.continueBtn:Enable()
-    else
-        mainFrame.continueBtn:Disable()
-    end
+    mainFrame.statusText:SetText(StatusLine())
+    mainFrame.harvestText:SetText(HarvestLine())
+    mainFrame.whisperedText:SetText(WhisperedLine())
+    mainFrame.continueBtn:Refresh()
 
     -- Update log
     self:UpdateLogDisplay()
@@ -779,6 +639,15 @@ end
 -- MESSAGES WINDOW (the new per-player click-to-send list)
 -- ============================================
 
+local function CountLine()
+    local sent = Recruiter:CountSentInHarvest()
+    local total = #harvestedPlayers
+    return string.format(
+        "|cFFFFFFFF%d|r harvested  -  |cFF00FF00%d|r ready  -  |cFF888888%d|r marked sent",
+        total, total - sent, sent
+    )
+end
+
 function Recruiter:ShowMessageList()
     if not messageFrame then
         self:CreateMessageFrame()
@@ -786,65 +655,43 @@ function Recruiter:ShowMessageList()
 
     if messageFrame:IsShown() then
         messageFrame:Hide()
-        return
+    else
+        messageFrame:Show()   -- OnShow fills the list
     end
-
-    messageFrame:Show()
-    self:UpdateMessageList()
 end
 
 function Recruiter:CreateMessageFrame()
-    local frame = CreateFrame("Frame", "WM_RecruiterMessageFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(480, 520)
-    frame:SetPoint("CENTER", 280, 0)
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
+    local panel = WM.UI:CreatePanel({
+        name = "WM_RecruiterMessageFrame",
+        title = "Whisper Messages",
+        titleColor = "FFD700",
+        width = 480,
+        height = 520,
+        minHeight = 300,
+        scroll = false,
+        onShow = function() Recruiter:UpdateMessageList() end,
+    })
+    PlaceBeside(panel, 280)
+    local L = panel.layout
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
+    L:Note("Click |cFF00FF00Send|r to prefill chat with the whisper. Press Enter in chat to actually send.\nThe row marks itself sent on click; use |cFFFFAA00Unmark|r if you didn't actually send it.")
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFD700Whisper Messages|r")
-
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    -- Instruction text
-    local instruction = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    instruction:SetPoint("TOPLEFT", 20, -45)
-    instruction:SetPoint("TOPRIGHT", -20, -45)
-    instruction:SetJustifyH("LEFT")
-    instruction:SetText("Click |cFF00FF00Send|r to prefill chat with the whisper. Press Enter in chat to actually send.\nThe row marks itself sent on click; use |cFFFFAA00Unmark|r if you didn't actually send it.")
-
-    -- Count display
-    local countText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    countText:SetPoint("TOPLEFT", 20, -82)
-    frame.countText = countText
-
-    -- Bulk action buttons
-    local markAllBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    markAllBtn:SetSize(110, 22)
-    markAllBtn:SetPoint("TOPRIGHT", -125, -78)
-    markAllBtn:SetText("Mark All Sent")
-    markAllBtn:SetScript("OnClick", function()
-        StaticPopup_Show("WM_RECRUITER_MARK_ALL_SENT")
-    end)
-
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(100, 22)
-    clearBtn:SetPoint("TOPRIGHT", -20, -78)
-    clearBtn:SetText("Clear List")
-    clearBtn:SetScript("OnClick", function()
-        Recruiter:ClearHarvest()
-        Recruiter:UpdateMessageList()
-        Recruiter:UpdateUI()
-    end)
+    local row = L:Row(28)
+    panel.countText = row:Text({ text = CountLine, font = "GameFontNormal" }, 8)
+    row:RightButton({
+        text = "Clear List", width = 100, height = 22,
+        onClick = function()
+            Recruiter:ClearHarvest()
+            Recruiter:UpdateMessageList()
+            Recruiter:UpdateUI()
+        end,
+        tooltip = { "Clear List", "Empties the list of harvested players. Whisper history and cooldowns are kept." },
+    }, 0)
+    row:RightButton({
+        text = "Mark All Sent", width = 110, height = 22,
+        onClick = function() StaticPopup_Show("WM_RECRUITER_MARK_ALL_SENT") end,
+        tooltip = { "Mark All Sent", "Marks every ready player in the list as messaged, starting their cooldown, without whispering them. Asks first." },
+    }, 105)
 
     StaticPopupDialogs["WM_RECRUITER_MARK_ALL_SENT"] = {
         text = "Mark all harvested players as sent? They will be added to the cooldown table.",
@@ -860,21 +707,13 @@ function Recruiter:CreateMessageFrame()
         hideOnEscape = true,
     }
 
-    -- Scroll frame for player rows
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 20, -110)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 20)
+    -- Scroll list of player rows in the remaining space
+    local fill = L:Fill(120)
+    panel.scrollFrame, panel.scrollChild = CreateLogList(fill, 480 - 24 - 8 - 23)
+    panel.rows = {}
 
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-
-    frame.scrollFrame = scrollFrame
-    frame.scrollChild = scrollChild
-    frame.rows = {}
-
-    messageFrame = frame
+    panel:Finish()
+    messageFrame = panel
 end
 
 -- Create or recycle a row at index i for the given player data
@@ -906,13 +745,7 @@ end
 function Recruiter:UpdateMessageList()
     if not messageFrame or not messageFrame:IsShown() then return end
 
-    local sent = self:CountSentInHarvest()
-    local total = #harvestedPlayers
-    local remaining = total - sent
-    messageFrame.countText:SetText(string.format(
-        "|cFFFFFFFF%d|r harvested  -  |cFF00FF00%d|r ready  -  |cFF888888%d|r marked sent",
-        total, remaining, sent
-    ))
+    messageFrame.countText:SetText(CountLine())
 
     -- Hide all existing rows first
     for _, row in ipairs(messageFrame.rows) do
@@ -964,56 +797,39 @@ end
 -- ============================================
 
 local historyFrame = nil
-
 function Recruiter:ShowHistoryWindow()
-    if historyFrame then
-        if historyFrame:IsShown() then
-            historyFrame:Hide()
-            return
-        end
-        historyFrame:Show()
-        self:UpdateHistoryDisplay()
-        return
+    if not historyFrame then
+        local panel = WM.UI:CreatePanel({
+            name = "WM_RecruiterHistoryFrame",
+            title = "Whisper History",
+            titleColor = "FFD700",
+            width = 400,
+            height = 450,
+            minHeight = 250,
+            scroll = false,
+            onShow = function() Recruiter:UpdateHistoryDisplay() end,
+        })
+        PlaceBeside(panel, 250)
+        local L = panel.layout
+
+        -- Filled by UpdateHistoryDisplay, so not a tracked (Refresh-reset) text
+        local row = L:Row(22)
+        panel.countText = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        panel.countText:SetPoint("LEFT", 8, 0)
+
+        local fill = L:Fill(100)
+        panel.scrollFrame, panel.scrollChild = CreateLogList(fill, 340)
+        panel.historyEntries = {}
+
+        panel:Finish()
+        historyFrame = panel
     end
 
-    local frame = CreateFrame("Frame", "WM_RecruiterHistoryFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(400, 450)
-    frame:SetPoint("CENTER", 250, 0)
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFD700Whisper History|r")
-
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local countText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    countText:SetPoint("TOPLEFT", 20, -45)
-    frame.countText = countText
-
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 20, -65)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 20)
-
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-    frame.scrollChild = scrollChild
-    frame.historyEntries = {}
-
-    historyFrame = frame
-    self:UpdateHistoryDisplay()
+    if historyFrame:IsShown() then
+        historyFrame:Hide()
+    else
+        historyFrame:Show()   -- OnShow fills the list
+    end
 end
 
 function Recruiter:UpdateHistoryDisplay()
@@ -1065,8 +881,7 @@ function Recruiter:ToggleUI()
     if frame:IsShown() then
         frame:Hide()
     else
-        frame:Show()
-        self:UpdateUI()
+        frame:Show()   -- OnShow runs UpdateUI
     end
 end
 
