@@ -480,6 +480,26 @@ end
 -- SETTINGS UI
 -- ============================================
 
+-- Dashboard on/off switch (see WM:CreateModuleCards). The settings panel's
+-- own enable checkbox goes through the same function.
+function AuraRange:IsModuleEnabled()
+    return AuraRangeDB and AuraRangeDB.enabled and true or false
+end
+
+function AuraRange:SetModuleEnabled(v)
+    AuraRangeDB.enabled = v and true or false
+    if AuraRangeDB.enabled then
+        self:ResetState()
+    else
+        wipe(activeAlerts)
+        wipe(alertOrder)
+        self:UpdateAlertFrame()
+    end
+    if settingsFrame and settingsFrame.enableCB then
+        settingsFrame.enableCB:SetChecked(AuraRangeDB.enabled)
+    end
+end
+
 function AuraRange:CreateUI()
     if settingsFrame then return settingsFrame end
 
@@ -515,15 +535,9 @@ function AuraRange:CreateUI()
     enableCB.Text:SetText("Enable out-of-range alerts")
     enableCB:SetChecked(AuraRangeDB.enabled)
     enableCB:SetScript("OnClick", function(self)
-        AuraRangeDB.enabled = self:GetChecked()
-        if AuraRangeDB.enabled then
-            AuraRange:ResetState()
-        else
-            wipe(activeAlerts)
-            wipe(alertOrder)
-            AuraRange:UpdateAlertFrame()
-        end
+        AuraRange:SetModuleEnabled(self:GetChecked())
     end)
+    frame.enableCB = enableCB
 
     yOffset = yOffset - 26
 

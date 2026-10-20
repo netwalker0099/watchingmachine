@@ -345,6 +345,18 @@ end
 -- UI
 -- ============================================
 
+-- Dashboard on/off switch (see WM:CreateModuleCards). The settings panel's
+-- own enable checkbox goes through the same function.
+function GuildInvite:IsModuleEnabled()
+    return GuildInviteDB and GuildInviteDB.enabled and true or false
+end
+
+function GuildInvite:SetModuleEnabled(v)
+    GuildInviteDB.enabled = v and true or false
+    self:Print(GuildInviteDB.enabled and "Enabled" or "Disabled")
+    if mainFrame and mainFrame.enableCB then mainFrame.enableCB:SetChecked(GuildInviteDB.enabled) end
+end
+
 function GuildInvite:CreateUI()
     if mainFrame then return mainFrame end
     
@@ -380,9 +392,9 @@ function GuildInvite:CreateUI()
     enableCB.Text:SetText("Enable auto-invite")
     enableCB:SetChecked(GuildInviteDB.enabled)
     enableCB:SetScript("OnClick", function(self)
-        GuildInviteDB.enabled = self:GetChecked()
-        GuildInvite:Print(GuildInviteDB.enabled and "Enabled" or "Disabled")
+        GuildInvite:SetModuleEnabled(self:GetChecked())
     end)
+    frame.enableCB = enableCB
     
     yOffset = yOffset - 30
     

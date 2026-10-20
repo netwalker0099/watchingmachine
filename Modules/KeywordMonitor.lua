@@ -56,6 +56,17 @@ function KeywordMonitor:Print(msg)
     WM:ModulePrint("KeywordMonitor", msg)
 end
 
+-- Dashboard on/off switch: off = paused, the same as the Stop button.
+-- Like Stop, it lasts for this session only.
+function KeywordMonitor:IsModuleEnabled()
+    return not isMonitoringPaused
+end
+
+function KeywordMonitor:SetModuleEnabled(v)
+    isMonitoringPaused = not v
+    self:UpdateStopButton()
+end
+
 function KeywordMonitor:UpdateStopButton()
     if not self.stopButton or not self.statusText then return end
     

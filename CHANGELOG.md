@@ -2,7 +2,90 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.7** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.8** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.8
+
+### Dashboard: see what's on, reach everything
+
+The dashboard was a list of thirteen identical cards. Each had one Open
+button and a one-line description, and nothing showed whether a module was
+on. Tools such as `whyboss`, `whybuff`, `soulstone`, Shear tallies and
+ArmorySnap's snapshot commands had no button anywhere.
+
+- **Groups:** cards sit under **Raid** (Buff Check, Debuff Tracker, Class
+  Tools, Aura Range, ArmorySnap), **Guild & Social** (Guild Invite,
+  Recruiter, PvP Tracker, Keyword Monitor, Services Parser, WhisperLogs)
+  and **Logging** (Auto Logger, Mail & Trade).
+- **Card tooltip:** hovering a card shows what the module does in a
+  sentence or two, its full status (which the card may truncate), whether
+  it's on, and its `/wmachine` command.
+- **On/off switch:** the card's checkbox switches the module's *own* flag,
+  through a new `IsModuleEnabled` / `SetModuleEnabled` pair. The module's
+  settings checkbox uses the same function, so the two always agree. An off
+  module's icon is greyed out. Modules with a switch:
+  - Buff Check (the ready-check trigger)
+  - Debuff Tracker (hides the display)
+  - PvP Tracker (stops its event handlers)
+  - Guild Invite
+  - Aura Range (clears active alerts)
+  - ArmorySnap (automatic scanning)
+  - Keyword Monitor (pause; for the session only, like its Stop button)
+
+  Mail & Trade, Services Parser, WhisperLogs, Recruiter and Class Tools
+  have no single on/off setting, so their cards have no switch. Auto Logger
+  has two separate settings (chat log and combat log), so it has none
+  either.
+- **Tools menu:** opened with the **...** button or a right-click on the
+  card. A confirmation dialog guards the actions that discard data (clear
+  exclusions, reset ArmorySnap session). Class-specific tools appear only
+  on that class.
+  - **Debuff Tracker:** encounter callouts, why is my target a boss,
+    exclude / un-exclude target, list exclusions, clear exclusions, Shear
+    tallies, shadow resist gear check.
+  - **Buff Check:** run check now, explain buffs on target.
+  - **ArmorySnap:** snapshot now, list snapshots, scanner status, reset
+    session.
+  - **PvP Tracker:** show leaderboard, request guild sync.
+  - **Class Tools:** consumable check, soulstone timers (warlock), portals
+    (mage).
+- **Card text** (title, description, status) is width-limited and
+  truncates, so long status lines no longer run under the buttons.
+- Buff Check's manual run is now `BuffCheck:RunLocalCheck()`. It works even
+  with the ready-check trigger off; Run Check Now and the tools menu both
+  use it.
+
+### Other ways in
+
+- **Minimap button:** right-click opens Settings (it used to do the same as
+  left-click). The tooltip says so and lists every module's status in
+  dashboard order with proper names.
+- **Options > AddOns > Watching Machine:** a page in the game's own options,
+  with Open Dashboard and Theme & Minimap buttons. It uses the Settings API
+  where the client has it and falls back to `InterfaceOptions_AddCategory`.
+
+### Cleanup
+
+- `WatchingMachineDB.moduleStates` was created and merged on every load but
+  never read. It is removed, and cleared from existing saved variables.
+- ArmorySnap's `/as auto` used to update the Auto-scan checkbox through a
+  variable declared later in the file, which Lua reads as an unset global,
+  so the checkbox didn't follow the command until the window was reopened.
+  It now goes through `AS:SetModuleEnabled`.
+
+### Tests
+
+`tests/test_dashboard.lua` (111 checks) loads the whole addon in `.toc`
+order and covers:
+- the card groups
+- switches against each module's own flag, in both directions
+- every tools-menu entry resolving to a real module method
+- class-only tools
+- right-click and **...** menus
+- card tooltips
+- the Options > AddOns registration, on both API paths
 
 ---
 

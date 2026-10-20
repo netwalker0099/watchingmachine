@@ -103,6 +103,7 @@ return function(REPO)
     function Frame:SetTextColor(r, g, b, a) self._color = { r, g, b, a } end
     function Frame:SetColorTexture(r, g, b, a) self._tex = { r, g, b, a } end
     function Frame:SetTexture(t) self._texture = t end
+    function Frame:SetDesaturated(v) self._desaturated = v and true or false end
     function Frame:GetStringHeight()
         local t = self._text or ""
         if t == "" then return 0 end
@@ -184,6 +185,7 @@ return function(REPO)
     end
     env.GetTime = function() return 0 end
     env.UnitName = function() return "Me" end
+    env.GetRealmName = function() return "Testrealm" end
     env.UnitClass = function() return "Mage", "MAGE" end
     env.IsInRaid = function() return false end
     env.IsInGroup = function() return false end

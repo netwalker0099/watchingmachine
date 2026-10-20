@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.7 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.8 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -326,6 +326,31 @@ never loads them, because they aren't listed in the `.toc`.
 
 ## Usage
 
+### Dashboard
+`/wmachine`, the minimap button, or **Options > AddOns > Watching Machine**
+opens the dashboard. Everything the addon does can be reached from it.
+
+- Cards are grouped into **Raid**, **Guild & Social** and **Logging**.
+- **Hover a card** to see what the module does, its full status, and its
+  slash command.
+- The **on/off switch** on a card turns the module on or off. Only modules
+  with a single on/off flag have one: Buff Check, Debuff Tracker, Aura
+  Range, ArmorySnap auto-scan, Guild Invite, PvP Tracker, and Keyword
+  Monitor (which pauses for the session). An off module's icon is greyed
+  out.
+- **Open** opens the module's window.
+- **...** or **right-click** opens the module's tools: the diagnostics that
+  used to be slash-command only.
+  - **Debuff Tracker:** why is my target a boss, exclude / un-exclude target,
+    list and clear exclusions, Shear tallies, shadow resist gear check,
+    encounter callouts.
+  - **Buff Check:** run a check now, explain buffs on target.
+  - **ArmorySnap:** snapshot now, list snapshots, scanner status, reset
+    session.
+  - **PvP Tracker:** leaderboard, request guild sync.
+  - **Class Tools:** consumable check, soulstone timers (warlock), portal
+    list (mage).
+
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
 - `/wmachine settings` - Open theme/addon settings
@@ -358,6 +383,8 @@ never loads them, because they aren't listed in the `.toc`.
 
 ### Minimap Button
 - **Left-click**: Toggle dashboard
+- **Right-click**: Settings (theme, minimap)
+- **Hover**: every module's status, in dashboard order
 - **Drag**: Move button anywhere on screen
 
 ## Saved Variables
@@ -385,6 +412,15 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.8
+- Dashboard: cards grouped into Raid, Guild & Social and Logging; hover a card for a description, its full status and its command
+- On/off switch on the cards of modules with an enable flag; off modules are greyed out
+- Tools menu on cards (**...** or right-click) for the diagnostics that were slash-command only
+- Card text truncates instead of running under the buttons
+- Minimap right-click opens Settings; its tooltip lists modules in dashboard order
+- Watching Machine page under the game's Options > AddOns
+- Removed the unused `moduleStates` saved setting
 
 ### Version 3.7
 - New shared panel builder (`UI.lua`): panels fit their content, never exceed the screen, scroll when needed, remember their position and have collapsible sections

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.7"
+WM.version = "3.8"
 WM.modules = {}
 
 -- ============================================
@@ -544,21 +544,6 @@ local coreDefaults = {
     dashboardPos = nil,
     theme = "Default",
     verboseChat = false,    -- Show diagnostic/sync messages in chat
-    moduleStates = {
-        AutoLogger = true,
-        KeywordMonitor = true,
-        MailLogger = true,
-        ServicesParser = true,
-        WhisperLogs = true,
-        GuildInvite = true,
-        DebuffTracker = true,
-        PvPTracker = true,
-        Recruiter = true,
-        BuffCheck = true,
-        ArmorySnap = true,
-        AuraRange = true,
-        ClassTools = true,
-    },
 }
 
 local function InitCoreDB()
@@ -576,7 +561,7 @@ local function InitCoreDB()
                 WatchingMachineDB[k] = v
             end
         elseif type(v) == "table" and type(WatchingMachineDB[k]) == "table" then
-            -- Merge missing keys into existing tables (e.g. new modules into moduleStates)
+            -- Merge missing keys into existing tables
             for k2, v2 in pairs(v) do
                 if WatchingMachineDB[k][k2] == nil then
                     WatchingMachineDB[k][k2] = v2
@@ -584,6 +569,10 @@ local function InitCoreDB()
             end
         end
     end
+    -- moduleStates was saved but never read; each module keeps its own
+    -- on/off flag, switched from its dashboard card
+    WatchingMachineDB.moduleStates = nil
+
     -- Initialize error log in DB and merge any early errors
     if not WatchingMachineDB.errorLog then
         WatchingMachineDB.errorLog = {}
@@ -697,7 +686,9 @@ local function CreateMinimapButton()
     -- Click handler
     button:SetScript("OnClick", function(self, btn)
         if isDragging then return end
-        if btn == "LeftButton" or btn == "RightButton" then
+        if btn == "RightButton" then
+            WM:ToggleSettings()
+        elseif btn == "LeftButton" then
             WM:ToggleDashboard()
         end
     end)
@@ -707,14 +698,20 @@ local function CreateMinimapButton()
         if isDragging then return end
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Watching Machine", 1, 1, 1)
-        GameTooltip:AddLine("Left-click: Toggle Dashboard", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Left-click: Dashboard", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Right-click: Settings (theme, minimap)", 0.7, 0.7, 0.7)
         GameTooltip:AddLine("Drag: Move button anywhere", 0.7, 0.7, 0.7)
         GameTooltip:AddLine(" ")
-        
-        for name, module in pairs(WM.modules) do
-            if module.GetQuickStatus then
-                local status = module:GetQuickStatus()
-                GameTooltip:AddLine(name .. ": " .. status, 0.8, 0.8, 0.8)
+
+        -- Same order and names as the dashboard
+        for _, group in ipairs(WM.MODULE_GROUPS or {}) do
+            for _, name in ipairs(group.modules) do
+                local module = WM.modules[name]
+                if module and module.GetQuickStatus then
+                    local info = WM.MODULE_INFO[name]
+                    GameTooltip:AddDoubleLine(info and info.title or name, module:GetQuickStatus(),
+                        0.8, 0.8, 0.8, 1, 1, 1)
+                end
             end
         end
         
@@ -811,7 +808,7 @@ function WM:CreateDashboard()
     
     local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     subtitle:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    subtitle:SetText("v" .. WM.version .. " - Comprehensive Monitoring Suite")
+    subtitle:SetText("v" .. WM.version .. "  |cFF888888-  hover a card for details, ... for tools|r")
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -883,158 +880,385 @@ function WM:UpdateMinimapButtonText()
     end
 end
 
+-- ============================================
+-- DASHBOARD MODULE CARDS
+-- ============================================
+-- One card per module, grouped. A card shows what the module is, whether
+-- it's on, and its live status, and reaches everything it offers:
+--   Open      the module's window
+--   switch    on/off, for modules that define IsModuleEnabled/SetModuleEnabled
+--   ...       tools menu (also right-click): the diagnostics that were
+--             otherwise slash-command only
+-- Hovering a card explains it.
+
+local function Mod(name) return WM.modules[name] end
+
+local function Call(name, method, ...)
+    local m = Mod(name)
+    if m and m[method] then return m[method](m, ...) end
+    WM:Print(name .. " not available")
+end
+
+local function PlayerClass()
+    local _, class = UnitClass("player")
+    return class
+end
+
+-- Two-step confirm for menu tools that discard data
+StaticPopupDialogs = StaticPopupDialogs or {}
+StaticPopupDialogs["WM_CONFIRM_TOOL"] = {
+    text = "%s",
+    button1 = YES or "Yes",
+    button2 = NO or "No",
+    OnAccept = function(self, data) if data then data() end end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+
+function WM:Confirm(text, fn)
+    if StaticPopup_Show then
+        StaticPopup_Show("WM_CONFIRM_TOOL", text, nil, fn)
+    else
+        fn()
+    end
+end
+
+local MODULE_GROUPS = {
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap" } },
+    { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
+    { title = "Logging", modules = { "AutoLogger", "MailLogger" } },
+}
+
+local MODULE_INFO = {
+    AutoLogger = {
+        title = "Auto Logger", desc = "Automatic chat and combat logging",
+        about = "Turns on chat logging at login and combat logging in raid instances (optionally 5-mans too), and keeps Advanced Combat Logging on so Warcraft Logs uploads are complete.",
+        command = "logger", color = {0, 1, 0}, icon = "Interface\\Icons\\INV_Misc_Book_09",
+    },
+    KeywordMonitor = {
+        title = "Keyword Monitor", desc = "Monitor channels for keywords",
+        about = "Watches Trade, General, LFG and the other public channels for words you choose and collects every match in one list.",
+        toggleNote = "Off pauses monitoring for this session, like the Stop button.",
+        command = "keyword", color = {1, 0.67, 0}, icon = "Interface\\Icons\\INV_Misc_SpyGlass_03",
+    },
+    MailLogger = {
+        title = "Mail & Trade Logger", desc = "Log mail and trade transactions",
+        about = "Long-term record of gold and items you receive by mail and trade, including auction house sales, buys and expired auctions, for each of your characters.",
+        command = "mail", color = {1, 0.41, 0.71}, icon = "Interface\\Icons\\INV_Letter_15",
+    },
+    ServicesParser = {
+        title = "Services Parser", desc = "Parse boost advertisements",
+        about = "Reads boost adverts from the Services channel and sorts them by dungeon, with a separate tab for summons and portals.",
+        command = "services", color = {0, 0.8, 1}, icon = "Interface\\Icons\\Spell_Nature_Polymorph",
+    },
+    WhisperLogs = {
+        title = "WarcraftLogs Lookup", desc = "WCL links for whispers & group",
+        about = "Lists the players who whisper you and your group members, each with a Warcraft Logs link on their own realm. Click a name to copy the link.",
+        command = "wcl", color = {0.8, 0.5, 1}, icon = "Interface\\Icons\\INV_Misc_Note_01",
+    },
+    GuildInvite = {
+        title = "Guild Invite", desc = "Auto-invite on 'inv' trigger",
+        about = "Invites guild members to your group when they say the trigger word (default \"inv\") in guild chat or a whisper. Needs lead or assist.",
+        command = "ginvite", color = {0, 1, 0}, icon = "Interface\\Icons\\Spell_Holy_Resurrection",
+    },
+    DebuffTracker = {
+        title = "Debuff Tracker", desc = "Raid debuff monitoring",
+        about = "Shows which raid debuffs are on the boss, calls out missing ones, and runs the encounter callouts (Illidan Doom and Shear, the Black Temple shadow resist check).",
+        command = "debuff", color = {1, 0.8, 0}, icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+        tools = {
+            { text = "Encounter callouts", desc = "Open settings at the Encounter Callouts section.",
+              func = function() Call("DebuffTracker", "ToggleEncounterUI") end },
+            { text = "Why is my target a boss?", desc = "Explain how the tracker classifies your target.",
+              func = function() Call("DebuffTracker", "ExplainTarget") end },
+            { text = "Exclude my target", desc = "Stop treating your target's creature as a boss.",
+              func = function() Call("DebuffTracker", "ExcludeTarget") end },
+            { text = "Un-exclude my target", func = function() Call("DebuffTracker", "UnexcludeTarget") end },
+            { text = "List exclusions", func = function() Call("DebuffTracker", "ListExclusions") end },
+            { text = "Clear all exclusions...", func = function()
+                WM:Confirm("Remove every Debuff Tracker exclusion?", function() Call("DebuffTracker", "ClearExclusions") end)
+              end },
+            { text = "Shear tallies", desc = "Illidan Shear monitor status and counts.",
+              func = function() Call("DebuffTracker", "ShowShearStatus") end },
+            { text = "Check my shadow resist gear", func = function() Call("DebuffTracker", "ExplainShadowResist") end },
+        },
+    },
+    PvPTracker = {
+        title = "PvP Enemy Tracker", desc = "Track and alert on hostile players",
+        about = "Keeps a kill-on-sight list of players who kill you (or that you add), alerts when they're near, and shares it with your guild.",
+        command = "pvp", color = {0.9, 0.2, 0.2}, icon = "Interface\\Icons\\Ability_Dualwield",
+        tools = {
+            { text = "Show leaderboard", func = function() Call("PvPTracker", "ToggleLeaderboard") end },
+            { text = "Request guild sync", desc = "Ask online guildies for their KOS data (5 minute cooldown).",
+              func = function() Call("PvPTracker", "RequestSync") end },
+        },
+    },
+    Recruiter = {
+        title = "Recruiting Tool", desc = "Automated guild recruiting",
+        about = "Scans for unguilded players by class and level range and sends them your recruiting message, keeping a history so nobody is messaged twice.",
+        command = "recruit", color = {1, 0.84, 0}, icon = "Interface\\Icons\\INV_Misc_GroupLooking",
+    },
+    BuffCheck = {
+        title = "Buff Check", desc = "Ready-check raid buff audit",
+        about = "On every ready check, lists who is missing class buffs and the consumables you choose. Announced to raid if you started the check, shown only to you otherwise.",
+        command = "buffcheck", color = {0.2, 1, 0.6}, icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
+        tools = {
+            { text = "Run check now", desc = "Check the group now; only you see the report.",
+              func = function() Call("BuffCheck", "RunLocalCheck") end },
+            { text = "Explain buffs on target", desc = "Which checks your target's (or your own) auras satisfy.",
+              func = function() Call("BuffCheck", "ExplainUnit", UnitExists("target") and "target" or "player") end },
+        },
+    },
+    ArmorySnap = {
+        title = "ArmorySnap", desc = "Raid gear & talent snapshots",
+        about = "Quietly records every raid member's gear, enchants, gems and talents, and lets you browse the snapshots later.",
+        toggleNote = "Automatic scanning in raids. Manual snapshots work either way.",
+        command = "armory", color = {0.4, 0.67, 1}, icon = "Interface\\Icons\\INV_Chest_Chain_09",
+        tools = {
+            { text = "Take a snapshot now", func = function()
+                local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("snap") end
+              end },
+            { text = "List snapshots", func = function()
+                local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("list") end
+              end },
+            { text = "Scanner status", func = function()
+                local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("status") end
+              end },
+            { text = "Reset current session...", func = function()
+                WM:Confirm("Reset the current ArmorySnap scanning session?", function()
+                    local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("reset") end
+                end)
+              end },
+        },
+    },
+    AuraRange = {
+        title = "Aura Range", desc = "Totem/aura out-of-range alerts",
+        about = "Warns you the moment you walk out of range of a party aura or shaman totem you were getting, and clears when you step back in.",
+        command = "range", color = {1, 1, 0.4}, icon = "Interface\\Icons\\Spell_Nature_StoneSkinTotem",
+    },
+    ClassTools = {
+        title = "Class Tools", desc = "Tools for the class you're playing",
+        about = "Per-class checks and helpers (missing armor spells, soulstones, portal button) plus raid consumable warnings for everyone, in one CHECK YOURSELF frame.",
+        command = "class", color = {1, 0.6, 0.87}, icon = "Interface\\Icons\\Achievement_Character_Human_Male",
+        tools = {
+            { text = "What the consumable checks see", desc = "Flask, food buff and weapon enchant, as the General checks read them.",
+              func = function() Call("ClassGeneral", "Explain") end },
+            { text = "Soulstone timers", visible = function() return PlayerClass() == "WARLOCK" end,
+              func = function() Call("ClassWarlock", "ReportSoulstones") end },
+            { text = "List my portals and teleports", visible = function() return PlayerClass() == "MAGE" end,
+              func = function() Call("ClassMage", "ReportSpells") end },
+        },
+    },
+}
+WM.MODULE_INFO = MODULE_INFO
+WM.MODULE_GROUPS = MODULE_GROUPS
+
+local function HasSwitch(module)
+    return module and module.IsModuleEnabled and module.SetModuleEnabled and true or false
+end
+
+local function VisibleTools(info)
+    local out = {}
+    for _, t in ipairs(info.tools or {}) do
+        if not t.visible or t.visible() then out[#out + 1] = t end
+    end
+    return out
+end
+
+local toolsMenu
+local function ShowToolsMenu(info)
+    local tools = VisibleTools(info)
+    if #tools == 0 then return end
+    if not toolsMenu then
+        toolsMenu = CreateFrame("Frame", "WM_DashboardToolsMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+    UIDropDownMenu_Initialize(toolsMenu, function(self, level)
+        local item = UIDropDownMenu_CreateInfo()
+        item.text, item.isTitle, item.notCheckable = info.title, true, true
+        UIDropDownMenu_AddButton(item, level)
+        for _, t in ipairs(tools) do
+            item = UIDropDownMenu_CreateInfo()
+            item.text, item.notCheckable = t.text, true
+            item.func = function() CloseDropDownMenus(); t.func() end
+            if t.desc then
+                item.tooltipTitle, item.tooltipText, item.tooltipOnButton = t.text, t.desc, true
+            end
+            UIDropDownMenu_AddButton(item, level)
+        end
+        item = UIDropDownMenu_CreateInfo()
+        item.text, item.notCheckable = CANCEL or "Cancel", true
+        item.func = function() CloseDropDownMenus() end
+        UIDropDownMenu_AddButton(item, level)
+    end, "MENU")
+    ToggleDropDownMenu(1, nil, toolsMenu, "cursor", 0, 0)
+end
+WM.ShowToolsMenu = ShowToolsMenu
+
+local function ColorHex(c)
+    return string.format("%02X%02X%02X", c[1] * 255, c[2] * 255, c[3] * 255)
+end
+
+local function ShowCardTooltip(card)
+    local info, module = card.info, WM.modules[card.moduleName]
+    GameTooltip:SetOwner(card, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("|cFF" .. ColorHex(info.color) .. info.title .. "|r")
+    GameTooltip:AddLine(info.about or info.desc, 0.9, 0.9, 0.9, true)
+    GameTooltip:AddLine(" ")
+    if module and module.GetQuickStatus then
+        GameTooltip:AddLine("Status: " .. module:GetQuickStatus(), 0.8, 0.8, 0.8, true)
+    end
+    if HasSwitch(module) then
+        GameTooltip:AddLine("Switch: " .. (module:IsModuleEnabled() and "|cFF00FF00on|r" or "|cFFFF4444off|r"),
+            0.8, 0.8, 0.8)
+    end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("Open: settings and details", 0.6, 0.8, 1)
+    if #VisibleTools(info) > 0 then
+        GameTooltip:AddLine("... or right-click: tools", 0.6, 0.8, 1)
+    end
+    if info.command then
+        GameTooltip:AddLine("/wmachine " .. info.command, 0.6, 0.6, 0.6)
+    end
+    GameTooltip:Show()
+end
+
+local CARD_H, CARD_GAP, GROUP_H = 46, 3, 20
+
 function WM:CreateModuleCards()
     if not dashboard or not dashboard.cardsContainer then return end
-    
-    local container = dashboard.cardsContainer
-    local yOffset = 0
-    local cardHeight = 46
-    local cardSpacing = 3
 
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap", "AuraRange", "ClassTools"}
-    local moduleInfo = {
-        AutoLogger = {
-            title = "Auto Logger",
-            desc = "Automatic chat and combat logging",
-            color = {0, 1, 0},
-            icon = "Interface\\Icons\\INV_Misc_Book_09",
-        },
-        KeywordMonitor = {
-            title = "Keyword Monitor",
-            desc = "Monitor channels for keywords",
-            color = {1, 0.67, 0},
-            icon = "Interface\\Icons\\INV_Misc_SpyGlass_03",
-        },
-        MailLogger = {
-            title = "Mail & Trade Logger",
-            desc = "Log mail and trade transactions",
-            color = {1, 0.41, 0.71},
-            icon = "Interface\\Icons\\INV_Letter_15",
-        },
-        ServicesParser = {
-            title = "Services Parser",
-            desc = "Parse boost advertisements",
-            color = {0, 0.8, 1},
-            icon = "Interface\\Icons\\Spell_Nature_Polymorph",
-        },
-        WhisperLogs = {
-            title = "WarcraftLogs Lookup",
-            desc = "WCL links for whispers & group",
-            color = {0.8, 0.5, 1},
-            icon = "Interface\\Icons\\INV_Misc_Note_01",
-        },
-        GuildInvite = {
-            title = "Guild Invite",
-            desc = "Auto-invite on 'inv' trigger",
-            color = {0, 1, 0},
-            icon = "Interface\\Icons\\Spell_Holy_Resurrection",
-        },
-        DebuffTracker = {
-            title = "Debuff Tracker",
-            desc = "Raid debuff monitoring",
-            color = {1, 0.8, 0},
-            icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
-        },
-        PvPTracker = {
-            title = "PvP Enemy Tracker",
-            desc = "Track and alert on hostile players",
-            color = {0.9, 0.2, 0.2},
-            icon = "Interface\\Icons\\Ability_Dualwield",
-        },
-        Recruiter = {
-            title = "Recruiting Tool",
-            desc = "Automated guild recruiting",
-            color = {1, 0.84, 0},
-            icon = "Interface\\Icons\\INV_Misc_GroupLooking",
-        },
-        BuffCheck = {
-            title = "Buff Check",
-            desc = "Ready-check raid buff audit",
-            color = {0.2, 1, 0.6},
-            icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
-        },
-        ArmorySnap = {
-            title = "ArmorySnap",
-            desc = "Raid gear & talent snapshots",
-            color = {0.4, 0.67, 1},
-            icon = "Interface\\Icons\\INV_Chest_Chain_09",
-        },
-        AuraRange = {
-            title = "Aura Range",
-            desc = "Totem/aura out-of-range alerts",
-            color = {1, 1, 0.4},
-            icon = "Interface\\Icons\\Spell_Nature_StoneSkinTotem",
-        },
-        ClassTools = {
-            title = "Class Tools",
-            desc = "Tools for the class you're playing",
-            color = {1, 0.6, 0.87},
-            icon = "Interface\\Icons\\Achievement_Character_Human_Male",
-        },
-    }
-    
-    for _, moduleName in ipairs(moduleOrder) do
-            local info = moduleInfo[moduleName]
+    local container = dashboard.cardsContainer
+    local width = container:GetWidth()
+    local yOffset = 0
+
+    for _, group in ipairs(MODULE_GROUPS) do
+        local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        header:SetPoint("TOPLEFT", 4, -(yOffset + 4))
+        header:SetText(group.title)
+        WM:ThemeText(header, "headerColor")
+        yOffset = yOffset + GROUP_H
+
+        for _, moduleName in ipairs(group.modules) do
+            local info = MODULE_INFO[moduleName]
             local module = self.modules[moduleName]
-        
-        local card = CreateFrame("Frame", nil, container, "BackdropTemplate")
-        card:SetSize(container:GetWidth(), cardHeight)
-        card:SetPoint("TOPLEFT", 0, -yOffset)
-        card:SetPoint("TOPRIGHT", 0, -yOffset)
-        WM:SkinCard(card, info.color)
-        WM:RegisterSkinnedCard(card, info.color)
-        
-        -- Icon
-        local icon = card:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(32, 32)
-        icon:SetPoint("LEFT", 10, 0)
-        icon:SetTexture(info.icon)
-        
-        -- Title
-        local titleText = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleText:SetPoint("TOPLEFT", 50, -6)
-        titleText:SetText("|cFF" .. string.format("%02X%02X%02X", info.color[1]*255, info.color[2]*255, info.color[3]*255) .. info.title .. "|r")
-        
-        -- Description
-        local descText = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        descText:SetPoint("TOPLEFT", 50, -20)
-        descText:SetText(info.desc)
-        
-        -- Status text
-        local statusText = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        statusText:SetPoint("TOPLEFT", 50, -34)
-        statusText:SetText("|cFF888888Loading...|r")
-        card.statusText = statusText
-        
-        -- Open button
-        local openBtn = CreateFrame("Button", nil, card, "UIPanelButtonTemplate")
-        openBtn:SetSize(55, 20)
-        openBtn:SetPoint("RIGHT", -8, 0)
-        openBtn:SetText("Open")
-        openBtn:SetScript("OnClick", function()
-            if module and module.ToggleUI then
-                module:ToggleUI()
-            elseif module and module.Toggle then
-                module:Toggle()
-            else
-                WM:Print(moduleName .. " UI not available")
+
+            local card = CreateFrame("Frame", nil, container, "BackdropTemplate")
+            card:SetSize(width, CARD_H)
+            card:SetPoint("TOPLEFT", 0, -yOffset)
+            card:SetPoint("TOPRIGHT", 0, -yOffset)
+            WM:SkinCard(card, info.color)
+            WM:RegisterSkinnedCard(card, info.color)
+            card.info, card.moduleName = info, moduleName
+
+            local icon = card:CreateTexture(nil, "ARTWORK")
+            icon:SetSize(32, 32)
+            icon:SetPoint("LEFT", 10, 0)
+            icon:SetTexture(info.icon)
+            card.icon = icon
+
+            -- Right-hand controls, laid out from the right edge
+            local openBtn = CreateFrame("Button", nil, card, "UIPanelButtonTemplate")
+            openBtn:SetSize(55, 20)
+            openBtn:SetPoint("RIGHT", -8, 0)
+            openBtn:SetText("Open")
+            openBtn:SetScript("OnClick", function()
+                if module and module.ToggleUI then
+                    module:ToggleUI()
+                elseif module and module.Toggle then
+                    module:Toggle()
+                else
+                    WM:Print(moduleName .. " UI not available")
+                end
+            end)
+            local leftmost = openBtn
+
+            if info.tools then
+                local toolsBtn = CreateFrame("Button", nil, card, "UIPanelButtonTemplate")
+                toolsBtn:SetSize(24, 20)
+                toolsBtn:SetPoint("RIGHT", leftmost, "LEFT", -3, 0)
+                toolsBtn:SetText("...")
+                toolsBtn:SetScript("OnClick", function() ShowToolsMenu(info) end)
+                toolsBtn:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:AddLine(info.title .. " tools", 1, 0.8, 0)
+                    for _, t in ipairs(VisibleTools(info)) do
+                        GameTooltip:AddLine(t.text, 0.8, 0.8, 0.8)
+                    end
+                    GameTooltip:Show()
+                end)
+                toolsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                card.toolsBtn = toolsBtn
+                leftmost = toolsBtn
             end
-        end)
-        
-        card.moduleName = moduleName
-        dashboard.moduleCards[moduleName] = card
-        
-        yOffset = yOffset + cardHeight + cardSpacing
+
+            if HasSwitch(module) then
+                local sw = CreateFrame("CheckButton", nil, card, "UICheckButtonTemplate")
+                sw:SetSize(24, 24)
+                sw:SetPoint("RIGHT", leftmost, "LEFT", -2, 0)
+                sw:SetScript("OnClick", function(self)
+                    module:SetModuleEnabled(self:GetChecked() and true or false)
+                    WM:UpdateDashboard()
+                end)
+                sw:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:AddLine(info.title .. ": " .. (module:IsModuleEnabled() and "on" or "off"), 1, 0.8, 0)
+                    GameTooltip:AddLine("Click to turn it " .. (module:IsModuleEnabled() and "off." or "on."), 0.8, 0.8, 0.8)
+                    if info.toggleNote then GameTooltip:AddLine(info.toggleNote, 0.8, 0.8, 0.8, true) end
+                    GameTooltip:Show()
+                end)
+                sw:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                card.switch = sw
+                leftmost = sw
+            end
+
+            -- Text column stops short of the controls; long text truncates
+            -- rather than running underneath them
+            local textWidth = width - 50 - (8 + 55) - 6
+                - (card.toolsBtn and 27 or 0) - (card.switch and 26 or 0)
+
+            local titleText = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            titleText:SetPoint("TOPLEFT", 50, -6)
+            titleText:SetWidth(textWidth)
+            titleText:SetJustifyH("LEFT")
+            titleText:SetWordWrap(false)
+            titleText:SetText("|cFF" .. ColorHex(info.color) .. info.title .. "|r")
+
+            local descText = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            descText:SetPoint("TOPLEFT", 50, -20)
+            descText:SetWidth(textWidth)
+            descText:SetJustifyH("LEFT")
+            descText:SetWordWrap(false)
+            descText:SetText(info.desc)
+
+            local statusText = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            statusText:SetPoint("TOPLEFT", 50, -34)
+            statusText:SetWidth(textWidth)
+            statusText:SetJustifyH("LEFT")
+            statusText:SetWordWrap(false)
+            statusText:SetText("|cFF888888Loading...|r")
+            card.statusText = statusText
+
+            -- Hover explains the card; right-click opens its tools
+            card:EnableMouse(true)
+            card:SetScript("OnEnter", ShowCardTooltip)
+            card:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            card:SetScript("OnMouseUp", function(self, button)
+                if button == "RightButton" then ShowToolsMenu(info) end
+            end)
+
+            dashboard.moduleCards[moduleName] = card
+            yOffset = yOffset + CARD_H + CARD_GAP
+        end
+        yOffset = yOffset + 4
     end
 
     -- Scroll child must be tall enough for everything, or the lower cards
     -- are unreachable
     container:SetHeight(math.max(yOffset, 1))
+    self:UpdateDashboard()
 end
 
 function WM:UpdateDashboard()
     if not dashboard or not dashboard:IsShown() then return end
-    
+
     for moduleName, card in pairs(dashboard.moduleCards) do
         local module = self.modules[moduleName]
         if module and module.GetQuickStatus then
@@ -1042,6 +1266,64 @@ function WM:UpdateDashboard()
         else
             card.statusText:SetText("|cFF888888Module not loaded|r")
         end
+        if card.switch then
+            local on = module:IsModuleEnabled()
+            card.switch:SetChecked(on)
+            card.icon:SetDesaturated(not on)
+        end
+    end
+end
+
+-- A small page under the game's Options > AddOns, so the addon can be found
+-- without knowing its slash command. Uses the Settings API where the client
+-- has it, the older InterfaceOptions call otherwise.
+function WM:RegisterOptionsCategory()
+    if self.optionsCategory then return end
+    local f = CreateFrame("Frame")
+    f.name = "Watching Machine"
+
+    local title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText("Watching Machine  |cFF888888v" .. self.version .. "|r")
+
+    local desc = f:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+    desc:SetWidth(560)
+    desc:SetJustifyH("LEFT")
+    desc:SetText("Every module is on the dashboard: switch modules on and off, open their"
+        .. " settings, and hover a card to see what it does. Also: /wmachine, or the minimap button.")
+
+    local function CloseOptions()
+        if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
+        if InterfaceOptionsFrame and InterfaceOptionsFrame:IsShown() then HideUIPanel(InterfaceOptionsFrame) end
+        if GameMenuFrame and GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) end
+    end
+
+    local open = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    open:SetSize(160, 24)
+    open:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -14)
+    open:SetText("Open Dashboard")
+    open:SetScript("OnClick", function()
+        CloseOptions()
+        if not (dashboard and dashboard:IsShown()) then WM:ToggleDashboard() end
+    end)
+
+    local settings = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    settings:SetSize(160, 24)
+    settings:SetPoint("LEFT", open, "RIGHT", 8, 0)
+    settings:SetText("Theme & Minimap")
+    settings:SetScript("OnClick", function()
+        CloseOptions()
+        WM:ToggleSettings()
+    end)
+
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        local category = Settings.RegisterCanvasLayoutCategory(f, f.name)
+        Settings.RegisterAddOnCategory(category)
+        self.optionsCategory = category
+    elseif InterfaceOptions_AddCategory then
+        InterfaceOptions_AddCategory(f)
+        self.optionsCategory = f
     end
 end
 
@@ -1638,6 +1920,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         
         -- Create or reuse minimap button
         CreateMinimapButton()
+
+        -- Entry in the game's own AddOns options list
+        WM:RegisterOptionsCategory()
         
         -- Hook Minimap OnShow to restore our button when minimap becomes visible
         if Minimap and not Minimap.wmHooked then

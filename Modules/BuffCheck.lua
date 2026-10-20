@@ -596,6 +596,15 @@ function BuffCheck:RunCheck(selfInitiated)
     self:Report(lines, missingCount, skipped, announce)
 end
 
+-- Manual run: always local-only, and works even with the ready-check
+-- trigger switched off (Run Check Now button, dashboard tools menu)
+function BuffCheck:RunLocalCheck()
+    local lines, missingCount, skipped = self:ScanGroup()
+    lastReport = lines
+    lastReportTime = date("%H:%M:%S")
+    self:Report(lines, missingCount, skipped, false)
+end
+
 -- ============================================
 -- DIAGNOSTIC
 -- ============================================
@@ -729,8 +738,12 @@ function BuffCheck:CreateUI()
         return function() return BuffCheckDB[key] end, function(v) BuffCheckDB[key] = v end
     end
 
-    local get, set = opt("enabled")
-    L:Checkbox({ label = "Enable buff check on ready check", get = get, set = set })
+    L:Checkbox({
+        label = "Enable buff check on ready check",
+        get = function() return BuffCheck:IsModuleEnabled() end,
+        set = function(v) BuffCheck:SetModuleEnabled(v) end,
+    })
+    local get, set
 
     get, set = opt("announceToRaid")
     L:Checkbox({
@@ -794,13 +807,7 @@ function BuffCheck:CreateUI()
     panel:AddFooterButton({
         text = "Run Check Now", width = 130,
         tooltip = { "Run Check Now", "Checks the group right now and shows the report only to you." },
-        onClick = function()
-            -- Manual runs are always local-only
-            local lines, missingCount, skipped = BuffCheck:ScanGroup()
-            lastReport = lines
-            lastReportTime = date("%H:%M:%S")
-            BuffCheck:Report(lines, missingCount, skipped, false)
-        end,
+        onClick = function() BuffCheck:RunLocalCheck() end,
     }, "LEFT")
 
     panel:Finish()
@@ -809,6 +816,17 @@ function BuffCheck:CreateUI()
     self.mainFrame = panel
 
     return panel
+end
+
+-- Dashboard on/off switch (see WM:CreateModuleCards). The settings panel's
+-- own enable checkbox goes through the same function.
+function BuffCheck:IsModuleEnabled()
+    return BuffCheckDB and BuffCheckDB.enabled and true or false
+end
+
+function BuffCheck:SetModuleEnabled(v)
+    BuffCheckDB.enabled = v and true or false
+    if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
 end
 
 function BuffCheck:Toggle()

@@ -2544,7 +2544,11 @@ function DebuffTracker:CreateUI()
         local g, s = DBGetSet(key)
         L:Checkbox({ label = label, get = g, set = function(v) s(v); DebuffTracker:UpdateVisibility() end })
     end
-    Visibility("enabled", "Enable Debuff Tracker")
+    L:Checkbox({
+        label = "Enable Debuff Tracker",
+        get = function() return DebuffTracker:IsModuleEnabled() end,
+        set = function(v) DebuffTracker:SetModuleEnabled(v) end,
+    })
     Visibility("showOnlyInRaid", "Show only in raid")
     Visibility("showOnlyOnBoss", "Show only on boss targets")
     Visibility("hideWhenNoTarget", "Hide when no hostile target")
@@ -2955,6 +2959,18 @@ end
 function DebuffTracker:ToggleEncounterUI()
     local panel = self:CreateUI()
     panel:ShowSection("encounters")
+end
+
+-- Dashboard on/off switch (see WM:CreateModuleCards). The settings panel's
+-- own enable checkbox goes through the same function.
+function DebuffTracker:IsModuleEnabled()
+    return DebuffTrackerDB and DebuffTrackerDB.enabled and true or false
+end
+
+function DebuffTracker:SetModuleEnabled(v)
+    DebuffTrackerDB.enabled = v and true or false
+    self:UpdateVisibility()
+    self:RefreshSettingsUI()
 end
 
 function DebuffTracker:Toggle()

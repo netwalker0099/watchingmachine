@@ -1283,11 +1283,8 @@ function PvPTracker:CreateUI()
 
     L:Checkbox({
         label = "Enable PvP Enemy Tracker",
-        get = function() return PvPTrackerDB.enabled end,
-        set = function(v)
-            PvPTrackerDB.enabled = v
-            if v then PvPTracker:RegisterEvents() else PvPTracker:UnregisterEvents() end
-        end,
+        get = function() return PvPTracker:IsModuleEnabled() end,
+        set = function(v) PvPTracker:SetModuleEnabled(v) end,
     })
     local row = L:Row(24)
     get, set = opt("alertSound")
@@ -1478,6 +1475,18 @@ function PvPTracker:CreateUI()
     mainFrame = panel
     self:RefreshList()
     return panel
+end
+
+-- Dashboard on/off switch (see WM:CreateModuleCards). The settings panel's
+-- own enable checkbox goes through the same function.
+function PvPTracker:IsModuleEnabled()
+    return PvPTrackerDB and PvPTrackerDB.enabled and true or false
+end
+
+function PvPTracker:SetModuleEnabled(v)
+    PvPTrackerDB.enabled = v and true or false
+    if PvPTrackerDB.enabled then self:RegisterEvents() else self:UnregisterEvents() end
+    if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
 end
 
 function PvPTracker:RefreshList()

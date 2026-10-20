@@ -110,6 +110,18 @@ end
 ----------------------------------------------------------------------
 -- Instance / zone detection
 ----------------------------------------------------------------------
+-- Dashboard on/off switch: automatic scanning (the Auto-scan checkbox).
+-- Manual /as snap works either way.
+function AS:IsModuleEnabled()
+    return not (AS.db and AS.db.options and AS.db.options.enabled == false)
+end
+
+function AS:SetModuleEnabled(v)
+    if not (AS.db and AS.db.options) then return end
+    AS.db.options.enabled = v and true or false
+    if AS.SyncAutoCheckbox then AS.SyncAutoCheckbox() end
+end
+
 function AS.ShouldAutoScan()
     if not AS.db or AS.standaloneConflict then return false end
     if AS.db.options and AS.db.options.enabled == false then return false end
@@ -834,10 +846,9 @@ function AS.HandleSlash(msg)
         if AS.UpdateGroupCheckbox then AS.UpdateGroupCheckbox() end
 
     elseif cmd == "auto" or cmd == "autoscan" then
-        AS.db.options.enabled = (AS.db.options.enabled == false)
+        AS:SetModuleEnabled(AS.db.options.enabled == false)
         Print("Auto-scan " .. (AS.db.options.enabled
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
-        if autoCheckbox then autoCheckbox:SetChecked(AS.db.options.enabled) end
 
     elseif cmd == "elvui" or cmd == "theme" then
         AS.db.options.elvuiTheme = not AS.db.options.elvuiTheme
@@ -935,6 +946,12 @@ local snapshotDropdown
 local memberScrollChild
 local scanStatusBar, scanStatusText, scanStatusPct, scanStatusBg
 local groupCheckbox, themeCheckbox, verboseCheckbox, autoCheckbox
+
+function AS.SyncAutoCheckbox()
+    if autoCheckbox and AS.db and AS.db.options then
+        autoCheckbox:SetChecked(AS.db.options.enabled ~= false)
+    end
+end
 local dollFrame, dollBg
 
 local selectedSnapshotKey = nil
