@@ -139,6 +139,8 @@ return function(REPO)
     function Frame:GetFontString() return self._fs or NewFrame(nil, self) end
     function Frame:StopMovingOrSizing() end
     function Frame:StartMoving() end
+    function Frame:StartSizing() end
+    function Frame:SetResizeBounds(a, b, c, d) self._bounds = { a, b, c, d } end
 
     W.click = function(f, ...)
         if f._enabled == false then return end
@@ -190,6 +192,26 @@ return function(REPO)
     env.IsInRaid = function() return false end
     env.IsInGroup = function() return false end
     env.IsInInstance = function() return false, "none" end
+
+    -- UIDropDownMenu: Initialize stores the init function; W.openMenu(dd)
+    -- runs it and returns the items it added
+    env.UIDropDownMenu_SetWidth = function(dd, w) dd._ddWidth = w end
+    env.UIDropDownMenu_SetText = function(dd, t) dd._ddText = t end
+    env.UIDropDownMenu_GetText = function(dd) return dd._ddText end
+    env.UIDropDownMenu_Initialize = function(dd, fn) dd._ddInit = fn end
+    env.UIDropDownMenu_CreateInfo = function() return {} end
+    env.UIDropDownMenu_EnableDropDown = function(dd) dd._ddEnabled = true end
+    env.UIDropDownMenu_DisableDropDown = function(dd) dd._ddEnabled = false end
+    env.CloseDropDownMenus = function() end
+    local menuItems
+    env.UIDropDownMenu_AddButton = function(info) if menuItems then menuItems[#menuItems + 1] = info end end
+    W.openMenu = function(dd)
+        menuItems = {}
+        if dd._ddInit then dd._ddInit(dd, 1) end
+        local items = menuItems
+        menuItems = nil
+        return items
+    end
 
     W.timers = {}
     local WM = {}

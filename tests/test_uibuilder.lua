@@ -152,5 +152,50 @@ local tipped = UI.Button(env.UIParent, { text = "T", tooltip = { "Title", "Body"
 W.fire(tipped, "OnEnter")
 check("tooltip lines added in order", shown and shown[1] == "Title" and shown[2] == "Body" and shown[3] == "Hint")
 
+-- ---- dropdown ----
+local ddDB = { region = "EU" }
+local regions = { { value = "US", text = "Americas" }, { value = "EU", text = "Europe" }, { value = "KR", text = "Korea" } }
+local dp = UI:CreatePanel({ name = "WM_DropPanel", title = "Drop" })
+local dd = dp.layout:Dropdown({ label = "Region:", options = function() return regions end,
+    get = function() return ddDB.region end, set = function(v) ddDB.region = v end })
+dp:Finish()
+check("dropdown shows current option text", dd.dropdown._ddText == "Europe")
+local items = W.openMenu(dd.dropdown)
+check("dropdown lists every option", #items == 3 and items[2].checked == true and items[1].checked == false)
+items[3].func()
+check("choosing an option writes set()", ddDB.region == "KR" and dd.dropdown._ddText == "Korea")
+table.insert(regions, { value = "TW", text = "Taiwan" })
+check("options function re-read on open", #W.openMenu(dd.dropdown) == 4)
+
+-- ---- footer text ----
+local fp = UI:CreatePanel({ name = "WM_FooterTextPanel", title = "Foot" })
+for i = 1, 4 do fp.layout:Checkbox({ label = "x" .. i }) end   -- clear of the 120px minimum
+local count = 3
+local ft = fp:AddFooterText({ text = function() return "Roster: " .. count end })
+fp:Finish()
+check("footer text reserves the footer band", fp:GetHeight() == 40 + fp.layout.height + 44 + 4)
+count = 7; fp:Refresh()
+check("dynamic footer text refreshes", ft:GetText() == "Roster: 7")
+
+-- ---- resizable ----
+local resized = 0
+local rp = UI:CreatePanel({ name = "WM_ResizePanel", title = "Resize", scroll = false, height = 500, width = 500,
+    resizable = { 400, 300, 800, 900 }, onResize = function() resized = resized + 1 end })
+rp.layout:Checkbox({ label = "a" })
+rp.layout:Fill(50)
+rp:Finish()
+check("resizable panel has a grip", rp.sizeGrip ~= nil)
+check("max height capped at the screen", rp._bounds and rp._bounds[4] == 768 - 16)
+rp:SetSize(620, 610)
+W.fire(rp.sizeGrip, "OnMouseUp")
+check("size saved after resize", env.WatchingMachineDB.panels.WM_ResizePanel.size[1] == 620
+    and env.WatchingMachineDB.panels.WM_ResizePanel.size[2] == 610)
+check("onResize called", resized == 1)
+rp:Hide(); rp:Show()
+check("saved height kept on reopen", rp:GetHeight() == 610)
+local rp2 = UI:CreatePanel({ name = "WM_ResizePanel", title = "Resize again", scroll = false, height = 500,
+    width = 500, resizable = { 400, 300, 800, 900 } })
+check("saved width restored on rebuild", rp2:GetWidth() == 620)
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

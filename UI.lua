@@ -351,6 +351,63 @@ function UI.EditBox(parent, spec)
     return box
 end
 
+-- Blizzard dropdown. options = list of { value =, text = } or a function
+-- returning one (re-read each time the menu opens, for lists that change).
+function UI.Dropdown(parent, spec)
+    local box = CreateFrame("Frame", nil, parent)
+    box:SetSize(1, 24)
+
+    local label
+    if spec.label then
+        label = box:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        label:SetPoint("LEFT", 0, 0)
+        label:SetText(spec.label)
+    end
+
+    local dd = CreateFrame("Frame", spec.name or UniqueName("WM_UIDropdown"), box, "UIDropDownMenuTemplate")
+    -- The template carries ~16px of padding on its left
+    if label then
+        dd:SetPoint("LEFT", label, "RIGHT", -10, -2)
+    else
+        dd:SetPoint("LEFT", -16, -2)
+    end
+    UIDropDownMenu_SetWidth(dd, spec.width or 120)
+
+    local function Options() return Eval(spec.options) or {} end
+    local function TextFor(v)
+        for _, o in ipairs(Options()) do
+            if o.value == v then return o.text end
+        end
+        return spec.placeholder or (v ~= nil and tostring(v)) or ""
+    end
+
+    UIDropDownMenu_Initialize(dd, function(self, level)
+        local cur = spec.get and spec.get()
+        for _, o in ipairs(Options()) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text, info.value = o.text, o.value
+            info.checked = (o.value == cur)
+            info.func = function()
+                if spec.set then spec.set(o.value) end
+                UIDropDownMenu_SetText(dd, o.text)
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end)
+    UI.SetTooltip(dd, spec.tooltip)
+
+    box.dropdown = dd
+    function box:Refresh()
+        UIDropDownMenu_SetText(dd, TextFor(spec.get and spec.get()))
+        if spec.disabled then
+            if spec.disabled() then UIDropDownMenu_DisableDropDown(dd) else UIDropDownMenu_EnableDropDown(dd) end
+        end
+    end
+    box:Refresh()
+    return box
+end
+
 -- Font string whose text can come from a function (re-read on Refresh)
 function UI.Text(parent, spec)
     local fs = parent:CreateFontString(nil, "OVERLAY", spec.font or "GameFontHighlightSmall")
@@ -358,6 +415,7 @@ function UI.Text(parent, spec)
     fs:SetJustifyH(spec.justify or "LEFT")
     if spec.colorKey then WM:ThemeText(fs, spec.colorKey) end
     function fs:Refresh() self:SetText(Eval(spec.text) or "") end
+    fs.dynamic = type(spec.text) == "function"
     fs:Refresh()
     return fs
 end
@@ -387,6 +445,7 @@ function RowMethods:Button(spec, x)   return TrackOn(self, PlaceLeft(self, UI.Bu
 function RowMethods:EditBox(spec, x)  return TrackOn(self, PlaceLeft(self, UI.EditBox(self.frame, spec), x)) end
 function RowMethods:Text(spec, x)     return TrackOn(self, PlaceLeft(self, UI.Text(self.frame, spec), x)) end
 function RowMethods:Slider(spec, x)   return TrackOn(self, PlaceLeft(self, UI.Slider(self.frame, spec), x)) end
+function RowMethods:Dropdown(spec, x) return TrackOn(self, PlaceLeft(self, UI.Dropdown(self.frame, spec), x)) end
 -- Anchor relative to the row's right edge instead (x is the gap)
 function RowMethods:RightButton(spec, gap)
     local b = UI.Button(self.frame, spec)
@@ -466,6 +525,11 @@ end
 function Layout:Cycle(spec)
     local row = self:Row(ROW_H.cycle)
     return row:Cycle(spec, 12 + (spec.indent or 0)), row
+end
+
+function Layout:Dropdown(spec)
+    local row = self:Row(28)
+    return row:Dropdown(spec, 12 + (spec.indent or 0)), row
 end
 
 function Layout:EditBox(spec)
@@ -653,13 +717,16 @@ end
 -- Size to content, capped at maxHeight and the screen
 function Panel:Fit()
     local opts = self.opts
-    local footer = (#self.footerButtons > 0) and FOOTER_H or BOTTOM_PAD
+    local footer = (#self.footerButtons > 0 or self.hasFooter) and FOOTER_H or BOTTOM_PAD
     self.body:ClearAllPoints()
     self.body:SetPoint("TOPLEFT", SIDE_PAD, -TOP_PAD)
     self.body:SetPoint("BOTTOMRIGHT", -(opts.scroll and SCROLLBAR_PAD or SIDE_PAD), footer)
 
     local wanted
-    if opts.height then
+    local size = opts.resizable and self:GetState().size
+    if size then
+        wanted = size[2]
+    elseif opts.height then
         wanted = opts.height
     else
         wanted = TOP_PAD + (self.layout.height or 0) + footer + 4
@@ -693,6 +760,9 @@ function Panel:Refresh()
     for _, b in ipairs(self.footerButtons) do
         if b.Refresh then b:Refresh() end
     end
+    for _, t in ipairs(self.footerTexts or {}) do
+        if t.Refresh and t.dynamic then t:Refresh() end
+    end
     if self.opts.onRefresh then self.opts.onRefresh(self) end
     self:Reflow()
 end
@@ -725,6 +795,24 @@ function Panel:AddFooterButton(spec, side)
     return b
 end
 
+-- Status text in the footer band (between any footer buttons). text may be
+-- a function; it's re-read on Refresh, or set directly with :SetText.
+function Panel:AddFooterText(spec, side)
+    local fs = UI.Text(self, spec)
+    if side == "RIGHT" then
+        fs:SetPoint("BOTTOMRIGHT", -20, 20)
+        fs:SetJustifyH("RIGHT")
+    elseif side == "CENTER" then
+        fs:SetPoint("BOTTOM", 0, 20)
+    else
+        fs:SetPoint("BOTTOMLEFT", 20, 20)
+    end
+    self.footerTexts = self.footerTexts or {}
+    self.footerTexts[#self.footerTexts + 1] = fs
+    self.hasFooter = true
+    return fs
+end
+
 -- Call once all rows are added
 function Panel:Finish()
     self:Reflow()
@@ -741,7 +829,12 @@ end
 --   minHeight  default 120
 --   scroll     default true; false for panels using Layout:Fill
 --   strata     default "HIGH"
+--   resizable  { minWidth, minHeight, maxWidth, maxHeight }: adds a size
+--              grabber and remembers the size; for scroll = false panels,
+--              whose rows stretch to the width (maxHeight is still capped
+--              at the screen). onResize(panel) runs after a resize.
 --   onShow     extra OnShow handler (after Refresh)
+--   onHide     OnHide handler
 --   onRefresh  called at the end of every Refresh
 function UI:CreatePanel(opts)
     assert(opts and opts.name, "WM.UI:CreatePanel needs a name")
@@ -767,6 +860,39 @@ function UI:CreatePanel(opts)
     frame:SetFrameStrata(opts.strata or "HIGH")
     frame:Hide()
     RestorePosition(frame)
+
+    if opts.resizable then
+        local r = opts.resizable
+        local saved = frame:GetState().size
+        if saved then frame:SetWidth(math.max(r[1], math.min(saved[1], r[3]))) end
+        width = frame:GetWidth() > 0 and frame:GetWidth() or width
+        frame:SetResizable(true)
+        local function Bounds()
+            local maxH = math.min(r[4], (UIParent:GetHeight() or r[4]) - SCREEN_MARGIN)
+            if frame.SetResizeBounds then
+                frame:SetResizeBounds(r[1], r[2], r[3], maxH)
+            elseif frame.SetMinResize then
+                frame:SetMinResize(r[1], r[2])
+                frame:SetMaxResize(r[3], maxH)
+            end
+        end
+        Bounds()
+        local grip = CreateFrame("Button", nil, frame)
+        grip:SetSize(16, 16)
+        grip:SetPoint("BOTTOMRIGHT", -4, 4)
+        grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+        grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+        grip:SetScript("OnMouseDown", function() Bounds(); frame:StartSizing("BOTTOMRIGHT") end)
+        grip:SetScript("OnMouseUp", function()
+            frame:StopMovingOrSizing()
+            frame:GetState().size = { math.floor(frame:GetWidth() + 0.5), math.floor(frame:GetHeight() + 0.5) }
+            SavePosition(frame)
+            frame:Reflow()
+            if opts.onResize then opts.onResize(frame) end
+        end)
+        frame.sizeGrip = grip
+    end
 
     WM:SkinPanel(frame)
     WM:RegisterSkinnedPanel(frame)
@@ -809,6 +935,7 @@ function UI:CreatePanel(opts)
         self:Refresh()
         if opts.onShow then opts.onShow(self) end
     end)
+    if opts.onHide then frame:SetScript("OnHide", opts.onHide) end
 
     return frame
 end
