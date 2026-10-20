@@ -119,7 +119,7 @@ end
 function AS:SetModuleEnabled(v)
     if not (AS.db and AS.db.options) then return end
     AS.db.options.enabled = v and true or false
-    if AS.SyncAutoCheckbox then AS.SyncAutoCheckbox() end
+    AS.RefreshBrowseFrame()
 end
 
 function AS.ShouldAutoScan()
@@ -739,10 +739,9 @@ function AS:Initialize()
     if AS.db.options.scanGroup     == nil then AS.db.options.scanGroup     = false end
     if AS.db.options.verbose       == nil then AS.db.options.verbose       = false end
     if AS.db.options.retentionDays == nil then AS.db.options.retentionDays = 30 end
-    -- First run inside Watching Machine: inherit the global theme choice
-    if AS.db.options.elvuiTheme == nil then
-        AS.db.options.elvuiTheme = (WM:GetThemeName() == "ElvUI")
-    end
+    -- options.elvuiTheme is no longer read: the browser follows the global
+    -- Watching Machine theme. It is left in place rather than cleared because
+    -- ArmorySnapDB is shared with the standalone addon, which still uses it.
 
     -- If the standalone ArmorySnap addon is running, stand down completely:
     -- two scanners would fight over the one-at-a-time inspect slot
@@ -843,7 +842,7 @@ function AS.HandleSlash(msg)
         AS.db.options.scanGroup = not AS.db.options.scanGroup
         Print("Group scanning " .. (AS.db.options.scanGroup
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
-        if AS.UpdateGroupCheckbox then AS.UpdateGroupCheckbox() end
+        AS.RefreshBrowseFrame()
 
     elseif cmd == "auto" or cmd == "autoscan" then
         AS:SetModuleEnabled(AS.db.options.enabled == false)
@@ -851,16 +850,14 @@ function AS.HandleSlash(msg)
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
 
     elseif cmd == "elvui" or cmd == "theme" then
-        AS.db.options.elvuiTheme = not AS.db.options.elvuiTheme
-        Print("ElvUI theme " .. (AS.db.options.elvuiTheme
-              and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
-        if AS.ApplyTheme then AS.ApplyTheme() end
+        Print("ArmorySnap now follows the global Watching Machine theme."
+              .. " Change it in |cfffff000/wmachine settings|r.")
 
     elseif cmd == "verbose" or cmd == "chat" then
         AS.db.options.verbose = not AS.db.options.verbose
         Print("Chat output " .. (AS.db.options.verbose
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
-        if AS.UpdateVerboseCheckbox then AS.UpdateVerboseCheckbox() end
+        AS.RefreshBrowseFrame()
 
     elseif cmd == "status" then
         local s = AS.session
@@ -887,7 +884,6 @@ function AS.HandleSlash(msg)
         Print("  |cfffff000/as delete <n>|r   – Delete a snapshot")
         Print("  |cfffff000/as auto|r            – Toggle automatic scanning")
         Print("  |cfffff000/as group|r           – Toggle group scanning")
-        Print("  |cfffff000/as theme|r           – Toggle ElvUI theme")
         Print("  |cfffff000/as verbose|r         – Toggle chat output")
         Print("  |cfffff000/as status|r          – Show scanner status")
         Print("  |cfffff000/as reset|r           – Reset current session")
@@ -906,12 +902,19 @@ local RIGHT_SLOTS   = { 10, 6, 7, 8, 11, 12, 13, 14 }
 local BOT_SLOTS     = { 16, 17, 18 }
 
 local LIST_WIDTH    = 180
+local LIST_GAP      = 10
 local DOLL_WIDTH    = 330
-local FRAME_WIDTH   = LIST_WIDTH + DOLL_WIDTH + 30
+local BODY_INSET    = 12    -- WM.UI's padding either side of a panel body
+local FRAME_WIDTH   = LIST_WIDTH + LIST_GAP + DOLL_WIDTH + 2 * BODY_INSET
 local DOLL_COL_H    = #LEFT_SLOTS * (SLOT_SIZE + SLOT_SPACING)
 local DOLL_H        = DOLL_COL_H + SLOT_SIZE + 16
 local TALENT_H      = 52
-local FRAME_HEIGHT  = math.max(590, 28 + 18 + 26 + 24 + 28 + 22 + 30 + DOLL_H + TALENT_H + 40)
+-- The right column stacks name, level/race/class, guild, paper doll,
+-- talents and the enchant/gem summary, with the gaps between them. That is
+-- what the Fill area has to hold, and the panel height is fitted to it.
+local NAME_H, DETAIL_H, GUILD_H, SUMMARY_H = 18, 12, 12, 12
+local CONTENT_H     = 4 + NAME_H + 2 + DETAIL_H + 1 + GUILD_H + 8 + DOLL_H
+                    + 6 + TALENT_H + 6 + SUMMARY_H + 4
 
 local CLASS_COLORS = RAID_CLASS_COLORS or {}
 
@@ -925,13 +928,11 @@ local QUALITY_COLORS = {
 }
 
 local ELVUI = {
-    bgMain     = { 0.07, 0.07, 0.07, 0.92 },
     bgPanel    = { 0.05, 0.05, 0.05, 0.85 },
     border     = { 0.15, 0.15, 0.15, 1 },
     statusBg   = { 0.08, 0.08, 0.08, 0.8 },
     statusBar  = { 0.00, 0.44, 0.87, 0.85 },
     statusDone = { 0.18, 0.70, 0.18, 0.85 },
-    text       = { 0.84, 0.84, 0.84 },
     slotBg     = { 0.10, 0.10, 0.10, 0.7 },
     listHover  = { 1, 1, 1, 0.06 },
     listSelect = { 0.00, 0.44, 0.87, 0.18 },
@@ -945,17 +946,22 @@ local talentFrame, talentIcons, talentTexts, talentSpecText
 local snapshotDropdown
 local memberScrollChild
 local scanStatusBar, scanStatusText, scanStatusPct, scanStatusBg
-local groupCheckbox, themeCheckbox, verboseCheckbox, autoCheckbox
-
-function AS.SyncAutoCheckbox()
-    if autoCheckbox and AS.db and AS.db.options then
-        autoCheckbox:SetChecked(AS.db.options.enabled ~= false)
-    end
-end
-local dollFrame, dollBg
+local dollBg
 
 local selectedSnapshotKey = nil
 local selectedMemberName  = nil
+
+-- The window follows the global Watching Machine theme; with ElvUI the
+-- slots, status bar, talent panel and member list get flat pixel styling
+local function IsElvTheme()
+    return WM:GetThemeName() == "ElvUI"
+end
+
+-- Re-read every control from the saved options (slash commands, the
+-- dashboard switch)
+function AS.RefreshBrowseFrame()
+    if browseFrame and browseFrame:IsShown() then browseFrame:Refresh() end
+end
 
 local function GetQualityFromLink(link)
     if not link then return 1 end
@@ -1087,58 +1093,27 @@ local function SetSlotItem(btn, gearData)
     else
         btn.itemLink = nil
         btn.iconTex:Hide()
-        local isElv = AS.db and AS.db.options and AS.db.options.elvuiTheme
-        btn.bgTex:SetShown(not isElv)
+        btn.bgTex:SetShown(not IsElvTheme())
         btn.borderTex:Hide()
     end
 end
 
--- Changing the Watching Machine theme resets ArmorySnap to match. The
--- module's own ElvUI toggle stays as a per-window override until the next
--- global change.
-function AS:OnGlobalThemeChanged(themeName)
-    if AS.db and AS.db.options then
-        AS.db.options.elvuiTheme = (themeName == "ElvUI")
+local function HidePixelBorder(frame)
+    if frame._pxBorders then
+        for _, t in ipairs(frame._pxBorders) do t:Hide() end
     end
 end
 
+-- WM.UI skins the window itself with the global theme. This switches the
+-- inner styling to match; Core calls it on every theme change.
 function AS.ApplyTheme()
     if not browseFrame then return end
-    local elv = AS.db and AS.db.options and AS.db.options.elvuiTheme
 
-    if elv then
-        if browseFrame.SetBackdrop then
-            browseFrame:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8X8",
-                edgeFile = "Interface\\Buttons\\WHITE8X8",
-                edgeSize = 1,
-            })
-            browseFrame:SetBackdropColor(unpack(ELVUI.bgMain))
-            browseFrame:SetBackdropBorderColor(unpack(ELVUI.border))
-        end
-        if browseFrame.TitleBg        then browseFrame.TitleBg:Hide() end
-        if browseFrame.TopTileStreaky then browseFrame.TopTileStreaky:Hide() end
-        if browseFrame.Bg             then browseFrame.Bg:Hide() end
-        if browseFrame.InsetBg        then browseFrame.InsetBg:Hide() end
-        for _, region in pairs({browseFrame:GetRegions()}) do
-            if region.GetDrawLayer and region:GetDrawLayer() == "BORDER" then
-                region:SetAlpha(0)
-            end
-        end
-        local inset = browseFrame.Inset
-        if inset then
-            for _, region in pairs({inset:GetRegions()}) do
-                region:SetAlpha(0)
-            end
-        end
-        browseFrame.TitleText:SetTextColor(unpack(ELVUI.text))
-
-        if scanStatusBg then scanStatusBg:SetColorTexture(unpack(ELVUI.statusBg)) end
-        if scanStatusBar then
-            scanStatusBar:SetStatusBarColor(unpack(ELVUI.statusBar))
-            MakePixelBorder(scanStatusBar, unpack(ELVUI.border))
-        end
-        if dollBg then dollBg:SetColorTexture(unpack(ELVUI.bgPanel)) end
+    if IsElvTheme() then
+        scanStatusBg:SetColorTexture(unpack(ELVUI.statusBg))
+        scanStatusBar:SetStatusBarColor(unpack(ELVUI.statusBar))
+        MakePixelBorder(scanStatusBar, unpack(ELVUI.border))
+        dollBg:SetColorTexture(unpack(ELVUI.bgPanel))
         for _, btn in pairs(slotButtons) do
             btn.elvBg:Show()
             btn.bgTex:Hide()
@@ -1146,93 +1121,68 @@ function AS.ApplyTheme()
             btn.hlTex:SetTexture("Interface\\Buttons\\WHITE8X8")
             btn.hlTex:SetAlpha(0.08)
         end
-        if talentFrame then
-            talentFrame.bg:SetColorTexture(unpack(ELVUI.bgPanel))
-            MakePixelBorder(talentFrame, unpack(ELVUI.border))
-        end
+        talentFrame.bg:SetColorTexture(unpack(ELVUI.bgPanel))
+        MakePixelBorder(talentFrame, unpack(ELVUI.border))
     else
-        if browseFrame.SetBackdrop then
-            browseFrame:SetBackdrop(nil)
-        end
-        if browseFrame.TitleBg        then browseFrame.TitleBg:Show() end
-        if browseFrame.TopTileStreaky then browseFrame.TopTileStreaky:Show() end
-        if browseFrame.Bg             then browseFrame.Bg:Show() end
-        if browseFrame.InsetBg        then browseFrame.InsetBg:Show() end
-        for _, region in pairs({browseFrame:GetRegions()}) do
-            if region.GetDrawLayer and region:GetDrawLayer() == "BORDER" then
-                region:SetAlpha(1)
-            end
-        end
-        local inset = browseFrame.Inset
-        if inset then
-            for _, region in pairs({inset:GetRegions()}) do
-                region:SetAlpha(1)
-            end
-        end
-        browseFrame.TitleText:SetTextColor(1, 0.82, 0)
-
-        if scanStatusBg then scanStatusBg:SetColorTexture(0.1, 0.1, 0.1, 0.6) end
-        if scanStatusBar then
-            scanStatusBar:SetStatusBarColor(0.26, 0.8, 0.26, 0.7)
-            if scanStatusBar._pxBorders then
-                for _, t in ipairs(scanStatusBar._pxBorders) do t:Hide() end
-            end
-        end
-        if dollBg then dollBg:SetColorTexture(0, 0, 0, 0.15) end
+        scanStatusBg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
+        scanStatusBar:SetStatusBarColor(0.26, 0.8, 0.26, 0.7)
+        HidePixelBorder(scanStatusBar)
+        dollBg:SetColorTexture(0, 0, 0, 0.15)
         for _, btn in pairs(slotButtons) do
             btn.elvBg:Hide()
             if not btn.itemLink then btn.bgTex:Show() end
-            if btn._pxBorders then
-                for _, t in ipairs(btn._pxBorders) do t:Hide() end
-            end
+            HidePixelBorder(btn)
             btn.hlTex:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
             btn.hlTex:SetAlpha(1)
         end
-        if talentFrame then
-            talentFrame.bg:SetColorTexture(0, 0, 0, 0.2)
-            if talentFrame._pxBorders then
-                for _, t in ipairs(talentFrame._pxBorders) do t:Hide() end
-            end
-        end
+        talentFrame.bg:SetColorTexture(0, 0, 0, 0.2)
+        HidePixelBorder(talentFrame)
     end
 
-    if themeCheckbox then
-        themeCheckbox:SetChecked(elv and true or false)
-    end
+    -- Member rows and the status bar colour pick the theme up as they draw
+    AS.RefreshMemberList()
+    AS.UpdateScanStatus()
 end
 
 local function CreateBrowseFrame()
     if browseFrame then return end
 
-    local f = CreateFrame("Frame", "WM_ArmorySnapFrame", UIParent,
-                          "BasicFrameTemplateWithInset, BackdropTemplate")
-    f:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
-    f:SetPoint("CENTER")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop",  f.StopMovingOrSizing)
-    f:SetFrameStrata("HIGH")
-    f:SetClampedToScreen(true)
-    tinsert(UISpecialFrames, "WM_ArmorySnapFrame")
-    f.TitleText:SetText("ArmorySnap")
+    -- WM.UI provides the shell: title, close button, Escape, theme skin and
+    -- saved position. Three control rows on top; the snapshot browser fills
+    -- the rest, and the panel height is fitted to CONTENT_H so the paper
+    -- doll always has its room.
+    local panel = WM.UI:CreatePanel({
+        name = "WM_ArmorySnapFrame",
+        title = "ArmorySnap",
+        titleColor = "66AAFF",
+        width = FRAME_WIDTH,
+        maxHeight = 700,
+        scroll = false,
+        onShow = function()
+            if not selectedSnapshotKey then
+                selectedSnapshotKey = AS.session.snapshotKey or AS.GetSnapshotKeys()[1]
+                snapshotDropdown:Refresh()
+            end
+            AS.RefreshMemberList()
+            AS.UpdateScanStatus()
+        end,
+    })
+    local L = panel.layout
+    local options = AS.db.options
 
     -- Scan status bar
-    local statusBar = CreateFrame("StatusBar", nil, f)
-    statusBar:SetPoint("TOPLEFT", 10, -28)
-    statusBar:SetPoint("RIGHT", f, "RIGHT", -10, 0)
+    local row = L:Row(22)
+    local statusBar = CreateFrame("StatusBar", nil, row.frame)
+    statusBar:SetPoint("LEFT", row.frame, "LEFT", 0, 0)
+    statusBar:SetPoint("RIGHT", row.frame, "RIGHT", 0, 0)
     statusBar:SetHeight(18)
     statusBar:SetMinMaxValues(0, 1)
     statusBar:SetValue(0)
     statusBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    statusBar:SetStatusBarColor(0.26, 0.8, 0.26, 0.7)
     scanStatusBar = statusBar
 
-    local sBg = statusBar:CreateTexture(nil, "BACKGROUND")
-    sBg:SetAllPoints()
-    sBg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
-    scanStatusBg = sBg
+    scanStatusBg = statusBar:CreateTexture(nil, "BACKGROUND")
+    scanStatusBg:SetAllPoints()
 
     scanStatusText = statusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     scanStatusText:SetPoint("LEFT", 6, 0)
@@ -1241,178 +1191,80 @@ local function CreateBrowseFrame()
     scanStatusPct = statusBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     scanStatusPct:SetPoint("RIGHT", -6, 0)
 
-    -- Checkbox row (group + theme + verbose)
-    local cbRow = CreateFrame("Frame", nil, f)
-    cbRow:SetPoint("TOPLEFT", statusBar, "BOTTOMLEFT", -2, -1)
-    cbRow:SetPoint("RIGHT", f, "RIGHT", -10, 0)
-    cbRow:SetHeight(24)
+    -- Scanner options
+    row = L:Row(24)
+    row:Checkbox({
+        label = "Scan in group", font = "GameFontNormalSmall",
+        get = function() return options.scanGroup end,
+        set = function(v) options.scanGroup = v end,
+        tooltip = { "Scan in Group", "Also scan automatically whenever you are in a party or raid,"
+            .. " not only inside raid instances. Needs Auto-scan. Same as /as group." },
+    }, 0)
+    row:Checkbox({
+        label = "Chat Log", font = "GameFontNormalSmall",
+        get = function() return options.verbose end,
+        set = function(v) options.verbose = v end,
+        tooltip = { "Chat Log", "Print scan progress to chat: each member captured, scans starting,"
+            .. " passes finished, retries and roster changes. Same as /as verbose." },
+    }, 150)
+    row:Checkbox({
+        label = "Auto-scan", font = "GameFontNormalSmall",
+        get = function() return AS:IsModuleEnabled() end,
+        set = function(v) AS:SetModuleEnabled(v) end,
+        tooltip = { "Auto-scan", "Snapshot raid gear automatically in raid instances"
+            .. " (and groups, with Scan in group). Manual /as snap always works."
+            .. " Same as the dashboard switch and /as auto." },
+    }, 270)
 
-    local gcb = CreateFrame("CheckButton", "WM_ASGroupCB", cbRow, "UICheckButtonTemplate")
-    gcb:SetPoint("LEFT", 0, 0)
-    gcb:SetSize(22, 22)
-    gcb.text = _G[gcb:GetName() .. "Text"] or gcb.Text
-    if gcb.text then
-        gcb.text:SetText("Scan in group")
-        gcb.text:SetFontObject("GameFontNormalSmall")
-    end
-    gcb:SetChecked(AS.db and AS.db.options and AS.db.options.scanGroup or false)
-    gcb:SetScript("OnClick", function(self)
-        if AS.db and AS.db.options then
-            AS.db.options.scanGroup = self:GetChecked() and true or false
-        end
-    end)
-    groupCheckbox = gcb
+    row = L:Row(28)
+    row:Dropdown({
+        name = "WM_ASRetentionDD", label = "Keep snapshots:", width = 80,
+        options = {
+            { text = "1 day",   value = 1 },
+            { text = "7 days",  value = 7 },
+            { text = "14 days", value = 14 },
+            { text = "30 days", value = 30 },
+        },
+        get = function() return options.retentionDays end,
+        set = function(v) options.retentionDays = v end,
+        tooltip = { "Keep Snapshots", "Snapshots older than this are deleted the next time you"
+            .. " log in or reload the UI." },
+    }, 2)
 
-    local tcb = CreateFrame("CheckButton", "WM_ASThemeCB", cbRow, "UICheckButtonTemplate")
-    tcb:SetPoint("LEFT", gcb, "RIGHT", 110, 0)
-    tcb:SetSize(22, 22)
-    tcb.text = _G[tcb:GetName() .. "Text"] or tcb.Text
-    if tcb.text then
-        tcb.text:SetText("ElvUI Theme")
-        tcb.text:SetFontObject("GameFontNormalSmall")
-    end
-    tcb:SetChecked(AS.db and AS.db.options and AS.db.options.elvuiTheme or false)
-    tcb:SetScript("OnClick", function(self)
-        if AS.db and AS.db.options then
-            AS.db.options.elvuiTheme = self:GetChecked() and true or false
-            AS.ApplyTheme()
-        end
-    end)
-    themeCheckbox = tcb
-
-    local vcb = CreateFrame("CheckButton", "WM_ASVerboseCB", cbRow, "UICheckButtonTemplate")
-    vcb:SetPoint("LEFT", tcb, "RIGHT", 80, 0)
-    vcb:SetSize(22, 22)
-    vcb.text = _G[vcb:GetName() .. "Text"] or vcb.Text
-    if vcb.text then
-        vcb.text:SetText("Chat Log")
-        vcb.text:SetFontObject("GameFontNormalSmall")
-    end
-    vcb:SetChecked(AS.db and AS.db.options and AS.db.options.verbose or false)
-    vcb:SetScript("OnClick", function(self)
-        if AS.db and AS.db.options then
-            AS.db.options.verbose = self:GetChecked() and true or false
-        end
-    end)
-    verboseCheckbox = vcb
-
-    -- options.enabled gates automatic scanning; it had no control before
-    local acb = CreateFrame("CheckButton", "WM_ASAutoCB", cbRow, "UICheckButtonTemplate")
-    acb:SetPoint("LEFT", vcb, "RIGHT", 70, 0)
-    acb:SetSize(22, 22)
-    acb.text = _G[acb:GetName() .. "Text"] or acb.Text
-    if acb.text then
-        acb.text:SetText("Auto-scan")
-        acb.text:SetFontObject("GameFontNormalSmall")
-    end
-    acb:SetChecked(not (AS.db and AS.db.options and AS.db.options.enabled == false))
-    acb:SetScript("OnClick", function(self)
-        if AS.db and AS.db.options then
-            AS.db.options.enabled = self:GetChecked() and true or false
-        end
-    end)
-    acb:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Auto-scan", 1, 0.8, 0)
-        GameTooltip:AddLine("Snapshot raid gear automatically in raid instances"
-            .. " (and groups, with Scan in group). Manual /as snap always works.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    acb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    autoCheckbox = acb
-
-    -- Retention row
-    local retRow = CreateFrame("Frame", nil, f)
-    retRow:SetPoint("TOPLEFT", cbRow, "BOTTOMLEFT", 0, 0)
-    retRow:SetPoint("RIGHT", f, "RIGHT", -10, 0)
-    retRow:SetHeight(26)
-
-    local retLabel = retRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    retLabel:SetPoint("LEFT", 4, 0)
-    retLabel:SetText("Keep snapshots:")
-
-    local retDD = CreateFrame("Frame", "WM_ASRetentionDD", retRow, "UIDropDownMenuTemplate")
-    retDD:SetPoint("LEFT", retLabel, "RIGHT", -8, -2)
-    UIDropDownMenu_SetWidth(retDD, 80)
-
-    local retOptions = {
-        { text = "1 day",   value = 1 },
-        { text = "7 days",  value = 7 },
-        { text = "14 days", value = 14 },
-        { text = "30 days", value = 30 },
-    }
-
-    UIDropDownMenu_Initialize(retDD, function(self, level)
-        local current = AS.db and AS.db.options and AS.db.options.retentionDays or 30
-        for _, opt in ipairs(retOptions) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text    = opt.text
-            info.value   = opt.value
-            info.checked = (opt.value == current)
-            info.func = function(self)
-                if AS.db and AS.db.options then
-                    AS.db.options.retentionDays = self.value
-                end
-                UIDropDownMenu_SetText(retDD, opt.text)
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end)
-
-    local initDays = AS.db and AS.db.options and AS.db.options.retentionDays or 30
-    for _, opt in ipairs(retOptions) do
-        if opt.value == initDays then
-            UIDropDownMenu_SetText(retDD, opt.text)
-            break
-        end
-    end
+    local fill = L:Fill(CONTENT_H)
 
     -- Left panel: snapshot dropdown + member list
-    local leftPanel = CreateFrame("Frame", nil, f)
-    leftPanel:SetPoint("TOPLEFT", retRow, "BOTTOMLEFT", 2, -2)
-    leftPanel:SetPoint("BOTTOM", f, "BOTTOM", 0, 8)
+    local leftPanel = CreateFrame("Frame", nil, fill)
+    leftPanel:SetPoint("TOPLEFT", 0, 0)
+    leftPanel:SetPoint("BOTTOMLEFT", 0, 0)
     leftPanel:SetWidth(LIST_WIDTH)
 
     local snapLabel = leftPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    snapLabel:SetPoint("TOPLEFT", 0, 0)
+    snapLabel:SetPoint("TOPLEFT", 0, -2)
     snapLabel:SetText("Snapshot:")
 
-    local dd = CreateFrame("Frame", "WM_ASSnapDD", leftPanel, "UIDropDownMenuTemplate")
-    dd:SetPoint("TOPLEFT", snapLabel, "BOTTOMLEFT", -16, -2)
-    snapshotDropdown = dd
-    UIDropDownMenu_SetWidth(dd, LIST_WIDTH - 30)
-
-    local function DDInit(self, level)
-        local keys = AS.GetSnapshotKeys()
-        for _, key in ipairs(keys) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text     = key
-            info.value    = key
-            info.checked  = (key == selectedSnapshotKey)
-            info.func = function(self)
-                selectedSnapshotKey = self.value
-                selectedMemberName  = nil
-                UIDropDownMenu_SetText(dd, self.value)
-                CloseDropDownMenus()
-                AS.RefreshMemberList()
-                AS.ClearPaperDoll()
+    snapshotDropdown = L:Track(WM.UI.Dropdown(leftPanel, {
+        name = "WM_ASSnapDD", width = LIST_WIDTH - 30, placeholder = "Select snapshot …",
+        options = function()
+            local list = {}
+            for _, key in ipairs(AS.GetSnapshotKeys()) do
+                list[#list + 1] = { value = key, text = key }
             end
-            UIDropDownMenu_AddButton(info, level)
-        end
-        if #keys == 0 then
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = "(No snapshots)"
-            info.disabled = true
-            info.notCheckable = true
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end
-    UIDropDownMenu_Initialize(dd, DDInit)
-    UIDropDownMenu_SetText(dd, "Select snapshot …")
+            return list
+        end,
+        get = function() return selectedSnapshotKey end,
+        set = function(key)
+            selectedSnapshotKey = key
+            selectedMemberName  = nil
+            AS.RefreshMemberList()
+            AS.ClearPaperDoll()
+        end,
+        disabled = function() return next(AS.db.snapshots) == nil end,
+    }))
+    snapshotDropdown:SetPoint("TOPLEFT", snapLabel, "BOTTOMLEFT", 0, -2)
 
     local mLabel = leftPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    mLabel:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 16, -6)
+    mLabel:SetPoint("TOPLEFT", snapshotDropdown.dropdown, "BOTTOMLEFT", 16, -6)
     mLabel:SetText("Raid Members:")
 
     local sf = CreateFrame("ScrollFrame", "WM_ASMemberScroll", leftPanel,
@@ -1425,29 +1277,32 @@ local function CreateBrowseFrame()
     sf:SetScrollChild(child)
     memberScrollChild = child
 
-    -- Right panel: char info + paper doll + talents + summary
-    local rightPanel = CreateFrame("Frame", nil, f)
-    rightPanel:SetPoint("TOPLEFT", leftPanel, "TOPRIGHT", 10, 0)
-    rightPanel:SetPoint("BOTTOM", f, "BOTTOM", 0, 8)
+    -- Right panel: char info + paper doll + talents + summary. Fixed text
+    -- heights keep the doll in place whether or not a member is selected.
+    local rightPanel = CreateFrame("Frame", nil, fill)
+    rightPanel:SetPoint("TOPLEFT", leftPanel, "TOPRIGHT", LIST_GAP, 0)
+    rightPanel:SetPoint("BOTTOMLEFT", leftPanel, "BOTTOMRIGHT", LIST_GAP, 0)
     rightPanel:SetWidth(DOLL_WIDTH)
 
     charNameText = rightPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     charNameText:SetPoint("TOP", 0, -4)
+    charNameText:SetHeight(NAME_H)
 
     charDetailText = rightPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     charDetailText:SetPoint("TOP", charNameText, "BOTTOM", 0, -2)
+    charDetailText:SetHeight(DETAIL_H)
 
     charGuildText = rightPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     charGuildText:SetPoint("TOP", charDetailText, "BOTTOM", 0, -1)
+    charGuildText:SetHeight(GUILD_H)
     charGuildText:SetTextColor(0.25, 1.0, 0.25)
 
-    dollFrame = CreateFrame("Frame", nil, rightPanel)
+    local dollFrame = CreateFrame("Frame", nil, rightPanel)
     dollFrame:SetPoint("TOP", charGuildText, "BOTTOM", 0, -8)
     dollFrame:SetSize(DOLL_WIDTH, DOLL_H)
 
     dollBg = dollFrame:CreateTexture(nil, "BACKGROUND")
     dollBg:SetAllPoints()
-    dollBg:SetColorTexture(0, 0, 0, 0.15)
 
     for i, sid in ipairs(LEFT_SLOTS) do
         local btn = CreateSlotButton(dollFrame, sid)
@@ -1518,14 +1373,15 @@ local function CreateBrowseFrame()
     summaryLabel:SetWidth(DOLL_WIDTH - 8)
     summaryLabel:SetJustifyH("CENTER")
 
-    browseFrame = f
-    f:Hide()
+    panel:Finish()
+    browseFrame = panel
+    AS.ApplyTheme()
 end
 
 function AS.UpdateScanStatus()
     if not browseFrame or not browseFrame:IsShown() then return end
     local s   = AS.session
-    local elv = AS.db and AS.db.options and AS.db.options.elvuiTheme
+    local elv = IsElvTheme()
     if s.active then
         local total = math.max(s.totalInRaid, 1)
         local pct   = s.totalCaptured / total
@@ -1555,7 +1411,7 @@ function AS.RefreshMemberList()
     local snap  = AS.db.snapshots[selectedSnapshotKey]
     if not snap then return end
 
-    local elv = AS.db and AS.db.options and AS.db.options.elvuiTheme
+    local elv = IsElvTheme()
     local yOff, btnH = 0, 18
     for i, name in ipairs(names) do
         local member = snap.members[name]
@@ -1727,46 +1583,13 @@ function AS.RefreshPaperDoll()
 end
 
 function AS.RefreshSnapshotList()
-    if not browseFrame or not browseFrame:IsShown() then return end
-    UIDropDownMenu_Initialize(snapshotDropdown, function(self, level)
-        local keys = AS.GetSnapshotKeys()
-        for _, key in ipairs(keys) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text    = key
-            info.value   = key
-            info.checked = (key == selectedSnapshotKey)
-            info.func = function(self)
-                selectedSnapshotKey = self.value
-                selectedMemberName  = nil
-                UIDropDownMenu_SetText(snapshotDropdown, self.value)
-                CloseDropDownMenus()
-                AS.RefreshMemberList()
-                AS.ClearPaperDoll()
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end)
-    if selectedSnapshotKey then
-        UIDropDownMenu_SetText(snapshotDropdown, selectedSnapshotKey)
-    end
+    if browseFrame and browseFrame:IsShown() then snapshotDropdown:Refresh() end
 end
 
 function AS.OnMemberCaptured()
     if not browseFrame or not browseFrame:IsShown() then return end
     if AS.session.snapshotKey and selectedSnapshotKey == AS.session.snapshotKey then
         AS.RefreshMemberList()
-    end
-end
-
-function AS.UpdateGroupCheckbox()
-    if groupCheckbox and AS.db and AS.db.options then
-        groupCheckbox:SetChecked(AS.db.options.scanGroup)
-    end
-end
-
-function AS.UpdateVerboseCheckbox()
-    if verboseCheckbox and AS.db and AS.db.options then
-        verboseCheckbox:SetChecked(AS.db.options.verbose)
     end
 end
 
@@ -1779,25 +1602,7 @@ function AS.ToggleBrowseFrame()
     if browseFrame:IsShown() then
         browseFrame:Hide()
     else
-        if groupCheckbox then groupCheckbox:SetChecked(AS.db.options.scanGroup) end
-        if themeCheckbox then themeCheckbox:SetChecked(AS.db.options.elvuiTheme) end
-        if verboseCheckbox then verboseCheckbox:SetChecked(AS.db.options.verbose) end
-        if autoCheckbox then autoCheckbox:SetChecked(AS.db.options.enabled ~= false) end
         browseFrame:Show()
-        AS.ApplyTheme()
-        if not selectedSnapshotKey then
-            if AS.session.snapshotKey then
-                selectedSnapshotKey = AS.session.snapshotKey
-            else
-                local keys = AS.GetSnapshotKeys()
-                if #keys > 0 then selectedSnapshotKey = keys[1] end
-            end
-            if selectedSnapshotKey then
-                UIDropDownMenu_SetText(snapshotDropdown, selectedSnapshotKey)
-            end
-        end
-        AS.RefreshMemberList()
-        AS.UpdateScanStatus()
     end
 end
 

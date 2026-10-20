@@ -42,7 +42,8 @@ local defaults = {
 -- State
 local messages = {}
 local mainFrame = nil
-local tabButtons = {}
+local tabChoices = {}    -- the two rows of tab buttons
+local tabCounts = {}     -- listing count on each tab, by key
 local currentTab = "SM"
 local updateTimer = 0
 
@@ -219,172 +220,143 @@ end
 -- ============================================
 -- UI
 -- ============================================
+-- One row of tab buttons. Choice shows the current tab in green; the
+-- listing count sits in each button's top-right corner.
+local function AddTabRow(L, tabs)
+    local row = L:Row(22)
+    local options = {}
+    for i, t in ipairs(tabs) do
+        options[i] = { value = t.key, text = t.text, width = 46, tooltip = t.tooltip }
+    end
+    local choice = row:Choice({
+        get = function() return currentTab end,
+        set = function(v)
+            currentTab = v
+            ServicesParser:RefreshDisplay()
+        end,
+        options = options,
+    }, 8)
+    -- Choice keeps its buttons to itself; they are its only child frames, in option order
+    local buttons = { choice:GetChildren() }
+    for i, t in ipairs(tabs) do
+        local btn = buttons[i]
+        if type(btn) == "table" and btn.CreateFontString then
+            local count = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            count:SetPoint("TOPRIGHT", 2, 2)
+            count:SetTextColor(1, 0.8, 0)
+            tabCounts[t.key] = count
+        end
+    end
+    tabChoices[#tabChoices + 1] = choice
+end
+
+local function DungeonTab(dungeon)
+    return { key = dungeon.key, text = dungeon.key,
+             tooltip = { dungeon.name, "Levels " .. dungeon.levelRange } }
+end
 
 function ServicesParser:CreateMainFrame()
     if mainFrame then return mainFrame end
-    
-    local frame = CreateFrame("Frame", "WM_ServicesParserFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(520, 480)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF00CCFFServices Parser|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
+
+    -- Tabs and (collapsed) settings on top, the listings fill the rest
+    local panel = WM.UI:CreatePanel({
+        name = "WM_ServicesParserFrame",
+        title = "Services Parser",
+        titleColor = "00CCFF",
+        width = 520,
+        height = 480,
+        scroll = false,
+        onRefresh = function() ServicesParser:RefreshDisplay() end,
+    })
+    local L = panel.layout
+
     -- Header
-    local header = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header:SetPoint("TOP", 0, -40)
-    frame.header = header
-    
-    -- Tab buttons - Two rows: Classic (row 1), TBC (row 2)
-    tabButtons = {}
-    local xOffset = 10
-    local yOffset = -58
-    local tabWidth = 48
-    local tabsPerRow = 10
-    local tabCount = 0
-    
-    -- Classic dungeons (first row)
+    local row = L:Row(20)
+    local header = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("CENTER", row.frame, "CENTER", 0, 0)
+    panel.header = header
+
+    -- Tab buttons - two rows: Classic + Summons, then TBC
+    tabChoices, tabCounts = {}, {}
+    local classic, tbc = {}, {}
     for i, dungeon in ipairs(DUNGEONS) do
-        if i <= 7 then  -- Classic dungeons
-            local btn = self:CreateTabButton(frame, dungeon.key, dungeon.key, xOffset, yOffset)
-            tabButtons[dungeon.key] = btn
-            xOffset = xOffset + tabWidth
-            tabCount = tabCount + 1
-        end
+        table.insert(i <= 7 and classic or tbc, DungeonTab(dungeon))
     end
-    
-    -- Summons tab at end of first row
-    local sumBtn = self:CreateTabButton(frame, "SUM", "SUMMONS", xOffset, yOffset)
-    tabButtons["SUMMONS"] = sumBtn
-    
-    -- TBC dungeons (second row)
-    xOffset = 10
-    yOffset = yOffset - 24
-    for i, dungeon in ipairs(DUNGEONS) do
-        if i > 7 then  -- TBC dungeons
-            local btn = self:CreateTabButton(frame, dungeon.key, dungeon.key, xOffset, yOffset)
-            tabButtons[dungeon.key] = btn
-            xOffset = xOffset + tabWidth
-        end
-    end
-    
-    -- Scroll frame (adjusted for two rows of tabs)
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 15, -110)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
-    frame.scrollFrame = scrollFrame
-    
+    table.insert(classic, { key = "SUMMONS", text = "SUM",
+        tooltip = { "Summons / Portals", "Adverts offering summons or portals." } })
+    AddTabRow(L, classic)
+    AddTabRow(L, tbc)
+
+    -- ---------- Settings ----------
+    L:Section({ key = "settings", title = "Settings", collapsed = true })
+    local channelBox
+    channelBox = L:EditBox({
+        label = "Channel to monitor:", width = 150,
+        get = function() return ServicesParserDB.channelName end,
+        set = function(v)
+            if v ~= "" then
+                ServicesParserDB.channelName = v
+            else
+                channelBox.editBox:SetText(ServicesParserDB.channelName)   -- empty would match every channel
+            end
+        end,
+        tooltip = { "Channel to Monitor", "Adverts are read from any channel whose name contains this"
+            .. " text (not case-sensitive)." },
+    })
+    local durationBox = L:EditBox({
+        label = "Message duration (sec):", width = 60,
+        get = function() return tostring(ServicesParserDB.messageDuration) end,
+        set = function(v) ServicesParserDB.messageDuration = tonumber(v) or 60 end,
+        tooltip = { "Message Duration", "How long a listing stays in the list. A repeat of the same advert"
+            .. " restarts its timer; listings already shown keep their old time." },
+    })
+    durationBox.editBox:SetNumeric(true)
+    L:Checkbox({
+        label = "Play sound on new message",
+        get = function() return ServicesParserDB.playSound end,
+        set = function(v) ServicesParserDB.playSound = v end,
+        tooltip = { "Play Sound", "Play a click whenever a matching advert arrives, repeats included." },
+    })
+    L:EndSection()
+
+    -- Listings in the remaining space
+    local fill = L:Fill(120)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, -4)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 0)
+    panel.scrollFrame = scrollFrame
+
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
+    scrollChild:SetWidth(520 - 24 - 23)
     scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-    frame.scrollChild = scrollChild
-    frame.entries = {}
-    
-    -- Settings button
-    local settingsBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    settingsBtn:SetSize(80, 22)
-    settingsBtn:SetPoint("BOTTOMLEFT", 15, 15)
-    settingsBtn:SetText("Settings")
-    settingsBtn:SetScript("OnClick", function()
-        ServicesParser:ShowSettings()
-    end)
-    
-    -- Clear button
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(80, 22)
-    clearBtn:SetPoint("BOTTOMRIGHT", -15, 15)
-    clearBtn:SetText("Clear All")
-    clearBtn:SetScript("OnClick", function()
-        ServicesParser:InitMessageTables()
-        ServicesParser:RefreshDisplay()
-    end)
-    
-    mainFrame = frame
-    self.mainFrame = frame
-    
-    self:UpdateTabHighlights()
-    self:RefreshDisplay()
-    
-    return frame
-end
+    panel.scrollChild = scrollChild
+    panel.entries = {}
 
-function ServicesParser:CreateTabButton(parent, text, key, xOffset, yOffset)
-    yOffset = yOffset or -65
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(46, 22)
-    btn:SetPoint("TOPLEFT", xOffset, yOffset)
-    
-    local bg = btn:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.2, 0.2, 0.2, 0.9)
-    btn.bg = bg
-    
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    label:SetPoint("CENTER")
-    label:SetText(text)
-    btn.label = label
-    
-    local count = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    count:SetPoint("TOPRIGHT", 2, 2)
-    count:SetTextColor(1, 0.8, 0)
-    btn.count = count
-    
-    btn.key = key
-    
-    btn:SetScript("OnClick", function()
-        currentTab = key
-        ServicesParser:UpdateTabHighlights()
-        ServicesParser:RefreshDisplay()
-    end)
-    
-    btn:SetScript("OnEnter", function(self)
-        self.bg:SetColorTexture(0.3, 0.3, 0.3, 0.9)
-    end)
-    btn:SetScript("OnLeave", function(self)
-        if currentTab == self.key then
-            self.bg:SetColorTexture(0.3, 0.5, 0.3, 0.9)
-        else
-            self.bg:SetColorTexture(0.2, 0.2, 0.2, 0.9)
-        end
-    end)
-    
-    return btn
+    panel:AddFooterButton({
+        text = "Clear All", width = 80,
+        onClick = function()
+            ServicesParser:InitMessageTables()
+            ServicesParser:RefreshDisplay()
+        end,
+        tooltip = { "Clear All", "Remove every listing from all tabs." },
+    }, "RIGHT")
+
+    panel:Finish()
+
+    mainFrame = panel
+    self.mainFrame = panel
+
+    return panel
 end
 
 function ServicesParser:UpdateTabHighlights()
-    for key, btn in pairs(tabButtons) do
-        if key == currentTab then
-            btn.bg:SetColorTexture(0.3, 0.5, 0.3, 0.9)
-            btn.label:SetTextColor(1, 1, 1)
-        else
-            btn.bg:SetColorTexture(0.2, 0.2, 0.2, 0.9)
-            btn.label:SetTextColor(0.7, 0.7, 0.7)
-        end
-        
+    for _, choice in ipairs(tabChoices) do
+        choice:Refresh()
+    end
+    for key, count in pairs(tabCounts) do
         local msgCount = #(messages[key] or {})
-        if msgCount > 0 then
-            btn.count:SetText(msgCount)
-        else
-            btn.count:SetText("")
-        end
+        count:SetText(msgCount > 0 and msgCount or "")
     end
 end
 
@@ -508,83 +480,12 @@ function ServicesParser:CreateMessageEntry(parent, width)
     return frame
 end
 
-function ServicesParser:ShowSettings()
-    if self.settingsFrame then
-        self.settingsFrame:Show()
-        return
-    end
-    
-    local frame = CreateFrame("Frame", "WM_ServicesParserSettings", UIParent, "BackdropTemplate")
-    frame:SetSize(300, 180)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("DIALOG")
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("Services Parser Settings")
-    
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    -- Channel input
-    local channelLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    channelLabel:SetPoint("TOPLEFT", 20, -50)
-    channelLabel:SetText("Channel to monitor:")
-    
-    local channelInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    channelInput:SetSize(150, 20)
-    channelInput:SetPoint("LEFT", channelLabel, "RIGHT", 10, 0)
-    channelInput:SetText(ServicesParserDB.channelName)
-    channelInput:SetAutoFocus(false)
-    channelInput:SetScript("OnEnterPressed", function(self)
-        ServicesParserDB.channelName = self:GetText()
-        self:ClearFocus()
-    end)
-    
-    -- Duration input
-    local durationLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    durationLabel:SetPoint("TOPLEFT", 20, -80)
-    durationLabel:SetText("Message duration (sec):")
-    
-    local durationInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    durationInput:SetSize(60, 20)
-    durationInput:SetPoint("LEFT", durationLabel, "RIGHT", 10, 0)
-    durationInput:SetText(ServicesParserDB.messageDuration)
-    durationInput:SetAutoFocus(false)
-    durationInput:SetNumeric(true)
-    durationInput:SetScript("OnEnterPressed", function(self)
-        ServicesParserDB.messageDuration = tonumber(self:GetText()) or 60
-        self:ClearFocus()
-    end)
-    
-    -- Sound checkbox
-    local soundCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    soundCB:SetPoint("TOPLEFT", 15, -110)
-    soundCB.Text:SetText("Play sound on new message")
-    soundCB:SetChecked(ServicesParserDB.playSound)
-    soundCB:SetScript("OnClick", function(self)
-        ServicesParserDB.playSound = self:GetChecked()
-    end)
-    
-    self.settingsFrame = frame
-end
-
 function ServicesParser:ToggleUI()
     local frame = self:CreateMainFrame()
     if frame:IsShown() then
         frame:Hide()
     else
-        frame:Show()
-        self:RefreshDisplay()
+        frame:Show()   -- OnShow refreshes the listings
     end
 end
 

@@ -32,7 +32,6 @@ function KeywordMonitor:InitDB()
                 ["LookingForGroup"] = true,
             },
             results = {},
-            position = {},
             keywordHistory = {},
             alertsEnabled = true,
             soundEnabled = true,
@@ -69,14 +68,9 @@ end
 
 function KeywordMonitor:UpdateStopButton()
     if not self.stopButton or not self.statusText then return end
-    
-    if isMonitoringPaused then
-        self.stopButton:SetText("Resume")
-        self.statusText:SetText("|cffff0000PAUSED|r")
-    else
-        self.stopButton:SetText("Stop")
-        self.statusText:SetText("|cff00ff00ACTIVE|r")
-    end
+    -- Both read isMonitoringPaused
+    self.stopButton:Refresh()
+    self.statusText:Refresh()
 end
 
 local function GetCurrentTime()
@@ -250,49 +244,81 @@ end
 -- UI
 -- ============================================
 
-function KeywordMonitor:UpdateKeywordList()
-    if not self.keywordDisplay then return end
-    
+local CHANNELS = {
+    { key = "Trade", label = "Trade" },
+    { key = "General", label = "General" },
+    { key = "LookingForGroup", label = "LFG" },
+    { key = "LocalDefense", label = "LocalDef" },
+    { key = "WorldDefense", label = "WorldDef" },
+    { key = "GuildRecruitment", label = "GuildRecruit" },
+    { key = "Services", label = "Services" },
+}
+
+local function KeywordSummary()
     local keywords = {}
     for kw, _ in pairs(KeywordMonitorDB.keywords) do
         table.insert(keywords, kw)
     end
-    
-    if #keywords == 0 then
-        self.keywordDisplay:SetText("Active: |cFF888888(none)|r")
-    else
-        self.keywordDisplay:SetText("Active: |cFF00FF00" .. table.concat(keywords, ", ") .. "|r")
-    end
+    if #keywords == 0 then return "Active: (none)" end
+    table.sort(keywords)
+    return "Active: |cFF00FF00" .. table.concat(keywords, ", ") .. "|r"
 end
 
+local function AddKeyword(text)
+    text = strtrim(text or "")
+    if text == "" then return end
+    KeywordMonitorDB.keywords[text] = true
+    AddToHistory(text)
+    KeywordMonitor:UpdateKeywordList()
+    KeywordMonitor:UpdateHistoryDisplay()
+end
+
+-- The active list is a wrapped note; re-measure so the rows below move
+function KeywordMonitor:UpdateKeywordList()
+    if not self.keywordDisplay then return end
+    self.keywordDisplay:Refresh()
+    self.mainFrame:Reflow()
+end
+
+-- One button per recent keyword, as many as fit the row (buttons pooled)
 function KeywordMonitor:UpdateHistoryDisplay()
-    if not self.historyContainer then return end
-    
-    -- Clear existing buttons
-    if self.historyButtons then
-        for _, btn in ipairs(self.historyButtons) do
+    local container = self.historyContainer
+    if not container then return end
+
+    local room = container:GetWidth()
+    if not room or room <= 0 then room = self.mainFrame.layout.width - 68 end
+
+    local x, full = 0, false
+    for i, keyword in ipairs(KeywordMonitorDB.keywordHistory) do
+        local btn = self.historyButtons[i]
+        if not btn then
+            btn = CreateFrame("Button", nil, container, "UIPanelButtonTemplate")
+            btn:SetHeight(18)
+            btn:SetScript("OnClick", function(b)
+                KeywordMonitorDB.keywords[b.keyword] = true
+                KeywordMonitor:UpdateKeywordList()
+            end)
+            WM.UI.SetTooltip(btn, function()
+                return { btn.keyword, "Click to make this an active keyword again." }
+            end)
+            self.historyButtons[i] = btn
+        end
+        btn.keyword = keyword
+        btn:SetText(keyword)
+        local w = btn:GetFontString():GetStringWidth() + 20
+        btn:SetWidth(w)
+        if full or x + w > room then
+            full = true
             btn:Hide()
-            btn:SetParent(nil)
+        else
+            btn:ClearAllPoints()
+            btn:SetPoint("LEFT", container, "LEFT", x, 0)
+            btn:Show()
+            x = x + w + 3
         end
     end
-    self.historyButtons = {}
-    
-    local xOffset = 0
-    for i, keyword in ipairs(KeywordMonitorDB.keywordHistory) do
-        local btn = CreateFrame("Button", nil, self.historyContainer, "UIPanelButtonTemplate")
-        btn:SetHeight(18)
-        btn:SetText(keyword)
-        btn:SetWidth(btn:GetFontString():GetStringWidth() + 20)
-        btn:SetPoint("LEFT", xOffset, 0)
-        btn:SetScript("OnClick", function()
-            KeywordMonitorDB.keywords[keyword] = true
-            self:UpdateKeywordList()
-        end)
-        
-        table.insert(self.historyButtons, btn)
-        xOffset = xOffset + btn:GetWidth() + 3
-        
-        if xOffset > 350 then break end
+    for i = #KeywordMonitorDB.keywordHistory + 1, #self.historyButtons do
+        self.historyButtons[i]:Hide()
     end
 end
 
@@ -300,6 +326,11 @@ function KeywordMonitor:UpdateResultsDisplay()
     if not self.resultsScrollChild then return end
 
     CleanupOldResults()
+
+    -- Rows stretch to the scroll child, which follows the window width
+    local width = self.resultsScrollFrame:GetWidth()
+    if not width or width <= 0 then width = self.mainFrame:GetWidth() - 24 - 23 end
+    self.resultsScrollChild:SetWidth(width)
 
     -- Reuse pooled frames — WoW frames are never garbage-collected, so
     -- recreating them every refresh (this runs once per second while the
@@ -399,309 +430,155 @@ function KeywordMonitor:CreateResultFrame()
 end
 
 function KeywordMonitor:CreateMainFrame()
-    if self.mainFrame then return end
-    
-    local frame = CreateFrame("Frame", "WM_KeywordMonitorFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(500, WM:ScreenFitHeight(580, 480))
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:SetResizable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", function(f)
-        f:StopMovingOrSizing()
-        local point, _, relPoint, x, y = f:GetPoint()
-        KeywordMonitorDB.position = {point, relPoint, x, y}
-    end)
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Restore position
-    if KeywordMonitorDB.position and #KeywordMonitorDB.position >= 4 then
-        frame:ClearAllPoints()
-        frame:SetPoint(KeywordMonitorDB.position[1], UIParent, KeywordMonitorDB.position[2], 
-                      KeywordMonitorDB.position[3], KeywordMonitorDB.position[4])
+    if self.mainFrame then return self.mainFrame end
+
+    -- Settings rows on top, the match list fills whatever height is left.
+    -- Collapsing a section gives the list more room.
+    local panel = WM.UI:CreatePanel({
+        name = "WM_KeywordMonitorFrame",
+        title = "Keyword Monitor",
+        titleColor = "FFAA00",
+        width = 500,
+        height = 580,
+        minHeight = 480,
+        scroll = false,
+        resizable = { 400, 480, 800, 800 },
+        onResize = function()
+            KeywordMonitor:UpdateHistoryDisplay()
+            KeywordMonitor:UpdateResultsDisplay()
+        end,
+        onRefresh = function()
+            KeywordMonitor:UpdateHistoryDisplay()
+            KeywordMonitor:UpdateResultsDisplay()
+        end,
+    })
+    self.mainFrame = panel
+    local L = panel.layout
+
+    -- Carry over the position saved by the old hand-built window
+    local old = KeywordMonitorDB.position
+    if old and #old >= 4 and not panel:GetState().pos then
+        panel:GetState().pos = { old[1], old[2], old[3], old[4] }
+        panel:ClearAllPoints()
+        panel:SetPoint(old[1], UIParent, old[2], old[3], old[4])
     end
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFAA00Keyword Monitor|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    -- Resize handle
-    local resizeBtn = CreateFrame("Button", nil, frame)
-    resizeBtn:SetSize(16, 16)
-    resizeBtn:SetPoint("BOTTOMRIGHT", -6, 6)
-    resizeBtn:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resizeBtn:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resizeBtn:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resizeBtn:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
-    resizeBtn:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
-    frame:SetResizeBounds(400, 480, 800, WM:ScreenFitHeight(800, 480))
-    
-    -- ========== Keywords Section ==========
-    local keywordSection = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    keywordSection:SetPoint("TOPLEFT", 15, -40)
-    keywordSection:SetPoint("TOPRIGHT", -15, -40)
-    keywordSection:SetHeight(70)
-    keywordSection:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    keywordSection:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    
-    local keywordLabel = keywordSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    keywordLabel:SetPoint("TOPLEFT", 8, -8)
-    keywordLabel:SetText("Keywords:")
-    
-    local keywordInput = CreateFrame("EditBox", nil, keywordSection, "InputBoxTemplate")
-    keywordInput:SetSize(120, 20)
-    keywordInput:SetPoint("TOPLEFT", 8, -25)
-    keywordInput:SetAutoFocus(false)
-    keywordInput:SetScript("OnEnterPressed", function(self)
-        local text = strtrim(self:GetText() or "")
-        if text ~= "" then
-            KeywordMonitorDB.keywords[text] = true
-            AddToHistory(text)
+    KeywordMonitorDB.position = nil
+
+    -- ---------- Monitoring status ----------
+    local row = L:Row(26)
+    self.statusText = row:Text({
+        text = function()
+            return "Monitoring: " .. (isMonitoringPaused and "|cffff0000PAUSED|r" or "|cff00ff00ACTIVE|r")
+        end,
+    }, 12)
+    self.stopButton = row:RightButton({
+        text = function() return isMonitoringPaused and "Resume" or "Stop" end,
+        width = 70,
+        onClick = function()
+            isMonitoringPaused = not isMonitoringPaused
+            KeywordMonitor:UpdateStopButton()
+        end,
+        tooltip = { "Stop / Resume", "Pause keyword matching. This lasts for this session only:"
+            .. " monitoring starts again at your next login or reload." },
+    }, 3)
+
+    -- ---------- Keywords ----------
+    L:Section({ key = "keywords", title = "Keywords" })
+    row = L:Row(26)
+    local addBox = row:EditBox({
+        label = "Keyword:", width = 120, onEnter = AddKeyword, clearOnEnter = true,
+        tooltip = { "Add Keyword", "Type a word or phrase and press Enter, or click Add. A message matches"
+            .. " when it contains the keyword anywhere, ignoring case." },
+    }, 12)
+    row:Button({
+        text = "Add", width = 50,
+        onClick = function()
+            AddKeyword(addBox:GetText())
+            addBox:SetText("")
+        end,
+    }, 215)
+    row:Button({
+        text = "Clear All", width = 60,
+        onClick = function()
+            KeywordMonitorDB.keywords = {}
             KeywordMonitor:UpdateKeywordList()
-            KeywordMonitor:UpdateHistoryDisplay()
-            self:SetText("")
-        end
-        self:ClearFocus()
-    end)
-    
-    local addBtn = CreateFrame("Button", nil, keywordSection, "UIPanelButtonTemplate")
-    addBtn:SetSize(50, 22)
-    addBtn:SetPoint("LEFT", keywordInput, "RIGHT", 5, 0)
-    addBtn:SetText("Add")
-    addBtn:SetScript("OnClick", function()
-        local text = strtrim(keywordInput:GetText() or "")
-        if text ~= "" then
-            KeywordMonitorDB.keywords[text] = true
-            AddToHistory(text)
-            KeywordMonitor:UpdateKeywordList()
-            KeywordMonitor:UpdateHistoryDisplay()
-            keywordInput:SetText("")
-        end
-    end)
-    
-    local clearAllBtn = CreateFrame("Button", nil, keywordSection, "UIPanelButtonTemplate")
-    clearAllBtn:SetSize(60, 22)
-    clearAllBtn:SetPoint("LEFT", addBtn, "RIGHT", 5, 0)
-    clearAllBtn:SetText("Clear All")
-    clearAllBtn:SetScript("OnClick", function()
-        KeywordMonitorDB.keywords = {}
-        KeywordMonitor:UpdateKeywordList()
-    end)
-    
-    local keywordDisplay = keywordSection:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    keywordDisplay:SetPoint("TOPLEFT", 8, -50)
-    keywordDisplay:SetPoint("RIGHT", -8, 0)
-    keywordDisplay:SetJustifyH("LEFT")
-    keywordDisplay:SetWordWrap(true)
-    self.keywordDisplay = keywordDisplay
-    
-    -- ========== History Section ==========
-    local historySection = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    historySection:SetPoint("TOPLEFT", keywordSection, "BOTTOMLEFT", 0, -5)
-    historySection:SetPoint("TOPRIGHT", keywordSection, "BOTTOMRIGHT", 0, -5)
-    historySection:SetHeight(50)
-    historySection:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    historySection:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    
-    local historyLabel = historySection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    historyLabel:SetPoint("TOPLEFT", 8, -8)
-    historyLabel:SetText("Recent Keywords (click to add):")
-    
-    local historyContainer = CreateFrame("Frame", nil, historySection)
-    historyContainer:SetPoint("TOPLEFT", 8, -25)
-    historyContainer:SetPoint("BOTTOMRIGHT", -8, 5)
-    self.historyContainer = historyContainer
+        end,
+        tooltip = { "Clear All", "Remove every active keyword. They stay in the Recent list below." },
+    }, 270)
+    self.keywordDisplay = L:Note(KeywordSummary).text
+
+    row = L:Row(24)
+    row:Text({ text = "|cFF888888Recent:|r" }, 12)
+    local history = CreateFrame("Frame", nil, row.frame)
+    history:SetPoint("TOPLEFT", row.frame, "TOPLEFT", 60, 0)
+    history:SetPoint("BOTTOMRIGHT", row.frame, "BOTTOMRIGHT", -8, 0)
+    self.historyContainer = history
     self.historyButtons = {}
-    
-    -- ========== Channels Section ==========
-    local channelSection = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    channelSection:SetPoint("TOPLEFT", historySection, "BOTTOMLEFT", 0, -5)
-    channelSection:SetPoint("TOPRIGHT", historySection, "BOTTOMRIGHT", 0, -5)
-    channelSection:SetHeight(72)
-    channelSection:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    channelSection:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    
-    local channelLabel = channelSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    channelLabel:SetPoint("TOPLEFT", 8, -8)
-    channelLabel:SetText("Channels:")
-    
-    -- Stop/Resume button
-    local stopBtn = CreateFrame("Button", nil, channelSection, "UIPanelButtonTemplate")
-    stopBtn:SetSize(70, 22)
-    stopBtn:SetPoint("TOPRIGHT", -8, -6)
-    self.stopButton = stopBtn
-    
-    local statusText = channelSection:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    statusText:SetPoint("RIGHT", stopBtn, "LEFT", -8, 0)
-    self.statusText = statusText
-    
-    stopBtn:SetScript("OnClick", function()
-        isMonitoringPaused = not isMonitoringPaused
-        KeywordMonitor:UpdateStopButton()
-    end)
-    self:UpdateStopButton()
-    
-    -- Channel checkboxes
-    local channels = {"Trade", "General", "LookingForGroup", "LocalDefense", "WorldDefense", "GuildRecruitment", "Services"}
-    local xPos, yPos = 8, -25
+
+    -- ---------- Channels ----------
+    L:Section({ key = "channels", title = "Channels" })
     self.channelCheckboxes = {}
-    
-    for _, channel in ipairs(channels) do
-        local cb = CreateFrame("CheckButton", nil, channelSection, "UICheckButtonTemplate")
-        cb:SetSize(24, 24)
-        cb:SetPoint("TOPLEFT", xPos, yPos)
-        cb:SetChecked(KeywordMonitorDB.channels[channel] or false)
-        cb:SetScript("OnClick", function(self)
-            KeywordMonitorDB.channels[channel] = self:GetChecked()
-        end)
-        
-        local cbLabel = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        cbLabel:SetPoint("LEFT", cb, "RIGHT", 0, 0)
-        
-        local shortName = channel
-        if channel == "LookingForGroup" then shortName = "LFG"
-        elseif channel == "LocalDefense" then shortName = "LocalDef"
-        elseif channel == "WorldDefense" then shortName = "WorldDef"
-        elseif channel == "GuildRecruitment" then shortName = "GuildRecruit"
-        end
-        cbLabel:SetText(shortName)
-        
-        self.channelCheckboxes[channel] = cb
-        xPos = xPos + 75
-        if xPos > 400 then
-            xPos = 8
-            yPos = yPos - 22
-        end
+    for i, ch in ipairs(CHANNELS) do
+        if (i - 1) % 4 == 0 then row = L:Row(24) end
+        self.channelCheckboxes[ch.key] = row:Checkbox({
+            label = ch.label,
+            get = function() return KeywordMonitorDB.channels[ch.key] end,
+            set = function(v) KeywordMonitorDB.channels[ch.key] = v end,
+            tooltip = { ch.key, "Check messages in any channel whose name contains \"" .. ch.key .. "\"." },
+        }, 8 + ((i - 1) % 4) * 115)
     end
-    
-    -- ========== Alert Section ==========
-    local alertSection = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    alertSection:SetPoint("TOPLEFT", channelSection, "BOTTOMLEFT", 0, -5)
-    alertSection:SetPoint("TOPRIGHT", channelSection, "BOTTOMRIGHT", 0, -5)
-    alertSection:SetHeight(45)
-    alertSection:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    alertSection:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    
-    local alertLabel = alertSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    alertLabel:SetPoint("TOPLEFT", 8, -8)
-    alertLabel:SetText("Alerts:")
-    
-    local chatAlertCB = CreateFrame("CheckButton", nil, alertSection, "UICheckButtonTemplate")
-    chatAlertCB:SetSize(24, 24)
-    chatAlertCB:SetPoint("TOPLEFT", 8, -24)
-    chatAlertCB:SetChecked(KeywordMonitorDB.alertsEnabled)
-    chatAlertCB:SetScript("OnClick", function(self)
-        KeywordMonitorDB.alertsEnabled = self:GetChecked()
-    end)
-    
-    local chatAlertLabel = chatAlertCB:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    chatAlertLabel:SetPoint("LEFT", chatAlertCB, "RIGHT", 0, 0)
-    chatAlertLabel:SetText("Chat")
-    
-    local soundAlertCB = CreateFrame("CheckButton", nil, alertSection, "UICheckButtonTemplate")
-    soundAlertCB:SetSize(24, 24)
-    soundAlertCB:SetPoint("LEFT", chatAlertCB, "RIGHT", 50, 0)
-    soundAlertCB:SetChecked(KeywordMonitorDB.soundEnabled)
-    soundAlertCB:SetScript("OnClick", function(self)
-        KeywordMonitorDB.soundEnabled = self:GetChecked()
-    end)
-    
-    local soundAlertLabel = soundAlertCB:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    soundAlertLabel:SetPoint("LEFT", soundAlertCB, "RIGHT", 0, 0)
-    soundAlertLabel:SetText("Sound")
-    
-    -- ========== Results Section ==========
-    local resultsSection = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-    resultsSection:SetPoint("TOPLEFT", alertSection, "BOTTOMLEFT", 0, -5)
-    resultsSection:SetPoint("BOTTOMRIGHT", -15, 15)
-    resultsSection:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 }
-    })
-    resultsSection:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    
-    local resultsLabel = resultsSection:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    resultsLabel:SetPoint("TOPLEFT", 8, -8)
-    resultsLabel:SetText("Recent Matches (click to whisper):")
-    
-    local clearResultsBtn = CreateFrame("Button", nil, resultsSection, "UIPanelButtonTemplate")
-    clearResultsBtn:SetSize(80, 18)
-    clearResultsBtn:SetPoint("TOPRIGHT", -8, -5)
-    clearResultsBtn:SetText("Clear Results")
-    clearResultsBtn:SetScript("OnClick", function()
-        KeywordMonitorDB.results = {}
-        KeywordMonitor:UpdateResultsDisplay()
-    end)
-    
-    -- Scroll frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, resultsSection, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 8, -28)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 8)
-    
+
+    -- ---------- Alerts ----------
+    L:Section({ key = "alerts", title = "Alerts" })
+    row = L:Row(24)
+    row:Checkbox({
+        label = "Chat alert",
+        get = function() return KeywordMonitorDB.alertsEnabled end,
+        set = function(v) KeywordMonitorDB.alertsEnabled = v end,
+        tooltip = { "Chat Alert", "Print each new match in your chat frame. The same message from the same"
+            .. " player isn't repeated within 5 minutes." },
+    }, 8)
+    row:Checkbox({
+        label = "Sound alert",
+        get = function() return KeywordMonitorDB.soundEnabled end,
+        set = function(v) KeywordMonitorDB.soundEnabled = v end,
+        tooltip = { "Sound Alert", "Play a sound on each new match (repeats within 5 minutes are silent)." },
+    }, 123)
+    L:EndSection()
+
+    -- ---------- Results ----------
+    row = L:Row(24)
+    row:Text({ text = "Recent Matches (click to whisper):", font = "GameFontNormal" }, 8)
+    row:RightButton({
+        text = "Clear Results", width = 90, height = 18,
+        onClick = function()
+            KeywordMonitorDB.results = {}
+            KeywordMonitor:UpdateResultsDisplay()
+        end,
+        tooltip = { "Clear Results", "Empty the match list. Matches also drop off on their own after 5 minutes." },
+    }, 3)
+
+    local fill = L:Fill(120)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 8)
+
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(scrollFrame:GetWidth(), 1)
+    scrollChild:SetSize(500 - 24 - 23, 1)
     scrollFrame:SetScrollChild(scrollChild)
     self.resultsScrollChild = scrollChild
     self.resultsScrollFrame = scrollFrame
-    
-    frame:SetScript("OnSizeChanged", function()
-        local width = scrollFrame:GetWidth()
-        scrollChild:SetWidth(width)
-        KeywordMonitor:UpdateResultsDisplay()
-    end)
-    
-    self.mainFrame = frame
-    
-    -- Initial update
-    self:UpdateKeywordList()
-    self:UpdateHistoryDisplay()
-    self:UpdateResultsDisplay()
+
+    panel:Finish()
+    return panel
 end
 
 function KeywordMonitor:ToggleUI()
-    if not self.mainFrame then
-        self:CreateMainFrame()
-    end
-    
-    if self.mainFrame:IsShown() then
-        self.mainFrame:Hide()
+    local frame = self:CreateMainFrame()
+    if frame:IsShown() then
+        frame:Hide()
     else
-        self.mainFrame:Show()
-        self:UpdateStopButton()
-        self:UpdateResultsDisplay()
+        frame:Show()
     end
 end
 

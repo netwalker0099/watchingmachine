@@ -129,14 +129,12 @@ WM:OnThemeChanged()
 check("global theme passed before ApplyTheme", seen[1] == "global:ElvUI" and seen[2] == "apply")
 WM.modules.FakeAS = nil
 
--- ArmorySnap's handler syncs its flag
+-- ArmorySnap follows the global theme directly now (its own flag is
+-- retired; theme behaviour is covered in test_panels_armorysnap.lua)
 load("Modules/ArmorySnap.lua")
 local AS = WM.modules.ArmorySnap
 AS.db = { options = { elvuiTheme = false } }
-AS:OnGlobalThemeChanged("ElvUI")
-check("ArmorySnap follows ElvUI", AS.db.options.elvuiTheme == true)
-AS:OnGlobalThemeChanged("Default")
-check("ArmorySnap follows Default", AS.db.options.elvuiTheme == false)
+check("ArmorySnap has no private theme handler", AS.OnGlobalThemeChanged == nil)
 AS.db.options.enabled = true
 env.strsplit = function(sep, s, n) local a, b = s:match("^(%S*)%s*(.*)$"); return a, b end
 env.strlower, env.strtrim = string.lower, function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -187,9 +185,8 @@ for _, rel in ipairs({ "Core.lua", "Modules/PvPTracker.lua", "Modules/DebuffTrac
 end
 check("ToggleTracker dead code removed", not src("Modules/DebuffTracker.lua"):find("ToggleTracker"))
 local sp = src("Modules/ServicesParser.lua")
-check("ServicesParser settings named", sp:find('CreateFrame%("Frame", "WM_ServicesParserSettings"') ~= nil)
-check("ServicesParser settings clamped",
-    sp:find('"WM_ServicesParserSettings".-SetClampedToScreen%(true%)') ~= nil)
+-- The settings sub-window is now a section of the main panel
+check("ServicesParser settings window retired", not sp:find("WM_ServicesParserSettings", 1, true))
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

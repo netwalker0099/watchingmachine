@@ -96,7 +96,6 @@ function WhisperLogs:InitDB()
         WhisperLogsDB = {
             region = DEFAULT_REGION,
             whispers = {},
-            position = nil,
             detectedServer = nil,
             detectedServerRaw = nil,
         }
@@ -285,120 +284,86 @@ end
 -- UI
 -- ============================================
 
+local REGIONS = { "us", "eu", "kr", "tw", "cn" }
+
 function WhisperLogs:CreateMainFrame()
     if mainFrame then return mainFrame end
 
-    local frame = CreateFrame("Frame", "WM_WhisperLogsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(500, 420)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", function(f)
-        f:StopMovingOrSizing()
-        local point, _, relPoint, x, y = f:GetPoint()
-        WhisperLogsDB.position = {point, relPoint, x, y}
-    end)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
+    -- Server/region line on top, the player list fills the rest
+    local panel = WM.UI:CreatePanel({
+        name = "WM_WhisperLogsFrame",
+        title = "WarcraftLogs Lookup",
+        titleColor = "00CCFF",
+        width = 500,
+        height = 420,
+        scroll = false,
+        onRefresh = function() WhisperLogs:RefreshDisplay() end,
+    })
+    local L = panel.layout
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-
-    -- Restore position
-    if WhisperLogsDB.position then
-        frame:ClearAllPoints()
-        frame:SetPoint(
-            WhisperLogsDB.position[1],
-            UIParent,
-            WhisperLogsDB.position[2],
-            WhisperLogsDB.position[3],
-            WhisperLogsDB.position[4]
-        )
+    -- Carry over the position saved by the old hand-built window
+    local old = WhisperLogsDB.position
+    if old and #old >= 4 and not panel:GetState().pos then
+        panel:GetState().pos = { old[1], old[2], old[3], old[4] }
+        panel:ClearAllPoints()
+        panel:SetPoint(old[1], UIParent, old[2], old[3], old[4])
     end
+    WhisperLogsDB.position = nil
 
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF00CCFFWarcraftLogs Lookup|r")
+    -- Server + region
+    local row = L:Row(28)
+    panel.serverLabel = row:Text({
+        font = "GameFontNormalSmall",
+        text = function()
+            local region = (WhisperLogsDB.region or DEFAULT_REGION):upper()
+            return "Server: |cFF00FF00" .. (playerRealmRaw or "Unknown") .. " (" .. region .. ")|r"
+        end,
+    }, 8)
+    local regionOptions = {}
+    for _, region in ipairs(REGIONS) do
+        regionOptions[#regionOptions + 1] = { value = region, text = region:upper() }
+    end
+    row:Dropdown({
+        name = "WM_WhisperLogsRegionDropdown", label = "Region:", width = 50,
+        options = regionOptions,
+        get = function() return WhisperLogsDB.region or DEFAULT_REGION end,
+        set = function(v)
+            WhisperLogsDB.region = v
+            WhisperLogs:RebuildAllURLs()
+            panel.serverLabel:Refresh()
+        end,
+        tooltip = { "Region", "Warcraft Logs region used in every link. Changing it rebuilds the links"
+            .. " already in the list." },
+    }, 340)
 
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    row = L:Row(16)
+    row:Text({ text = "|cFF888888Click name to copy URL | Right-click to remove|r" }, 8)
 
-    -- Server + Region info line
-    local serverLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    serverLabel:SetPoint("TOPLEFT", 20, -40)
-    local serverDisplay = (playerRealmRaw or "Unknown") .. " (" .. (WhisperLogsDB.region or DEFAULT_REGION):upper() .. ")"
-    serverLabel:SetText("Server: |cFF00FF00" .. serverDisplay .. "|r")
-    frame.serverLabel = serverLabel
-
-    -- Region selector
-    local regionLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    regionLabel:SetPoint("TOPRIGHT", -130, -40)
-    regionLabel:SetText("Region:")
-
-    local regionDropdown = CreateFrame("Frame", "WM_WhisperLogsRegionDropdown", frame, "UIDropDownMenuTemplate")
-    regionDropdown:SetPoint("TOPRIGHT", -15, -34)
-
-    local regions = {"us", "eu", "kr", "tw", "cn"}
-    UIDropDownMenu_SetWidth(regionDropdown, 50)
-    UIDropDownMenu_SetText(regionDropdown, (WhisperLogsDB.region or DEFAULT_REGION):upper())
-
-    UIDropDownMenu_Initialize(regionDropdown, function(self, level)
-        for _, region in ipairs(regions) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = region:upper()
-            info.value = region
-            info.func = function(self)
-                WhisperLogsDB.region = self.value
-                UIDropDownMenu_SetText(regionDropdown, self.value:upper())
-                WhisperLogs:RebuildAllURLs()
-                local sd = (playerRealmRaw or "Unknown") .. " (" .. self.value:upper() .. ")"
-                frame.serverLabel:SetText("Server: |cFF00FF00" .. sd .. "|r")
-                CloseDropDownMenus()
-            end
-            info.checked = (WhisperLogsDB.region == region)
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-
-    -- Instructions
-    local helpText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    helpText:SetPoint("TOPLEFT", 20, -55)
-    helpText:SetText("|cFF888888Click name to copy URL | Right-click to remove|r")
-
-    -- Scroll frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 15, -72)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 60)
-    frame.scrollFrame = scrollFrame
+    -- Player list in the remaining space
+    local fill = L:Fill(120)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, -2)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 0)
+    panel.scrollFrame = scrollFrame
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
+    scrollChild:SetWidth(500 - 24 - 23)
     scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-    frame.scrollChild = scrollChild
-    frame.entries = {}
+    panel.scrollChild = scrollChild
+    panel.entries = {}
 
-    -- Bottom buttons
-    local scanGroupBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    scanGroupBtn:SetSize(140, 24)
-    scanGroupBtn:SetPoint("BOTTOMLEFT", 15, 20)
-    scanGroupBtn:SetText("Scan Raid/Party")
-    scanGroupBtn:SetScript("OnClick", function()
-        WhisperLogs:ScanGroup()
-    end)
-
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(80, 24)
-    clearBtn:SetPoint("BOTTOMRIGHT", -15, 20)
-    clearBtn:SetText("Clear All")
-    clearBtn:SetScript("OnClick", function()
-        StaticPopup_Show("WM_WHISPERLOGS_CLEAR")
-    end)
+    panel:AddFooterButton({
+        text = "Scan Raid/Party", width = 140,
+        onClick = function() WhisperLogs:ScanGroup() end,
+        tooltip = { "Scan Raid/Party", "Add everyone in your raid (online members) or party to the list,"
+            .. " each linked on their own realm." },
+    }, "LEFT")
+    panel:AddFooterButton({
+        text = "Clear All", width = 80,
+        onClick = function() StaticPopup_Show("WM_WHISPERLOGS_CLEAR") end,
+        tooltip = { "Clear All", "Remove every player from the list (asks first)." },
+    }, "RIGHT")
 
     StaticPopupDialogs["WM_WHISPERLOGS_CLEAR"] = {
         text = "Clear all whisper entries?",
@@ -412,10 +377,12 @@ function WhisperLogs:CreateMainFrame()
         hideOnEscape = true,
     }
 
-    mainFrame = frame
-    self.mainFrame = frame
+    panel:Finish()
 
-    return frame
+    mainFrame = panel
+    self.mainFrame = panel
+
+    return panel
 end
 
 -- Create one pooled entry row. Data is attached as frame fields so the
@@ -550,8 +517,7 @@ function WhisperLogs:Toggle()
     if mainFrame:IsShown() then
         mainFrame:Hide()
     else
-        mainFrame:Show()
-        self:RefreshDisplay()
+        mainFrame:Show()   -- OnShow refreshes the list
     end
 end
 
