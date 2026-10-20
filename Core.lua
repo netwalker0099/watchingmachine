@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.6"
+WM.version = "3.7"
 WM.modules = {}
 
 -- ============================================
@@ -1299,7 +1299,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
     print("|cFFFFFF00/wmachine shear|r - Illidan Shear monitor status and tallies")
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
-    print("|cFFFFFF00/wmachine encounters|r - Per-boss callout settings")
+    print("|cFFFFFF00/wmachine encounters|r - Debuff Tracker settings, opened at Encounter Callouts")
     print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
     print("|cFFFFFF00/wmachine class|r - Open Class Tools for your class")
     print("|cFFFFFF00/wmachine soulstone|r - Soulstone timers in your group (warlock)")

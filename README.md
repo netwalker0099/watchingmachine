@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.6 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.7 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -109,7 +109,7 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - Configurable threshold (default 60 gear SR) so an odd piece with incidental resistance is ignored
   - Warns you locally with a screen flash and sound by default; optional Say/Party/Raid/`/rw` announce. Unlike the other callouts this is **not** limited to the raid leader, since it's about your own gear
   - One warning per pull (20s cooldown), `/wmachine srcheck` to see exactly what it detects per slot
-- **Encounter callouts** (Doom warning, Shear monitor, SR check) live in their own window via `/wmachine encounters` or the button in Debuff Tracker settings
+- **Encounter callouts** (Doom warning, Shear monitor, SR check) are the *Encounter Callouts* section of Debuff Tracker settings; `/wmachine encounters` opens the panel scrolled to it
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
 
@@ -281,7 +281,8 @@ Addon-wide theme support accessible via `/wmachine settings` or the Settings but
 
 ### Theme Coverage
 - Dashboard and all module cards
-- All module settings panels (ArmorySnap ships its own ElvUI toggle instead, carried over from the standalone addon)
+- All module settings panels, including section headers and separators
+- ArmorySnap follows the global theme; its own ElvUI toggle overrides it until the next global change
 - Debuff Tracker overlay and indicators
 - Live re-skinning: theme changes apply immediately without /reload
 
@@ -298,6 +299,24 @@ Built-in error capture system for debugging.
 1. Extract the `WatchingMachine` folder to your WoW addons directory:
    - `World of Warcraft\_classic_anniversary_\Interface\AddOns\`
 2. Restart WoW or reload UI (`/reload`)
+
+## Panel Builder
+
+`UI.lua` is the shared builder for settings windows (`WM.UI:CreatePanel`).
+A panel is a vertical list of rows (checkbox, slider, cycle, choice, edit
+box, buttons, note, header, separator, collapsible section) instead of
+hand-placed controls. Every panel built with it gets:
+
+- title, close button, **Escape to close**, theme skin
+- a height fitted to its content and **never taller than the screen**; the
+  body scrolls when needed
+- **collapsible sections**, and a **remembered position**, both saved in
+  `WatchingMachineDB.panels`
+- in-place refresh: controls re-read their settings, so a panel is never
+  torn down and rebuilt to show new state
+
+Buff Check, Debuff Tracker and PvP Tracker use it. The other modules still
+lay out their windows by hand and move over as they are worked on.
 
 ## Tests
 
@@ -366,6 +385,13 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.7
+- New shared panel builder (`UI.lua`): panels fit their content, never exceed the screen, scroll when needed, remember their position and have collapsible sections
+- **Debuff Tracker**: settings and encounter callouts are one scrolling panel again, in collapsible sections; the debuff list is no longer squeezed into a 141px box; `/wmachine encounters` opens it at the callouts
+- **PvP Tracker**: Guild Sync and Leaderboard sections collapse to give the KOS list more room; tooltips on every alert option
+- **Buff Check** rebuilt on the builder
+- Debuff Tracker settings refresh in place on roster changes instead of being rebuilt
 
 ### Version 3.6
 - Buff Check's **Food Buff** check (Well Fed or Enlightened) is now **on by default**, including for existing installs (once — turning it off afterwards sticks)

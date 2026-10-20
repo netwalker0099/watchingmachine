@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local DebuffTracker = {}
 WM:RegisterModule("DebuffTracker", DebuffTracker)
 
-DebuffTracker.version = "3.2"
+DebuffTracker.version = "3.3"
 
 -- ============================================
 -- DEBUFF DEFINITIONS (TBC)
@@ -2489,1120 +2489,472 @@ function DebuffTracker:GetQuickStatus()
 end
 
 -- ============================================
--- SETTINGS UI
+-- SETTINGS PANEL
 -- ============================================
+-- One scrolling panel built with WM.UI. Encounter callouts used to live in
+-- a second window only because the hand-measured panel outgrew the screen;
+-- they're a collapsible section here, and /wmachine encounters opens the
+-- panel scrolled to it. The panel is refreshed in place (panel:Refresh)
+-- when settings or the raid roster change, never rebuilt.
 
+local CHANNEL_OPTIONS = {
+    { value = "LOCAL", text = "Me only" }, { value = "SAY", text = "Say" },
+    { value = "PARTY", text = "Party" }, { value = "RAID", text = "Raid" },
+    { value = "RAID_WARNING", text = "/rw" },
+}
+local PULL_CHANNEL_OPTIONS = {
+    { value = "SAY", text = "Say" }, { value = "PARTY", text = "Party" },
+    { value = "RAID", text = "Raid" }, { value = "RAID_WARNING", text = "/rw" },
+}
 
--- ============================================
--- ENCOUNTER CALLOUTS WINDOW
--- ============================================
--- Split out of the main settings panel: that frame had grown taller than
--- UIParent (~768px at UI scale 1.0), so its lowest controls were unreachable.
-
-local encounterFrame = nil
-
-function DebuffTracker:CreateEncounterUI()
-    if encounterFrame then return encounterFrame end
-
-    local theme = GetTheme()
-
-    local frame = CreateFrame("Frame", "WM_DebuffEncounterFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(420, 500)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("DIALOG")
-    frame:Hide()
-
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-
-    local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    titleText:SetPoint("TOP", 0, -15)
-    titleText:SetText("Encounter Callouts")
-    WM:ThemeText(titleText, "headerColor")
-
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local yOffset = -45
-
-    -- Illidan Doom warning
-    local doomCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    doomCB:SetPoint("TOPLEFT", 20, yOffset)
-    doomCB.Text:SetText("Illidan 68%: raid warn \"CAST DOOM NOW\"")
-    doomCB:SetChecked(DebuffTrackerDB.illidanDoomWarning)
-    doomCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.illidanDoomWarning = self:GetChecked()
-    end)
-    doomCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Illidan Doom Warning", 1, 0.8, 0)
-        GameTooltip:AddLine("When Illidan Stormrage reaches 68% health, sends", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("CAST DOOM NOW as a raid warning so warlocks land", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Curse of Doom before he lifts off at 65%.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Fires once per pull. Sent by the raid leader (or", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("assistants if allowed above); others see it locally.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    doomCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 24
-
-    -- Illidan Shear monitor
-    local shearCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearCB:SetPoint("TOPLEFT", 20, yOffset)
-    shearCB.Text:SetText("Illidan: call out Shear on the main tank")
-    shearCB:SetChecked(DebuffTrackerDB.shearMonitor)
-    shearCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearMonitor = self:GetChecked()
-    end)
-    shearCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Illidan Shear Monitor", 1, 0.8, 0)
-        GameTooltip:AddLine("Shear cuts the main tank's maximum health by about", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("60% and can be dodged, parried or blocked.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Damage meters miss it: the hit is a max-health debuff", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and an avoided Shear deals no damage at all. This", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("watches every cast, hit, aura and avoidance event,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and sweeps raid auras as a backup.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("A summary prints when the pull ends.", 0.6, 0.8, 1)
-        GameTooltip:AddLine("/wmachine shear - status and tallies", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    shearCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Shear announce channel cycle
-    local shearChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    shearChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
-    shearChanLabel:SetText("|cFF888888To:|r")
-
-    local shearChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
-    local shearChannelLabels = {
-        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
-    }
-    local shearChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    shearChanBtn:SetSize(66, 18)
-    shearChanBtn:SetPoint("LEFT", shearChanLabel, "RIGHT", 4, 0)
-    local function RefreshShearChanText()
-        local cur = DebuffTrackerDB.shearChannel or "RAID"
-        shearChanBtn:SetText(shearChannelLabels[cur] or cur)
-    end
-    RefreshShearChanText()
-    shearChanBtn:SetScript("OnClick", function()
-        local cur = DebuffTrackerDB.shearChannel or "RAID"
-        local nextIdx = 1
-        for i, ch in ipairs(shearChannels) do
-            if ch == cur then nextIdx = (i % #shearChannels) + 1 break end
-        end
-        DebuffTrackerDB.shearChannel = shearChannels[nextIdx]
-        RefreshShearChanText()
-    end)
-    shearChanBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Announce Channel", 1, 0.8, 0)
-        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("You always see a local line regardless.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Chat is sent by the raid leader (or assistants if", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("allowed above) so only one person calls it.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 22
-
-    -- Announce avoided Shears too
-    local shearAvoidCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearAvoidCB:SetPoint("TOPLEFT", 35, yOffset)
-    shearAvoidCB.Text:SetText("Also call dodged / parried / blocked")
-    shearAvoidCB:SetChecked(DebuffTrackerDB.shearAnnounceAvoided)
-    shearAvoidCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearAnnounceAvoided = self:GetChecked()
-    end)
-    shearAvoidCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Avoided Shears", 1, 0.8, 0)
-        GameTooltip:AddLine("Off by default: Shear repeats every ~10s, so calling", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("both outcomes doubles the chat. Avoided Shears are", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("still counted and appear in the pull summary.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearAvoidCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Local pre-warning on cast start
-    local shearWarnCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearWarnCB:SetPoint("TOPLEFT", 262, yOffset)
-    shearWarnCB.Text:SetText("Cast warning")
-    shearWarnCB:SetChecked(DebuffTrackerDB.shearPreWarn)
-    shearWarnCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearPreWarn = self:GetChecked()
-    end)
-    shearWarnCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Cast Warning", 1, 0.8, 0)
-        GameTooltip:AddLine("Shear has a ~1.5s cast. This prints a local heads-up", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("the moment it starts - the window to use Shield", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Block or Holy Shield. Never sent to chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearWarnCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 26
-
-    -- Shear chat throttle
-    local shearThrLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    shearThrLabel:SetPoint("TOPLEFT", 35, yOffset)
-    shearThrLabel:SetText("Min gap between calls:")
-
-    local shearThrValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    shearThrValue:SetPoint("LEFT", shearThrLabel, "RIGHT", 5, 0)
-    local function FormatThrottle(v)
-        if v <= 0 then return "every one" end
-        return v .. "s"
-    end
-    shearThrValue:SetText(FormatThrottle(DebuffTrackerDB.shearThrottle or 0))
-
-    local shearThrSlider = CreateFrame("Slider", "WM_DebuffShearThrottleSlider", frame, "OptionsSliderTemplate")
-    shearThrSlider:SetPoint("TOPLEFT", 38, yOffset - 18)
-    shearThrSlider:SetSize(165, 16)
-    shearThrSlider:SetMinMaxValues(0, 30)
-    shearThrSlider:SetValueStep(1)
-    shearThrSlider:SetObeyStepOnDrag(true)
-    shearThrSlider:SetValue(DebuffTrackerDB.shearThrottle or 0)
-    shearThrSlider.Low:SetText("all")
-    shearThrSlider.High:SetText("30s")
-    shearThrSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value + 0.5)
-        DebuffTrackerDB.shearThrottle = value
-        shearThrValue:SetText(FormatThrottle(value))
-    end)
-    shearThrSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Chat Throttle", 1, 0.8, 0)
-        GameTooltip:AddLine("Shear repeats roughly every 10s across three ground", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("phases, so calling every one is a lot of raid chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("This sets the minimum gap between CHAT calls.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Throttled Shears are still counted and still shown", 0.6, 0.8, 1)
-        GameTooltip:AddLine("to you locally - only the chat line is skipped.", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    shearThrSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Per-pull summary
-    local shearSumCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    shearSumCB:SetPoint("TOPLEFT", 262, yOffset - 4)
-    shearSumCB.Text:SetText("Pull summary")
-    shearSumCB:SetChecked(DebuffTrackerDB.shearSummary)
-    shearSumCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.shearSummary = self:GetChecked()
-    end)
-    shearSumCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shear Pull Summary", 1, 0.8, 0)
-        GameTooltip:AddLine("When combat ends, prints the pull's tally: total,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("hit vs avoided, a per-tank breakdown so swaps are", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("visible, and which avoidance types occurred.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Local only, never sent to chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    shearSumCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 42
-
-    -- ========================================
-    -- SHADOW RESIST GEAR CHECK (post-Mother Shahraz)
-    -- ========================================
-
-    local srHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    srHeader:SetPoint("TOPLEFT", 20, yOffset)
-    srHeader:SetText("Black Temple: shadow resist gear")
-    WM:ThemeText(srHeader, "headerColor")
-
-    yOffset = yOffset - 22
-
-    local srCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    srCB:SetPoint("TOPLEFT", 20, yOffset)
-    srCB.Text:SetText("Warn if still in SR gear after Mother")
-    srCB:SetChecked(DebuffTrackerDB.srCheck)
-    srCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.srCheck = self:GetChecked()
-    end)
-    srCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shadow Resist Gear Check", 1, 0.8, 0)
-        GameTooltip:AddLine("Mother Shahraz is the only fight in Black Temple that", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("wants shadow resist gear. This warns you if you pull", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("the Grand Promenade constructs after her while still", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("wearing it.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Arms when Mother dies, or the moment you engage one", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("of the trigger mobs (so a /reload still works).", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("/wmachine srcheck - see exactly what it detects", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    srCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Channel for the SR warning
-    local srChanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    srChanLabel:SetPoint("TOPLEFT", 262, yOffset - 6)
-    srChanLabel:SetText("|cFF888888To:|r")
-
-    local srChannels = { "LOCAL", "SAY", "PARTY", "RAID", "RAID_WARNING" }
-    local srChannelLabels = {
-        LOCAL = "Me only", SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw",
-    }
-    local srChanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    srChanBtn:SetSize(66, 18)
-    srChanBtn:SetPoint("LEFT", srChanLabel, "RIGHT", 4, 0)
-    local function RefreshSRChanText()
-        local cur = DebuffTrackerDB.srCheckChannel or "LOCAL"
-        srChanBtn:SetText(srChannelLabels[cur] or cur)
-    end
-    RefreshSRChanText()
-    srChanBtn:SetScript("OnClick", function()
-        local cur = DebuffTrackerDB.srCheckChannel or "LOCAL"
-        local nextIdx = 1
-        for i, ch in ipairs(srChannels) do
-            if ch == cur then nextIdx = (i % #srChannels) + 1 break end
-        end
-        DebuffTrackerDB.srCheckChannel = srChannels[nextIdx]
-        RefreshSRChanText()
-    end)
-    srChanBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("SR Warning Channel", 1, 0.8, 0)
-        GameTooltip:AddLine("Cycles: Me only > Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("This one is about YOUR gear, so unlike the other", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("callouts every player warns themselves - it is not", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("limited to the raid leader.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    srChanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 26
-
-    -- Threshold
-    local srThrLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    srThrLabel:SetPoint("TOPLEFT", 35, yOffset)
-    srThrLabel:SetText("Warn at gear SR of:")
-
-    local srThrValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    srThrValue:SetPoint("LEFT", srThrLabel, "RIGHT", 5, 0)
-    srThrValue:SetText(tostring(DebuffTrackerDB.srCheckThreshold or 60))
-
-    local srThrSlider = CreateFrame("Slider", "WM_DebuffSRThresholdSlider", frame, "OptionsSliderTemplate")
-    srThrSlider:SetPoint("TOPLEFT", 38, yOffset - 18)
-    srThrSlider:SetSize(165, 16)
-    srThrSlider:SetMinMaxValues(10, 250)
-    srThrSlider:SetValueStep(10)
-    srThrSlider:SetObeyStepOnDrag(true)
-    srThrSlider:SetValue(DebuffTrackerDB.srCheckThreshold or 60)
-    srThrSlider.Low:SetText("10")
-    srThrSlider.High:SetText("250")
-    srThrSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value / 10 + 0.5) * 10
-        DebuffTrackerDB.srCheckThreshold = value
-        srThrValue:SetText(tostring(value))
-    end)
-    srThrSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Shadow Resist Threshold", 1, 0.8, 0)
-        GameTooltip:AddLine("Total shadow resistance from EQUIPPED GEAR that counts", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("as still wearing the set. Buffs and auras are ignored.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("A Mother set runs well over 200. Raise this if an odd", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("piece with incidental SR sets it off.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    srThrSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Diagnostic button
-    local srTestBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    srTestBtn:SetSize(110, 20)
-    srTestBtn:SetPoint("TOPLEFT", 262, yOffset - 4)
-    srTestBtn:SetText("Check My Gear")
-    srTestBtn:SetScript("OnClick", function() DebuffTracker:ExplainShadowResist() end)
-    srTestBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Check My Gear", 1, 0.8, 0)
-        GameTooltip:AddLine("Lists every equipped piece carrying shadow resistance,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("the gear total against the threshold, and whether the", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("check is currently armed.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    srTestBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 44
-
-    local srNote = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    srNote:SetPoint("TOPLEFT", 20, yOffset)
-    srNote:SetWidth(380)
-    srNote:SetJustifyH("LEFT")
-    srNote:SetText("|cFF888888Trigger mobs: Shadowmoon Reaver, Promenade Sentinel and the "
-        .. "Illidari packs on the Grand Promenade. Use Check My Gear to confirm detection "
-        .. "works on your client before relying on it.|r")
-
-    frame:SetHeight(math.abs(yOffset) + 70)
-
-    encounterFrame = frame
-    self.encounterFrame = frame
-    return frame
+local function DBGetSet(key)
+    return function() return DebuffTrackerDB[key] end,
+        function(v) DebuffTrackerDB[key] = v end
 end
 
-function DebuffTracker:ToggleEncounterUI()
-    local f = self:CreateEncounterUI()
-    if f:IsShown() then f:Hide() else f:Show() end
+local function ClassHex(className)
+    local c = RAID_CLASS_COLORS[className] or { r = 1, g = 1, b = 1 }
+    return string.format("%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255)
+end
+
+local function FormatThrottle(v)
+    if v <= 0 then return "every one" end
+    return v .. "s"
+end
+
+local function FormatHP(v)
+    if v <= 0 then return "off" end
+    return string.format("%dk", math.floor(v / 1000))
 end
 
 function DebuffTracker:CreateUI()
     if mainFrame then return mainFrame end
-    
-    local theme = GetTheme()
-    
-    local frame = CreateFrame("Frame", "WM_DebuffTrackerSettingsFrame", UIParent, "BackdropTemplate")
-    -- 742 fits a 768px screen; at larger UI scales the debuff tree (anchored
-    -- to the bottom) shrinks instead of the footer going off screen
-    frame:SetWidth(420)
-    WM:FitHeight(frame, 742, 640)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    titleText:SetPoint("TOP", 0, -15)
-    titleText:SetText("Debuff Tracker Settings")
-    WM:ThemeText(titleText, "headerColor")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    local yOffset = -45
-    
-    -- Enable checkbox
-    local enableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    enableCB:SetPoint("TOPLEFT", 20, yOffset)
-    enableCB.Text:SetText("Enable Debuff Tracker")
-    enableCB:SetChecked(DebuffTrackerDB.enabled)
-    enableCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.enabled = self:GetChecked()
-        DebuffTracker:UpdateVisibility()
-    end)
-    
-    yOffset = yOffset - 25
-    
-    -- Show only in raid
-    local raidCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    raidCB:SetPoint("TOPLEFT", 20, yOffset)
-    raidCB.Text:SetText("Show only in raid")
-    raidCB:SetChecked(DebuffTrackerDB.showOnlyInRaid)
-    raidCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.showOnlyInRaid = self:GetChecked()
-        DebuffTracker:UpdateVisibility()
-    end)
-    
-    yOffset = yOffset - 25
-    
-    -- Show only on boss
-    local bossCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    bossCB:SetPoint("TOPLEFT", 20, yOffset)
-    bossCB.Text:SetText("Show only on boss targets")
-    bossCB:SetChecked(DebuffTrackerDB.showOnlyOnBoss)
-    bossCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.showOnlyOnBoss = self:GetChecked()
-        DebuffTracker:UpdateVisibility()
-    end)
-    
-    yOffset = yOffset - 25
-    
-    -- Hide when no target
-    local noTargetCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    noTargetCB:SetPoint("TOPLEFT", 20, yOffset)
-    noTargetCB.Text:SetText("Hide when no hostile target")
-    noTargetCB:SetChecked(DebuffTrackerDB.hideWhenNoTarget)
-    noTargetCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.hideWhenNoTarget = self:GetChecked()
-        DebuffTracker:UpdateVisibility()
-    end)
-    
-    yOffset = yOffset - 30
-    
-    -- ========================================
-    -- AUTO-DETECT SECTION
-    -- ========================================
-    
-    local autoHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    autoHeader:SetPoint("TOPLEFT", 20, yOffset)
-    autoHeader:SetText("Raid Auto-Detection:")
-    WM:ThemeText(autoHeader, "headerColor")
-    
-    yOffset = yOffset - 22
-    
-    -- Auto-detect checkbox
-    local autoCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    autoCB:SetPoint("TOPLEFT", 20, yOffset)
-    autoCB.Text:SetText("Auto-configure from raid composition")
-    autoCB:SetChecked(DebuffTrackerDB.autoDetect)
-    frame.autoCB = autoCB
-    
-    yOffset = yOffset - 20
-    
-    -- Auto-detect description
-    local autoDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    autoDesc:SetPoint("TOPLEFT", 40, yOffset)
-    autoDesc:SetWidth(320)
-    autoDesc:SetJustifyH("LEFT")
-    autoDesc:SetText("|cFF888888Scans raid roster for classes. Only shows debuff categories that your raid can actually provide. Re-scans when roster changes.|r")
-    frame.autoDesc = autoDesc
-    
-    yOffset = yOffset - 30
-    
-    -- Raid composition display
-    local compLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    compLabel:SetPoint("TOPLEFT", 25, yOffset)
-    compLabel:SetText("Detected classes:")
-    compLabel:SetTextColor(0.7, 0.7, 0.7)
-    
-    local compText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    compText:SetPoint("TOPLEFT", 25, yOffset - 14)
-    compText:SetWidth(280)
-    compText:SetJustifyH("LEFT")
-    compText:SetText(DebuffTracker:GetRaidCompositionString())
-    frame.compText = compText
-    
-    -- Scan Now button
-    local scanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    scanBtn:SetSize(70, 18)
-    scanBtn:SetPoint("TOPRIGHT", -20, yOffset)
-    scanBtn:SetText("Scan Now")
-    scanBtn:SetScript("OnClick", function()
-        DebuffTracker:ScanRaidComposition()
-        if frame.compText then
-            frame.compText:SetText(DebuffTracker:GetRaidCompositionString())
-        end
-        DebuffTracker:VerbosePrint("Raid scanned: " .. DebuffTracker:GetRaidCompositionString())
-    end)
-    frame.scanBtn = scanBtn
-    
-    yOffset = yOffset - 36
-    
-    -- Separator
-    local autoSep = frame:CreateTexture(nil, "ARTWORK")
-    autoSep:SetHeight(1)
-    autoSep:SetPoint("TOPLEFT", 15, yOffset)
-    autoSep:SetPoint("TOPRIGHT", -15, yOffset)
-    WM:ThemeTexture(autoSep, "separatorColor")
-    
-    yOffset = yOffset - 8
-    
-    -- ========================================
-    -- RAID ALERT SECTION
-    -- ========================================
-    
-    local alertHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    alertHeader:SetPoint("TOPLEFT", 20, yOffset)
-    alertHeader:SetText("Missing Debuff Alerts:")
-    WM:ThemeText(alertHeader, "headerColor")
-    
-    yOffset = yOffset - 22
-    
-    -- Enable raid alerts checkbox
-    local alertCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    alertCB:SetPoint("TOPLEFT", 20, yOffset)
-    alertCB.Text:SetText("Send raid message when debuff missing")
-    alertCB:SetChecked(DebuffTrackerDB.raidAlerts)
-    alertCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.raidAlerts = self:GetChecked()
-    end)
-    
-    yOffset = yOffset - 22
-    
-    -- Boss only checkbox
-    local alertBossCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    alertBossCB:SetPoint("TOPLEFT", 35, yOffset)
-    alertBossCB.Text:SetText("Only on boss targets")
-    alertBossCB:SetChecked(DebuffTrackerDB.alertOnlyOnBoss)
-    alertBossCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.alertOnlyOnBoss = self:GetChecked()
-    end)
-    
-    -- Assist can announce checkbox (same row, right side)
-    local assistCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    assistCB:SetPoint("TOPLEFT", 220, yOffset)
-    assistCB.Text:SetText("Assistants can announce")
-    assistCB:SetChecked(DebuffTrackerDB.assistCanAnnounce)
-    assistCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.assistCanAnnounce = self:GetChecked()
-    end)
-    assistCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Assistant Announcements", 1, 0.8, 0)
-        GameTooltip:AddLine("By default only the raid leader sends", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("missing debuff alerts to chat. Enable this", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("if the raid leader doesn't have the addon", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("and you want assistants to announce.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    assistCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    yOffset = yOffset - 24
-    
-    -- Alert delay slider
-    local delayLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    delayLabel:SetPoint("TOPLEFT", 25, yOffset)
-    delayLabel:SetText("Delay before alert:")
-    
-    local delayValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    delayValue:SetPoint("LEFT", delayLabel, "RIGHT", 5, 0)
-    delayValue:SetText(DebuffTrackerDB.alertDelay .. "s")
-    
-    local delaySlider = CreateFrame("Slider", "WM_DebuffAlertDelaySlider", frame, "OptionsSliderTemplate")
-    delaySlider:SetPoint("TOPLEFT", 25, yOffset - 18)
-    delaySlider:SetSize(160, 16)
-    delaySlider:SetMinMaxValues(2, 15)
-    delaySlider:SetValueStep(1)
-    delaySlider:SetObeyStepOnDrag(true)
-    delaySlider:SetValue(DebuffTrackerDB.alertDelay)
-    delaySlider.Low:SetText("2s")
-    delaySlider.High:SetText("15s")
-    delaySlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value + 0.5)
-        DebuffTrackerDB.alertDelay = value
-        delayValue:SetText(value .. "s")
-    end)
-    
-    -- Alert cooldown slider
-    local cdLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    cdLabel:SetPoint("TOPLEFT", 200, yOffset)
-    cdLabel:SetText("Cooldown between alerts:")
-    
-    local cdValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cdValue:SetPoint("LEFT", cdLabel, "RIGHT", 5, 0)
-    cdValue:SetText(DebuffTrackerDB.alertCooldown .. "s")
-    
-    local cdSlider = CreateFrame("Slider", "WM_DebuffAlertCDSlider", frame, "OptionsSliderTemplate")
-    cdSlider:SetPoint("TOPLEFT", 200, yOffset - 18)
-    cdSlider:SetSize(140, 16)
-    cdSlider:SetMinMaxValues(10, 120)
-    cdSlider:SetValueStep(5)
-    cdSlider:SetObeyStepOnDrag(true)
-    cdSlider:SetValue(DebuffTrackerDB.alertCooldown)
-    cdSlider.Low:SetText("10s")
-    cdSlider.High:SetText("120s")
-    cdSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value / 5 + 0.5) * 5
-        DebuffTrackerDB.alertCooldown = value
-        cdValue:SetText(value .. "s")
-    end)
-    
-    yOffset = yOffset - 40
-    
-    -- Alert description
-    local alertDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    alertDesc:SetPoint("TOPLEFT", 25, yOffset)
-    alertDesc:SetWidth(340)
-    alertDesc:SetJustifyH("LEFT")
-    alertDesc:SetText("|cFF888888Uses /rw if you have assist, otherwise /raid. Only alerts for enabled categories.|r")
-    
-    yOffset = yOffset - 22
-    
-    -- ========================================
-    -- PULL ANNOUNCE SECTION
-    -- ========================================
-    
-    local pullCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    pullCB:SetPoint("TOPLEFT", 20, yOffset)
-    pullCB.Text:SetText("Announce who pulled the boss")
-    pullCB:SetChecked(DebuffTrackerDB.pullAnnounce)
-    pullCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.pullAnnounce = self:GetChecked()
-    end)
-    pullCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Pull Announce", 1, 0.8, 0)
-        GameTooltip:AddLine("Detects the first player in your group to", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("hit a boss and announces it to chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Example: First hit: Playername on Gruul", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    pullCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    -- Channel selector
-    local chanLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    chanLabel:SetPoint("TOPLEFT", 220, yOffset - 2)
-    chanLabel:SetText("|cFF888888Channel:|r")
-    
-    local channels = { "SAY", "PARTY", "RAID", "RAID_WARNING" }
-    local channelLabels = { SAY = "Say", PARTY = "Party", RAID = "Raid", RAID_WARNING = "/rw" }
-    
-    local currentChannel = DebuffTrackerDB.pullAnnounceChannel or "SAY"
-    
-    local chanBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    chanBtn:SetSize(55, 18)
-    chanBtn:SetPoint("LEFT", chanLabel, "RIGHT", 5, 0)
-    chanBtn:SetText(channelLabels[currentChannel] or currentChannel)
-    chanBtn:SetScript("OnClick", function(self)
-        -- Cycle through channels
-        local cur = DebuffTrackerDB.pullAnnounceChannel or "SAY"
-        local nextIdx = 1
-        for i, ch in ipairs(channels) do
-            if ch == cur then
-                nextIdx = (i % #channels) + 1
-                break
-            end
-        end
-        DebuffTrackerDB.pullAnnounceChannel = channels[nextIdx]
-        self:SetText(channelLabels[channels[nextIdx]] or channels[nextIdx])
-    end)
-    chanBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Announce Channel", 1, 0.8, 0)
-        GameTooltip:AddLine("Click to cycle: Say > Party > Raid > /rw", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("/rw falls back to Raid if no assist.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    chanBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    yOffset = yOffset - 24
+    local panel = WM.UI:CreatePanel({
+        name = "WM_DebuffTrackerSettingsFrame",
+        title = "Debuff Tracker Settings",
+        width = 420,
+        maxHeight = 700,
+    })
+    local L = panel.layout
+    local get, set
 
-    -- Encounter callouts live in their own window: this panel had grown past
-    -- the ~768px UIParent height, which clipped the controls at the bottom.
-    local encBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    encBtn:SetSize(190, 22)
-    encBtn:SetPoint("TOPLEFT", 20, yOffset)
-    encBtn:SetText("Encounter Callouts...")
-    encBtn:SetScript("OnClick", function() DebuffTracker:ToggleEncounterUI() end)
-    encBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Encounter Callouts", 1, 0.8, 0)
-        GameTooltip:AddLine("Per-boss helpers: Illidan Doom warning, Illidan Shear", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("monitor, and the post-Mother shadow resist gear check.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("/wmachine encounters", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    encBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 28
-
-    -- ========================================
-    -- FALSE-POSITIVE CONTROLS
-    -- ========================================
-
-    local fpHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fpHeader:SetPoint("TOPLEFT", 20, yOffset)
-    fpHeader:SetText("Target Filtering:")
-    WM:ThemeText(fpHeader, "headerColor")
-
-    yOffset = yOffset - 22
-
-    -- Focus tracking
-    local focusCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    focusCB:SetPoint("TOPLEFT", 20, yOffset)
-    focusCB.Text:SetText("Only alert for the raid's actual kill target")
-    focusCB:SetChecked(DebuffTrackerDB.focusTracking)
-    focusCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.focusTracking = self:GetChecked()
-    end)
-    focusCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Focus Target Tracking", 1, 0.8, 0)
-        GameTooltip:AddLine("On multi-boss fights (Fathom-Lord Karathress,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Illidari Council) the addon watches which mob is", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("taking the most raid damage and only alerts for", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("that one. Target an add the raid is ignoring and", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("it stays quiet. Adapts to any kill order — no", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("configuration needed if you change strategy.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    focusCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 26
-
-    -- Boss min health slider
-    local hpLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hpLabel:SetPoint("TOPLEFT", 25, yOffset)
-    hpLabel:SetText("Min boss health:")
-
-    local hpValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hpValue:SetPoint("LEFT", hpLabel, "RIGHT", 5, 0)
-    local function FormatHP(v)
-        if v <= 0 then return "off" end
-        return string.format("%dk", math.floor(v / 1000))
+    -- ---------- General ----------
+    local function Visibility(key, label)
+        local g, s = DBGetSet(key)
+        L:Checkbox({ label = label, get = g, set = function(v) s(v); DebuffTracker:UpdateVisibility() end })
     end
-    hpValue:SetText(FormatHP(DebuffTrackerDB.bossMinHealth))
+    Visibility("enabled", "Enable Debuff Tracker")
+    Visibility("showOnlyInRaid", "Show only in raid")
+    Visibility("showOnlyOnBoss", "Show only on boss targets")
+    Visibility("hideWhenNoTarget", "Hide when no hostile target")
 
-    local hpSlider = CreateFrame("Slider", "WM_DebuffBossHPSlider", frame, "OptionsSliderTemplate")
-    hpSlider:SetPoint("TOPLEFT", 25, yOffset - 18)
-    hpSlider:SetSize(170, 16)
-    hpSlider:SetMinMaxValues(0, 400000)
-    hpSlider:SetValueStep(25000)
-    hpSlider:SetObeyStepOnDrag(true)
-    hpSlider:SetValue(DebuffTrackerDB.bossMinHealth or 150000)
-    hpSlider.Low:SetText("off")
-    hpSlider.High:SetText("400k")
-    hpSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value / 25000 + 0.5) * 25000
-        DebuffTrackerDB.bossMinHealth = value
-        hpValue:SetText(FormatHP(value))
-    end)
-    hpSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Minimum Boss Health", 1, 0.8, 0)
-        GameTooltip:AddLine("Mobs below this max health are never treated as", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("bosses. Raid trash is level 72-73 elite just like", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("real bosses, so level alone can't tell them apart —", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("health pool can. Lower it if a real boss is being", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("missed; raise it if trash still triggers alerts.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    hpSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- ---------- Auto-detection ----------
+    L:Section({ key = "autodetect", title = "Raid Auto-Detection" })
+    L:Checkbox({
+        label = "Auto-configure from raid composition",
+        get = function() return DebuffTrackerDB.autoDetect end,
+        set = function(v)
+            DebuffTrackerDB.autoDetect = v
+            if v then DebuffTracker:ScanRaidComposition() end
+            panel:Refresh()
+        end,
+        tooltip = {
+            "Auto-Detection",
+            "Scans the raid roster for classes and only tracks debuff categories your raid can"
+                .. " actually provide. Re-scans when the roster changes.",
+            "While on, the debuff selection below is managed for you.",
+        },
+    })
+    local compRow = L:Row(22)
+    compRow:Text({ text = "|cFFB3B3B3Detected classes:|r", font = "GameFontNormalSmall" }, 17)
+    compRow:RightButton({
+        text = "Scan Now", width = 70, height = 18,
+        tooltip = { "Scan Now", "Re-read the raid roster immediately." },
+        onClick = function()
+            DebuffTracker:ScanRaidComposition()
+            DebuffTracker:VerbosePrint("Raid scanned: " .. DebuffTracker:GetRaidCompositionString())
+            panel:Refresh()
+        end,
+    }, 8)
+    L:Note(function() return DebuffTracker:GetRaidCompositionString() end, 5)
 
-    -- Exclude target button
-    local excludeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    excludeBtn:SetSize(115, 20)
-    excludeBtn:SetPoint("TOPRIGHT", -20, yOffset - 4)
-    excludeBtn:SetText("Exclude Target")
-    excludeBtn:SetScript("OnClick", function()
-        DebuffTracker:ExcludeTarget()
-    end)
-    excludeBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Exclude Target", 1, 0.8, 0)
-        GameTooltip:AddLine("Permanently stop treating your current target's", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("creature type as a boss. Matched by npcID, so", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("mobs that merely share a display name elsewhere", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("are unaffected.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("/wmachine exclusions to review the list", 0.6, 0.8, 1)
-        GameTooltip:AddLine("/wmachine whyboss to diagnose a target", 0.6, 0.8, 1)
-        GameTooltip:Show()
-    end)
-    excludeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- ---------- Alerts ----------
+    L:Section({ key = "alerts", title = "Missing Debuff Alerts" })
+    get, set = DBGetSet("raidAlerts")
+    L:Checkbox({
+        label = "Send raid message when debuff missing", get = get, set = set,
+        tooltip = { "Missing Debuff Alerts", "Uses /rw if you have assist, otherwise /raid."
+            .. " Only alerts for enabled categories." },
+    })
+    local row = L:Row(24)
+    get, set = DBGetSet("alertOnlyOnBoss")
+    row:Checkbox({ label = "Only on boss targets", get = get, set = set }, 23)
+    get, set = DBGetSet("assistCanAnnounce")
+    row:Checkbox({
+        label = "Assistants can announce", get = get, set = set,
+        tooltip = {
+            "Assistant Announcements",
+            "By default only the raid leader sends missing debuff alerts to chat. Enable this if"
+                .. " the raid leader doesn't have the addon and you want assistants to announce.",
+        },
+    }, 212)
+    row = L:Row(44)
+    get, set = DBGetSet("alertDelay")
+    row:Slider({
+        name = "WM_DebuffAlertDelaySlider", label = "Delay before alert", width = 160,
+        min = 2, max = 15, step = 1, get = get, set = set,
+        format = function(v) return v .. "s" end,
+        tooltip = { "Delay Before Alert", "How long a debuff must be missing from the boss before"
+            .. " the alert goes out, so normal refresh gaps don't trigger it." },
+    }, 12)
+    get, set = DBGetSet("alertCooldown")
+    row:Slider({
+        name = "WM_DebuffAlertCDSlider", label = "Cooldown between alerts", width = 150,
+        min = 10, max = 120, step = 5, get = get, set = set,
+        format = function(v) return v .. "s" end,
+        tooltip = { "Alert Cooldown", "Minimum time between two alerts, so a debuff that stays"
+            .. " missing isn't called out over and over." },
+    }, 200)
+    row = L:Row(24)
+    get, set = DBGetSet("pullAnnounce")
+    row:Checkbox({
+        label = "Announce who pulled the boss", get = get, set = set,
+        tooltip = {
+            "Pull Announce",
+            "Detects the first player in your group to hit a boss and announces it to chat.",
+            "Example: First hit: Playername on Gruul",
+        },
+    }, 8)
+    row:Cycle({
+        label = "Channel:", width = 55, options = PULL_CHANNEL_OPTIONS, default = "SAY",
+        get = function() return DebuffTrackerDB.pullAnnounceChannel end,
+        set = function(v) DebuffTrackerDB.pullAnnounceChannel = v end,
+        tooltip = { "Announce Channel", "Click to cycle: Say > Party > Raid > /rw",
+            "/rw falls back to Raid if no assist." },
+    }, 230)
 
-    yOffset = yOffset - 42
+    -- ---------- Target filtering ----------
+    L:Section({ key = "filtering", title = "Target Filtering" })
+    get, set = DBGetSet("focusTracking")
+    L:Checkbox({
+        label = "Only alert for the raid's actual kill target", get = get, set = set,
+        tooltip = {
+            "Focus Target Tracking",
+            "On multi-boss fights (Fathom-Lord Karathress, Illidari Council) the addon watches"
+                .. " which mob is taking the most raid damage and only alerts for that one.",
+            "Target an add the raid is ignoring and it stays quiet. Adapts to any kill order —"
+                .. " no configuration needed if you change strategy.",
+        },
+    })
+    row = L:Row(44)
+    row:Slider({
+        name = "WM_DebuffBossHPSlider", label = "Min boss health", width = 170,
+        min = 0, max = 400000, step = 25000, lowText = "off", highText = "400k",
+        get = function() return DebuffTrackerDB.bossMinHealth or 150000 end,
+        set = function(v) DebuffTrackerDB.bossMinHealth = v end,
+        format = FormatHP,
+        tooltip = {
+            "Minimum Boss Health",
+            "Mobs below this max health are never treated as bosses. Raid trash is level 72-73"
+                .. " elite just like real bosses, so level alone can't tell them apart — health pool can.",
+            "Lower it if a real boss is being missed; raise it if trash still triggers alerts.",
+        },
+    }, 12)
+    row:RightButton({
+        text = "Exclude Target", width = 115,
+        onClick = function() DebuffTracker:ExcludeTarget() end,
+        tooltip = {
+            "Exclude Target",
+            "Permanently stop treating your current target's creature type as a boss. Matched by"
+                .. " npcID, so mobs that merely share a display name elsewhere are unaffected.",
+            " ",
+            { "/wmachine exclusions to review the list" },
+            { "/wmachine whyboss to diagnose a target" },
+        },
+    }, 8)
 
-    -- Separator
-    local alertSep = frame:CreateTexture(nil, "ARTWORK")
-    alertSep:SetHeight(1)
-    alertSep:SetPoint("TOPLEFT", 15, yOffset)
-    alertSep:SetPoint("TOPRIGHT", -15, yOffset)
-    WM:ThemeTexture(alertSep, "separatorColor")
-    
-    yOffset = yOffset - 8
-    
-    -- ========================================
-    -- DEBUFF SELECTION SECTION
-    -- ========================================
-    
-    -- Category & Debuff Selection header
-    local catHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    catHeader:SetPoint("TOPLEFT", 20, yOffset)
-    catHeader:SetText("Debuff Selection by Class:")
-    WM:ThemeText(catHeader, "headerColor")
-    
-    local manualNote = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    manualNote:SetPoint("LEFT", catHeader, "RIGHT", 8, 0)
-    manualNote:SetText("")
-    frame.manualNote = manualNote
-    
-    yOffset = yOffset - 5
-    
-    -- Scroll frame for categories + debuffs
-    local scrollFrame = CreateFrame("ScrollFrame", "WM_DebuffTrackerScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 15, yOffset)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
-    
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
-    scrollChild:SetHeight(1)
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    -- Build the category + debuff checkbox tree
-    local scrollY = 0
-    local debuffCheckboxes = {}
-    
+    -- ---------- Encounter callouts ----------
+    L:Section({ key = "encounters", title = "Encounter Callouts" })
+    get, set = DBGetSet("illidanDoomWarning")
+    L:Checkbox({
+        label = "Illidan 68%: raid warn \"CAST DOOM NOW\"", get = get, set = set,
+        tooltip = {
+            "Illidan Doom Warning",
+            "When Illidan Stormrage reaches 68% health, sends CAST DOOM NOW as a raid warning so"
+                .. " warlocks land Curse of Doom before he lifts off at 65%.",
+            " ",
+            "Fires once per pull. Sent by the raid leader (or assistants if allowed under Missing"
+                .. " Debuff Alerts); others see it locally.",
+        },
+    })
+    row = L:Row(24)
+    get, set = DBGetSet("shearMonitor")
+    row:Checkbox({
+        label = "Illidan: call out Shear on the main tank", get = get, set = set,
+        tooltip = {
+            "Illidan Shear Monitor",
+            "Shear cuts the main tank's maximum health by about 60% and can be dodged, parried or blocked.",
+            " ",
+            "Damage meters miss it: the hit is a max-health debuff and an avoided Shear deals no"
+                .. " damage at all. This watches every cast, hit, aura and avoidance event, and sweeps"
+                .. " raid auras as a backup.",
+            " ",
+            { "A summary prints when the pull ends." },
+            { "/wmachine shear - status and tallies" },
+        },
+    }, 8)
+    row:Cycle({
+        label = "To:", options = CHANNEL_OPTIONS, default = "RAID",
+        get = function() return DebuffTrackerDB.shearChannel end,
+        set = function(v) DebuffTrackerDB.shearChannel = v end,
+        tooltip = {
+            "Shear Announce Channel",
+            "Cycles: Me only > Say > Party > Raid > /rw",
+            "You always see a local line regardless. Chat is sent by the raid leader (or"
+                .. " assistants if allowed) so only one person calls it.",
+        },
+    }, 268)
+    row = L:Row(24)
+    get, set = DBGetSet("shearAnnounceAvoided")
+    row:Checkbox({
+        label = "Also call dodged / parried / blocked", get = get, set = set,
+        tooltip = {
+            "Avoided Shears",
+            "Off by default: Shear repeats every ~10s, so calling both outcomes doubles the chat."
+                .. " Avoided Shears are still counted and appear in the pull summary.",
+        },
+    }, 23)
+    get, set = DBGetSet("shearPreWarn")
+    row:Checkbox({
+        label = "Cast warning", get = get, set = set,
+        tooltip = {
+            "Shear Cast Warning",
+            "Shear has a ~1.5s cast. This prints a local heads-up the moment it starts - the"
+                .. " window to use Shield Block or Holy Shield. Never sent to chat.",
+        },
+    }, 262)
+    row = L:Row(44)
+    row:Slider({
+        name = "WM_DebuffShearThrottleSlider", label = "Min gap between calls", width = 165,
+        min = 0, max = 30, step = 1, lowText = "all", highText = "30s",
+        get = function() return DebuffTrackerDB.shearThrottle or 0 end,
+        set = function(v) DebuffTrackerDB.shearThrottle = v end,
+        format = FormatThrottle,
+        tooltip = {
+            "Shear Chat Throttle",
+            "Shear repeats roughly every 10s across three ground phases, so calling every one is a"
+                .. " lot of raid chat. This sets the minimum gap between CHAT calls.",
+            " ",
+            { "Throttled Shears are still counted and still shown to you locally - only the chat line is skipped." },
+        },
+    }, 27)
+    get, set = DBGetSet("shearSummary")
+    row:Checkbox({
+        label = "Pull summary", get = get, set = set,
+        tooltip = {
+            "Shear Pull Summary",
+            "When combat ends, prints the pull's tally: total, hit vs avoided, a per-tank"
+                .. " breakdown so swaps are visible, and which avoidance types occurred.",
+            "Local only, never sent to chat.",
+        },
+    }, 262)
+
+    L:Header("Black Temple: shadow resist gear")
+    row = L:Row(24)
+    get, set = DBGetSet("srCheck")
+    row:Checkbox({
+        label = "Warn if still in SR gear after Mother", get = get, set = set,
+        tooltip = {
+            "Shadow Resist Gear Check",
+            "Mother Shahraz is the only fight in Black Temple that wants shadow resist gear. This"
+                .. " warns you if you pull the Grand Promenade constructs after her while still wearing it.",
+            " ",
+            "Arms when Mother dies, or the moment you engage one of the trigger mobs (so a /reload still works).",
+            " ",
+            { "/wmachine srcheck - see exactly what it detects" },
+        },
+    }, 8)
+    row:Cycle({
+        label = "To:", options = CHANNEL_OPTIONS, default = "LOCAL",
+        get = function() return DebuffTrackerDB.srCheckChannel end,
+        set = function(v) DebuffTrackerDB.srCheckChannel = v end,
+        tooltip = {
+            "SR Warning Channel",
+            "Cycles: Me only > Say > Party > Raid > /rw",
+            "This one is about YOUR gear, so unlike the other callouts every player warns"
+                .. " themselves - it is not limited to the raid leader.",
+        },
+    }, 268)
+    row = L:Row(44)
+    row:Slider({
+        name = "WM_DebuffSRThresholdSlider", label = "Warn at gear SR of", width = 165,
+        min = 10, max = 250, step = 10,
+        get = function() return DebuffTrackerDB.srCheckThreshold or 60 end,
+        set = function(v) DebuffTrackerDB.srCheckThreshold = v end,
+        tooltip = {
+            "Shadow Resist Threshold",
+            "Total shadow resistance from EQUIPPED GEAR that counts as still wearing the set."
+                .. " Buffs and auras are ignored.",
+            " ",
+            "A Mother set runs well over 200. Raise this if an odd piece with incidental SR sets it off.",
+        },
+    }, 27)
+    row:RightButton({
+        text = "Check My Gear", width = 110,
+        onClick = function() DebuffTracker:ExplainShadowResist() end,
+        tooltip = {
+            "Check My Gear",
+            "Lists every equipped piece carrying shadow resistance, the gear total against the"
+                .. " threshold, and whether the check is currently armed.",
+        },
+    }, 8)
+    L:Note("Trigger mobs: Shadowmoon Reaver, Promenade Sentinel and the Illidari packs on the"
+        .. " Grand Promenade. Use Check My Gear to confirm detection works on your client before relying on it.")
+
+    -- ---------- Debuff selection ----------
+    L:Section({
+        key = "debuffs", title = "Debuff Selection by Class",
+        rightText = function()
+            return DebuffTrackerDB.autoDetect and "|cFF888888(auto-managed)|r" or ""
+        end,
+    })
+
     for _, category in ipairs(DEBUFF_CATEGORIES) do
-        local catCoverable = DebuffTracker:IsCategoryCoverable(category)
-        
-        -- Category header checkbox
-        local catCB = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-        catCB:SetPoint("TOPLEFT", 5, -scrollY)
-        
-        local colorHex = string.format("%02x%02x%02x", 
-            category.color[1]*255, category.color[2]*255, category.color[3]*255)
-        
-        -- Show coverage indicator in category name
-        local coverageTag = ""
-        if category.optional then
-            coverageTag = " |cFFAAAA00(optional)|r"
-        elseif DebuffTrackerDB.autoDetect then
-            if catCoverable then
-                coverageTag = " |cFF00FF00(available)|r"
-            else
-                coverageTag = " |cFF666666(no class in raid)|r"
-            end
+        local catName = category.name
+        local function CanEdit()
+            return DebuffTrackerDB.trackedCategories[catName] and not DebuffTrackerDB.autoDetect
         end
-        catCB.Text:SetText("|cFF" .. colorHex .. category.name .. "|r" .. coverageTag)
-        catCB.Text:SetFontObject("GameFontNormal")
-        catCB:SetChecked(DebuffTrackerDB.trackedCategories[category.name])
-        
-        debuffCheckboxes[category.name] = {}
-        
-        scrollY = scrollY + 24
-        
-        -- Group debuffs by class for display
-        local classesSeen = {}
-        local classOrder = {}
+        local colorHex = string.format("%02x%02x%02x",
+            category.color[1] * 255, category.color[2] * 255, category.color[3] * 255)
+
+        L:Checkbox({
+            font = "GameFontNormal", indent = -3,
+            label = function()
+                local tag = ""
+                if category.optional then
+                    tag = " |cFFAAAA00(optional)|r"
+                elseif DebuffTrackerDB.autoDetect then
+                    tag = DebuffTracker:IsCategoryCoverable(category)
+                        and " |cFF00FF00(available)|r" or " |cFF666666(no class in raid)|r"
+                end
+                return "|cFF" .. colorHex .. catName .. "|r" .. tag
+            end,
+            get = function() return DebuffTrackerDB.trackedCategories[catName] end,
+            set = function(v)
+                DebuffTrackerDB.trackedCategories[catName] = v
+                DebuffTracker:UpdateFrameSize()
+                DebuffTracker:UpdateDebuffs()
+                panel:Refresh()
+            end,
+            -- Auto-detect owns every category except the optional ones
+            disabled = function() return DebuffTrackerDB.autoDetect and not category.optional end,
+        })
+
+        -- Debuffs grouped by providing class, in first-seen order
+        local byClass, classOrder = {}, {}
         for _, debuff in ipairs(category.debuffs) do
-            if not classesSeen[debuff.class] then
-                classesSeen[debuff.class] = {}
-                table.insert(classOrder, debuff.class)
+            if not byClass[debuff.class] then
+                byClass[debuff.class] = {}
+                classOrder[#classOrder + 1] = debuff.class
             end
-            table.insert(classesSeen[debuff.class], debuff)
+            table.insert(byClass[debuff.class], debuff)
         end
-        
-        -- Create per-class debuff checkboxes
+
         for _, className in ipairs(classOrder) do
-            local classDebuffs = classesSeen[className]
-            local classColor = RAID_CLASS_COLORS[className] or {r=1, g=1, b=1}
-            local classInRaid = DebuffTracker:IsClassInRaid(className)
-            
-            -- Class label with raid presence and spec indicator
-            local classLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            classLabel:SetPoint("TOPLEFT", 35, -scrollY)
-            
-            local raidTag = ""
-            if DebuffTrackerDB.autoDetect then
-                if classInRaid then
-                    local specStr = ""
-                    if raidSpecs[className] then
-                        local specParts = {}
-                        for spec, count in pairs(raidSpecs[className]) do
-                            table.insert(specParts, spec)
-                        end
-                        if #specParts > 0 then
-                            specStr = " - " .. table.concat(specParts, ", ")
+            local classRow = L:Row(18)
+            classRow:Text({
+                font = "GameFontNormalSmall",
+                text = function()
+                    local tag = ""
+                    if DebuffTrackerDB.autoDetect then
+                        if DebuffTracker:IsClassInRaid(className) then
+                            local specs = {}
+                            for spec in pairs(raidSpecs[className] or {}) do specs[#specs + 1] = spec end
+                            local specStr = #specs > 0 and (" - " .. table.concat(specs, ", ")) or ""
+                            tag = " |cFF00FF00(" .. (raidClasses[className] or 0) .. " in raid" .. specStr .. ")|r"
+                        else
+                            tag = " |cFFFF4444(not in raid)|r"
                         end
                     end
-                    raidTag = " |cFF00FF00(" .. (raidClasses[className] or 0) .. " in raid" .. specStr .. ")|r"
-                else
-                    raidTag = " |cFFFF4444(not in raid)|r"
-                end
-            end
-            classLabel:SetText("|cFF" .. string.format("%02x%02x%02x", 
-                classColor.r*255, classColor.g*255, classColor.b*255) .. className .. ":|r" .. raidTag)
-            
-            scrollY = scrollY + 18
-            
-            for _, debuff in ipairs(classDebuffs) do
-                local wrapper = CreateFrame("Frame", nil, scrollChild)
-                wrapper:SetSize(280, 22)
-                wrapper:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 40, -scrollY)
-                
-                local debuffCB = CreateFrame("CheckButton", nil, wrapper, "InterfaceOptionsCheckButtonTemplate")
-                debuffCB:SetPoint("LEFT", wrapper, "LEFT", 0, 0)
-                debuffCB.Text:SetText(debuff.name .. (debuff.spec and " |cFFAAAACC[" .. debuff.spec .. "]|r" or "") .. " |cFF888888(P:" .. debuff.priority .. ")|r")
-                debuffCB:SetChecked(DebuffTrackerDB.trackedDebuffs[category.name][debuff.name])
-                
-                table.insert(debuffCheckboxes[category.name], {
-                    checkbox = debuffCB,
-                    wrapper = wrapper,
-                    label = classLabel,
-                    debuffName = debuff.name,
-                    className = className,
+                    return "|cFF" .. ClassHex(className) .. className .. ":|r" .. tag
+                end,
+            }, 35)
+
+            for _, debuff in ipairs(byClass[className]) do
+                L:Checkbox({
+                    indent = 32,
+                    label = debuff.name .. (debuff.spec and " |cFFAAAACC[" .. debuff.spec .. "]|r" or "")
+                        .. " |cFF888888(P:" .. debuff.priority .. ")|r",
+                    get = function() return DebuffTrackerDB.trackedDebuffs[catName][debuff.name] end,
+                    set = function(v)
+                        DebuffTrackerDB.trackedDebuffs[catName][debuff.name] = v
+                        DebuffTracker:UpdateDebuffs()
+                    end,
+                    disabled = function() return not CanEdit() end,
                 })
-                
-                debuffCB:SetScript("OnClick", function(self)
-                    DebuffTrackerDB.trackedDebuffs[category.name][debuff.name] = self:GetChecked()
-                    DebuffTracker:UpdateDebuffs()
-                end)
-                
-                -- Disable if category is unchecked OR auto-detect is on
-                local catEnabled = DebuffTrackerDB.trackedCategories[category.name]
-                if not catEnabled or DebuffTrackerDB.autoDetect then
-                    debuffCB:Disable()
-                    debuffCB:SetAlpha(0.4)
-                end
-                
-                scrollY = scrollY + 24
             end
         end
-        
-        -- Enable All / Disable All buttons for this category
-        local enableAllBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
-        enableAllBtn:SetSize(65, 16)
-        enableAllBtn:SetPoint("TOPLEFT", 45, -scrollY)
-        enableAllBtn:SetText("All On")
-        enableAllBtn:GetFontString():SetFont(GameFontNormalSmall:GetFont())
-        enableAllBtn:SetScript("OnClick", function()
-            for _, entry in ipairs(debuffCheckboxes[category.name]) do
-                entry.checkbox:SetChecked(true)
-                DebuffTrackerDB.trackedDebuffs[category.name][entry.debuffName] = true
+
+        local function SetAll(v)
+            for _, debuff in ipairs(category.debuffs) do
+                DebuffTrackerDB.trackedDebuffs[catName][debuff.name] = v
             end
             DebuffTracker:UpdateDebuffs()
-        end)
-        
-        local disableAllBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
-        disableAllBtn:SetSize(65, 16)
-        disableAllBtn:SetPoint("LEFT", enableAllBtn, "RIGHT", 5, 0)
-        disableAllBtn:SetText("All Off")
-        disableAllBtn:GetFontString():SetFont(GameFontNormalSmall:GetFont())
-        disableAllBtn:SetScript("OnClick", function()
-            for _, entry in ipairs(debuffCheckboxes[category.name]) do
-                entry.checkbox:SetChecked(false)
-                DebuffTrackerDB.trackedDebuffs[category.name][entry.debuffName] = false
-            end
-            DebuffTracker:UpdateDebuffs()
-        end)
-        
-        -- Disable buttons if category is off or auto-detect is on
-        if not DebuffTrackerDB.trackedCategories[category.name] or DebuffTrackerDB.autoDetect then
-            enableAllBtn:Disable()
-            enableAllBtn:SetAlpha(0.4)
-            disableAllBtn:Disable()
-            disableAllBtn:SetAlpha(0.4)
+            panel:Refresh()
         end
-        
-        debuffCheckboxes[category.name].enableAllBtn = enableAllBtn
-        debuffCheckboxes[category.name].disableAllBtn = disableAllBtn
-        
-        scrollY = scrollY + 22
-        
-        -- Category checkbox OnClick
-        catCB:SetScript("OnClick", function(self)
-            local checked = self:GetChecked()
-            DebuffTrackerDB.trackedCategories[category.name] = checked
-            local canEdit = checked and not DebuffTrackerDB.autoDetect
-            for _, entry in ipairs(debuffCheckboxes[category.name]) do
-                if canEdit then
-                    entry.checkbox:Enable()
-                    entry.checkbox:SetAlpha(1.0)
-                else
-                    entry.checkbox:Disable()
-                    entry.checkbox:SetAlpha(0.4)
-                end
-            end
-            if canEdit then
-                debuffCheckboxes[category.name].enableAllBtn:Enable()
-                debuffCheckboxes[category.name].enableAllBtn:SetAlpha(1.0)
-                debuffCheckboxes[category.name].disableAllBtn:Enable()
-                debuffCheckboxes[category.name].disableAllBtn:SetAlpha(1.0)
-            else
-                debuffCheckboxes[category.name].enableAllBtn:Disable()
-                debuffCheckboxes[category.name].enableAllBtn:SetAlpha(0.4)
-                debuffCheckboxes[category.name].disableAllBtn:Disable()
-                debuffCheckboxes[category.name].disableAllBtn:SetAlpha(0.4)
-            end
-            DebuffTracker:UpdateFrameSize()
-            DebuffTracker:UpdateDebuffs()
-        end)
-        
-        -- Disable category CB when auto-detect is on (except optional categories)
-        if DebuffTrackerDB.autoDetect and not category.optional then
-            catCB:Disable()
-            catCB:SetAlpha(0.6)
-        end
-        
-        -- Separator line
-        local sep = scrollChild:CreateTexture(nil, "ARTWORK")
-        sep:SetHeight(1)
-        sep:SetPoint("TOPLEFT", 5, -scrollY)
-        sep:SetPoint("TOPRIGHT", -5, -scrollY)
-        WM:ThemeTexture(sep, "separatorColor")
-        
-        scrollY = scrollY + 8
+        local btnRow = L:Row(22)
+        btnRow:Button({ text = "All On", width = 65, height = 16, small = true,
+            onClick = function() SetAll(true) end, disabled = function() return not CanEdit() end }, 45)
+        btnRow:Button({ text = "All Off", width = 65, height = 16, small = true,
+            onClick = function() SetAll(false) end, disabled = function() return not CanEdit() end }, 115)
+        L:Separator()
     end
-    
-    scrollChild:SetHeight(scrollY + 10)
-    
-    -- Store references for auto-detect toggle
-    frame.debuffCheckboxes = debuffCheckboxes
-    frame.scrollChild = scrollChild
-    
-    -- Auto-detect checkbox OnClick (defined after debuffCheckboxes exist)
-    autoCB:SetScript("OnClick", function(self)
-        DebuffTrackerDB.autoDetect = self:GetChecked()
-        if DebuffTrackerDB.autoDetect then
-            DebuffTracker:ScanRaidComposition()
-            frame.manualNote:SetText("|cFF888888(auto-managed)|r")
-        else
-            frame.manualNote:SetText("")
-        end
-        -- Rebuild UI to reflect enable/disable state
-        DebuffTracker:RefreshSettingsUI()
-    end)
-    
-    -- Set initial manual note
-    if DebuffTrackerDB.autoDetect then
-        frame.manualNote:SetText("|cFF888888(auto-managed)|r")
-    end
-    
-    -- Bottom buttons
-    local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(120, 22)
-    resetBtn:SetPoint("BOTTOMLEFT", 20, 15)
-    resetBtn:SetText("Reset Position")
-    resetBtn:SetScript("OnClick", function()
-        DebuffTrackerDB.frameX = nil
-        DebuffTrackerDB.frameY = nil
-        if trackerFrame then
-            trackerFrame:ClearAllPoints()
-            trackerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
-        end
-        DebuffTracker:Print("Tracker position reset")
-    end)
-    
-    local testBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    testBtn:SetSize(100, 22)
-    testBtn:SetPoint("BOTTOMRIGHT", -20, 15)
-    testBtn:SetText("Test Display")
-    testBtn:SetScript("OnClick", function()
-        if trackerFrame then
-            trackerFrame:Show()
-            DebuffTracker:Print("Showing tracker for testing. Target a mob to see debuffs.")
-        end
-    end)
-    
-    mainFrame = frame
-    self.mainFrame = frame
-    
-    return frame
+
+    -- ---------- Footer ----------
+    panel:AddFooterButton({
+        text = "Reset Position", width = 120,
+        tooltip = { "Reset Position", "Move the debuff tracker display back to the middle of the screen." },
+        onClick = function()
+            DebuffTrackerDB.frameX = nil
+            DebuffTrackerDB.frameY = nil
+            if trackerFrame then
+                trackerFrame:ClearAllPoints()
+                trackerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+            end
+            DebuffTracker:Print("Tracker position reset")
+        end,
+    }, "LEFT")
+    panel:AddFooterButton({
+        text = "Test Display", width = 100,
+        tooltip = { "Test Display", "Show the tracker now, outside a raid. Target a mob to see debuffs." },
+        onClick = function()
+            if trackerFrame then
+                trackerFrame:Show()
+                DebuffTracker:Print("Showing tracker for testing. Target a mob to see debuffs.")
+            end
+        end,
+    }, "RIGHT")
+
+    panel:Finish()
+
+    mainFrame = panel
+    self.mainFrame = panel
+    return panel
 end
 
--- Refresh the settings UI by destroying and recreating it
+-- Re-read every control (roster scans and auto-detect call this). Kept
+-- under its old name: callers predate the panel being refreshable in place.
 function DebuffTracker:RefreshSettingsUI()
-    if mainFrame then
-        local wasShown = mainFrame:IsShown()
-        mainFrame:Hide()
-        WM:UnregisterSkinnedPanel(mainFrame)
-        mainFrame:SetParent(nil)
-        mainFrame = nil
-        self.mainFrame = nil
-        if wasShown then
-            self:CreateUI()
-            mainFrame:Show()
-        end
+    if mainFrame and mainFrame:IsShown() then
+        mainFrame:Refresh()
     end
+end
+
+-- /wmachine encounters: the callouts are a section of the settings panel
+function DebuffTracker:ToggleEncounterUI()
+    local panel = self:CreateUI()
+    panel:ShowSection("encounters")
 end
 
 function DebuffTracker:Toggle()

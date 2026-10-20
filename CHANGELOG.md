@@ -2,7 +2,82 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.6** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.7** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.7
+
+### Shared panel builder
+
+Every settings window used to be laid out by hand: a running `yOffset`,
+per-module checkbox and slider boilerplate, and a frame height measured by
+eye. Three times that produced a panel taller than the screen: Debuff
+Tracker settings at 948px, the dashboard card list, and PvP Tracker at
+780px. The new `UI.lua` (`WM.UI`) builds a panel from a vertical list of
+rows instead.
+
+- **Panel** (`WM.UI:CreatePanel`):
+  - title, close button, Escape to close, theme skin
+  - height fitted to its content, capped at `maxHeight` and at the screen;
+    the body scrolls when the content is taller
+  - fixed-height panels (`scroll = false`) can give the remaining space to
+    a list with `Layout:Fill`
+  - optional footer button row
+  - position saved in `WatchingMachineDB.panels[name]`
+- **Rows:**
+  - `Checkbox`, `Slider`, `Cycle` (replaces the hand-rolled channel cycle
+    buttons), `Choice` (one-of-N buttons), `EditBox` (always saves on Enter
+    and when focus leaves; Escape restores), `Buttons`, `Note` (wrapped grey
+    text sized to fit), `Header`, `Separator`, `Space`
+  - `Section`: collapsible, with state remembered per panel
+  - `Row(height)` with the same widgets at an x offset, for two-column rows
+- **Specs:** every control takes a `get`/`set` pair, an optional
+  `disabled()` and an optional `tooltip` (`{ "Title", "wrapped text", ... }`;
+  no more hand-broken lines). `panel:Refresh()` re-reads all of them, so a
+  panel never has to be destroyed and rebuilt to show new state.
+- **Two-click confirm:** `Button{ confirm = true }` replaces the copies in
+  PvP Tracker.
+
+### Moved to the builder
+
+- **Debuff Tracker settings.** The settings window and the separate
+  Encounter Callouts window are one panel again. It is 700px tall at most
+  and scrolls, with these sections: Raid Auto-Detection, Missing Debuff
+  Alerts, Target Filtering, Encounter Callouts, Debuff Selection by Class.
+  - The debuff list used to sit in a 141px inner scroll box. It is now part
+    of the panel's own scroll, and collapsing the sections above it gives it
+    the whole window.
+  - `/wmachine encounters` opens the panel scrolled to Encounter Callouts.
+    `WM_DebuffEncounterFrame` no longer exists.
+  - Roster scans and the auto-detect toggle refresh the panel in place.
+    Before, they destroyed and recreated it, which lost the scroll position
+    and leaked the old frame.
+  - The delay and cooldown sliders, the Scan Now button and the footer
+    buttons have tooltips now.
+- **PvP Enemy Tracker.**
+  - Guild Sync and KOS Leaderboard are collapsible sections; collapsing
+    them gives the KOS list more room.
+  - The window is still 700px and the list still fills what's left.
+  - Every alert option has a tooltip.
+  - The Reset and Clear All confirmations use the shared two-click button.
+- **Buff Check.** The panel is now built from rows and fits its content.
+  The PallyPower detection line is a note that's re-read on open, and Run
+  Check Now is a footer button.
+
+Saved settings are unchanged. The only new saved data is panel position
+and section state in `WatchingMachineDB.panels`.
+
+### Tests
+
+- `tests/wowstub.lua`: a reusable fake WoW client (frames, scripts, check
+  buttons, sliders, scroll frames, edit boxes).
+- `tests/test_uibuilder.lua` (43 checks):
+  - fitting, screen cap and scrolling
+  - sections, edit boxes, cycles, sliders
+  - confirm buttons, saved position, Escape registration
+- `tests/test_panels.lua` (30 checks): the three converted panels, driven
+  through their controls.
 
 ---
 

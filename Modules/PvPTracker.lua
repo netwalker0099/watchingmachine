@@ -5,7 +5,7 @@ local AddonName, WM = ...
 local PvPTracker = {}
 WM:RegisterModule("PvPTracker", PvPTracker)
 
-PvPTracker.version = "2.7"
+PvPTracker.version = "2.8"
 
 -- ============================================
 -- DEFAULT SETTINGS
@@ -1263,462 +1263,221 @@ end
 
 function PvPTracker:CreateUI()
     if mainFrame then return mainFrame end
-    
-    local frame = CreateFrame("Frame", "WM_PvPTrackerFrame", UIParent, "BackdropTemplate")
-    -- Keep under the screen height (~768px at UI scale 1.0); the KOS list is
-    -- anchored to the bottom and absorbs the difference
-    frame:SetWidth(450)
-    WM:FitHeight(frame, 700, 460)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    local theme = WM:GetTheme()
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("PvP Enemy Tracker")
-    title:SetTextColor(0.9, 0.2, 0.2, 1)
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    local yOffset = -42
-    
-    -- Enable checkbox
-    local enableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    enableCB:SetPoint("TOPLEFT", 15, yOffset)
-    enableCB.Text:SetText("Enable PvP Enemy Tracker")
-    enableCB:SetChecked(PvPTrackerDB.enabled)
-    enableCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.enabled = self:GetChecked()
-        if PvPTrackerDB.enabled then
-            PvPTracker:RegisterEvents()
-        else
-            PvPTracker:UnregisterEvents()
-        end
-    end)
-    
-    yOffset = yOffset - 22
-    
-    -- Alert checkboxes
-    local soundCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    soundCB:SetPoint("TOPLEFT", 15, yOffset)
-    soundCB.Text:SetText("Sound alerts")
-    soundCB:SetChecked(PvPTrackerDB.alertSound)
-    soundCB:SetScript("OnClick", function(self) PvPTrackerDB.alertSound = self:GetChecked() end)
-    
-    local chatCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    chatCB:SetPoint("TOPLEFT", 160, yOffset)
-    chatCB.Text:SetText("Chat alerts")
-    chatCB:SetChecked(PvPTrackerDB.alertChat)
-    chatCB:SetScript("OnClick", function(self) PvPTrackerDB.alertChat = self:GetChecked() end)
-    
-    local screenCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    screenCB:SetPoint("TOPLEFT", 290, yOffset)
-    screenCB.Text:SetText("Screen alerts")
-    screenCB:SetChecked(PvPTrackerDB.alertScreen)
-    screenCB:SetScript("OnClick", function(self) PvPTrackerDB.alertScreen = self:GetChecked() end)
-    
-    yOffset = yOffset - 24
-    
-    -- Manual only toggle
-    local manualCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    manualCB:SetPoint("TOPLEFT", 15, yOffset)
-    manualCB.Text:SetText("Manual tracking only (don't auto-add killers)")
-    manualCB:SetChecked(PvPTrackerDB.trackManualOnly)
-    manualCB:SetScript("OnClick", function(self) PvPTrackerDB.trackManualOnly = self:GetChecked() end)
-    
-    yOffset = yOffset - 28
-    
-    -- ==========================================
-    -- GUILD SYNC SECTION
-    -- ==========================================
-    local syncLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    syncLabel:SetPoint("TOPLEFT", 15, yOffset)
-    syncLabel:SetText("Guild Sync")
-    WM:ThemeText(syncLabel, "headerColor")
-    
-    yOffset = yOffset - 20
-    
-    local syncCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    syncCB:SetPoint("TOPLEFT", 15, yOffset)
-    syncCB.Text:SetText("Enable guild KOS sync")
-    syncCB:SetChecked(PvPTrackerDB.guildSync)
-    syncCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.guildSync = self:GetChecked()
-        if PvPTrackerDB.guildSync then
-            PvPTracker:SendHello()
-        end
-    end)
-    
-    yOffset = yOffset - 24
-    
-    local requestSyncBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    requestSyncBtn:SetSize(100, 20)
-    requestSyncBtn:SetPoint("TOPLEFT", 15, yOffset)
-    requestSyncBtn:SetText("Request Sync")
-    requestSyncBtn:SetScript("OnClick", function()
-        PvPTracker:RequestSync()
-    end)
-    requestSyncBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Request Sync", 1, 0.8, 0)
-        GameTooltip:AddLine("Ask online guildies running WatchingMachine to", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("send their KOS data. Cooldown: 5 minutes.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    requestSyncBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    local sendSyncBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    sendSyncBtn:SetSize(90, 20)
-    sendSyncBtn:SetPoint("LEFT", requestSyncBtn, "RIGHT", 5, 0)
-    sendSyncBtn:SetText("Send List")
-    sendSyncBtn:SetScript("OnClick", function()
-        PvPTracker:SendFullSync()
-    end)
-    sendSyncBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Send List", 1, 0.8, 0)
-        GameTooltip:AddLine("Push your personal kill data to all online", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("guildies running WatchingMachine.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    sendSyncBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    local syncDesc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    syncDesc:SetPoint("TOPLEFT", 230, yOffset)
-    syncDesc:SetWidth(200)
-    syncDesc:SetJustifyH("LEFT")
-    syncDesc:SetText("|cFF888888Kills broadcast to guild in real-time.\nFull list syncs on login and request.|r")
-    
-    yOffset = yOffset - 32
-    
-    -- Auto-request on login toggle
-    local autoSyncCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    autoSyncCB:SetPoint("TOPLEFT", 15, yOffset)
-    autoSyncCB.Text:SetText("Auto-request sync on login")
-    autoSyncCB:SetChecked(PvPTrackerDB.syncOnLogin ~= false) -- default true when sync enabled
-    autoSyncCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.syncOnLogin = self:GetChecked()
-    end)
-    
-    local revengeCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    revengeCB:SetPoint("TOPLEFT", 220, yOffset)
-    revengeCB.Text:SetText("Announce revenge kills")
-    revengeCB:SetChecked(PvPTrackerDB.announceRevenge ~= false)
-    revengeCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.announceRevenge = self:GetChecked()
-    end)
-    revengeCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Announce Revenge Kills", 1, 0.8, 0)
-        GameTooltip:AddLine("When you kill someone on the KOS list who", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("was reported by a guildie, announce the", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("kill to guild chat as a revenge message.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    revengeCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    yOffset = yOffset - 28
-    
-    -- ==========================================
-    -- LEADERBOARD SECTION
-    -- ==========================================
-    local lbLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lbLabel:SetPoint("TOPLEFT", 15, yOffset)
-    lbLabel:SetText("KOS Leaderboard")
-    WM:ThemeText(lbLabel, "headerColor")
-    
-    yOffset = yOffset - 20
-    
-    local lbEnableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    lbEnableCB:SetPoint("TOPLEFT", 15, yOffset)
-    lbEnableCB.Text:SetText("Enable point tracking")
-    lbEnableCB:SetChecked(PvPTrackerDB.leaderboardEnabled)
-    lbEnableCB:SetScript("OnClick", function(self)
-        PvPTrackerDB.leaderboardEnabled = self:GetChecked()
-    end)
-    lbEnableCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("KOS Leaderboard", 1, 0.8, 0)
-        GameTooltip:AddLine("Earn 1 point for each KOS-listed enemy you", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("kill. Points are synced with guild members", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("running WatchingMachine.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    lbEnableCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    -- Announce mode dropdown-like buttons
-    local announceLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    announceLabel:SetPoint("TOPLEFT", 220, yOffset - 2)
-    announceLabel:SetText("|cFF888888Announce:|r")
-    
-    local currentMode = PvPTrackerDB.leaderboardAnnounce or "off"
-    
-    local modeOffBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    modeOffBtn:SetSize(32, 18)
-    modeOffBtn:SetPoint("LEFT", announceLabel, "RIGHT", 5, 0)
-    modeOffBtn:SetText("Off")
-    
-    local modeHourlyBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    modeHourlyBtn:SetSize(48, 18)
-    modeHourlyBtn:SetPoint("LEFT", modeOffBtn, "RIGHT", 2, 0)
-    modeHourlyBtn:SetText("Hourly")
-    
-    local modeChangeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    modeChangeBtn:SetSize(60, 18)
-    modeChangeBtn:SetPoint("LEFT", modeHourlyBtn, "RIGHT", 2, 0)
-    modeChangeBtn:SetText("On Lead")
-    
-    -- Highlight active mode
-    local function UpdateModeButtons()
-        local mode = PvPTrackerDB.leaderboardAnnounce or "off"
-        modeOffBtn:SetText(mode == "off" and "|cFF00FF00Off|r" or "Off")
-        modeHourlyBtn:SetText(mode == "hourly" and "|cFF00FF00Hourly|r" or "Hourly")
-        modeChangeBtn:SetText(mode == "onchange" and "|cFF00FF00On Lead|r" or "On Lead")
+
+    -- Settings rows on top, the KOS list fills whatever height is left.
+    -- Collapsing Guild Sync or Leaderboard gives the list more room.
+    local panel = WM.UI:CreatePanel({
+        name = "WM_PvPTrackerFrame",
+        title = "PvP Enemy Tracker",
+        titleColor = "E63333",
+        width = 450,
+        height = 700,
+        minHeight = 460,
+        scroll = false,
+    })
+    local L = panel.layout
+    local function opt(key)
+        return function() return PvPTrackerDB[key] end, function(v) PvPTrackerDB[key] = v end
     end
-    
-    modeOffBtn:SetScript("OnClick", function()
-        PvPTrackerDB.leaderboardAnnounce = "off"
-        UpdateModeButtons()
-    end)
-    modeHourlyBtn:SetScript("OnClick", function()
-        PvPTrackerDB.leaderboardAnnounce = "hourly"
-        lastAnnounceTime = GetTime()  -- Reset timer from now
-        UpdateModeButtons()
-    end)
-    modeHourlyBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Hourly Announce", 1, 0.8, 0)
-        GameTooltip:AddLine("Posts the top 3 to guild chat once per hour.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    modeHourlyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    modeChangeBtn:SetScript("OnClick", function()
-        PvPTrackerDB.leaderboardAnnounce = "onchange"
-        UpdateModeButtons()
-    end)
-    modeChangeBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("On Lead Change", 1, 0.8, 0)
-        GameTooltip:AddLine("Posts to guild chat when a new player takes", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("the #1 spot on the leaderboard.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    modeChangeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    UpdateModeButtons()
-    
-    yOffset = yOffset - 24
-    
-    -- Open leaderboard button
-    local lbOpenBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    lbOpenBtn:SetSize(110, 20)
-    lbOpenBtn:SetPoint("TOPLEFT", 15, yOffset)
-    lbOpenBtn:SetText("Show Leaderboard")
-    lbOpenBtn:SetScript("OnClick", function()
-        PvPTracker:ToggleLeaderboard()
-    end)
-    
-    -- My points display
-    local myPointsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    myPointsText:SetPoint("LEFT", lbOpenBtn, "RIGHT", 10, 0)
-    local pts = PvPTrackerDB.myKOSKills or 0
-    myPointsText:SetText("|cFFFFCC00Your Points: " .. pts .. "|r")
-    frame.myPointsText = myPointsText
-    
-    -- Reset points button
-    local lbResetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    lbResetBtn:SetSize(50, 20)
-    lbResetBtn:SetPoint("RIGHT", frame, "TOPRIGHT", -15, yOffset)
-    lbResetBtn:SetText("Reset")
-    lbResetBtn:SetScript("OnClick", function()
-        if lbResetBtn._confirm then
+    local get, set
+
+    L:Checkbox({
+        label = "Enable PvP Enemy Tracker",
+        get = function() return PvPTrackerDB.enabled end,
+        set = function(v)
+            PvPTrackerDB.enabled = v
+            if v then PvPTracker:RegisterEvents() else PvPTracker:UnregisterEvents() end
+        end,
+    })
+    local row = L:Row(24)
+    get, set = opt("alertSound")
+    row:Checkbox({ label = "Sound alerts", get = get, set = set,
+        tooltip = { "Sound Alerts", "Play a sound when a KOS enemy is spotted." } }, 8)
+    get, set = opt("alertChat")
+    row:Checkbox({ label = "Chat alerts", get = get, set = set,
+        tooltip = { "Chat Alerts", "Print a line in your chat frame when a KOS enemy is spotted." } }, 153)
+    get, set = opt("alertScreen")
+    row:Checkbox({ label = "Screen alerts", get = get, set = set,
+        tooltip = { "Screen Alerts", "Flash a warning in the middle of the screen when a KOS enemy is spotted." } }, 283)
+    get, set = opt("trackManualOnly")
+    L:Checkbox({ label = "Manual tracking only (don't auto-add killers)", get = get, set = set,
+        tooltip = { "Manual Tracking Only", "Players who kill you are no longer added to the list"
+            .. " automatically; only names you add below are tracked." } })
+
+    -- ---------- Guild sync ----------
+    L:Section({ key = "sync", title = "Guild Sync" })
+    L:Checkbox({
+        label = "Enable guild KOS sync",
+        get = function() return PvPTrackerDB.guildSync end,
+        set = function(v)
+            PvPTrackerDB.guildSync = v
+            if v then PvPTracker:SendHello() end
+            PvPTracker:RefreshList()
+        end,
+        tooltip = { "Guild KOS Sync", "Share kills and the KOS list with guildies running Watching Machine." },
+    })
+    row = L:Row(32)
+    row:Button({
+        text = "Request Sync", width = 100,
+        onClick = function() PvPTracker:RequestSync() end,
+        tooltip = { "Request Sync", "Ask online guildies running WatchingMachine to send their KOS data."
+            .. " Cooldown: 5 minutes." },
+    }, 8)
+    row:Button({
+        text = "Send List", width = 90,
+        onClick = function() PvPTracker:SendFullSync() end,
+        tooltip = { "Send List", "Push your personal kill data to all online guildies running WatchingMachine." },
+    }, 113)
+    row:Text({ width = 200,
+        text = "|cFF888888Kills broadcast to guild in real-time.\nFull list syncs on login and request.|r" }, 215)
+    row = L:Row(24)
+    row:Checkbox({
+        label = "Auto-request sync on login",
+        get = function() return PvPTrackerDB.syncOnLogin ~= false end,  -- default true when sync enabled
+        set = function(v) PvPTrackerDB.syncOnLogin = v end,
+    }, 8)
+    row:Checkbox({
+        label = "Announce revenge kills",
+        get = function() return PvPTrackerDB.announceRevenge ~= false end,
+        set = function(v) PvPTrackerDB.announceRevenge = v end,
+        tooltip = { "Announce Revenge Kills", "When you kill someone on the KOS list who was reported by"
+            .. " a guildie, announce the kill to guild chat as a revenge message." },
+    }, 213)
+
+    -- ---------- Leaderboard ----------
+    L:Section({ key = "leaderboard", title = "KOS Leaderboard" })
+    row = L:Row(24)
+    get, set = opt("leaderboardEnabled")
+    row:Checkbox({ label = "Enable point tracking", get = get, set = set,
+        tooltip = { "KOS Leaderboard", "Earn 1 point for each KOS-listed enemy you kill. Points are"
+            .. " synced with guild members running WatchingMachine." } }, 8)
+    row:Choice({
+        label = "Announce:", default = "off",
+        get = function() return PvPTrackerDB.leaderboardAnnounce end,
+        set = function(v)
+            PvPTrackerDB.leaderboardAnnounce = v
+            if v == "hourly" then lastAnnounceTime = GetTime() end  -- reset timer from now
+        end,
+        options = {
+            { value = "off", text = "Off", width = 32,
+              tooltip = { "Announce Off", "Never post the leaderboard to guild chat." } },
+            { value = "hourly", text = "Hourly", width = 48,
+              tooltip = { "Hourly Announce", "Posts the top 3 to guild chat once per hour." } },
+            { value = "onchange", text = "On Lead", width = 60,
+              tooltip = { "On Lead Change", "Posts to guild chat when a new player takes the #1 spot on the leaderboard." } },
+        },
+    }, 213)
+    row = L:Row(26)
+    row:Button({
+        text = "Show Leaderboard", width = 110,
+        onClick = function() PvPTracker:ToggleLeaderboard() end,
+        tooltip = { "Show Leaderboard", "Open the guild KOS points table." },
+    }, 8)
+    local myPointsText = row.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    myPointsText:SetPoint("LEFT", row.frame, "LEFT", 128, 0)
+    myPointsText:SetText("|cFFFFCC00Your Points: " .. (PvPTrackerDB.myKOSKills or 0) .. "|r")
+    panel.myPointsText = myPointsText
+    row:RightButton({
+        text = "Reset", width = 50, confirm = true,
+        onClick = function()
             PvPTrackerDB.myKOSKills = 0
             PvPTrackerDB.leaderboard = {}
             lastLeader = nil
-            if frame.myPointsText then
-                frame.myPointsText:SetText("|cFFFFCC00Your Points: 0|r")
-            end
+            myPointsText:SetText("|cFFFFCC00Your Points: 0|r")
             if leaderboardFrame and leaderboardFrame:IsShown() then
                 PvPTracker:RefreshLeaderboard()
             end
             PvPTracker:Print("Leaderboard reset.")
-            lbResetBtn:SetText("Reset")
-            lbResetBtn._confirm = false
-        else
-            lbResetBtn:SetText("|cFFFF0000Sure?|r")
-            lbResetBtn._confirm = true
-            WM.RunAfter(3, function()
-                if lbResetBtn._confirm then
-                    lbResetBtn:SetText("Reset")
-                    lbResetBtn._confirm = false
-                end
-            end)
-        end
-    end)
-    lbResetBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Reset Leaderboard", 1, 0.3, 0.3)
-        GameTooltip:AddLine("Clears all leaderboard data including your", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("own points and all synced guild data.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    lbResetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
-    yOffset = yOffset - 28
-    
-    -- Add enemy manually
-    local addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    addLabel:SetPoint("TOPLEFT", 15, yOffset)
-    addLabel:SetText("Add to KOS:")
-    WM:ThemeText(addLabel, "headerColor")
-    
-    local addBox = CreateFrame("EditBox", "WM_PvPTrackerAddBox", frame, "InputBoxTemplate")
-    addBox:SetSize(150, 20)
-    addBox:SetPoint("LEFT", addLabel, "RIGHT", 8, 0)
-    addBox:SetAutoFocus(false)
-    addBox:SetMaxLetters(24)
-    
-    local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    addBtn:SetSize(50, 20)
-    addBtn:SetPoint("LEFT", addBox, "RIGHT", 5, 0)
-    addBtn:SetText("Add")
-    addBtn:SetScript("OnClick", function()
-        local name = addBox:GetText()
+        end,
+        tooltip = { "Reset Leaderboard", "Clears all leaderboard data including your own points and"
+            .. " all synced guild data. Click twice to confirm." },
+    }, 3)
+    L:EndSection()
+
+    -- ---------- Add + list ----------
+    L:Space(4)
+    row = L:Row(26)
+    local function AddName(name)
         if name and name ~= "" then
             PvPTracker:AddManualEnemy(strtrim(name))
+            PvPTracker:RefreshList()
+        end
+    end
+    local addBox = row:EditBox({
+        name = "WM_PvPTrackerAddBox", label = "Add to KOS:", labelColorKey = "headerColor",
+        width = 150, maxLetters = 24, onEnter = AddName, clearOnEnter = true,
+        tooltip = { "Add to KOS", "Type a player name and press Enter, or click Add." },
+    }, 8)
+    row:Button({
+        text = "Add", width = 50,
+        onClick = function()
+            AddName(addBox:GetText())
             addBox:SetText("")
-            PvPTracker:RefreshList()
-        end
-    end)
-    addBox:SetScript("OnEnterPressed", function(self)
-        local name = self:GetText()
-        if name and name ~= "" then
-            PvPTracker:AddManualEnemy(strtrim(name))
-            self:SetText("")
-            PvPTracker:RefreshList()
-        end
-        self:ClearFocus()
-    end)
-    
-    -- Add target button
-    local addTargetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    addTargetBtn:SetSize(80, 20)
-    addTargetBtn:SetPoint("LEFT", addBtn, "RIGHT", 5, 0)
-    addTargetBtn:SetText("Add Target")
-    addTargetBtn:SetScript("OnClick", function()
-        if UnitExists("target") and UnitIsPlayer("target") and not UnitIsFriend("player", "target") then
-            local targetName = UnitName("target")
-            PvPTracker:AddManualEnemy(targetName)
-            PvPTracker:RefreshList()
-        else
-            PvPTracker:Print("No hostile player target selected.")
-        end
-    end)
-    
-    yOffset = yOffset - 30
-    
-    -- Enemy list header
-    local listHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    listHeader:SetPoint("TOPLEFT", 15, yOffset)
+        end,
+    }, 243)
+    row:Button({
+        text = "Add Target", width = 80,
+        onClick = function()
+            if UnitExists("target") and UnitIsPlayer("target") and not UnitIsFriend("player", "target") then
+                PvPTracker:AddManualEnemy(UnitName("target"))
+                PvPTracker:RefreshList()
+            else
+                PvPTracker:Print("No hostile player target selected.")
+            end
+        end,
+        tooltip = { "Add Target", "Add your current target, if it's a hostile player." },
+    }, 298)
+
+    row = L:Row(22)
+    local listHeader = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    listHeader:SetPoint("LEFT", row.frame, "LEFT", 8, 0)
     listHeader:SetText("Kill-on-Sight List")
     WM:ThemeText(listHeader, "headerColor")
-    
-    local countText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local countText = row.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     countText:SetPoint("LEFT", listHeader, "RIGHT", 10, 0)
-    frame.countText = countText
-    
-    -- Sync status tag
-    local syncStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    syncStatus:SetPoint("RIGHT", frame, "TOPRIGHT", -80, yOffset)
-    if PvPTrackerDB.guildSync then
-        syncStatus:SetText("|cFF00CC00[Sync ON]|r")
-    else
-        syncStatus:SetText("|cFF888888[Sync OFF]|r")
-    end
-    frame.syncStatus = syncStatus
-    
-    -- Clear all button
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(60, 18)
-    clearBtn:SetPoint("RIGHT", frame, "TOPRIGHT", -15, yOffset)
-    clearBtn:SetText("Clear All")
-    clearBtn:SetScript("OnClick", function()
-        -- Confirmation via second click
-        if clearBtn._confirm then
+    panel.countText = countText
+    local syncStatus = row.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    syncStatus:SetPoint("RIGHT", row.frame, "RIGHT", -68, 0)
+    syncStatus:SetText(PvPTrackerDB.guildSync and "|cFF00CC00[Sync ON]|r" or "|cFF888888[Sync OFF]|r")
+    panel.syncStatus = syncStatus
+    row:RightButton({
+        text = "Clear All", width = 60, height = 18, confirm = true, confirmText = "Confirm",
+        onClick = function()
             PvPTrackerDB.enemies = {}
             PvPTracker:Print("Enemy list cleared.")
             PvPTracker:RefreshList()
-            clearBtn:SetText("Clear All")
-            clearBtn._confirm = false
-        else
-            clearBtn:SetText("|cFFFF0000Confirm|r")
-            clearBtn._confirm = true
-            WM.RunAfter(3, function()
-                if clearBtn._confirm then
-                    clearBtn:SetText("Clear All")
-                    clearBtn._confirm = false
-                end
-            end)
-        end
-    end)
-    
-    yOffset = yOffset - 8
-    
-    -- Column headers
-    local colY = yOffset
-    local headerFont = "GameFontNormalSmall"
-    
-    local colName = frame:CreateFontString(nil, "OVERLAY", headerFont)
-    colName:SetPoint("TOPLEFT", 18, colY)
-    colName:SetText("Name")
-    colName:SetTextColor(0.7, 0.7, 0.7)
-    
-    local colKills = frame:CreateFontString(nil, "OVERLAY", headerFont)
-    colKills:SetPoint("TOPLEFT", 170, colY)
-    colKills:SetText("Kills")
-    colKills:SetTextColor(0.7, 0.7, 0.7)
-    
-    local colZone = frame:CreateFontString(nil, "OVERLAY", headerFont)
-    colZone:SetPoint("TOPLEFT", 210, colY)
-    colZone:SetText("Last Zone")
-    colZone:SetTextColor(0.7, 0.7, 0.7)
-    
-    local colSeen = frame:CreateFontString(nil, "OVERLAY", headerFont)
-    colSeen:SetPoint("TOPLEFT", 360, colY)
-    colSeen:SetText("Last Kill")
-    colSeen:SetTextColor(0.7, 0.7, 0.7)
-    
-    yOffset = yOffset - 14
-    
-    -- Scrollable enemy list
-    local scrollFrame = CreateFrame("ScrollFrame", "WM_PvPTrackerScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 12, yOffset)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 15)
-    
+        end,
+        tooltip = { "Clear All", "Remove every name from the KOS list. Click twice to confirm." },
+    }, 3)
+
+    row = L:Row(16)
+    for _, col in ipairs({ { "Name", 3 }, { "Kills", 155 }, { "Last Zone", 195 }, { "Last Kill", 345 } }) do
+        local fs = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("LEFT", row.frame, "LEFT", col[2], 0)
+        fs:SetText(col[1])
+        fs:SetTextColor(0.7, 0.7, 0.7)
+    end
+
+    -- Scrollable enemy list in the remaining space
+    local fill = L:Fill(120)
+    local scrollFrame = CreateFrame("ScrollFrame", "WM_PvPTrackerScrollFrame", fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 0)
+
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
+    scrollChild:SetWidth(450 - 24 - 23)
+    scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-    
-    frame.scrollChild = scrollChild
-    frame.scrollFrame = scrollFrame
-    frame.rows = {}
-    
-    mainFrame = frame
+
+    panel.scrollChild = scrollChild
+    panel.scrollFrame = scrollFrame
+    panel.rows = {}
+
+    panel:Finish()
+
+    mainFrame = panel
     self:RefreshList()
-    return frame
+    return panel
 end
 
 function PvPTracker:RefreshList()

@@ -7,7 +7,7 @@ local AddonName, WM = ...
 local BuffCheck = {}
 WM:RegisterModule("BuffCheck", BuffCheck)
 
-BuffCheck.version = "3.0"
+BuffCheck.version = "3.1"
 
 -- ============================================
 -- BUFF DEFINITIONS (TBC)
@@ -718,130 +718,59 @@ end
 function BuffCheck:CreateUI()
     if mainFrame then return mainFrame end
 
-    local theme = WM:GetTheme()
+    local panel = WM.UI:CreatePanel({
+        name = "WM_BuffCheckFrame",
+        title = "Buff Check",
+        titleColor = "33FF99",
+        width = 380,
+    })
+    local L = panel.layout
+    local function opt(key)
+        return function() return BuffCheckDB[key] end, function(v) BuffCheckDB[key] = v end
+    end
 
-    local frame = CreateFrame("Frame", "WM_BuffCheckFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(360, 585)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
+    local get, set = opt("enabled")
+    L:Checkbox({ label = "Enable buff check on ready check", get = get, set = set })
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
+    get, set = opt("announceToRaid")
+    L:Checkbox({
+        label = "Announce to raid when I start the ready check", get = get, set = set,
+        tooltip = {
+            "Announce Mode",
+            "When YOU run the ready check, missing buffs are announced to raid/party chat.",
+            "When someone ELSE runs it, the report is always shown only to you.",
+        },
+    })
 
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF33FF99Buff Check|r")
+    get, set = opt("reportAllBuffed")
+    L:Checkbox({ label = "Also report when everyone is fully buffed", get = get, set = set })
 
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local yOffset = -45
-
-    -- Enable checkbox
-    local enableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    enableCB:SetPoint("TOPLEFT", 20, yOffset)
-    enableCB.Text:SetText("Enable buff check on ready check")
-    enableCB:SetChecked(BuffCheckDB.enabled)
-    enableCB:SetScript("OnClick", function(self)
-        BuffCheckDB.enabled = self:GetChecked()
-    end)
-
-    yOffset = yOffset - 26
-
-    -- Announce checkbox
-    local announceCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    announceCB:SetPoint("TOPLEFT", 20, yOffset)
-    announceCB.Text:SetText("Announce to raid when I start the ready check")
-    announceCB:SetChecked(BuffCheckDB.announceToRaid)
-    announceCB:SetScript("OnClick", function(self)
-        BuffCheckDB.announceToRaid = self:GetChecked()
-    end)
-    announceCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Announce Mode", 1, 0.8, 0)
-        GameTooltip:AddLine("When YOU run the ready check, missing buffs", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("are announced to raid/party chat.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("When someone ELSE runs it, the report is", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("always shown only to you.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    announceCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 26
-
-    -- Report all-buffed checkbox
-    local allBuffedCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    allBuffedCB:SetPoint("TOPLEFT", 20, yOffset)
-    allBuffedCB.Text:SetText("Also report when everyone is fully buffed")
-    allBuffedCB:SetChecked(BuffCheckDB.reportAllBuffed)
-    allBuffedCB:SetScript("OnClick", function(self)
-        BuffCheckDB.reportAllBuffed = self:GetChecked()
-    end)
-
-    yOffset = yOffset - 26
-
-    -- PallyPower integration checkbox
-    local ppCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    ppCB:SetPoint("TOPLEFT", 20, yOffset)
-    ppCB.Text:SetText("Use PallyPower blessing assignments")
-    ppCB:SetChecked(BuffCheckDB.usePallyPower)
-    ppCB:SetScript("OnClick", function(self)
-        BuffCheckDB.usePallyPower = self:GetChecked()
-    end)
-    ppCB:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("PallyPower Integration", 1, 0.8, 0)
-        GameTooltip:AddLine("When PallyPower is running and paladins in your", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("group have blessing assignments, each player is", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("checked against their ASSIGNED blessings, and the", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("report names the exact missing blessing.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Single-target assignments override that paladin's", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("class blessing for that player (a tank assigned", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("single Might isn't expected to have class Salv).", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Greater and normal versions both count.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Falls back to 'any blessing' when PallyPower is", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("missing or has no assignments configured.", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    ppCB:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    yOffset = yOffset - 22
-
-    -- PallyPower detection status (refreshed every time the panel opens)
-    local ppStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ppStatus:SetPoint("TOPLEFT", 45, yOffset)
-    frame.ppStatus = ppStatus
-    frame:SetScript("OnShow", function(self)
+    get, set = opt("usePallyPower")
+    L:Checkbox({
+        label = "Use PallyPower blessing assignments", get = get, set = set,
+        tooltip = {
+            "PallyPower Integration",
+            "When PallyPower is running and paladins in your group have blessing assignments,"
+                .. " each player is checked against their ASSIGNED blessings, and the report"
+                .. " names the exact missing blessing.",
+            "Single-target assignments override that paladin's class blessing for that player"
+                .. " (a tank assigned single Might isn't expected to have class Salv).",
+            "Greater and normal versions both count.",
+            "Falls back to 'any blessing' when PallyPower is missing or has no assignments configured.",
+        },
+    })
+    -- Detection status, re-read every time the panel opens
+    L:Note(function()
         if BuffCheck:IsPallyPowerAvailable() then
-            self.ppStatus:SetText("|cFF00FF00PallyPower detected|r")
-        else
-            self.ppStatus:SetText("|cFF888888PallyPower not detected — using generic blessing check|r")
+            return "|cFF00FF00PallyPower detected|r"
         end
-    end)
+        return "PallyPower not detected — using generic blessing check"
+    end, 25)
 
-    yOffset = yOffset - 26
+    L:Space(6)
+    L:Header("Buffs to check")
 
-    -- Buff selection header
-    local buffHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    buffHeader:SetPoint("TOPLEFT", 20, yOffset)
-    buffHeader:SetText("Buffs to check:")
-    WM:ThemeText(buffHeader, "headerColor")
-
-    yOffset = yOffset - 22
-
-    -- Per-buff-group checkboxes
     for _, group in ipairs(BUFF_GROUPS) do
-        local cb = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 25, yOffset)
         local label = group.name
         if group.providerClass then
             local classColor = RAID_CLASS_COLORS[group.providerClass]
@@ -851,40 +780,35 @@ function BuffCheck:CreateUI()
         if group.note then
             label = label .. " |cFF888888- " .. group.note .. "|r"
         end
-        cb.Text:SetText(label)
-        cb:SetChecked(BuffCheckDB.checkedGroups[group.key])
-        cb:SetScript("OnClick", function(self)
-            BuffCheckDB.checkedGroups[group.key] = self:GetChecked()
-        end)
-        yOffset = yOffset - 24
+        L:Checkbox({
+            label = label, indent = 5,
+            get = function() return BuffCheckDB.checkedGroups[group.key] end,
+            set = function(v) BuffCheckDB.checkedGroups[group.key] = v end,
+        })
     end
 
-    yOffset = yOffset - 8
+    L:Space(4)
+    L:Note("Class buffs are only checked when the providing class is in the group."
+        .. " Offline and dead players are skipped.")
 
-    -- Info text
-    local infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    infoText:SetPoint("TOPLEFT", 20, yOffset)
-    infoText:SetWidth(320)
-    infoText:SetJustifyH("LEFT")
-    infoText:SetText("|cFF888888Class buffs are only checked when the providing class is in the group. Offline and dead players are skipped.|r")
+    panel:AddFooterButton({
+        text = "Run Check Now", width = 130,
+        tooltip = { "Run Check Now", "Checks the group right now and shows the report only to you." },
+        onClick = function()
+            -- Manual runs are always local-only
+            local lines, missingCount, skipped = BuffCheck:ScanGroup()
+            lastReport = lines
+            lastReportTime = date("%H:%M:%S")
+            BuffCheck:Report(lines, missingCount, skipped, false)
+        end,
+    }, "LEFT")
 
-    -- Run Check Now button
-    local runBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    runBtn:SetSize(130, 24)
-    runBtn:SetPoint("BOTTOMLEFT", 20, 15)
-    runBtn:SetText("Run Check Now")
-    runBtn:SetScript("OnClick", function()
-        -- Manual runs are always local-only
-        local lines, missingCount, skipped = BuffCheck:ScanGroup()
-        lastReport = lines
-        lastReportTime = date("%H:%M:%S")
-        BuffCheck:Report(lines, missingCount, skipped, false)
-    end)
+    panel:Finish()
 
-    mainFrame = frame
-    self.mainFrame = frame
+    mainFrame = panel
+    self.mainFrame = panel
 
-    return frame
+    return panel
 end
 
 function BuffCheck:Toggle()
