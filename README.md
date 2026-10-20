@@ -414,7 +414,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
-[`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+[`docs/RELEASE-NOTES-v3.9.md`](docs/RELEASE-NOTES-v3.9.md).
 
 ### Version 3.9
 - Every remaining window moved to the panel builder: Auto Logger, Aura Range, Guild Invite, Keyword Monitor, WarcraftLogs Lookup, Services Parser, Mail & Trade, Recruiter (all three windows), Class Tools, PvP leaderboard, ArmorySnap, Settings and the dashboard
