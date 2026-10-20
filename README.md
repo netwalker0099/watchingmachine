@@ -432,7 +432,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
-[`docs/RELEASE-NOTES-v3.9.md`](docs/RELEASE-NOTES-v3.9.md).
+[`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)
+(every release from 2.9 to 3.11 in one post).
 
 ### Version 3.11
 - Chat Filter: premade filters for **GDKP**, **Guild Loot Run** and **Gear Carry** (incl. "gear carries"), one tick each in the Chat Filter window; off until switched on
