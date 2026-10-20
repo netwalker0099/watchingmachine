@@ -606,7 +606,7 @@ function AuraRange:CreateUI()
     local listHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     listHeader:SetPoint("TOPLEFT", 20, yOffset)
     listHeader:SetText("Auras to watch:")
-    listHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(listHeader, "headerColor")
 
     yOffset = yOffset - 20
 

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.5.1"
+WM.version = "3.5.2"
 WM.modules = {}
 
 -- ============================================
@@ -395,8 +395,41 @@ end
 WM._skinnedPanels = {}
 WM._skinnedCards = {}
 
+-- Named panels also close on Escape. UISpecialFrames holds global names,
+-- so a panel rebuilt under the same name needs only one entry.
+local escRegistered = {}
+
+function WM:RegisterEscClose(frame)
+    local name = frame and frame.GetName and frame:GetName()
+    if not name or escRegistered[name] then return end
+    escRegistered[name] = true
+    tinsert(UISpecialFrames, name)
+end
+
 function WM:RegisterSkinnedPanel(frame)
     self._skinnedPanels[frame] = true
+    self:RegisterEscClose(frame)
+end
+
+-- For panels being destroyed and rebuilt, so the stale frame isn't reskinned
+function WM:UnregisterSkinnedPanel(frame)
+    if frame then self._skinnedPanels[frame] = nil end
+end
+
+-- Text and textures coloured from a theme key (headerColor, separatorColor,
+-- ...). Registered so a theme change recolours them instead of leaving the
+-- colour they were built with. Weak keys: a discarded panel isn't pinned.
+WM._themedTexts = setmetatable({}, { __mode = "k" })
+WM._themedTextures = setmetatable({}, { __mode = "k" })
+
+function WM:ThemeText(fontString, colorKey)
+    self._themedTexts[fontString] = colorKey
+    fontString:SetTextColor(unpack(self:GetTheme()[colorKey]))
+end
+
+function WM:ThemeTexture(texture, colorKey)
+    self._themedTextures[texture] = colorKey
+    texture:SetColorTexture(unpack(self:GetTheme()[colorKey]))
 end
 
 function WM:RegisterSkinnedCard(frame, color)
@@ -413,6 +446,13 @@ function WM:ReskinAll()
         if frame and frame.SetBackdrop then
             self:SkinCard(frame, color)
         end
+    end
+    local theme = self:GetTheme()
+    for fs, key in pairs(self._themedTexts) do
+        fs:SetTextColor(unpack(theme[key]))
+    end
+    for tex, key in pairs(self._themedTextures) do
+        tex:SetColorTexture(unpack(theme[key]))
     end
 end
 
@@ -441,9 +481,10 @@ function WM:IsSecurityCheckComplete()
 end
 
 function WM:OnSecurityCheckFailed()
-    -- Hide dashboard if open (but keep minimap button visible for user preference)
-    if dashboard then
-        dashboard:Hide()
+    -- Hide dashboard if open (but keep minimap button visible for user preference).
+    -- WM.dashboard, not the file-local: that local is declared further down.
+    if self.dashboard then
+        self.dashboard:Hide()
     end
     
     -- Silently fail - don't announce to non-guild members
@@ -1113,7 +1154,7 @@ function WM:CreateSettingsPanel()
     desc:SetPoint("TOPLEFT", 25, yOffset)
     desc:SetWidth(270)
     desc:SetJustifyH("LEFT")
-    desc:SetText("|cFF888888Theme applies to the dashboard, all module panels, and the debuff tracker. ElvUI theme uses pixel-perfect borders matching Tukui/ElvUI style.|r")
+    desc:SetText("|cFF888888Applies to the dashboard, every module window, ArmorySnap and the debuff tracker. On-screen warning frames keep their own colours.|r")
     
     yOffset = yOffset - 55
     
@@ -1163,8 +1204,12 @@ function WM:OnThemeChanged()
         dashboard:Hide()
         -- Unregister from skinning
         self._skinnedPanels[dashboard] = nil
+        -- Cards sit card -> container -> scroll frame -> dashboard, so walk
+        -- the whole parent chain rather than assuming a fixed depth
         for card in pairs(self._skinnedCards) do
-            if card:GetParent() and card:GetParent():GetParent() == dashboard then
+            local p = card:GetParent()
+            while p and p ~= dashboard do p = p:GetParent() end
+            if p == dashboard then
                 self._skinnedCards[card] = nil
             end
         end
@@ -1186,8 +1231,12 @@ function WM:OnThemeChanged()
         settingsFrame:Show()
     end
     
-    -- Notify modules that have an ApplyTheme method
+    -- Notify modules that have an ApplyTheme method. Modules that keep their
+    -- own theme flag (ArmorySnap) get told the new global theme first.
     for name, module in pairs(self.modules) do
+        if module.OnGlobalThemeChanged then
+            module:OnGlobalThemeChanged(themeName)
+        end
         if module.ApplyTheme then
             module:ApplyTheme()
         end
@@ -1217,10 +1266,12 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
+    print("|cFFFFFF00/as snap [label]|r, |cFFFFFF00list|r, |cFFFFFF00delete <name>|r, |cFFFFFF00group|r, |cFFFFFF00status|r, |cFFFFFF00reset|r - ArmorySnap snapshots and scanner")
     print("|cFFFFFF00/wmachine range|r - Open Aura Range alert settings")
     print("|cFFFFFF00/wmachine exclude|r - Stop the debuff tracker treating your target as a boss")
     print("|cFFFFFF00/wmachine unexclude|r - Undo an exclusion for your target")
     print("|cFFFFFF00/wmachine exclusions|r - List excluded NPCs")
+    print("|cFFFFFF00/wmachine clearexclusions|r - Remove every exclusion")
     print("|cFFFFFF00/wmachine whyboss|r - Explain how the tracker sees your target")
     print("|cFFFFFF00/wmachine shear|r - Illidan Shear monitor status and tallies")
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
@@ -1232,6 +1283,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
+    print("|cFFFFFF00/wmachine status|r - One-line status for every module")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")
     print("|cFFFFFF00/wmachine debug|r - Show debug info")

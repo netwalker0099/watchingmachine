@@ -576,7 +576,7 @@ function ClassTools:CreateUI()
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -15)
     title:SetText("Class Tools")
-    title:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(title, "headerColor")
 
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -5, -5)

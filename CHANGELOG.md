@@ -2,7 +2,47 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.5.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.5.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.5.2
+
+### UI fixes
+
+These come from the first batch of the UI review: things that were broken.
+Layouts aren't redesigned, and saved settings are untouched.
+
+- **Escape closes every window.** Previously only ArmorySnap was registered
+  to close on Escape. Every panel that goes through `WM:RegisterSkinnedPanel`
+  is now registered too. On-screen warning frames (Aura Range, Class Tools,
+  the debuff overlay) are not panels and are left alone.
+- **PvP Enemy Tracker fits on screen.** The window was 780px tall. At UI
+  scale 1.0 the screen is about 768px, so the bottom of the KOS list and its
+  scroll-down arrow were off screen. It is now 700px tall; the controls
+  don't move and the list is 80px shorter.
+- **Theme changes reach every window.**
+  - Section headers and separators were coloured once, when the window was
+    built, so switching theme left the old colours behind. This affected
+    PvP, Buff Check, Aura Range, Class Tools and both Debuff Tracker
+    windows. They now register through `WM:ThemeText` / `WM:ThemeTexture`
+    and are recoloured on every theme change.
+  - ArmorySnap read only its own ElvUI flag after first run, so it never
+    followed the global theme. A global theme change now resets it to
+    match; its own toggle still works as an override until the next change.
+  - Stale dashboard cards are now dropped from the reskin list when the
+    dashboard is rebuilt. The old check looked one parent level too shallow
+    and never matched. A rebuilt Debuff Tracker settings panel is
+    unregistered the same way.
+- **Services Parser settings** can no longer be dragged off screen. It now
+  has a global name (`WM_ServicesParserSettings`) and is clamped to the
+  screen.
+- **Hiding the dashboard on a failed security check** now uses
+  `WM.dashboard`. The old code read a file-local that is declared further
+  down, so it always saw nil.
+- **Help** now lists `/wmachine status`, `/wmachine clearexclusions` and
+  ArmorySnap's `/as` sub-commands. The theme description in Settings no
+  longer claims to cover every frame.
 
 ---
 

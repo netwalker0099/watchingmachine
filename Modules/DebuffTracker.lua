@@ -2524,7 +2524,7 @@ function DebuffTracker:CreateEncounterUI()
     local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleText:SetPoint("TOP", 0, -15)
     titleText:SetText("Encounter Callouts")
-    titleText:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(titleText, "headerColor")
 
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
@@ -2724,7 +2724,7 @@ function DebuffTracker:CreateEncounterUI()
     local srHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     srHeader:SetPoint("TOPLEFT", 20, yOffset)
     srHeader:SetText("Black Temple: shadow resist gear")
-    srHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(srHeader, "headerColor")
 
     yOffset = yOffset - 22
 
@@ -2887,7 +2887,7 @@ function DebuffTracker:CreateUI()
     local titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleText:SetPoint("TOP", 0, -15)
     titleText:SetText("Debuff Tracker Settings")
-    titleText:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(titleText, "headerColor")
     
     -- Close button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
@@ -2950,7 +2950,7 @@ function DebuffTracker:CreateUI()
     local autoHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     autoHeader:SetPoint("TOPLEFT", 20, yOffset)
     autoHeader:SetText("Raid Auto-Detection:")
-    autoHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(autoHeader, "headerColor")
     
     yOffset = yOffset - 22
     
@@ -3007,7 +3007,7 @@ function DebuffTracker:CreateUI()
     autoSep:SetHeight(1)
     autoSep:SetPoint("TOPLEFT", 15, yOffset)
     autoSep:SetPoint("TOPRIGHT", -15, yOffset)
-    autoSep:SetColorTexture(unpack(theme.separatorColor))
+    WM:ThemeTexture(autoSep, "separatorColor")
     
     yOffset = yOffset - 8
     
@@ -3018,7 +3018,7 @@ function DebuffTracker:CreateUI()
     local alertHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     alertHeader:SetPoint("TOPLEFT", 20, yOffset)
     alertHeader:SetText("Missing Debuff Alerts:")
-    alertHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(alertHeader, "headerColor")
     
     yOffset = yOffset - 22
     
@@ -3208,7 +3208,7 @@ function DebuffTracker:CreateUI()
     local fpHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fpHeader:SetPoint("TOPLEFT", 20, yOffset)
     fpHeader:SetText("Target Filtering:")
-    fpHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(fpHeader, "headerColor")
 
     yOffset = yOffset - 22
 
@@ -3303,7 +3303,7 @@ function DebuffTracker:CreateUI()
     alertSep:SetHeight(1)
     alertSep:SetPoint("TOPLEFT", 15, yOffset)
     alertSep:SetPoint("TOPRIGHT", -15, yOffset)
-    alertSep:SetColorTexture(unpack(theme.separatorColor))
+    WM:ThemeTexture(alertSep, "separatorColor")
     
     yOffset = yOffset - 8
     
@@ -3315,7 +3315,7 @@ function DebuffTracker:CreateUI()
     local catHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     catHeader:SetPoint("TOPLEFT", 20, yOffset)
     catHeader:SetText("Debuff Selection by Class:")
-    catHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(catHeader, "headerColor")
     
     local manualNote = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     manualNote:SetPoint("LEFT", catHeader, "RIGHT", 8, 0)
@@ -3525,7 +3525,7 @@ function DebuffTracker:CreateUI()
         sep:SetHeight(1)
         sep:SetPoint("TOPLEFT", 5, -scrollY)
         sep:SetPoint("TOPRIGHT", -5, -scrollY)
-        sep:SetColorTexture(unpack(theme.separatorColor))
+        WM:ThemeTexture(sep, "separatorColor")
         
         scrollY = scrollY + 8
     end
@@ -3591,6 +3591,7 @@ function DebuffTracker:RefreshSettingsUI()
     if mainFrame then
         local wasShown = mainFrame:IsShown()
         mainFrame:Hide()
+        WM:UnregisterSkinnedPanel(mainFrame)
         mainFrame:SetParent(nil)
         mainFrame = nil
         self.mainFrame = nil

@@ -1265,7 +1265,7 @@ function PvPTracker:CreateUI()
     if mainFrame then return mainFrame end
     
     local frame = CreateFrame("Frame", "WM_PvPTrackerFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(450, 780)
+    frame:SetSize(450, 700)  -- keep under UIParent's ~768px at scale 1.0; the list absorbs it
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -1345,7 +1345,7 @@ function PvPTracker:CreateUI()
     local syncLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     syncLabel:SetPoint("TOPLEFT", 15, yOffset)
     syncLabel:SetText("Guild Sync")
-    syncLabel:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(syncLabel, "headerColor")
     
     yOffset = yOffset - 20
     
@@ -1436,7 +1436,7 @@ function PvPTracker:CreateUI()
     local lbLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbLabel:SetPoint("TOPLEFT", 15, yOffset)
     lbLabel:SetText("KOS Leaderboard")
-    lbLabel:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(lbLabel, "headerColor")
     
     yOffset = yOffset - 20
     
@@ -1580,7 +1580,7 @@ function PvPTracker:CreateUI()
     local addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     addLabel:SetPoint("TOPLEFT", 15, yOffset)
     addLabel:SetText("Add to KOS:")
-    addLabel:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(addLabel, "headerColor")
     
     local addBox = CreateFrame("EditBox", "WM_PvPTrackerAddBox", frame, "InputBoxTemplate")
     addBox:SetSize(150, 20)
@@ -1631,7 +1631,7 @@ function PvPTracker:CreateUI()
     local listHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     listHeader:SetPoint("TOPLEFT", 15, yOffset)
     listHeader:SetText("Kill-on-Sight List")
-    listHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(listHeader, "headerColor")
     
     local countText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     countText:SetPoint("LEFT", listHeader, "RIGHT", 10, 0)

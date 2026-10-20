@@ -827,7 +827,7 @@ function BuffCheck:CreateUI()
     local buffHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     buffHeader:SetPoint("TOPLEFT", 20, yOffset)
     buffHeader:SetText("Buffs to check:")
-    buffHeader:SetTextColor(unpack(theme.headerColor))
+    WM:ThemeText(buffHeader, "headerColor")
 
     yOffset = yOffset - 22
 

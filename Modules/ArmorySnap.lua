@@ -1069,6 +1069,15 @@ local function SetSlotItem(btn, gearData)
     end
 end
 
+-- Changing the Watching Machine theme resets ArmorySnap to match. The
+-- module's own ElvUI toggle stays as a per-window override until the next
+-- global change.
+function AS:OnGlobalThemeChanged(themeName)
+    if AS.db and AS.db.options then
+        AS.db.options.elvuiTheme = (themeName == "ElvUI")
+    end
+end
+
 function AS.ApplyTheme()
     if not browseFrame then return end
     local elv = AS.db and AS.db.options and AS.db.options.elvuiTheme

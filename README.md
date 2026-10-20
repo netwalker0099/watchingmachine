@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.5.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.5.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -358,6 +358,13 @@ Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.5.2
+- Escape now closes every Watching Machine window, not just ArmorySnap
+- PvP Enemy Tracker window is 700px tall instead of 780, so its list no longer runs off the bottom of the screen
+- Theme changes now recolour section headers and separators in open windows, and ArmorySnap follows the global theme
+- Services Parser settings window can no longer be dragged off screen
+- `/wmachine help` lists `status`, `clearexclusions` and the `/as` sub-commands
 
 ### Version 3.5.1
 - Buff Check and the General food check now accept **Enlightened** (Skullfish Soup) as a food buff, not just Well Fed
