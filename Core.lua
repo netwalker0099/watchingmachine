@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.4"
+WM.version = "3.5"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -139,6 +139,9 @@ local MODULE_COLORS = {
     ArmorySnap = "66AAFF",
     AuraRange = "FFFF66",
     ClassTools = "FF99DD",
+    ClassGeneral = "AADDAA",
+    ClassWarlock = "8787ED",
+    ClassMage = "3FC7EB",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1194,6 +1197,9 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine encounters|r - Per-boss callout settings")
     print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
     print("|cFFFFFF00/wmachine class|r - Open Class Tools for your class")
+    print("|cFFFFFF00/wmachine soulstone|r - Soulstone timers in your group (warlock)")
+    print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
+    print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
@@ -1343,6 +1349,30 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "soulstone" or cmd == "soulstones" or cmd == "ss" then
+        local module = WM.modules.ClassWarlock
+        if module and module.ReportSoulstones then
+            module:ReportSoulstones()
+        else
+            WM:Print("ClassWarlock module not available")
+        end
+
+    elseif cmd == "consumes" or cmd == "consumables" then
+        local module = WM.modules.ClassGeneral
+        if module and module.Explain then
+            module:Explain()
+        else
+            WM:Print("ClassGeneral module not available")
+        end
+
+    elseif cmd == "portals" or cmd == "teleports" then
+        local module = WM.modules.ClassMage
+        if module and module.ReportSpells then
+            module:ReportSpells()
+        else
+            WM:Print("ClassMage module not available")
         end
 
     elseif cmd == "class" or cmd == "classes" or cmd == "classtools" then

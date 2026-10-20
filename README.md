@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.4 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.5 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines thirteen powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines sixteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -213,6 +213,62 @@ CT:RegisterFeature("SHAMAN", {
   A feature then just asks `CT:IsEnabled("SHAMAN", "totemReminder")`, or
   `CT:IsActiveForPlayer("totemReminder")` for the class being played.
 
+- **Shared warning frame.** Features don't each build their own alert. They
+  call `CT:SetAlert(key, text, icon)` and `CT:ClearAlert(key)`; Class Tools
+  collects everything into one movable *CHECK YOURSELF* frame (up to six lines
+  at once) that hides itself the moment the last warning clears. Registered
+  monitors run on a shared one-second tick, so twenty checks cost one timer.
+- Warning frame options live at the bottom of the panel: sound on a new
+  warning, lock in place, reset position, and **Show example** — which puts
+  two dummy lines up for six seconds so you can find and position the frame
+  without waiting for a real warning.
+
+### 14. Class — General
+Consumable checks that apply to everyone, shown under a **General** tab that
+always sits first.
+
+- **Flask**, **food buff** (Well Fed) and **weapon enchant** checks, running
+  only while you're inside a raid instance — no nagging in town or while
+  questing
+- **25-man only by default**, with a tick to extend it to 10-mans
+- Wording follows your class: casters are told about **wizard oil**, melee
+  about **sharpening stones / weightstones**
+- The off hand is checked only when a real **weapon** is equipped there —
+  shields and held items share the slot but can't take an oil
+- `/wmachine consumes` prints exactly what the checks currently see
+
+Flask detection matches on substring, so `Unstable Flask of the Beast` and
+`Unstable Flask of the Sorcerer` count alongside the standard flasks.
+
+### 15. Class — Warlock
+- **Armor check** — warns when Fel Armor, Demon Armor or Demon Skin has
+  fallen off
+- **Demonic Sacrifice** — only nags when you've actually taken the talent and
+  have no demon out. A warlock with a pet summoned is making a choice, not
+  making a mistake, so no warning is raised
+- **Soul Link** — warns only when talented, with a living pet, and with no
+  sacrifice buff up. A sacrificed warlock is never nagged about Soul Link
+- **Soulstone timers** — scans the group for Soulstone Resurrection and reads
+  the real expiry from the buff itself, so it works regardless of which
+  warlock cast it or whether you saw the cast. `/wmachine soulstone` lists
+  who's stoned and for how long
+- Talents are cached for five seconds for speed, and the cache is dropped
+  immediately on a respec (`CHARACTER_POINTS_CHANGED` / `PLAYER_TALENT_UPDATE`)
+  so the checks never act on an old build
+
+### 16. Class — Mage
+- **Armor check** — warns when Molten, Mage, Ice or Frost Armor is missing
+- **Portal / teleport button** — one draggable button that expands on hover
+  into every teleport and portal you know, portals listed first. Built from
+  your spellbook, so it only ever shows what you can actually cast, and
+  refreshes when you learn a new one
+- The spellbook scan derives the `Teleport:` / `Portal:` prefixes from the
+  client's own spell names, so it works on non-English clients
+- The flyout deliberately **won't expand in combat**: its buttons are secure
+  frames that can't be reconfigured mid-fight, and portals aren't castable in
+  combat anyway
+- `/wmachine portals` lists what the scan found
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -262,6 +318,10 @@ Built-in error capture system for debugging.
 - `/wmachine unexclude` - Undo an exclusion for your target
 - `/wmachine exclusions` - List excluded NPCs
 - `/wmachine whyboss` - Explain how the debuff tracker sees your target
+- `/wmachine class` - Open Class Tools (tab per class, your own selected)
+- `/wmachine soulstone` - Soulstone timers in your group (warlock)
+- `/wmachine portals` - List the teleports and portals you know (mage)
+- `/wmachine consumes` - Show what the general raid consumable checks see
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
 - `/wmachine status` - Show status of all modules
@@ -288,12 +348,33 @@ Built-in error capture system for debugging.
 - `BuffCheckDB` - Buff Check settings
 - `ArmorySnapDB` - ArmorySnap snapshots and options (shared with the standalone addon — existing archives carry over)
 - `AuraRangeDB` - Aura Range settings
+- `ClassToolsDB` - Per-class feature toggles and warning frame options
+- `GeneralChecksDB` - General consumable check settings
+- `MageToolsDB` - Portal button position and lock state
 
 ## Changelog
 
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
-[`docs/RELEASE-NOTES-v3.2.md`](docs/RELEASE-NOTES-v3.2.md).
+[`docs/`](docs/) — the latest is
+[`docs/RELEASE-NOTES-v3.5.md`](docs/RELEASE-NOTES-v3.5.md).
+
+### Version 3.5
+- Class Tools: first class features — Warlock (armor, Demonic Sacrifice, Soul Link, soulstone timers), Mage (armor check, expanding portal/teleport button)
+- New **General** tab: flask, food buff and weapon oil/stone checks inside raid instances, 25-man only by default
+- Shared one-second monitor tick and a single movable *CHECK YOURSELF* warning frame for all class features
+- Warning frame options in the panel: sound, lock, reset position, show example
+- Warlock talent cache is dropped on respec instead of waiting out its 5s TTL
+- New commands: `/wmachine class`, `/wmachine soulstone`, `/wmachine portals`, `/wmachine consumes`
+
+### Version 3.4
+- Class Tools framework: per-class tabs in the dashboard, features register themselves, toggles saved per class
+- Mail Logger: Open All is logged by diffing the inbox rather than on take attempts, fixing duplicates during bulk pulls
+- Dashboard card list made scrollable so all modules stay reachable
+
+### Version 3.3
+- DebuffTracker: Illidan Shear monitor with raid announcements, throttle and pull summary
+- DebuffTracker: shadow resist gear check after Mother Shahraz
 
 ### Version 3.2
 - DebuffTracker: Illidan Doom warning — `/rw CAST DOOM NOW` at 68% (toggle in settings, on by default)

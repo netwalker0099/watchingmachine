@@ -1,0 +1,289 @@
+-- Watching Machine: Warlock Class Tools
+-- Registers warlock features into ClassTools. Everything here no-ops unless
+-- the player is a warlock and the individual feature is switched on.
+
+local AddonName, WM = ...
+local Warlock = {}
+WM:RegisterModule("ClassWarlock", Warlock)
+
+Warlock.version = "3.5"
+
+local CLASS = "WARLOCK"
+
+-- ============================================
+-- SPELL / BUFF NAMES (TBC)
+-- ============================================
+-- Matched by NAME rather than spell ID: ranks each have their own ID, and a
+-- name read back from GetSpellInfo is already localized.
+
+-- Demonic Sacrifice grants a different 30-minute buff per demon sacrificed.
+local SACRIFICE_BUFFS = {
+    ["Burning Wish"]    = "Imp",         -- +15% Fire damage
+    ["Fel Stamina"]     = "Voidwalker",  -- periodic health
+    ["Touch of Shadow"] = "Succubus",    -- +15% Shadow damage
+    ["Fel Energy"]      = "Felhunter",   -- periodic mana
+}
+
+local ARMOR_BUFFS = { "Fel Armor", "Demon Armor", "Demon Skin" }
+local SOUL_LINK_BUFF = "Soul Link"
+local SOULSTONE_BUFF = "Soulstone Resurrection"
+
+-- Talent names, used to decide whether a check is even relevant to this spec
+local TALENT_DEMONIC_SACRIFICE = "Demonic Sacrifice"
+local TALENT_SOUL_LINK = "Soul Link"
+
+local ICON_SAC   = "Interface\\Icons\\Spell_Shadow_PsychicScream"
+local ICON_LINK  = "Interface\\Icons\\Spell_Shadow_GatherShadows"
+local ICON_ARMOR = "Interface\\Icons\\Spell_Shadow_FelArmour"
+local ICON_STONE = "Interface\\Icons\\Spell_Shadow_SoulGem"
+
+-- ============================================
+-- HELPERS
+-- ============================================
+
+local function IsPlayerWarlock()
+    local _, c = UnitClass("player")
+    return c == CLASS
+end
+
+-- Does the player have this buff? Returns name, expirationTime
+local function PlayerBuff(name)
+    for i = 1, 40 do
+        local n, _, _, _, _, expires = UnitBuff("player", i)
+        if not n then return nil end
+        if n == name then return n, expires end
+    end
+    return nil
+end
+
+local function PlayerHasAnyBuff(list)
+    for _, n in ipairs(list) do
+        if PlayerBuff(n) then return n end
+    end
+    return nil
+end
+
+-- Points spent in a talent, found by name across all trees. Self-inspection
+-- works reliably in TBC Classic (unlike inspecting other players).
+local talentCache, talentCacheTime = {}, 0
+local TALENT_CACHE_TTL = 5
+
+local function TalentRank(wanted)
+    local now = GetTime()
+    if (now - talentCacheTime) < TALENT_CACHE_TTL and talentCache[wanted] ~= nil then
+        return talentCache[wanted]
+    end
+    if (now - talentCacheTime) >= TALENT_CACHE_TTL then
+        wipe(talentCache)
+        talentCacheTime = now
+    end
+
+    local rank = 0
+    local numTabs = 3
+    local ok, n = pcall(GetNumTalentTabs)
+    if ok and tonumber(n) then numTabs = tonumber(n) end
+
+    for tab = 1, numTabs do
+        local okN, count = pcall(GetNumTalents, tab)
+        count = tonumber(count) or 0
+        for i = 1, count do
+            local okT, tname, _, _, _, currRank = pcall(GetTalentInfo, tab, i)
+            if okT and tname == wanted then
+                rank = tonumber(currRank) or 0
+                break
+            end
+        end
+        if rank > 0 then break end
+    end
+
+    talentCache[wanted] = rank
+    return rank
+end
+
+-- A respec rewrites every rank at once, so the TTL alone would leave the
+-- checks acting on the old build for up to five seconds. Drop the cache the
+-- moment the client tells us talents moved.
+function Warlock:InvalidateTalentCache()
+    wipe(talentCache)
+    talentCacheTime = 0
+end
+
+function Warlock:Print(msg)
+    WM:ModulePrint("ClassWarlock", msg)
+end
+
+-- ============================================
+-- SOULSTONE TRACKING
+-- ============================================
+-- Scans the raid for the Soulstone Resurrection buff, which is the only
+-- reliable source: it carries a real expiration time and works regardless of
+-- which warlock applied it or whether we saw the cast.
+
+local soulstones = {}   -- name -> { expires = , class = }
+
+local function GroupUnits()
+    local units = { "player" }
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+    elseif IsInGroup() then
+        for i = 1, 4 do
+            if UnitExists("party" .. i) then units[#units + 1] = "party" .. i end
+        end
+    end
+    return units
+end
+
+function Warlock:ScanSoulstones()
+    wipe(soulstones)
+    for _, unit in ipairs(GroupUnits()) do
+        if UnitExists(unit) and UnitIsConnected(unit) then
+            for i = 1, 40 do
+                local n, _, _, _, _, expires = UnitBuff(unit, i)
+                if not n then break end
+                if n == SOULSTONE_BUFF then
+                    local name = UnitName(unit)
+                    local _, class = UnitClass(unit)
+                    if name then
+                        soulstones[name] = { expires = expires, class = class }
+                    end
+                    break
+                end
+            end
+        end
+    end
+    return soulstones
+end
+
+local function FormatRemaining(expires)
+    if not expires or expires <= 0 then return "unknown" end
+    local left = expires - GetTime()
+    if left <= 0 then return "expired" end
+    return string.format("%d:%02d", math.floor(left / 60), math.floor(left % 60))
+end
+
+-- /wmachine soulstone
+function Warlock:ReportSoulstones()
+    self:ScanSoulstones()
+    local any = false
+    self:Print("=== Soulstones in group ===")
+    for name, info in pairs(soulstones) do
+        any = true
+        local hex = "ffffff"
+        local c = info.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[info.class]
+        if c then hex = string.format("%02x%02x%02x", c.r*255, c.g*255, c.b*255) end
+        print("  |cFF" .. hex .. name .. "|r  " .. FormatRemaining(info.expires) .. " remaining")
+    end
+    if not any then
+        print("  none found (only soulstones on people in range are visible)")
+    end
+end
+
+-- ============================================
+-- MONITOR
+-- ============================================
+
+local CT  -- resolved lazily: module load order isn't guaranteed
+
+local function Tools()
+    CT = CT or WM.modules.ClassTools
+    return CT
+end
+
+local function Monitor()
+    local tools = Tools()
+    if not tools then return end
+    if not IsPlayerWarlock() then return end
+
+    -- Nothing to check while dead
+    if UnitIsDeadOrGhost("player") then
+        tools:ClearAlert("wl_sac")
+        tools:ClearAlert("wl_soullink")
+        tools:ClearAlert("wl_armor")
+        return
+    end
+
+    -- --- Armor spell ---
+    if tools:IsEnabled(CLASS, "armor") then
+        if PlayerHasAnyBuff(ARMOR_BUFFS) then
+            tools:ClearAlert("wl_armor")
+        else
+            tools:SetAlert("wl_armor", "No Fel/Demon Armor", ICON_ARMOR)
+        end
+    else
+        tools:ClearAlert("wl_armor")
+    end
+
+    -- --- Demonic Sacrifice ---
+    -- Only meaningful if the talent is actually taken. If a demon is out,
+    -- the player has chosen to keep the pet, so don't nag.
+    local sacBuff = PlayerHasAnyBuff({ "Burning Wish", "Fel Stamina", "Touch of Shadow", "Fel Energy" })
+    if tools:IsEnabled(CLASS, "sacrifice") and TalentRank(TALENT_DEMONIC_SACRIFICE) > 0 then
+        if sacBuff or UnitExists("pet") then
+            tools:ClearAlert("wl_sac")
+        else
+            tools:SetAlert("wl_sac", "Demonic Sacrifice buff missing", ICON_SAC)
+        end
+    else
+        tools:ClearAlert("wl_sac")
+    end
+
+    -- --- Soul Link ---
+    -- Needs a living pet, and is impossible while a sacrifice buff is up.
+    if tools:IsEnabled(CLASS, "soullink") and TalentRank(TALENT_SOUL_LINK) > 0 then
+        if sacBuff then
+            tools:ClearAlert("wl_soullink")          -- sacrificed: no pet by design
+        elseif not UnitExists("pet") or UnitIsDead("pet") then
+            tools:ClearAlert("wl_soullink")          -- no pet to link to
+        elseif PlayerBuff(SOUL_LINK_BUFF) then
+            tools:ClearAlert("wl_soullink")
+        else
+            tools:SetAlert("wl_soullink", "Soul Link not active", ICON_LINK)
+        end
+    else
+        tools:ClearAlert("wl_soullink")
+    end
+end
+
+-- ============================================
+-- REGISTRATION
+-- ============================================
+
+function Warlock:Initialize()
+    local tools = Tools()
+    if not tools then return end
+
+    tools:RegisterFeature(CLASS, {
+        key = "armor", name = "Warn if armor spell is missing",
+        desc = "Fel Armor, Demon Armor or Demon Skin.",
+        default = true,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "sacrifice", name = "Warn if Demonic Sacrifice buff is missing",
+        desc = "Only when the talent is taken and no demon is out.",
+        default = true,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "soullink", name = "Warn if Soul Link is not cast",
+        desc = "Only when talented, with a living pet and no sacrifice buff.",
+        default = true,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "soulstones", name = "Track soulstone timers",
+        desc = "Soulstones on you and others in range. /wmachine soulstone",
+        default = true,
+    })
+
+    tools:RegisterMonitor(Monitor)
+
+    local talentWatcher = CreateFrame("Frame")
+    talentWatcher:RegisterEvent("CHARACTER_POINTS_CHANGED")
+    talentWatcher:RegisterEvent("PLAYER_TALENT_UPDATE")
+    talentWatcher:RegisterEvent("SPELLS_CHANGED")
+    talentWatcher:SetScript("OnEvent", function()
+        Warlock:InvalidateTalentCache()
+    end)
+end
+
+function Warlock:GetSoulstones()
+    return soulstones
+end

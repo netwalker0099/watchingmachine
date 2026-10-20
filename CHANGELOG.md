@@ -2,7 +2,97 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.4** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.5** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.5
+
+### Class Tools — first class features, and a shared warning frame
+
+3.4 shipped the framework. 3.5 is what plugs into it.
+
+Features no longer each build their own alert window or their own timer. They
+call `SetAlert(key, text, icon)` / `ClearAlert(key)`, and Class Tools collects
+everything into **one movable *CHECK YOURSELF* frame** (up to six lines),
+hidden the moment the last warning clears. Registered monitors share a single
+one-second tick, so the cost does not grow with the number of checks.
+
+Frame options are in the panel, under the feature list: sound on a new
+warning, lock in place, reset position, and **Show example** — two dummy lines
+for six seconds so the frame can be found and positioned without waiting for a
+real warning.
+
+### New module — Class: Warlock
+
+- **Armor** — warns when Fel Armor, Demon Armor or Demon Skin has fallen off.
+- **Demonic Sacrifice** — warns only when the talent is actually taken *and*
+  no demon is out. A warlock standing there with a pet has made a choice, not
+  a mistake, so nothing is raised.
+- **Soul Link** — warns only when talented, with a living pet, and with no
+  sacrifice buff up. The two checks interlock: a sacrificed warlock is never
+  nagged about Soul Link, and a warlock with a pet out is never nagged about
+  the sacrifice.
+- **Soulstone timers** — the group is scanned for the Soulstone Resurrection
+  buff, which carries a real expiration time. Reading the buff rather than
+  watching for casts means it works for soulstones applied by any warlock,
+  including ones cast before you logged in. `/wmachine soulstone` lists who is
+  stoned and for how long.
+
+Talents are read by name across all trees (self-inspection is reliable in TBC
+Classic) and cached for five seconds. The cache is dropped outright on
+`CHARACTER_POINTS_CHANGED` / `PLAYER_TALENT_UPDATE`, so a respec takes effect
+immediately rather than at the end of the TTL.
+
+### New module — Class: Mage
+
+- **Armor** — warns when Molten, Mage, Ice or Frost Armor is missing.
+- **Portal / teleport button** — a single draggable button that expands on
+  hover into every teleport and portal you know, portals first. It is built
+  from your spellbook, so it shows exactly what you can cast and nothing else,
+  and rebuilds on `LEARNED_SPELL_IN_TAB` / `SPELLS_CHANGED`.
+
+The spellbook scan derives the `Teleport:` / `Portal:` prefixes from
+`GetSpellInfo` on two known spell IDs rather than hardcoding English strings,
+so it works on localised clients.
+
+The flyout deliberately refuses to expand in combat. Its entries are
+`SecureActionButtonTemplate` buttons, which cannot be created or reconfigured
+during combat lockdown; since portals aren't castable in combat either,
+declining to open is honest behaviour rather than a limitation worth working
+around with secure state drivers.
+
+### New module — Class: General
+
+Consumable checks that apply to every class, under a **General** tab that
+always sorts first.
+
+- **Flask**, **food buff** (Well Fed) and **weapon oil / stone**.
+- Active **only inside a raid instance**, and **25-man only by default**, with
+  a tick to include 10-mans. No nagging in town or while questing.
+- The wording follows your class: casters are told about wizard oil, melee
+  about sharpening stones and weightstones.
+- The off hand is checked only when a real weapon is equipped there. Shields
+  and held items occupy the same slot and can't take an oil, so they are
+  skipped rather than producing a permanent, unfixable warning.
+- Flask matching is on substring, so `Unstable Flask of the Beast` and
+  `Unstable Flask of the Sorcerer` count alongside the standard flasks.
+- `/wmachine consumes` prints what the checks currently see.
+
+Classic exposes only *whether* a temporary weapon enchant is present, not
+which one, so the check is presence-based — an oil on a melee weapon will
+satisfy it.
+
+### New commands
+
+- `/wmachine class` — open Class Tools (`/wmachine classes`, `classtools`)
+- `/wmachine soulstone` — soulstone timers (`soulstones`, `ss`)
+- `/wmachine portals` — list known teleports and portals (`teleports`)
+- `/wmachine consumes` — what the general checks see (`consumables`)
+
+### Saved variables
+
+`ClassToolsDB`, `GeneralChecksDB` and `MageToolsDB` are declared in the TOC.
 
 ---
 
