@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.3 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.4 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines twelve powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines thirteen powerful monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -190,6 +190,28 @@ Visual and audio alerts when you drift out of range of party auras and shaman to
 - Alert clears the moment you step back into range
 - **False-alarm guards**: no alerts while dead (death wipes buffs), when the provider (moonkin/shaman/etc.) is dead or gone, on zone transitions, or after leaving a group; stale alerts auto-expire (configurable 5–30s) to cover totems that simply expired or were destroyed
 - Per-aura toggles, sound toggle, lockable alert frame, test button
+
+### 13. Class Tools
+Detects the class you're playing and surfaces the tools built for it.
+
+- **Class section in the dashboard** (`/wmachine class`) with a **tab per class**. A tab appears only once something has been built for that class, so there are no empty tabs for work that hasn't been done.
+- **Your own class is selected when the panel opens**, and is always offered as a tab even before it has tools — so the panel explains itself rather than looking broken.
+- Per-feature on/off switches, **saved per class**, so the same feature key on two classes stays independent.
+- This ships as the framework. Class features register into it and appear automatically:
+
+```lua
+local CT = WM.modules.ClassTools
+CT:RegisterFeature("SHAMAN", {
+    key     = "totemReminder",
+    name    = "Totem reminder",
+    desc    = "Warn when a totem drops off.",
+    default = false,
+    onToggle = function(enabled) --[[ ... ]] end,
+})
+```
+
+  A feature then just asks `CT:IsEnabled("SHAMAN", "totemReminder")`, or
+  `CT:IsActiveForPlayer("totemReminder")` for the class being played.
 
 ## Global Theme System
 

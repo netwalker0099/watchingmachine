@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.3"
+WM.version = "3.4"
 WM.modules = {}
 
 -- ============================================
@@ -19,6 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
+    "ClassTools",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -137,6 +138,7 @@ local MODULE_COLORS = {
     BuffCheck = "33FF99",
     ArmorySnap = "66AAFF",
     AuraRange = "FFFF66",
+    ClassTools = "FF99DD",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -458,6 +460,7 @@ local coreDefaults = {
         BuffCheck = true,
         ArmorySnap = true,
         AuraRange = true,
+        ClassTools = true,
     },
 }
 
@@ -716,11 +719,17 @@ function WM:CreateDashboard()
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
     
-    -- Module cards container
-    local cardsContainer = CreateFrame("Frame", nil, frame)
-    cardsContainer:SetPoint("TOPLEFT", 15, -55)
-    cardsContainer:SetPoint("BOTTOMRIGHT", -15, 60)
-    
+    -- Module cards, in a scroll frame: the list grows with every module and
+    -- the panel itself can't exceed the ~768px screen height.
+    local cardsScroll = CreateFrame("ScrollFrame", "WM_DashboardCardScroll", frame, "UIPanelScrollFrameTemplate")
+    cardsScroll:SetPoint("TOPLEFT", 15, -55)
+    cardsScroll:SetPoint("BOTTOMRIGHT", -32, 60)
+
+    local cardsContainer = CreateFrame("Frame", nil, cardsScroll)
+    cardsContainer:SetSize(370, 1)
+    cardsScroll:SetScrollChild(cardsContainer)
+
+    frame.cardsScroll = cardsScroll
     frame.cardsContainer = cardsContainer
     frame.moduleCards = {}
     
@@ -784,7 +793,7 @@ function WM:CreateModuleCards()
     local cardHeight = 46
     local cardSpacing = 3
 
-    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap", "AuraRange"}
+    local moduleOrder = {"AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs", "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ArmorySnap", "AuraRange", "ClassTools"}
     local moduleInfo = {
         AutoLogger = {
             title = "Auto Logger",
@@ -858,6 +867,12 @@ function WM:CreateModuleCards()
             color = {1, 1, 0.4},
             icon = "Interface\\Icons\\Spell_Nature_StoneSkinTotem",
         },
+        ClassTools = {
+            title = "Class Tools",
+            desc = "Tools for the class you're playing",
+            color = {1, 0.6, 0.87},
+            icon = "Interface\\Icons\\Achievement_Character_Human_Male",
+        },
     }
     
     for _, moduleName in ipairs(moduleOrder) do
@@ -913,6 +928,10 @@ function WM:CreateModuleCards()
         
         yOffset = yOffset + cardHeight + cardSpacing
     end
+
+    -- Scroll child must be tall enough for everything, or the lower cards
+    -- are unreachable
+    container:SetHeight(math.max(yOffset, 1))
 end
 
 function WM:UpdateDashboard()
@@ -1174,6 +1193,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
     print("|cFFFFFF00/wmachine encounters|r - Per-boss callout settings")
     print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
+    print("|cFFFFFF00/wmachine class|r - Open Class Tools for your class")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
@@ -1323,6 +1343,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         else
             WM:Print("ArmorySnap module not available")
+        end
+
+    elseif cmd == "class" or cmd == "classes" or cmd == "classtools" then
+        local module = WM.modules.ClassTools
+        if module and module.Toggle then
+            module:Toggle()
+        else
+            WM:Print("ClassTools module not available")
         end
 
     elseif cmd == "encounters" or cmd == "callouts" then

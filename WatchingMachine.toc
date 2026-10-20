@@ -2,10 +2,10 @@
 ## Interface-Classic: 11508
 ## Interface-BCC: 20506
 ## Title: Watching Machine
-## Notes: Comprehensive monitoring suite - Keywords, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker, Buff Check, ArmorySnap, Aura Range
+## Notes: Comprehensive monitoring suite - Keywords, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker, Buff Check, ArmorySnap, Aura Range, Class Tools
 ## Author: Robert
-## Version: 3.3
-## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB
+## Version: 3.4
+## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB
 
 Core.lua
 Modules/AutoLogger.lua
@@ -20,3 +20,4 @@ Modules/PvPTracker.lua
 Modules/BuffCheck.lua
 Modules/ArmorySnap.lua
 Modules/AuraRange.lua
+Modules/ClassTools.lua

@@ -2,9 +2,66 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.4** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.4
+
+### Mail Logger — Open All logged by diffing the inbox
+
+The dedupe added in 3.2 could not work during an Open All, for two reasons:
+
+- Its key embedded `mailIndex`, but indices shift as each mail is emptied, so
+  the same physical mail produced a different key after a shift and was logged
+  again.
+- The guard was wiped on every `MAIL_INBOX_UPDATE`, and that event fires
+  continuously throughout a bulk pull — erasing the guard before it could
+  suppress anything.
+
+It held up when clicking mail slowly, which is what the earlier tests
+simulated, because those tests controlled when `MAIL_INBOX_UPDATE` fired.
+
+Replaced with content diffing. Every receivable unit (money, and each
+attachment) is fingerprinted by sender / subject / item / count into a
+multiset; the inbox is re-read every 0.4s while the mailbox is open, and
+whatever disappeared is logged. This is:
+
+- immune to retries — a retry changes nothing in the inbox,
+- immune to index shifts — no index appears in the key,
+- correct for N identical mails — multiset counts,
+- independent of which API the open-all uses, or how fast it runs.
+
+Details:
+
+- The take hooks no longer log. `ReturnInboxItem` and `DeleteInboxItem` are
+  hooked only to suppress mail that leaves *without* being received.
+- No diff on `MAIL_CLOSED`: the client can report an empty inbox afterwards,
+  which would look like everything was collected.
+- An empty read is held for one poll before being trusted, so a momentary blip
+  can't mass-log, while genuinely emptying the last mail still records.
+
+### New module — Class Tools
+
+Detects the class you're playing and surfaces the tools built for it.
+
+- Class section in the dashboard (`/wmachine class`) with a tab per class.
+  A tab appears only once a feature has been registered for that class, so
+  there are no empty tabs for work not yet done.
+- Your own class is selected on open, and is always offered as a tab even
+  before it has tools, so the panel explains itself.
+- Per-feature toggles saved per class; the same feature key on two different
+  classes keeps independent state.
+- Ships as the framework: features call `RegisterFeature(class, def)` and
+  appear in the panel automatically, then query `IsEnabled` /
+  `IsActiveForPlayer` without touching the UI. Registration before the saved
+  variables load is supported.
+
+### Dashboard — card list now scrolls
+
+With 13 modules the card list needed 634px inside a 585px area, so the last
+card was cut off, and the panel can't grow past the ~768px screen. The list is
+now a scroll frame, which also stops this recurring as more modules land.
 
 ## 3.3
 
