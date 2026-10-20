@@ -29,7 +29,7 @@ local isMailboxOpen = false
 -- changes). Bulk-pull addons retry TakeInboxItem/TakeInboxMoney for the same
 -- slot until the server confirms — without this, every retry logged a
 -- duplicate entry.
-local loggedTakes = {}
+-- (inbox snapshot state lives with the diff logic below)
 local currentCharKey = nil
 local selectedCharKey = nil
 local tradeCache = {}
@@ -240,121 +240,229 @@ end
 -- so takes landed on stale cache entries and logged the wrong (duplicate)
 -- mail's data.
 
--- Clear the dedupe guard whenever the inbox state changes
-function MailLogger:ResetTakeGuard()
-    wipe(loggedTakes)
+-- Capture strategy: DIFF THE INBOX, don't log on take attempts.
+--
+-- Logging when a take is *requested* cannot be made correct during an
+-- "open all": bulk-pull addons retry the same slot until the server answers,
+-- and every emptied mail shifts the indices of everything below it. Any key
+-- built from an index is therefore unstable, and any guard cleared on
+-- MAIL_INBOX_UPDATE is wiped constantly, because that event fires throughout
+-- the pull.
+--
+-- Instead we fingerprint the inbox by CONTENT into a multiset and re-read it
+-- periodically while the mailbox is open. Whatever disappeared since the last
+-- read was actually collected. That is immune to retries (a retry changes
+-- nothing), immune to index shifts (no index in the key), counts N identical
+-- mails correctly (multiset counts), and works no matter which API the
+-- open-all uses or how fast it runs.
+
+local inboxUnits = {}      -- fingerprint -> count currently in the inbox
+local inboxMeta = {}       -- fingerprint -> details needed to write the log line
+local snapshotValid = false
+local suppressUnits = {}   -- fingerprint -> count to NOT log (returned/deleted)
+local diffAccum = 0
+local pendingEmpty = false -- an empty read is held one poll before it is trusted
+local DIFF_INTERVAL = 0.4  -- seconds between inbox re-reads while open
+
+local function MoneyKey(sender, subject, money)
+    return "m|" .. sender .. "|" .. subject .. "|" .. money
 end
 
--- Log the gold attached to a mail (called from the take hooks)
-function MailLogger:LogMoneyTake(index)
-    if not MailLoggerDB or not MailLoggerDB.logGold then return end
+local function ItemKey(sender, subject, name, count)
+    return "i|" .. sender .. "|" .. subject .. "|" .. name .. "|" .. count
+end
 
-    local _, _, sender, subject, money = GetInboxHeaderInfo(index)
-    if not money or money <= 0 then return end
+-- Fingerprint every receivable unit currently in the inbox
+local function BuildInboxUnits()
+    local units, meta = {}, {}
+    local n = GetInboxNumItems() or 0
 
-    -- Dedupe: same slot + same content = a retry of the same take
-    local key = "money:" .. index .. ":" .. (sender or "?") .. ":" .. (subject or "?") .. ":" .. money
-    if loggedTakes[key] then return end
-    loggedTakes[key] = true
+    for i = 1, n do
+        local _, _, sender, subject, money, _, _, hasItem = GetInboxHeaderInfo(i)
+        sender  = sender or "?"
+        subject = subject or "?"
 
-    local invoiceType, invoiceItemName, invoicePlayerName = GetInboxInvoiceInfo(index)
+        local invoiceType, invoiceItemName, invoicePlayerName = GetInboxInvoiceInfo(i)
 
-    if invoiceType == "seller" or invoiceType == "seller_temp_invoice" then
-        if MailLoggerDB.logAuctionHouse then
-            self:AddLogEntry("ah_sale", {
-                sender = sender,
-                subject = subject,
-                amount = money,
-                itemName = invoiceItemName,
-                buyer = invoicePlayerName,
+        if money and money > 0 then
+            local key = MoneyKey(sender, subject, money)
+            units[key] = (units[key] or 0) + 1
+            if not meta[key] then
+                meta[key] = {
+                    kind = "money", sender = sender, subject = subject, money = money,
+                    invoiceType = invoiceType,
+                    invoiceItemName = invoiceItemName,
+                    invoicePlayerName = invoicePlayerName,
+                }
+            end
+        end
+
+        if hasItem then
+            for j = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
+                local name, _, _, count, quality = GetInboxItem(i, j)
+                if name then
+                    count = count or 1
+                    local key = ItemKey(sender, subject, name, count)
+                    units[key] = (units[key] or 0) + 1
+                    if not meta[key] then
+                        meta[key] = {
+                            kind = "item", sender = sender, subject = subject,
+                            itemName = name, count = count, quality = quality,
+                            itemLink = GetInboxItemLink(i, j),
+                            invoiceType = invoiceType,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    return units, meta, n
+end
+
+function MailLogger:ResetInboxSnapshot()
+    wipe(inboxUnits)
+    wipe(inboxMeta)
+    wipe(suppressUnits)
+    snapshotValid = false
+    diffAccum = 0
+    pendingEmpty = false
+end
+
+-- Back-compat: older code/tests called this
+function MailLogger:ResetTakeGuard()
+    self:ResetInboxSnapshot()
+end
+
+-- Write one log line for a unit that left the inbox
+function MailLogger:LogReceivedUnit(m)
+    if not m or not MailLoggerDB then return end
+
+    if m.kind == "money" then
+        if not MailLoggerDB.logGold then return end
+        if m.invoiceType == "seller" or m.invoiceType == "seller_temp_invoice" then
+            if MailLoggerDB.logAuctionHouse then
+                self:AddLogEntry("ah_sale", {
+                    sender = m.sender, subject = m.subject, amount = m.money,
+                    itemName = m.invoiceItemName, buyer = m.invoicePlayerName,
+                })
+            end
+        else
+            self:AddLogEntry("gold", {
+                sender = m.sender, subject = m.subject, amount = m.money,
             })
         end
-    else
-        self:AddLogEntry("gold", {
-            sender = sender,
-            subject = subject,
-            amount = money
-        })
+        return
     end
-end
 
--- Log one attachment slot of a mail (called from the take hooks)
-function MailLogger:LogItemTake(mailIndex, itemIndex)
-    if not MailLoggerDB or not MailLoggerDB.logItems then return end
+    if not MailLoggerDB.logItems then return end
 
-    -- TBC Anniversary API: name, itemID, texture, count, quality, canUse
-    local name, _, _, count, quality = GetInboxItem(mailIndex, itemIndex)
-    if not name then return end
-    count = count or 1
-
-    local _, _, sender, subject = GetInboxHeaderInfo(mailIndex)
-
-    local key = "item:" .. mailIndex .. ":" .. itemIndex .. ":" .. (sender or "?") .. ":" .. (subject or "?") .. ":" .. name .. ":" .. count
-    if loggedTakes[key] then return end
-    loggedTakes[key] = true
-
-    local itemLink = GetInboxItemLink(mailIndex, itemIndex)
-    local invoiceType = GetInboxInvoiceInfo(mailIndex)
-
-    if invoiceType == "buyer" then
+    if m.invoiceType == "buyer" then
         if MailLoggerDB.logAuctionHouse then
             self:AddLogEntry("ah_purchase", {
-                sender = sender,
-                itemName = name,
-                itemLink = itemLink,
-                count = count,
+                sender = m.sender, itemName = m.itemName,
+                itemLink = m.itemLink, count = m.count,
             })
         end
-    elseif subject and subject:find("Auction expired") then
+    elseif m.subject and m.subject:find("Auction expired") then
         if MailLoggerDB.logAuctionHouse then
             self:AddLogEntry("ah_expired", {
-                itemName = name,
-                itemLink = itemLink,
-                count = count
+                itemName = m.itemName, itemLink = m.itemLink, count = m.count,
             })
         end
     else
         self:AddLogEntry("item", {
-            sender = sender,
-            subject = subject,
-            itemName = name,
-            itemLink = itemLink,
-            count = count,
-            quality = quality
+            sender = m.sender, subject = m.subject, itemName = m.itemName,
+            itemLink = m.itemLink, count = m.count, quality = m.quality,
         })
     end
 end
 
--- Hook TakeInboxMoney
-local originalTakeInboxMoney = TakeInboxMoney
-function TakeInboxMoney(index, ...)
-    pcall(MailLogger.LogMoneyTake, MailLogger, index)
-    return originalTakeInboxMoney(index, ...)
-end
+-- Re-read the inbox and log whatever vanished since the previous read
+function MailLogger:DiffInbox()
+    if not isMailboxOpen then return end
 
--- Hook TakeInboxItem
-local originalTakeInboxItem = TakeInboxItem
-function TakeInboxItem(mailIndex, itemIndex, ...)
-    pcall(MailLogger.LogItemTake, MailLogger, mailIndex, itemIndex)
-    return originalTakeInboxItem(mailIndex, itemIndex, ...)
-end
+    local newUnits, newMeta, n = BuildInboxUnits()
 
--- Hook AutoLootMailItem — the Anniversary client's "Open All Mail" button
--- loots through this function, not TakeInboxItem, so those pulls were
--- previously never logged.
-if AutoLootMailItem then
-    local originalAutoLootMailItem = AutoLootMailItem
-    function AutoLootMailItem(index, ...)
-        pcall(function()
-            MailLogger:LogMoneyTake(index)
-            local _, _, _, _, _, _, _, hasItem = GetInboxHeaderInfo(index)
-            if hasItem then
-                for j = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
-                    MailLogger:LogItemTake(index, j)
-                end
+    -- First read after opening: establish the baseline, log nothing
+    if not snapshotValid then
+        inboxUnits, inboxMeta = newUnits, newMeta
+        snapshotValid = true
+        return
+    end
+
+    -- Emptying the last mail is the normal end of an open-all, so an empty
+    -- read usually IS real and must be logged. But a momentary empty read
+    -- while the client is catching up would look like "collected everything"
+    -- and write a pile of false entries. Hold one poll to tell them apart:
+    -- a blip resolves on the next read, a real collection stays empty.
+    if n == 0 and next(inboxUnits) ~= nil then
+        if not pendingEmpty then
+            pendingEmpty = true
+            return              -- keep the snapshot, decide next poll
+        end
+    end
+    pendingEmpty = false
+
+    for key, oldCount in pairs(inboxUnits) do
+        local gone = oldCount - (newUnits[key] or 0)
+        if gone > 0 then
+            -- Mail returned to sender or deleted was not "received"
+            local suppressed = suppressUnits[key] or 0
+            local skip = math.min(suppressed, gone)
+            if skip > 0 then
+                suppressUnits[key] = suppressed - skip
             end
-        end)
-        return originalAutoLootMailItem(index, ...)
+            for _ = 1, (gone - skip) do
+                self:LogReceivedUnit(inboxMeta[key])
+            end
+        end
+    end
+
+    inboxUnits, inboxMeta = newUnits, newMeta
+end
+
+-- ============================================
+-- MAIL HOOKS
+-- ============================================
+-- The take functions are no longer hooked for logging — the inbox diff above
+-- does that. These hooks only mark mail that is leaving WITHOUT being
+-- received, so the diff doesn't record it as income.
+
+function MailLogger:SuppressMail(index)
+    if not index then return end
+    local _, _, sender, subject, money, _, _, hasItem = GetInboxHeaderInfo(index)
+    sender  = sender or "?"
+    subject = subject or "?"
+
+    if money and money > 0 then
+        local key = MoneyKey(sender, subject, money)
+        suppressUnits[key] = (suppressUnits[key] or 0) + 1
+    end
+    if hasItem then
+        for j = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
+            local name, _, _, count = GetInboxItem(index, j)
+            if name then
+                local key = ItemKey(sender, subject, name, count or 1)
+                suppressUnits[key] = (suppressUnits[key] or 0) + 1
+            end
+        end
+    end
+end
+
+if ReturnInboxItem then
+    local originalReturnInboxItem = ReturnInboxItem
+    function ReturnInboxItem(index, ...)
+        pcall(MailLogger.SuppressMail, MailLogger, index)
+        return originalReturnInboxItem(index, ...)
+    end
+end
+
+if DeleteInboxItem then
+    local originalDeleteInboxItem = DeleteInboxItem
+    function DeleteInboxItem(index, ...)
+        pcall(MailLogger.SuppressMail, MailLogger, index)
+        return originalDeleteInboxItem(index, ...)
     end
 end
 
@@ -915,19 +1023,33 @@ eventFrame:RegisterEvent("UI_INFO_MESSAGE")
 
 local tradeSuccessful = false
 
+-- Poll the inbox while the mailbox is open. An open-all fires MAIL_INBOX_UPDATE
+-- far too often to diff on, and may finish a burst between any two events, so a
+-- steady re-read is both cheaper and more reliable.
+eventFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not isMailboxOpen then return end
+    diffAccum = diffAccum + elapsed
+    if diffAccum < DIFF_INTERVAL then return end
+    diffAccum = 0
+    pcall(MailLogger.DiffInbox, MailLogger)
+end)
+
 eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "MAIL_SHOW" then
         isMailboxOpen = true
-        MailLogger:ResetTakeGuard()
+        MailLogger:ResetInboxSnapshot()
 
     elseif event == "MAIL_INBOX_UPDATE" then
-        -- Inbox contents changed (mail looted/deleted, indices shifted) —
-        -- previously-seen slot fingerprints no longer describe the same mail
-        MailLogger:ResetTakeGuard()
+        -- Nothing to do here: the periodic diff below picks the change up.
+        -- Acting on this event directly is what broke before, because it
+        -- fires continuously throughout an open-all.
 
     elseif event == "MAIL_CLOSED" then
+        -- Deliberately no final diff. Once the mailbox closes the client may
+        -- report an empty inbox, which would look like "everything was
+        -- collected" and write a pile of false entries.
         isMailboxOpen = false
-        MailLogger:ResetTakeGuard()
+        MailLogger:ResetInboxSnapshot()
 
     elseif event == "TRADE_SHOW" then
         isTrading = true
