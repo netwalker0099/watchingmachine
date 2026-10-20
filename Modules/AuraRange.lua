@@ -495,163 +495,101 @@ function AuraRange:SetModuleEnabled(v)
         wipe(alertOrder)
         self:UpdateAlertFrame()
     end
-    if settingsFrame and settingsFrame.enableCB then
-        settingsFrame.enableCB:SetChecked(AuraRangeDB.enabled)
-    end
+    if settingsFrame and settingsFrame:IsShown() then settingsFrame:Refresh() end
 end
 
 function AuraRange:CreateUI()
     if settingsFrame then return settingsFrame end
 
-    local theme = WM:GetTheme()
+    local panel = WM.UI:CreatePanel({
+        name = "WM_AuraRangeSettings",
+        title = "Aura Range",
+        titleColor = "FFFF66",
+        width = 360,
+        maxHeight = 700,
+    })
+    local L = panel.layout
 
-    local frame = CreateFrame("Frame", "WM_AuraRangeSettings", UIParent, "BackdropTemplate")
-    frame:SetSize(360, 560)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
+    L:Checkbox({
+        label = "Enable out-of-range alerts",
+        get = function() return AuraRange:IsModuleEnabled() end,
+        set = function(v) AuraRange:SetModuleEnabled(v) end,
+    })
+    L:Checkbox({
+        label = "Play sound when an aura is lost",
+        get = function() return AuraRangeDB.soundEnabled end,
+        set = function(v) AuraRangeDB.soundEnabled = v end,
+        tooltip = { "Alert Sound", "Plays the raid warning sound when a watched aura drops off you,"
+            .. " at most once every " .. SOUND_THROTTLE .. " seconds." },
+    })
+    L:Checkbox({
+        label = "Lock alert frame position",
+        get = function() return AuraRangeDB.locked end,
+        set = function(v)
+            AuraRangeDB.locked = v
+            if alertFrame then
+                alertFrame:EnableMouse(not AuraRangeDB.locked)
+            end
+        end,
+        tooltip = { "Lock Alert Frame", "Stops the red OUT OF RANGE frame from being dragged;"
+            .. " it also lets mouse clicks pass through it." },
+    })
 
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
+    -- Timeout slider, with the test button on the same row
+    local row = L:Row(48)
+    row:Slider({
+        name = "WM_AuraRangeTimeoutSlider", label = "Alert timeout", width = 180,
+        min = 5, max = 30, step = 1,
+        format = function(v) return v .. "s" end,
+        get = function() return AuraRangeDB.alertTimeout end,
+        set = function(v) AuraRangeDB.alertTimeout = v end,
+        tooltip = { "Alert Timeout", "How long an out-of-range alert stays up before assuming the"
+            .. " totem/aura is simply gone (expired, destroyed, or the provider shifted forms)." },
+    }, 12)
+    row:RightButton({
+        text = "Test Alert", width = 90, height = 22,
+        onClick = function()
+            local entry = TRACKED[1]
+            local buffName = entry.buffs[1]
+            if not activeAlerts[buffName] then
+                table.insert(alertOrder, buffName)
+            end
+            activeAlerts[buffName] = { entry = entry, lostAt = GetTime() }
+            if AuraRangeDB.soundEnabled then
+                pcall(PlaySound, 8959, "Master")
+            end
+            AuraRange:UpdateAlertFrame()
+        end,
+        tooltip = { "Test Alert", "Shows the alert frame with a sample " .. TRACKED[1].label
+            .. " alert (and the sound, if on) so you can see and position it."
+            .. " It clears after the alert timeout." },
+    }, 8)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFFFFFF66Aura Range|r")
-
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local yOffset = -45
-
-    -- Enable
-    local enableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    enableCB:SetPoint("TOPLEFT", 20, yOffset)
-    enableCB.Text:SetText("Enable out-of-range alerts")
-    enableCB:SetChecked(AuraRangeDB.enabled)
-    enableCB:SetScript("OnClick", function(self)
-        AuraRange:SetModuleEnabled(self:GetChecked())
-    end)
-    frame.enableCB = enableCB
-
-    yOffset = yOffset - 26
-
-    -- Sound
-    local soundCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    soundCB:SetPoint("TOPLEFT", 20, yOffset)
-    soundCB.Text:SetText("Play sound when an aura is lost")
-    soundCB:SetChecked(AuraRangeDB.soundEnabled)
-    soundCB:SetScript("OnClick", function(self)
-        AuraRangeDB.soundEnabled = self:GetChecked()
-    end)
-
-    yOffset = yOffset - 26
-
-    -- Lock alert frame
-    local lockCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    lockCB:SetPoint("TOPLEFT", 20, yOffset)
-    lockCB.Text:SetText("Lock alert frame position")
-    lockCB:SetChecked(AuraRangeDB.locked)
-    lockCB:SetScript("OnClick", function(self)
-        AuraRangeDB.locked = self:GetChecked()
-        if alertFrame then
-            alertFrame:EnableMouse(not AuraRangeDB.locked)
-        end
-    end)
-
-    yOffset = yOffset - 30
-
-    -- Timeout slider
-    local toLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    toLabel:SetPoint("TOPLEFT", 25, yOffset)
-    toLabel:SetText("Alert timeout:")
-
-    local toValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    toValue:SetPoint("LEFT", toLabel, "RIGHT", 5, 0)
-    toValue:SetText(AuraRangeDB.alertTimeout .. "s")
-
-    local toSlider = CreateFrame("Slider", "WM_AuraRangeTimeoutSlider", frame, "OptionsSliderTemplate")
-    toSlider:SetPoint("TOPLEFT", 25, yOffset - 18)
-    toSlider:SetSize(180, 16)
-    toSlider:SetMinMaxValues(5, 30)
-    toSlider:SetValueStep(1)
-    toSlider:SetObeyStepOnDrag(true)
-    toSlider:SetValue(AuraRangeDB.alertTimeout)
-    toSlider.Low:SetText("5s")
-    toSlider.High:SetText("30s")
-    toSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value + 0.5)
-        AuraRangeDB.alertTimeout = value
-        toValue:SetText(value .. "s")
-    end)
-    toSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Alert Timeout", 1, 0.8, 0)
-        GameTooltip:AddLine("How long an out-of-range alert stays up before", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("assuming the totem/aura is simply gone (expired,", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("destroyed, or the provider shifted forms).", 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    toSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Test button (same row, right)
-    local testBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    testBtn:SetSize(90, 22)
-    testBtn:SetPoint("TOPRIGHT", -20, yOffset - 12)
-    testBtn:SetText("Test Alert")
-    testBtn:SetScript("OnClick", function()
-        local entry = TRACKED[1]
-        activeAlerts[entry.buffs[1]] = { entry = entry, lostAt = GetTime() }
-        table.insert(alertOrder, entry.buffs[1])
-        if AuraRangeDB.soundEnabled then
-            pcall(PlaySound, 8959, "Master")
-        end
-        AuraRange:UpdateAlertFrame()
-    end)
-
-    yOffset = yOffset - 48
-
-    -- Tracked aura list
-    local listHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    listHeader:SetPoint("TOPLEFT", 20, yOffset)
-    listHeader:SetText("Auras to watch:")
-    WM:ThemeText(listHeader, "headerColor")
-
-    yOffset = yOffset - 20
-
+    L:Space(4)
+    L:Header("Auras to watch")
     for _, entry in ipairs(TRACKED) do
-        local cb = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 25, yOffset)
         local classColor = RAID_CLASS_COLORS[entry.providerClass]
         local hex = classColor and string.format("%02x%02x%02x",
             classColor.r * 255, classColor.g * 255, classColor.b * 255) or "ffffff"
         local tag = entry.totem and " |cFF888888(totem)|r" or ""
-        cb.Text:SetText(entry.label .. " |cFF" .. hex .. "("
-            .. entry.providerClass:sub(1, 1) .. entry.providerClass:sub(2):lower() .. ")|r" .. tag)
-        cb:SetChecked(AuraRangeDB.trackedAuras[entry.key])
-        cb:SetScript("OnClick", function(self)
-            AuraRangeDB.trackedAuras[entry.key] = self:GetChecked()
-        end)
-        yOffset = yOffset - 22
+        L:Checkbox({
+            label = entry.label .. " |cFF" .. hex .. "("
+                .. entry.providerClass:sub(1, 1) .. entry.providerClass:sub(2):lower() .. ")|r" .. tag,
+            indent = 5,
+            get = function() return AuraRangeDB.trackedAuras[entry.key] end,
+            set = function(v) AuraRangeDB.trackedAuras[entry.key] = v end,
+        })
     end
 
-    yOffset = yOffset - 6
+    L:Space(4)
+    L:Note("Alerts fire when a buff you had drops off while its provider is alive in your group."
+        .. " Drag the red alert frame to reposition it (unlock first).")
 
-    -- Info
-    local infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    infoText:SetPoint("TOPLEFT", 20, yOffset)
-    infoText:SetWidth(320)
-    infoText:SetJustifyH("LEFT")
-    infoText:SetText("|cFF888888Alerts fire when a buff you had drops off while its provider is alive in your group. Drag the red alert frame to reposition it (unlock first).|r")
+    panel:Finish()
 
-    settingsFrame = frame
-    self.settingsFrame = frame
-    return frame
+    settingsFrame = panel
+    self.settingsFrame = panel
+    return panel
 end
 
 function AuraRange:Toggle()

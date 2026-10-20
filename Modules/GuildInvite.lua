@@ -232,6 +232,8 @@ function GuildInvite:LogInvite(playerName, source)
     while #GuildInviteDB.inviteLog > GuildInviteDB.maxLogEntries do
         table.remove(GuildInviteDB.inviteLog)
     end
+
+    if mainFrame and mainFrame:IsShown() then self:UpdateLogDisplay() end
 end
 
 function GuildInvite:CheckTrigger(message)
@@ -354,152 +356,116 @@ end
 function GuildInvite:SetModuleEnabled(v)
     GuildInviteDB.enabled = v and true or false
     self:Print(GuildInviteDB.enabled and "Enabled" or "Disabled")
-    if mainFrame and mainFrame.enableCB then mainFrame.enableCB:SetChecked(GuildInviteDB.enabled) end
+    if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
+end
+
+-- guildRoster holds each member twice (with and without realm)
+local function RosterCount()
+    local count = 0
+    for _ in pairs(guildRoster) do count = count + 1 end
+    return math.floor(count / 2)
 end
 
 function GuildInvite:CreateUI()
     if mainFrame then return mainFrame end
-    
-    local frame = CreateFrame("Frame", "WM_GuildInviteFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(400, 450)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:SetFrameStrata("HIGH")
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF00FF00Guild Invite|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    local yOffset = -45
-    
-    -- Enable checkbox
-    local enableCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    enableCB:SetPoint("TOPLEFT", 20, yOffset)
-    enableCB.Text:SetText("Enable auto-invite")
-    enableCB:SetChecked(GuildInviteDB.enabled)
-    enableCB:SetScript("OnClick", function(self)
-        GuildInvite:SetModuleEnabled(self:GetChecked())
-    end)
-    frame.enableCB = enableCB
-    
-    yOffset = yOffset - 30
-    
-    -- Trigger word
-    local triggerLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    triggerLabel:SetPoint("TOPLEFT", 20, yOffset)
-    triggerLabel:SetText("Trigger word:")
-    
-    local triggerInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    triggerInput:SetSize(80, 20)
-    triggerInput:SetPoint("LEFT", triggerLabel, "RIGHT", 10, 0)
-    triggerInput:SetText(GuildInviteDB.trigger or "inv")
-    triggerInput:SetAutoFocus(false)
-    triggerInput:SetScript("OnEnterPressed", function(self)
-        GuildInviteDB.trigger = self:GetText()
-        self:ClearFocus()
-        GuildInvite:Print("Trigger set to: " .. GuildInviteDB.trigger)
-    end)
-    triggerInput:SetScript("OnEditFocusLost", function(self)
-        GuildInviteDB.trigger = self:GetText()
-    end)
-    
-    yOffset = yOffset - 30
-    
-    -- Announce invites checkbox
-    local announceCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    announceCB:SetPoint("TOPLEFT", 20, yOffset)
-    announceCB.Text:SetText("Announce invites in chat")
-    announceCB:SetChecked(GuildInviteDB.announceInvites)
-    announceCB:SetScript("OnClick", function(self)
-        GuildInviteDB.announceInvites = self:GetChecked()
-    end)
-    
-    yOffset = yOffset - 25
-    
-    -- Respond to non-guild checkbox
-    local respondCB = CreateFrame("CheckButton", nil, frame, "InterfaceOptionsCheckButtonTemplate")
-    respondCB:SetPoint("TOPLEFT", 20, yOffset)
-    respondCB.Text:SetText("Reply to non-guild whispers")
-    respondCB:SetChecked(GuildInviteDB.respondToNonGuild)
-    respondCB:SetScript("OnClick", function(self)
-        GuildInviteDB.respondToNonGuild = self:GetChecked()
-    end)
-    
-    yOffset = yOffset - 35
-    
-    -- Info text about triggers
-    local infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    infoText:SetPoint("TOPLEFT", 20, yOffset)
-    infoText:SetWidth(360)
-    infoText:SetJustifyH("LEFT")
-    infoText:SetText("|cFFFFFF00Triggers:|r Say trigger word in guild/whisper/party to get invited.\nSay \"raid\" or \"raid convert\" in party/guild to convert to raid.\nAuto-converts to raid when a 6th member is invited.")
-    
-    yOffset = yOffset - 45
-    
-    -- Invite log header
-    local logLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    logLabel:SetPoint("TOPLEFT", 20, yOffset)
+
+    -- Settings rows on top, the invite log fills the rest
+    local panel = WM.UI:CreatePanel({
+        name = "WM_GuildInviteFrame",
+        title = "Guild Invite",
+        titleColor = "00FF00",
+        width = 400,
+        height = 450,
+        minHeight = 360,
+        scroll = false,
+        onRefresh = function() GuildInvite:UpdateLogDisplay() end,
+    })
+    local L = panel.layout
+
+    L:Checkbox({
+        label = "Enable auto-invite",
+        get = function() return GuildInvite:IsModuleEnabled() end,
+        set = function(v) GuildInvite:SetModuleEnabled(v) end,
+    })
+    L:EditBox({
+        label = "Trigger word:", width = 80,
+        get = function() return GuildInviteDB.trigger or "inv" end,
+        set = function(v)
+            if v == GuildInviteDB.trigger then return end
+            GuildInviteDB.trigger = v
+            GuildInvite:Print("Trigger set to: " .. v)
+        end,
+        tooltip = { "Trigger Word", "Saying exactly this word (any case) in guild chat gets the sender invited.",
+            "Whispers, party and raid chat work too, but only from players on your guild roster.",
+            "Saved when you press Enter or click away." },
+    })
+    L:Checkbox({
+        label = "Announce invites in chat",
+        get = function() return GuildInviteDB.announceInvites end,
+        set = function(v) GuildInviteDB.announceInvites = v end,
+        tooltip = { "Announce Invites", "Print a line in your chat frame for each invite sent.",
+            "With verbose chat on, also notes requests ignored because you aren't leader or assist." },
+    })
+    L:Checkbox({
+        label = "Reply to non-guild whispers",
+        get = function() return GuildInviteDB.respondToNonGuild end,
+        set = function(v) GuildInviteDB.respondToNonGuild = v end,
+        tooltip = { "Reply to Non-Guild Whispers", "When someone outside your guild whispers the trigger word,"
+            .. " whisper back \"Sorry, raid invites are for guild members only.\"",
+            "Off: they're silently ignored." },
+    })
+
+    L:Space(4)
+    L:Note("|cFFFFFF00Triggers:|r |cFF888888Say the trigger word in guild/whisper/party to get invited."
+        .. " Say \"raid\" or \"raid convert\" in party/guild to convert to raid."
+        .. " Auto-converts to raid when a 6th member is invited.|r")
+
+    -- Invite log header with its Clear button
+    local row = L:Row(24)
+    local logLabel = row.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    logLabel:SetPoint("LEFT", row.frame, "LEFT", 8, 0)
     logLabel:SetText("Recent Invites:")
-    
-    -- Clear log button
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(70, 20)
-    clearBtn:SetPoint("LEFT", logLabel, "RIGHT", 10, 0)
-    clearBtn:SetText("Clear")
-    clearBtn:SetScript("OnClick", function()
-        GuildInviteDB.inviteLog = {}
-        GuildInvite:UpdateLogDisplay()
-    end)
-    
-    yOffset = yOffset - 20
-    
-    -- Log scroll frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 20, yOffset)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
-    
+    WM:ThemeText(logLabel, "headerColor")
+    row:Button({
+        text = "Clear", width = 70,
+        onClick = function()
+            GuildInviteDB.inviteLog = {}
+            GuildInvite:UpdateLogDisplay()
+        end,
+        tooltip = { "Clear Log", "Delete every entry from the invite log." },
+    }, 120)
+
+    -- Scrollable log in the remaining space
+    local fill = L:Fill(100)
+    local scrollFrame = CreateFrame("ScrollFrame", "WM_GuildInviteScrollFrame", fill, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 8, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -23, 0)
+
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(scrollFrame:GetWidth())
+    scrollChild:SetWidth(400 - 24 - 8 - 23)
     scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-    frame.scrollChild = scrollChild
-    frame.logEntries = {}
-    
-    -- Refresh roster button
-    local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    refreshBtn:SetSize(120, 22)
-    refreshBtn:SetPoint("BOTTOMLEFT", 20, 15)
-    refreshBtn:SetText("Refresh Roster")
-    refreshBtn:SetScript("OnClick", function()
-        GuildInvite:UpdateGuildRoster()
-        local count = 0
-        for _ in pairs(guildRoster) do count = count + 1 end
-        GuildInvite:VerbosePrint("Guild roster updated (" .. math.floor(count/2) .. " members)")
-    end)
-    
-    -- Status text
-    local statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    statusText:SetPoint("BOTTOMRIGHT", -20, 20)
-    frame.statusText = statusText
-    
-    mainFrame = frame
-    self.mainFrame = frame
-    
-    return frame
+    panel.scrollChild = scrollChild
+    panel.logEntries = {}
+
+    panel:AddFooterButton({
+        text = "Refresh Roster", width = 120,
+        onClick = function()
+            GuildInvite:UpdateGuildRoster()
+            GuildInvite:VerbosePrint("Guild roster updated (" .. RosterCount() .. " members)")
+            GuildInvite:UpdateLogDisplay()
+        end,
+        tooltip = { "Refresh Roster", "Re-read the guild roster now. Whispers, party and raid requests"
+            .. " are only answered for names on it; it also updates on its own when the game sends a roster update." },
+    }, "LEFT")
+    panel.statusText = panel:AddFooterText({ text = "", font = "GameFontNormalSmall" }, "RIGHT")
+
+    panel:Finish()
+
+    mainFrame = panel
+    self.mainFrame = panel
+
+    return panel
 end
 
 function GuildInvite:UpdateLogDisplay()
@@ -543,9 +509,7 @@ function GuildInvite:UpdateLogDisplay()
     mainFrame.scrollChild:SetHeight(math.max(yOffset, 1))
     
     -- Update status
-    local rosterCount = 0
-    for _ in pairs(guildRoster) do rosterCount = rosterCount + 1 end
-    mainFrame.statusText:SetText("Roster: " .. math.floor(rosterCount/2) .. " members")
+    mainFrame.statusText:SetText("Roster: " .. RosterCount() .. " members")
 end
 
 function GuildInvite:Toggle()
@@ -554,6 +518,5 @@ function GuildInvite:Toggle()
         frame:Hide()
     else
         frame:Show()
-        self:UpdateLogDisplay()
     end
 end

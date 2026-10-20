@@ -169,66 +169,53 @@ end
 
 local settingsPanel = nil
 
+-- Current instance, combat log and Advanced Logging state, for the panel
+local function StatusText()
+    local inInstance, instanceType = IsInInstance()
+    local name = GetInstanceInfo()
+
+    local status = "Outside Instances"
+    if inInstance then
+        status = "In: " .. (name or "Unknown") .. " (" .. (instanceType or "?") .. ")"
+    end
+
+    local combatStatus = currentlyLogging and "|cFF00FF00Logging|r" or "|cFFFF0000Not Logging|r"
+    local advStatus = AutoLogger:IsAdvancedLoggingEnabled() and "|cFF00FF00On|r" or "|cFFFF0000Off|r"
+    return status .. "\nCombat Log: " .. combatStatus .. "\nAdvanced Logging: " .. advStatus
+end
+
 function AutoLogger:CreateSettingsUI()
     if settingsPanel then return settingsPanel end
-    
-    local frame = CreateFrame("Frame", "WM_AutoLoggerSettings", UIParent, "BackdropTemplate")
-    frame:SetSize(350, 400)
-    frame:SetPoint("CENTER")
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetClampedToScreen(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:Hide()
-    
-    WM:SkinPanel(frame)
-    WM:RegisterSkinnedPanel(frame)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF00FF00Auto Logger|r")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    
-    local yOffset = -50
-    local checkboxes = {}
-    
-    -- Helper function
-    local function CreateCheckBox(name, label, tooltip, yPos, onClick)
-        local check = CreateFrame("CheckButton", "WM_AL_" .. name, frame, "InterfaceOptionsCheckButtonTemplate")
-        check:SetPoint("TOPLEFT", 20, yPos)
-        check.Text:SetText(label)
-        check.tooltipText = tooltip
-        check:SetScript("OnClick", onClick)
-        checkboxes[name] = check
-        return check
-    end
-    
-    -- Chat Logging
-    CreateCheckBox("ChatLog", "Enable Chat Logging on Login",
-        "Automatically enable chat logging every time you log in", yOffset,
-        function(self)
-            AutoLoggerDB.enableChatLog = self:GetChecked()
-            if AutoLoggerDB.enableChatLog then
+
+    local panel = WM.UI:CreatePanel({
+        name = "WM_AutoLoggerSettings",
+        title = "Auto Logger",
+        titleColor = "00FF00",
+        width = 350,
+        maxHeight = 700,
+    })
+    local L = panel.layout
+
+    L:Checkbox({
+        label = "Enable Chat Logging on Login",
+        get = function() return AutoLoggerDB.enableChatLog end,
+        set = function(v)
+            AutoLoggerDB.enableChatLog = v
+            if v then
                 LoggingChat(1)
                 AutoLogger:Print("Chat logging enabled")
             else
                 AutoLogger:Print("Chat logging will be disabled on next login")
             end
-        end)
-    
-    -- Combat Logging
-    yOffset = yOffset - 30
-    CreateCheckBox("CombatLog", "Enable Combat Logging in Raids",
-        "Automatically enable combat logging when entering raid instances", yOffset,
-        function(self)
-            AutoLoggerDB.enableCombatLog = self:GetChecked()
-            if AutoLoggerDB.enableCombatLog then
+        end,
+        tooltip = { "Chat Logging", "Automatically enable chat logging every time you log in." },
+    })
+    L:Checkbox({
+        label = "Enable Combat Logging in Raids",
+        get = function() return AutoLoggerDB.enableCombatLog end,
+        set = function(v)
+            AutoLoggerDB.enableCombatLog = v
+            if v then
                 AutoLogger:Print("Combat logging enabled for raids")
                 AutoLogger:UpdateCombatLog()
             else
@@ -236,91 +223,64 @@ function AutoLogger:CreateSettingsUI()
                 LoggingCombat(0)
                 currentlyLogging = false
             end
-        end)
-    
-    -- Dungeon Logging
-    yOffset = yOffset - 30
-    CreateCheckBox("DungeonLog", "Enable Combat Logging in Dungeons",
-        "Also enable combat logging in 5-man dungeons", yOffset,
-        function(self)
-            AutoLoggerDB.enableInDungeons = self:GetChecked()
+            panel:Refresh()
+        end,
+        tooltip = { "Combat Logging", "Automatically enable combat logging when entering raid instances,"
+            .. " and turn it off again when you leave." },
+    })
+    L:Checkbox({
+        label = "Enable Combat Logging in Dungeons",
+        get = function() return AutoLoggerDB.enableInDungeons end,
+        set = function(v)
+            AutoLoggerDB.enableInDungeons = v
             AutoLogger:UpdateCombatLog()
-        end)
-
-    -- Advanced Combat Logging
-    yOffset = yOffset - 30
-    CreateCheckBox("AdvancedLog", "Keep Advanced Combat Logging On",
-        "Checks the advancedCombatLogging setting on login and when entering raids, and re-enables it if it was turned off. Required for complete Warcraft Logs uploads.", yOffset,
-        function(self)
-            AutoLoggerDB.enableAdvancedLogging = self:GetChecked()
-            if AutoLoggerDB.enableAdvancedLogging then
+            panel:Refresh()
+        end,
+        tooltip = { "Dungeon Logging", "Also enable combat logging in 5-man dungeons."
+            .. " Only applies while combat logging in raids is on." },
+    })
+    L:Checkbox({
+        label = "Keep Advanced Combat Logging On",
+        get = function() return AutoLoggerDB.enableAdvancedLogging end,
+        set = function(v)
+            AutoLoggerDB.enableAdvancedLogging = v
+            if v then
                 AutoLogger:EnsureAdvancedLogging("settings toggle")
             else
                 AutoLogger:Print("Advanced logging check disabled (CVar left as-is)")
             end
-        end)
-    
-    -- Debug Mode
-    yOffset = yOffset - 30
-    CreateCheckBox("Debug", "Enable Debug Mode",
-        "Show detailed messages when logging is enabled/disabled", yOffset,
-        function(self)
-            AutoLoggerDB.debugMode = self:GetChecked()
-        end)
-    
-    -- Status section
-    yOffset = yOffset - 50
-    local statusLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    statusLabel:SetPoint("TOPLEFT", 20, yOffset)
-    statusLabel:SetText("|cFFFFFF00Current Status:|r")
-    
-    local statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    statusText:SetPoint("TOPLEFT", statusLabel, "BOTTOMLEFT", 0, -8)
-    statusText:SetJustifyH("LEFT")
-    frame.statusText = statusText
-    
-    -- Info text
-    yOffset = yOffset - 95
-    local infoText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    infoText:SetPoint("TOPLEFT", 20, yOffset)
-    infoText:SetWidth(310)
-    infoText:SetJustifyH("LEFT")
-    infoText:SetText(
-        "|cFFFFAA00Log Files:|r World of Warcraft\\_classic_anniversary_\\Logs\\\n\n" ..
-        "Combat logs (with Advanced enabled) are required for Warcraft Logs uploads."
-    )
-    
-    -- Refresh function
-    frame.Refresh = function()
-        checkboxes.ChatLog:SetChecked(AutoLoggerDB.enableChatLog)
-        checkboxes.CombatLog:SetChecked(AutoLoggerDB.enableCombatLog)
-        checkboxes.DungeonLog:SetChecked(AutoLoggerDB.enableInDungeons)
-        checkboxes.AdvancedLog:SetChecked(AutoLoggerDB.enableAdvancedLogging)
-        checkboxes.Debug:SetChecked(AutoLoggerDB.debugMode)
+            panel:Refresh()
+        end,
+        tooltip = { "Advanced Combat Logging", "Checks the advancedCombatLogging setting on login and when"
+            .. " entering raids, and re-enables it if it was turned off. Required for complete Warcraft Logs uploads.",
+            "Only applies while combat logging in raids is on." },
+    })
+    L:Checkbox({
+        label = "Enable Debug Mode",
+        get = function() return AutoLoggerDB.debugMode end,
+        set = function(v) AutoLoggerDB.debugMode = v end,
+        tooltip = { "Debug Mode", "Show detailed messages when logging is enabled/disabled." },
+    })
 
-        local inInstance, instanceType = IsInInstance()
-        local name = GetInstanceInfo()
+    -- Status, re-read on every Refresh (panel open, zone change)
+    L:Space(8)
+    L:Header("Current Status")
+    local row = L:Row(46)
+    panel.statusText = row:Text({ text = StatusText, font = "GameFontHighlight" }, 12)
 
-        local status = "Outside Instances"
-        if inInstance then
-            status = "In: " .. (name or "Unknown") .. " (" .. (instanceType or "?") .. ")"
-        end
+    L:Space(8)
+    L:Note("|cFFFFAA00Log Files:|r |cFF888888World of Warcraft\\_classic_anniversary_\\Logs\\|r")
+    L:Note("Combat logs (with Advanced enabled) are required for Warcraft Logs uploads.")
 
-        local combatStatus = currentlyLogging and "|cFF00FF00Logging|r" or "|cFFFF0000Not Logging|r"
-        local advStatus = AutoLogger:IsAdvancedLoggingEnabled() and "|cFF00FF00On|r" or "|cFFFF0000Off|r"
-        statusText:SetText(status .. "\nCombat Log: " .. combatStatus .. "\nAdvanced Logging: " .. advStatus)
-    end
-    
-    frame:SetScript("OnShow", frame.Refresh)
-    
-    settingsPanel = frame
-    return frame
+    panel:Finish()
+
+    settingsPanel = panel
+    return panel
 end
 
 function AutoLogger:OpenSettings()
     local panel = self:CreateSettingsUI()
-    panel:Show()
-    panel.Refresh()
+    if panel:IsShown() then panel:Refresh() else panel:Show() end
 end
 
 function AutoLogger:ToggleUI()
@@ -329,7 +289,6 @@ function AutoLogger:ToggleUI()
         panel:Hide()
     else
         panel:Show()
-        panel.Refresh()
     end
 end
 
@@ -349,7 +308,7 @@ eventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         AutoLogger:UpdateCombatLog()
         if settingsPanel and settingsPanel:IsShown() then
-            settingsPanel.Refresh()
+            settingsPanel:Refresh()
         end
     end
 end)
