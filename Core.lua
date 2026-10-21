@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.15"
+WM.version = "3.16"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -273,6 +273,7 @@ local MODULE_COLORS = {
     ClassGeneral = "AADDAA",
     ClassWarlock = "8787ED",
     ClassMage = "3FC7EB",
+    ClassShaman = "0070DE",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1118,7 +1119,7 @@ local MODULE_INFO = {
     },
     ClassTools = {
         title = "Class Tools", desc = "Tools for the class you're playing",
-        about = "Per-class checks and helpers (missing armor spells, soulstones, portal button) plus raid consumable warnings for everyone, in one CHECK YOURSELF frame.",
+        about = "Per-class checks and helpers (missing armor spells, soulstones, portal and totem buttons) plus raid consumable warnings for everyone, in one CHECK YOURSELF frame.",
         command = "class", color = {1, 0.6, 0.87}, icon = "Interface\\Icons\\INV_Misc_Gear_01",
         classIcon = true,   -- the player's class crest; the gear is the fallback
         tools = {
@@ -1128,6 +1129,8 @@ local MODULE_INFO = {
               func = function() Call("ClassWarlock", "ReportSoulstones") end },
             { text = "List my portals and teleports", visible = function() return PlayerClass() == "MAGE" end,
               func = function() Call("ClassMage", "ReportSpells") end },
+            { text = "Edit totem sets", visible = function() return PlayerClass() == "SHAMAN" end,
+              func = function() Call("ClassShaman", "ToggleEditor") end },
         },
     },
 }
@@ -1563,6 +1566,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine soulstone|r - Soulstone timers in your group (warlock)")
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
     print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
+    print("|cFFFFFF00/wmachine totems|r - Edit your totem sets (shaman)")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine status|r - One-line status for every module")
@@ -1745,6 +1749,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:ReportSpells()
         else
             WM:Print("ClassMage module not available")
+        end
+
+    elseif cmd == "totems" or cmd == "totem" then
+        local module = WM.modules.ClassShaman
+        if module and module.ToggleEditor then
+            module:ToggleEditor()
+        else
+            WM:Print("ClassShaman module not available")
         end
 
     elseif cmd == "class" or cmd == "classes" or cmd == "classtools" then

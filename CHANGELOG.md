@@ -2,7 +2,59 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.15** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.16** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.16
+
+### New — Shaman totem button
+
+One button that drops a **totem set**, one totem per click, in the order
+**Air, Water, Earth, then Fire**. Fire always goes last.
+
+- **Picking a set:** hover the button to open your sets, and click one to
+  use it. The button's icon and label show the set in use; its tooltip
+  lists the four totems.
+- **Dropping:** each click casts the next totem. A secure button can only
+  cast one spell per click, so the button runs a `/castsequence` macro
+  built from the set.
+- **Starting again from Air:** when all your totems are gone (destroyed or
+  expired; TBC has no Totemic Recall, so "no totems down" is the signal,
+  read from `PLAYER_TOTEM_UPDATE`), when combat ends, or on **Ctrl-click**.
+  A reset that happens in combat applies when combat ends, which is when
+  the sequence resets anyway.
+- **Moving:** Shift-drag, since a plain press casts. The shared flyout lock
+  and docking apply.
+- **Right-click** opens the set editor.
+
+**Sets:** four, premade as:
+
+| Set | Air | Water | Earth | Fire |
+|---|---|---|---|---|
+| **Melee** | Windfury (Grace of Air) | Mana Spring (Healing Stream) | Strength of Earth (Stoneskin) | Searing |
+| **Caster** | Wrath of Air (Tranquil Air) | Mana Spring (Healing Stream) | Stoneskin (Strength of Earth) | Totem of Wrath (Searing) |
+| **Healer** | Wrath of Air (Tranquil Air) | Healing Stream (Mana Spring) | Stoneskin (Strength of Earth) | Searing |
+| **Tremor** | Windfury (Grace of Air) | Mana Spring (Healing Stream) | Tremor | Searing |
+
+A premade element is **Auto**: it uses the first totem in its list that you
+know (fallbacks in brackets). Elements with nothing known are skipped.
+
+**Totem Sets editor:** `/wmachine totems`, right-click the button, or
+*Edit totem sets* in the Class Tools card's tools menu. Rename a set, and
+choose each element's totem, *Auto*, or *None*. *Restore premades* puts all
+four back.
+
+**Options** (Class Tools > Shaman): *Show the totem button* (on by
+default) and *Totem sets expand* (Up by default, or Hidden).
+
+**Saved data:** new SavedVariable `ShamanToolsDB`.
+
+### Flyout engine
+
+- A flyout's anchor can now be a secure button with an action of its own
+  (the totem button), and flyout entries can pick something instead of
+  casting a spell.
 
 ---
 

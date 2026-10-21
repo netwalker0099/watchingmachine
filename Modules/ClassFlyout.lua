@@ -28,6 +28,15 @@
 --   })
 --
 -- Entries are { name, index (spellbook slot), icon, badge = function or nil }.
+-- An entry with select = function picks something instead of casting (the
+-- shaman's totem sets); tooltip = { lines } gives it a tooltip of its own.
+--
+-- cfg.secureAnchor: the anchor is itself a SecureActionButton that does
+-- something on click (the totem button casts its set), so the flyout only
+-- opens on hover; cfg.setupAnchor(anchor) sets its attributes and clicks,
+-- and cfg.anchorTooltip(tooltip, inCombat) fills the anchor's tooltip (it
+-- still works in combat, unlike the flyout). cfg.dragNeedsShift: only a
+-- Shift-drag moves it, so a plain press can't both cast and start a drag.
 -- A def with prefix = true matches every spell whose name starts with it,
 -- for spells whose ranks are separate names ("Create Healthstone (Major)").
 
@@ -82,7 +91,11 @@ local function Settings()
 end
 Flyout.Settings = Settings
 
-local function ClickMode() return Settings().openMode == "click" end
+-- Click-to-open applies unless the anchor's own click does something else
+local function ClickMode(fly)
+    if fly and fly.cfg.secureAnchor then return false end
+    return Settings().openMode == "click"
+end
 
 -- ============================================
 -- HELPERS
@@ -137,7 +150,7 @@ end
 -- highest rank, since ranks are listed lowest first and casting by name
 -- picks the highest anyway. Matched by English name and by the client's
 -- own name for the ID, so localized clients work. Extra fields on a def
--- (badge = ...) are copied onto its entry.
+-- (badge = ...) are copied onto its entry; key is the def's English name.
 function Flyout.ScanSpells(defs, fallbackIcon)
     local byName, byPrefix = {}, {}
     for group, list in pairs(defs) do
@@ -175,7 +188,7 @@ function Flyout.ScanSpells(defs, fallbackIcon)
             local slot = Lookup(name)
             if slot then
                 found[slot.group][slot.order] = {
-                    name = name, index = i,
+                    name = name, index = i, key = slot.def[1],
                     icon = Flyout.SpellIcon(i, name, fallbackIcon),
                     badge = slot.def.badge,
                 }
@@ -196,6 +209,14 @@ function Flyout.ScanSpells(defs, fallbackIcon)
 end
 
 local function ShowSpellTooltip(b)
+    if b.tooltipLines then
+        GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+        for i, line in ipairs(b.tooltipLines) do
+            if i == 1 then GameTooltip:AddLine(line, 1, 0.8, 0) else GameTooltip:AddLine(line, 0.9, 0.9, 0.9, true) end
+        end
+        GameTooltip:Show()
+        return
+    end
     if not b.spellName then return end
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
     -- The full spell tooltip (name, cast time, reagent) where the client
@@ -253,7 +274,7 @@ end
 
 -- Hover mode closes a moment after the mouse leaves; click mode stays open
 function FlyoutMT:ScheduleClose()
-    if ClickMode() then return end
+    if ClickMode(self) then return end
     self.closePending = true
     WM.RunAfter(0.35, function()
         if self.closePending then self:HideButtons() end
@@ -292,9 +313,10 @@ function FlyoutMT:NewButton(i)
         GameTooltip:Hide()
         self:ScheduleClose()
     end)
-    -- Click mode: picking a spell closes the flyout (after the cast)
-    b:SetScript("PostClick", function()
-        if ClickMode() then self:HideButtons() end
+    -- A picker entry runs its choice; click mode closes after a pick or cast
+    b:SetScript("PostClick", function(btn)
+        if btn.select then btn.select() end
+        if ClickMode(self) or btn.select then self:HideButtons() end
     end)
     return b
 end
@@ -325,9 +347,16 @@ function FlyoutMT:Build()
         local x, y = Flyout.Offset(p.dir, p.n)
         b:SetPoint("CENTER", self.anchor, "CENTER", x, y)
         b:RegisterForClicks(clicks)
-        b:SetAttribute("type", "spell")
-        b:SetAttribute("spell", p.entry.name)
+        if p.entry.select then
+            -- Picks something; no secure action
+            b:SetAttribute("type", nil)
+            b:SetAttribute("spell", nil)
+        else
+            b:SetAttribute("type", "spell")
+            b:SetAttribute("spell", p.entry.name)
+        end
         b.spellName, b.bookIndex, b.badge = p.entry.name, p.entry.index, p.entry.badge
+        b.select, b.tooltipLines = p.entry.select, p.entry.tooltip
         b.icon:SetTexture(p.entry.icon)
         if self.open then b:Show() else b:Hide() end
     end
@@ -338,6 +367,7 @@ function FlyoutMT:Build()
         b:Hide()
         b:SetAttribute("spell", nil)
         b.spellName, b.bookIndex, b.badge = nil, nil, nil
+        b.select, b.tooltipLines = nil, nil
     end
 
     self.count = #placed
@@ -366,12 +396,13 @@ function FlyoutMT:CreateAnchor()
     if self.anchor then return self.anchor end
     local cfg = self.cfg
 
-    local a = CreateFrame("Button", cfg.anchorName, UIParent)
+    local a = CreateFrame("Button", cfg.anchorName, UIParent,
+        cfg.secureAnchor and "SecureActionButtonTemplate" or nil)
     a:SetSize(ANCHOR_SIZE, ANCHOR_SIZE)
     a:SetMovable(true)
     a:SetClampedToScreen(true)
-    a:RegisterForDrag("LeftButton")
-    a:RegisterForClicks("LeftButtonUp")
+    a:RegisterForDrag("LeftButton")   -- a secure anchor's setupAnchor may change this
+    if not cfg.secureAnchor then a:RegisterForClicks("LeftButtonUp") end
     a.icon = a:CreateTexture(nil, "ARTWORK")
     a.icon:SetAllPoints()
     a:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
@@ -383,6 +414,7 @@ function FlyoutMT:CreateAnchor()
     -- Docked buttons move as one: dragging any of them drags the lead
     a:SetScript("OnDragStart", function()
         if Settings().locked or InCombatLockdown() then return end
+        if cfg.dragNeedsShift and not (IsShiftKeyDown and IsShiftKeyDown()) then return end
         local mover = Flyout.DragTarget(self)
         mover.anchor:StartMoving()
         self.dragging = mover
@@ -395,12 +427,24 @@ function FlyoutMT:CreateAnchor()
         Flyout.ApplyDock()
     end)
 
-    a:SetScript("OnClick", function()
-        if not ClickMode() or InCombatLockdown() then return end
-        if self.open then self:HideButtons() else self:ShowButtons() end
-    end)
+    if cfg.secureAnchor then
+        -- Never replace a secure button's OnClick: it's what performs the action
+        if cfg.setupAnchor then cfg.setupAnchor(a, self) end
+    else
+        a:SetScript("OnClick", function()
+            if not ClickMode() or InCombatLockdown() then return end
+            if self.open then self:HideButtons() else self:ShowButtons() end
+        end)
+    end
 
     a:SetScript("OnEnter", function(btn)
+        if cfg.anchorTooltip then
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            cfg.anchorTooltip(GameTooltip, InCombatLockdown())
+            GameTooltip:Show()
+            if not InCombatLockdown() then self:ShowButtons() end
+            return
+        end
         if InCombatLockdown() then
             GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
             GameTooltip:AddLine(cfg.title, 1, 0.8, 0)
@@ -408,14 +452,14 @@ function FlyoutMT:CreateAnchor()
             GameTooltip:Show()
             return
         end
-        if not ClickMode() then self:ShowButtons() else self.closePending = false end
+        if not ClickMode(self) then self:ShowButtons() else self.closePending = false end
         if self.count == 0 then
             GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
             GameTooltip:AddLine(cfg.title, 1, 0.8, 0)
             GameTooltip:AddLine(cfg.emptyText, 0.8, 0.8, 0.8, true)
             GameTooltip:AddLine("Or every group is set to Hidden in Class Tools.", 0.6, 0.6, 0.6, true)
             GameTooltip:Show()
-        elseif ClickMode() and not self.open then
+        elseif ClickMode(self) and not self.open then
             GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
             GameTooltip:AddLine(cfg.title, 1, 0.8, 0)
             GameTooltip:AddLine("Click to open.", 0.8, 0.8, 0.8)

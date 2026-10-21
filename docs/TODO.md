@@ -7,7 +7,7 @@ what still needs settling before it's built.
 2. Audio trigger for alerts
 3. Melee swing timer
 4. ~~Warlock button: armors and demon summons~~ (done, 3.15)
-5. Shaman totem bar with quick sets
+5. ~~Shaman totem bar with quick sets~~ (done, 3.16)
 6. ~~Flyout buttons: open on hover or on click~~ (done, 3.15)
 7. ~~Flyout directions: add "Hidden", and use dropdowns~~ (done, 3.15)
 8. ~~Dock flyout buttons together~~ (done, 3.15)
@@ -131,39 +131,26 @@ direction or Hidden:
 
 ---
 
-## 5. Shaman totem bar with quick sets
+## 5. Shaman totem bar — DONE in 3.16
 
-A bar for building **totem sets** (one totem per element) and dropping a
-set quickly.
+Built as one totem button in Class Tools > Shaman. The open questions were
+settled as:
 
-- **Per-element pickers:** one button per element (Earth, Fire, Water, Air),
-  each expanding into the totems you know for that element, using the mage
-  flyout pattern. Picking one sets it as that element's slot in the current
-  set.
-- **Sets:** save named sets, e.g. *Melee group* (Strength of Earth /
-  Windfury / Mana Spring / Searing) and *Caster group* (Wrath of Air / Totem
-  of Wrath / Mana Spring / ...). Switch between them from the bar.
-- **Dropping a set:** a secure button can cast **only one spell per click**;
-  the game allows nothing more. So "drop the set" is a button that casts the
-  set's totems in order, one per press. The likely mechanism is a macro
-  attribute with `/castsequence reset=combat/<n> TotemA, TotemB, TotemC,
-  TotemD` (TBC has `/castsequence`), rebuilt whenever the set changes.
-  Totems share a 1-second global cooldown, so the drop takes four presses.
-- **Status:** show which totems are down and their time left, if the client
-  has `GetTotemInfo` / `PLAYER_TOTEM_UPDATE`. Check this on 2.5.6.
-- **Combat:** changing a set changes secure attributes, so it can only
-  happen out of combat. Dropping a set works in combat.
-- **Aura Range:** already warns when you walk out of range of a totem, so
-  the two should work together. Possibly link the totem bar's status to it.
-
-**To settle:**
-- [ ] **Where it lives:** inside Class Tools as a Shaman tab feature, or as a
-      standalone bar module?
-- [ ] **Drop method:** `/castsequence` vs. one button per element (four
-      buttons, each casting that element's totem).
-- [ ] **Sets:** how many, whether they're named, and whether they're saved
-      per character or account-wide.
-- [ ] **Keybinding:** a binding for "drop next totem in set" (Bindings.xml).
+- **Where it lives:** a Shaman tab feature, on the shared flyout engine, so
+  it docks and locks with the other buttons.
+- **Drop method:** `/castsequence`, Air, Water, Earth, then Fire (fire
+  always last). It starts again from Air when no totems are down, after
+  combat, or on Ctrl-click.
+- **Sets:** four, named and editable, premade as Melee, Caster, Healer and
+  Tremor, saved per character (`ShamanToolsDB`). Picked by hovering the
+  button.
+- **Status:** the reset uses `GetTotemInfo` / `PLAYER_TOTEM_UPDATE`; the
+  button skips it if the client lacks them.
+- **Still to confirm in game:** that a sequence reset in combat waits for
+  combat to end cleanly, and the totem spell IDs (used only for localized
+  clients).
+- **Not built:** a keybinding (Bindings.xml) for the button, and per-totem
+  timers on the bar.
 
 ---
 

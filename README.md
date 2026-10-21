@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.15 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.16 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -226,7 +226,7 @@ CT:RegisterFeature("SHAMAN", {
   without waiting for a real warning.
 
 ### Flyout buttons (all classes)
-The mage and warlock buttons share one flyout engine (`Modules/ClassFlyout.lua`)
+The mage, warlock and shaman buttons share one flyout engine (`Modules/ClassFlyout.lua`)
 and a set of options in Class Tools > **General**:
 
 - **Flyout buttons open**: *On hover* (default) or *On click*. In click mode
@@ -322,7 +322,34 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   class's flyout buttons: see **Flyout buttons** under Class Tools
 - `/wmachine portals` lists what the scan found
 
-### 17. Chat Filter
+### 17. Class — Shaman
+- **Totem button**: one button that drops a whole **totem set**, one totem
+  per click, in the order **Air, Water, Earth, then Fire** (fire is always
+  last)
+  - **Hover** the button to open your sets and click one to use it. Its
+    icon and label show the set in use, and the tooltip lists its totems
+  - **Click** to drop the next totem. Underneath it's a `/castsequence`
+    macro, since the game allows one cast per click
+  - The sequence **starts again from Air** when all your totems are gone
+    (destroyed or expired; TBC has no Totemic Recall), when combat ends, or
+    on **Ctrl-click**
+  - **Shift-drag** moves it (a plain press casts). **Right-click** opens the
+    set editor
+- **Four sets**, premade as **Melee** (Windfury / Mana Spring / Strength of
+  Earth / Searing), **Caster** (Wrath of Air / Mana Spring / Stoneskin /
+  Totem of Wrath), **Healer** (Wrath of Air / Healing Stream / Stoneskin /
+  Searing) and **Tremor** (Windfury / Mana Spring / Tremor / Searing)
+  - Each premade element is **Auto**: the first totem in its list that you
+    know, so a set keeps working as you level (Searing until you have Totem
+    of Wrath, Grace of Air until Windfury)
+- **Totem Sets editor** (`/wmachine totems`, right-click the button, or the
+  Class Tools card's tools menu): rename a set and choose each element's
+  totem, Auto, or None to skip that element. *Restore premades* puts all
+  four back
+- *Totem sets expand* sets the flyout's direction (or Hidden). Changes made
+  in combat apply when it ends; dropping a set works in combat
+
+### 18. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -418,7 +445,7 @@ opens the dashboard. Everything the addon does can be reached from it.
     session.
   - **PvP Tracker:** leaderboard, request guild sync.
   - **Class Tools:** consumable check, soulstone timers (warlock), portal
-    list (mage).
+    list (mage), totem set editor (shaman).
 
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
@@ -443,6 +470,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine class` - Open Class Tools (tab per class, your own selected)
 - `/wmachine soulstone` - Soulstone timers in your group (warlock)
 - `/wmachine portals` - List the teleports and portals you know (mage)
+- `/wmachine totems` - Edit your totem sets (shaman)
 - `/wmachine consumes` - Show what the general raid consumable checks see
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
@@ -477,6 +505,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `GeneralChecksDB` - General consumable check settings
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
+- `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
 
@@ -493,6 +522,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.16
+- **Shaman totem button**: hover to pick a totem set, click to drop it one totem per click (Air, Water, Earth, then Fire); starts again from Air when your totems are gone, after combat, or on Ctrl-click
+- Four editable sets, premade as Melee, Caster, Healer and Tremor, each picking the best totem you know; `/wmachine totems` opens the editor
 
 ### Version 3.15
 - **Warlock button**: demons (Felguard only if talented), armors, and Soulwell / Ritual of Summoning / Healthstone / Soulstone, with Soul Shard counts on the spells that use one
