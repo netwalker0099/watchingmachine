@@ -443,6 +443,11 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `GeneralChecksDB` - General consumable check settings
 - `MageToolsDB` - Mage button positions, expansion directions and lock state
 
+## Planned work
+
+Ideas that are planned but not started, with open questions, are in
+[`docs/TODO.md`](docs/TODO.md).
+
 ## Changelog
 
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
