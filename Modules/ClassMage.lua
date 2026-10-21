@@ -304,9 +304,9 @@ function Mage:Initialize()
 
     if IsPlayerMage() then
         self:CreateAnchor()
-        eventFrame:RegisterEvent("LEARNED_SPELL_IN_TAB")
-        eventFrame:RegisterEvent("SPELLS_CHANGED")
-        eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        -- SPELLS_CHANGED also fires when a spell is learned, which is what
+        -- picks up a new portal; LEARNED_SPELL_IN_TAB doesn't exist on 2.5.6
+        WM:RegisterEvents(eventFrame, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED" })
         -- Spellbook isn't reliably populated the instant we initialise
         WM.RunAfter(2, function() Mage:UpdatePortalButtonVisibility() end)
     end

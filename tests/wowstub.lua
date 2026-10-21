@@ -235,6 +235,7 @@ return function(REPO)
         -- Timers: collect, run on demand with W.runTimers()
         if WM.RunAfter and not W._timersHooked then
             W._timersHooked = true
+            W.realRunAfter = WM.RunAfter   -- Core's own timer, for tests of it
             WM.RunAfter = function(_, fn) table.insert(W.timers, fn) end
         end
     end

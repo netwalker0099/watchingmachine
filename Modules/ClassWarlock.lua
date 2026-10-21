@@ -276,9 +276,9 @@ function Warlock:Initialize()
     tools:RegisterMonitor(Monitor)
 
     local talentWatcher = CreateFrame("Frame")
-    talentWatcher:RegisterEvent("CHARACTER_POINTS_CHANGED")
-    talentWatcher:RegisterEvent("PLAYER_TALENT_UPDATE")
-    talentWatcher:RegisterEvent("SPELLS_CHANGED")
+    -- CHARACTER_POINTS_CHANGED is the TBC talent event; PLAYER_TALENT_UPDATE
+    -- may not exist on every Classic client, so register defensively
+    WM:RegisterEvents(talentWatcher, { "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "SPELLS_CHANGED" })
     talentWatcher:SetScript("OnEvent", function()
         Warlock:InvalidateTalentCache()
     end)

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.11 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.11.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -434,6 +434,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)
 (every release from 2.9 to 3.11 in one post).
+
+### Version 3.11.1
+- Fixed: error spam on login on mages ("Attempt to register unknown event LEARNED_SPELL_IN_TAB"), which also stopped other modules from starting
+- A module that errors at start-up no longer blocks the others, and a failing timer no longer repeats every frame
 
 ### Version 3.11
 - Chat Filter: premade filters for **GDKP**, **Guild Loot Run** and **Gear Carry** (incl. "gear carries"), one tick each in the Chat Filter window; off until switched on

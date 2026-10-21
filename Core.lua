@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.11"
+WM.version = "3.11.1"
 WM.modules = {}
 
 -- ============================================
@@ -98,17 +98,29 @@ local function RunTicker(interval, callback)
     return id
 end
 
+-- Due timers are rescheduled (or dropped) BEFORE their callback runs, and
+-- each callback runs protected. Before, a one-shot callback that errored
+-- was never removed, so it stayed due and fired again every frame: one
+-- error became ~60 a second. Callbacks may also schedule new timers, so
+-- the due list is collected first rather than run inside the pairs() walk.
+local dueScratch = {}
 timerFrame:SetScript("OnUpdate", function(self, elapsed)
     for id, timer in pairs(timers) do
         timer.remaining = timer.remaining - elapsed
         if timer.remaining <= 0 then
-            timer.callback()
+            dueScratch[#dueScratch + 1] = timer.callback
             if timer.repeating then
                 timer.remaining = timer.interval
             else
                 timers[id] = nil
             end
         end
+    end
+    for i = 1, #dueScratch do
+        local callback = dueScratch[i]
+        dueScratch[i] = nil
+        local ok, err = pcall(callback)
+        if not ok then geterrorhandler()(err) end
     end
 end)
 
@@ -187,6 +199,22 @@ function WM:VerbosePrint(moduleName, msg)
 end
 
 -- Register a module
+-- Register a list of events, skipping any this client doesn't have.
+-- RegisterEvent throws on an unknown event, and event names differ between
+-- Classic clients (LEARNED_SPELL_IN_TAB exists in Wrath and retail, not in
+-- 2.5.6). Returns the number registered.
+function WM:RegisterEvents(frame, events)
+    local n = 0
+    for _, event in ipairs(events) do
+        if pcall(frame.RegisterEvent, frame, event) then
+            n = n + 1
+        else
+            self:VerbosePrint("Core", "Event not available on this client: " .. event)
+        end
+    end
+    return n
+end
+
 function WM:RegisterModule(name, module)
     self.modules[name] = module
     module.name = name
@@ -492,6 +520,11 @@ function WM:OnSecurityCheckFailed()
 end
 
 function WM:OnSecurityCheckPassed()
+    -- Start-up runs once. A failure used to make the timer that calls this
+    -- re-fire every frame, re-initialising every module each time.
+    if self.modulesInitialized then return end
+    self.modulesInitialized = true
+
     -- Minimap button visibility is managed by CreateMinimapButton based on minimapHidden setting
     
     -- Auto-detect ElvUI/Tukui theme on first run
@@ -499,10 +532,14 @@ function WM:OnSecurityCheckPassed()
     
     self:Print("Loaded v" .. self.version .. ". Type /wmachine to open dashboard.")
     
-    -- Initialize modules
+    -- Initialize modules, each one protected: a module that errors is
+    -- reported but can't stop the others from starting
     for name, module in pairs(self.modules) do
         if module.Initialize then
-            module:Initialize()
+            local ok, err = pcall(module.Initialize, module)
+            if not ok then
+                geterrorhandler()(name .. ":Initialize failed: " .. tostring(err))
+            end
         end
     end
     

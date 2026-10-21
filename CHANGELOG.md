@@ -2,7 +2,66 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.11** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.11.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.11.1
+
+### Fixed — error spam on login (mages)
+
+Logging in on a mage filled the error log with about 60 errors a second:
+
+> `Frame:RegisterEvent(): Attempt to register unknown event "LEARNED_SPELL_IN_TAB"`
+
+Three problems stacked:
+
+1. **The trigger.** The Mage module (3.5) registered `LEARNED_SPELL_IN_TAB`.
+   That event exists in Wrath and retail but not in the 2.5.6 client, so
+   `RegisterEvent` threw. It's gone: `SPELLS_CHANGED` already fires when a
+   spell is learned, and that's what picks up a new portal.
+2. **Why it repeated.** Core's timer ran a one-shot callback *before*
+   removing it. The start-up callback threw, was never removed, stayed due,
+   and fired again on every frame. Timers are now rescheduled or dropped
+   before their callback runs, and each callback runs protected: a failing
+   timer reports its error once and is done. A failing repeating timer keeps
+   its interval. Callbacks that schedule new timers are handled safely.
+3. **What else it broke.** Modules were started one after another, unguarded.
+   The error aborted the loop, so on every attempt each module after Class
+   Mage never finished starting, and the ones before it started again.
+   Start-up now runs once, and each module's `Initialize` runs protected: a
+   failure is logged as `<Module>:Initialize failed: ...` and the remaining
+   modules still start.
+
+Also:
+
+- New `WM:RegisterEvents(frame, { ... })` registers a list of events and
+  skips any the client doesn't have (noted in verbose chat). Class Mage and
+  Class Warlock use it. Warlock's `PLAYER_TALENT_UPDATE` is registered this
+  way in case it's missing too; `CHARACTER_POINTS_CHANGED` is the TBC talent
+  event and is what matters.
+- The mage portal button was also affected, since its events and first
+  refresh came after the failing call. It now sets itself up normally.
+
+The 200 old entries stay in the saved error log until cleared:
+`/wmachine clearerrors`.
+
+### Tests
+
+`tests/test_startup.lua` (37 checks) replays the login with a
+`RegisterEvent` that rejects unknown events the way the client does. It
+covers:
+- a failing timer runs once and reports once
+- other timers due in the same frame still run
+- timers scheduled from inside a callback
+- a failing ticker keeps its interval
+- a mage login raises no unknown-event error
+- a broken module can't stop the others
+- every module initialises exactly once, even if start-up is called again
+- the mage module still listens for the events it needs
+- warlock start-up survives a missing `PLAYER_TALENT_UPDATE`
+
+The timer checks fail against the 3.11 code.
 
 ---
 
