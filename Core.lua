@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.11.1"
+WM.version = "3.11.2"
 WM.modules = {}
 
 -- ============================================
@@ -1059,7 +1059,11 @@ local function VisibleTools(info)
 end
 
 local toolsMenu
-local function ShowToolsMenu(info)
+-- The menu hangs below `anchor` (the card's ... button). It used to open
+-- at "cursor", which FrameXML positions from the cursor divided by a UI
+-- scale; when UIParent's scale isn't the default (ElvUI and other UI packs
+-- change it) the menu landed far from the click, near the screen bottom.
+local function ShowToolsMenu(info, anchor)
     local tools = VisibleTools(info)
     if #tools == 0 then return end
     if not toolsMenu then
@@ -1083,7 +1087,7 @@ local function ShowToolsMenu(info)
         item.func = function() CloseDropDownMenus() end
         UIDropDownMenu_AddButton(item, level)
     end, "MENU")
-    ToggleDropDownMenu(1, nil, toolsMenu, "cursor", 0, 0)
+    ToggleDropDownMenu(1, nil, toolsMenu, anchor or "cursor", 0, 0)
 end
 WM.ShowToolsMenu = ShowToolsMenu
 
@@ -1188,7 +1192,7 @@ function WM:CreateModuleCards()
                 toolsBtn:SetSize(24, 20)
                 toolsBtn:SetPoint("RIGHT", leftmost, "LEFT", -3, 0)
                 toolsBtn:SetText("...")
-                toolsBtn:SetScript("OnClick", function() ShowToolsMenu(info) end)
+                toolsBtn:SetScript("OnClick", function(self) ShowToolsMenu(info, self) end)
                 toolsBtn:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:AddLine(info.title .. " tools", 1, 0.8, 0)
@@ -1254,7 +1258,7 @@ function WM:CreateModuleCards()
             card:SetScript("OnEnter", ShowCardTooltip)
             card:SetScript("OnLeave", function() GameTooltip:Hide() end)
             card:SetScript("OnMouseUp", function(self, button)
-                if button == "RightButton" then ShowToolsMenu(info) end
+                if button == "RightButton" then ShowToolsMenu(info, self.toolsBtn or self) end
             end)
 
             dashboard.moduleCards[moduleName] = card

@@ -2,7 +2,22 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.11.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.11.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.11.2
+
+### Fixed — dashboard tools menu opened at the bottom of the screen
+
+The **...** button and right-clicking a card opened the tools menu with
+`ToggleDropDownMenu(..., "cursor")`. FrameXML places a cursor-anchored
+menu from the cursor position divided by a UI scale. When UIParent's scale
+isn't the default, as with ElvUI and other UI packs, that calculation puts
+the menu far from the click, near the bottom of the screen. The menu is now
+anchored to the card's **...** button and opens directly below it at any UI
+scale, from either the button or a right-click. The dashboard tests now
+check where it is anchored.
 
 ---
 

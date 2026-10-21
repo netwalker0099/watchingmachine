@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.11.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.11.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -434,6 +434,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)
 (every release from 2.9 to 3.11 in one post).
+
+### Version 3.11.2
+- Fixed: the dashboard tools menu (**...** / right-click) opened near the bottom of the screen with ElvUI or a non-default UI scale; it now opens under the card's **...** button
 
 ### Version 3.11.1
 - Fixed: error spam on login on mages ("Attempt to register unknown event LEARNED_SPELL_IN_TAB"), which also stopped other modules from starting

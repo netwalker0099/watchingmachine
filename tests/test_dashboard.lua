@@ -163,14 +163,18 @@ local added, toggled = {}, 0
 env.UIDropDownMenu_CreateInfo = function() return {} end
 env.UIDropDownMenu_AddButton = function(item) added[#added + 1] = item end
 env.UIDropDownMenu_Initialize = function(frame, fn) fn(frame, 1) end
-env.ToggleDropDownMenu = function() toggled = toggled + 1 end
+local lastAnchor
+env.ToggleDropDownMenu = function(level, value, frame, anchor) toggled = toggled + 1; lastAnchor = anchor end
 W.fire(cards.DebuffTracker, "OnMouseUp", "RightButton")
 check("right-click opens a menu", toggled == 1)
+check("right-click menu hangs off the card's ... button, not the cursor",
+    lastAnchor == cards.DebuffTracker.toolsBtn)
 check("menu has title, every tool and cancel", #added == #WM.MODULE_INFO.DebuffTracker.tools + 2
     and added[1].isTitle and added[#added].text)
 added = {}
 W.click(cards.BuffCheck.toolsBtn)
 check("... button opens the same menu", toggled == 2 and #added == #WM.MODULE_INFO.BuffCheck.tools + 2)
+check("menu opens under the ... button that was clicked", lastAnchor == cards.BuffCheck.toolsBtn)
 added = {}
 W.fire(cards.AutoLogger, "OnMouseUp", "RightButton")
 check("no menu for a module without tools", toggled == 2 and #added == 0)
