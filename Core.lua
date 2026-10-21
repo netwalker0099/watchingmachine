@@ -158,6 +158,94 @@ function WM:IsFlaskBuff(name)
     return false
 end
 
+-- Battle and guardian elixirs. In TBC a flask fills both elixir slots, so
+-- a player is covered by a flask OR one battle plus one guardian elixir.
+-- Elixir auras are often not named after the item (Adept's Elixir's buff
+-- is "Spellpower Elixir"), so they're matched by spell ID too; the names
+-- cover clients where UnitBuff doesn't return an ID. /wmachine whybuff
+-- prints the name and ID of anything unmatched, to add here.
+WM.BATTLE_ELIXIRS = {
+    -- TBC battle elixirs
+    "Elixir of Major Strength", "Elixir of Major Agility",
+    "Elixir of Major Shadow Power", "Elixir of Major Firepower",
+    "Elixir of Major Frost Power",
+    "Adept's Elixir", "Spellpower Elixir", "Onslaught Elixir", "Elixir of Mastery",
+    "Elixir of Healing Power", "Fel Strength Elixir",
+    "Elixir of Demonslaying", "Elixir of Camouflage",
+    -- Classic-era battle elixirs still in use
+    "Elixir of the Mongoose", "Greater Arcane Elixir",
+    "Arcane Elixir", "Elixir of Shadow Power",
+    "Elixir of Greater Firepower", "Elixir of Frost Power",
+    "Elixir of Giants", "Elixir of Greater Agility",
+    "Winterfall Firewater", "Juju Might", "Juju Power",
+}
+WM.GUARDIAN_ELIXIRS = {
+    -- TBC guardian elixirs
+    "Elixir of Major Fortitude", "Elixir of Major Defense",
+    "Elixir of Ironskin",
+    "Elixir of Draenic Wisdom", "Elixir of Major Mageblood",
+    "Earthen Elixir", "Elixir of Empowerment",
+    -- Classic-era guardian elixirs still in use
+    "Elixir of Superior Defense", "Elixir of Fortitude",
+    "Gift of Arthas", "Elixir of Greater Defense",
+    "Elixir of the Sages", "Mageblood Potion",
+    "Elixir of Poison Resistance", "Greater Nature Protection",
+    "Juju Ember", "Juju Chill",
+}
+-- Buff spell IDs of the TBC elixirs
+WM.BATTLE_ELIXIR_IDS = {
+    [33721] = true,  -- Adept's Elixir (aura: Spellpower Elixir)
+    [28490] = true,  -- Elixir of Major Strength
+    [28497] = true,  -- Elixir of Major Agility
+    [28501] = true,  -- Elixir of Major Firepower
+    [28503] = true,  -- Elixir of Major Shadow Power
+    [28493] = true,  -- Elixir of Major Frost Power
+    [28491] = true,  -- Elixir of Healing Power
+    [33720] = true,  -- Onslaught Elixir
+    [33726] = true,  -- Elixir of Mastery
+    [38954] = true,  -- Fel Strength Elixir
+}
+WM.GUARDIAN_ELIXIR_IDS = {
+    [39627] = true,  -- Elixir of Draenic Wisdom
+    [28509] = true,  -- Elixir of Major Mageblood
+    [28502] = true,  -- Elixir of Major Defense
+    [39625] = true,  -- Elixir of Major Fortitude
+    [39628] = true,  -- Elixir of Ironskin
+    [39626] = true,  -- Earthen Elixir
+    [28514] = true,  -- Elixir of Empowerment
+}
+
+local BATTLE_SET, GUARDIAN_SET = {}, {}
+for _, n in ipairs(WM.BATTLE_ELIXIRS) do BATTLE_SET[n] = true end
+for _, n in ipairs(WM.GUARDIAN_ELIXIRS) do GUARDIAN_SET[n] = true end
+
+-- "flask", "battle", "guardian" or nil for one aura
+function WM:ConsumableKind(name, spellId)
+    if self:IsFlaskBuff(name) then return "flask" end
+    if (spellId and WM.BATTLE_ELIXIR_IDS[spellId]) or (name and BATTLE_SET[name]) then return "battle" end
+    if (spellId and WM.GUARDIAN_ELIXIR_IDS[spellId]) or (name and GUARDIAN_SET[name]) then return "guardian" end
+    return nil
+end
+
+-- What a unit has up: hasFlask, hasBattle, hasGuardian
+function WM:ElixirState(unit)
+    local flask, battle, guardian = false, false, false
+    for i = 1, 40 do
+        local name, _, _, _, _, _, _, _, _, spellId = UnitBuff(unit, i)
+        if not name then break end
+        local kind = self:ConsumableKind(name, spellId)
+        if kind == "flask" then flask = true
+        elseif kind == "battle" then battle = true
+        elseif kind == "guardian" then guardian = true end
+    end
+    return flask, battle, guardian
+end
+
+-- The TBC rule: a flask, or both elixir slots filled
+function WM:IsFlaskCovered(flask, battle, guardian)
+    return flask or (battle and guardian)
+end
+
 -- ============================================
 -- CORE UTILITIES
 -- ============================================

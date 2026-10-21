@@ -25,7 +25,12 @@ env.DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) printed[#printed+1] = m e
 env.CreateFrame = function() return stub end
 env.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 env.date = os.date
-env.UnitBuff = function(u, i) local l = auras[u]; return l and l[i] end
+-- An aura is a name, or { name, spellId } to return the ID like the client
+env.UnitBuff = function(u, i)
+    local a = auras[u] and auras[u][i]
+    if type(a) == "table" then return a[1], nil, nil, nil, nil, nil, nil, nil, nil, a[2] end
+    return a
+end
 env.UnitExists = function(u) return units[u] ~= nil end
 env.UnitName = function(u) return units[u] and units[u].name end
 env.UnitClass = function(u) local c = units[u] and units[u].class; return c, c end
@@ -159,6 +164,61 @@ printed = {}
 Gen:Explain()
 check("general: eating without buff is no", has("food buff: |cFFFF4444no"))
 check("general: no flask", has("flask: |cFFFF4444no"))
+
+-- ---- flask OR battle + guardian elixir (TBC rule) ----
+-- Adept's Elixir's aura is "Spellpower Elixir" (33721); Draenic Wisdom is 39627
+local ADEPT, DRAENIC = { "Spellpower Elixir", 33721 }, { "Elixir of Draenic Wisdom", 39627 }
+check("Adept's Elixir is a battle elixir (by ID)", WM:ConsumableKind("Spellpower Elixir", 33721) == "battle")
+check("Draenic Wisdom is a guardian elixir (by ID)", WM:ConsumableKind("Something Else", 39627) == "guardian")
+check("names still work without an ID", WM:ConsumableKind("Adept's Elixir") == "battle"
+    and WM:ConsumableKind("Elixir of Draenic Wisdom") == "guardian")
+
+for k in pairs(DB.checkedGroups) do DB.checkedGroups[k] = false end
+DB.checkedGroups.flask = true
+auras.raid1 = { ADEPT, DRAENIC }                          -- both elixirs
+auras.raid2 = { "Flask of Supreme Power" }                -- flask
+auras.raid3 = { ADEPT }                                   -- battle only
+auras.raid4 = { DRAENIC }                                 -- guardian only
+lines, missing = BC:ScanGroup()
+check("raid flask check: elixir pair counts as covered", not (lines[1] or ""):find("Souper", 1, true))
+check("raid flask check: flask covered", not (lines[1] or ""):find("Steaker", 1, true))
+check("raid flask check: one elixir isn't enough", missing == 2
+    and lines[1]:find("Hungry", 1, true) and lines[1]:find("Eater", 1, true))
+check("raid check renamed", lines[1]:find("Missing Flask or Elixirs:", 1, true) ~= nil)
+DB.checkedGroups.flask = false
+DB.checkedGroups.battleelixir = true
+DB.checkedGroups.guardianelixir = true
+lines, missing = BC:ScanGroup()
+check("battle/guardian checks by spell ID: only the gaps reported", missing == 2)
+DB.checkedGroups.battleelixir, DB.checkedGroups.guardianelixir = false, false
+
+-- personal (Class Tools General) check: run the real monitor and read the alert
+local alerts, monitor = {}, nil
+local tools = WM.modules.ClassTools
+tools.SetAlert = function(_, key, text) alerts[key] = text end
+tools.ClearAlert = function(_, key) alerts[key] = nil end
+tools.IsEnabled = function(_, class, key) return key == "flask" end
+tools.RegisterMonitor = function(_, fn) monitor = fn end
+env.UnitIsDeadOrGhost = function() return false end
+Gen:Initialize()
+check("general monitor registered", monitor ~= nil)
+local function Warn(list) auras.player = list; monitor(); return alerts.gen_flask end
+check("personal: Adept's + Draenic, no warning", Warn({ ADEPT, DRAENIC }) == nil)
+check("personal: flask alone, no warning", Warn({ "Flask of Pure Death" }) == nil)
+check("personal: battle only asks for a guardian", Warn({ ADEPT }) == "No guardian elixir (or flask)")
+check("personal: guardian only asks for a battle", Warn({ DRAENIC }) == "No battle elixir (or flask)")
+check("personal: nothing up", Warn({ "Arcane Intellect" }) == "No flask or elixirs")
+check("personal: by name too (no spell ID)", Warn({ "Adept's Elixir", "Elixir of Draenic Wisdom" }) == nil)
+
+-- whybuff prints the spell ID of anything unmatched, to add it
+auras.player = { { "Mystery Elixir", 99999 } }
+printed = {}
+BC:ExplainUnit("player")
+check("whybuff shows spell IDs of unmatched auras", has("Mystery Elixir (spell id 99999)"))
+auras.player = { ADEPT, DRAENIC }
+printed = {}
+BC:ExplainUnit("player")
+check("whybuff summarises flask-or-elixirs", has("Flask or elixirs: |cFF00FF00covered"))
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -96,36 +96,25 @@ local BUFF_GROUPS = {
     },
     {
         key = "flask",
-        name = "Flask",
+        name = "Flask or Elixirs",
         providerClass = nil,  -- consumable
         buffs = {},
         -- Substring (not prefix) match: TBC's Zul'Aman-era flasks are named
         -- "Unstable Flask of the Beast" / "...of the Sorcerer", so anchoring
         -- to the start of the name would miss them.
         contains = WM.FLASK_CONTAINS,
+        -- A battle plus a guardian elixir is as good as a flask in TBC
+        orElixirPair = true,
         appliesTo = ALL_CLASSES,
         default = false,
-        note = "Any flask aura",
+        note = "Flask, or battle + guardian elixir",
     },
     {
         key = "battleelixir",
         name = "Battle Elixir",
         providerClass = nil,  -- consumable
-        buffs = {
-            -- TBC battle elixirs
-            "Elixir of Major Strength", "Elixir of Major Agility",
-            "Elixir of Major Shadow Power", "Elixir of Major Firepower",
-            "Elixir of Major Frost Power",
-            "Adept's Elixir", "Onslaught Elixir", "Elixir of Mastery",
-            "Elixir of Healing Power", "Fel Strength Elixir",
-            "Elixir of Demonslaying", "Elixir of Camouflage",
-            -- Classic-era battle elixirs still in use
-            "Elixir of the Mongoose", "Greater Arcane Elixir",
-            "Arcane Elixir", "Elixir of Shadow Power",
-            "Elixir of Greater Firepower", "Elixir of Frost Power",
-            "Elixir of Giants", "Elixir of Greater Agility",
-            "Winterfall Firewater", "Juju Might", "Juju Power",
-        },
+        buffs = WM.BATTLE_ELIXIRS,       -- shared with ClassGeneral (Core.lua)
+        ids = WM.BATTLE_ELIXIR_IDS,
         -- Flasks occupy both elixir slots in TBC
         contains = WM.FLASK_CONTAINS,
         appliesTo = ALL_CLASSES,
@@ -136,19 +125,8 @@ local BUFF_GROUPS = {
         key = "guardianelixir",
         name = "Guardian Elixir",
         providerClass = nil,  -- consumable
-        buffs = {
-            -- TBC guardian elixirs
-            "Elixir of Major Fortitude", "Elixir of Major Defense",
-            "Elixir of Ironskin",
-            "Elixir of Draenic Wisdom", "Elixir of Major Mageblood",
-            "Earthen Elixir", "Elixir of Empowerment",
-            -- Classic-era guardian elixirs still in use
-            "Elixir of Superior Defense", "Elixir of Fortitude",
-            "Gift of Arthas", "Elixir of Greater Defense",
-            "Elixir of the Sages", "Mageblood Potion",
-            "Elixir of Poison Resistance", "Greater Nature Protection",
-            "Juju Ember", "Juju Chill",
-        },
+        buffs = WM.GUARDIAN_ELIXIRS,
+        ids = WM.GUARDIAN_ELIXIR_IDS,
         contains = WM.FLASK_CONTAINS,
         appliesTo = ALL_CLASSES,
         default = false,
@@ -253,21 +231,25 @@ end
 -- Fill a reusable set with every buff name on a unit
 local buffScratch = {}
 local expectedScratch = {}
+-- name -> spell ID (or true where the client gives none)
 local function GetUnitBuffSet(unit)
     wipe(buffScratch)
     for i = 1, 40 do
-        local name = UnitBuff(unit, i)
+        local name, _, _, _, _, _, _, _, _, spellId = UnitBuff(unit, i)
         if not name then break end
-        buffScratch[name] = true
+        buffScratch[name] = spellId or true
     end
     return buffScratch
 end
 
 -- Does this single aura name satisfy the group? Returns the reason it
 -- matched (for diagnostics) or nil.
-local function BuffMatchesGroup(buffName, group)
+local function BuffMatchesGroup(buffName, group, spellId)
     if group.buffSet[buffName] then
         return "exact"
+    end
+    if group.ids and type(spellId) == "number" and group.ids[spellId] then
+        return "spell id " .. spellId
     end
     if group.contains then
         for _, needle in ipairs(group.contains) do
@@ -281,12 +263,17 @@ local function BuffMatchesGroup(buffName, group)
 end
 
 local function UnitHasGroupBuff(buffSet, group)
-    for buffName in pairs(buffSet) do
-        if BuffMatchesGroup(buffName, group) then
+    local battle, guardian = false, false
+    for buffName, spellId in pairs(buffSet) do
+        if BuffMatchesGroup(buffName, group, spellId) then
             return true
         end
+        if group.orElixirPair then
+            local kind = WM:ConsumableKind(buffName, type(spellId) == "number" and spellId or nil)
+            if kind == "battle" then battle = true elseif kind == "guardian" then guardian = true end
+        end
     end
-    return false
+    return group.orElixirPair and battle and guardian or false
 end
 
 -- ============================================
@@ -628,13 +615,13 @@ function BuffCheck:ExplainUnit(unit)
     local anyBuff = false
 
     for i = 1, 40 do
-        local buffName = UnitBuff(unit, i)
+        local buffName, _, _, _, _, _, _, _, _, spellId = UnitBuff(unit, i)
         if not buffName then break end
         anyBuff = true
 
         local hits = {}
         for _, group in ipairs(BUFF_GROUPS) do
-            local why = BuffMatchesGroup(buffName, group)
+            local why = BuffMatchesGroup(buffName, group, spellId)
             if why then
                 local state = BuffCheckDB.checkedGroups[group.key] and "on" or "|cFF888888off|r"
                 hits[#hits + 1] = group.name .. " [" .. state .. ", " .. why .. "]"
@@ -644,7 +631,9 @@ function BuffCheck:ExplainUnit(unit)
         if #hits > 0 then
             matched[#matched + 1] = "  |cFF00FF00" .. buffName .. "|r -> " .. table.concat(hits, ", ")
         else
-            unmatched[#unmatched + 1] = "  |cFF888888" .. buffName .. "|r"
+            -- The spell ID is what's needed to add a missing elixir
+            unmatched[#unmatched + 1] = "  |cFF888888" .. buffName
+                .. (spellId and (" (spell id " .. spellId .. ")") or "") .. "|r"
         end
     end
 
@@ -653,6 +642,11 @@ function BuffCheck:ExplainUnit(unit)
     end
 
     for _, line in ipairs(matched) do print(line) end
+
+    local flask, battle, guardian = WM:ElixirState(unit)
+    print("  Flask or elixirs: " .. (WM:IsFlaskCovered(flask, battle, guardian) and "|cFF00FF00covered|r" or "|cFFFF4444missing|r")
+        .. "  (flask " .. (flask and "yes" or "no") .. ", battle " .. (battle and "yes" or "no")
+        .. ", guardian " .. (guardian and "yes" or "no") .. ")")
 
     if #unmatched > 0 then
         self:Print("Not matched by any check:")

@@ -246,3 +246,33 @@ open on mouseover today. Add an option to open them on **click** instead.
 - **Tests:** extend `test_classmage` / `test_mageutility` to cover a hidden
   group (no icons, the other group starting next to the button) and choosing
   from the dropdown.
+
+---
+
+## 8. Dock the mage buttons together
+
+Let the portal button and the utility button (and future class buttons) be
+**docked** into one group that moves as one.
+
+- **Docking:** drag one button next to another and it snaps into place,
+  attached to that button's edge (top, bottom, left or right). Docked buttons
+  move together when the group is dragged.
+- **Undocking:** for example, Shift-drag a button out of the group, or use an
+  "Undock" option in Class Tools.
+- **Saving:** store the dock relationship, e.g. `utility docked to the left
+  of portal`, instead of two independent positions. A docked button anchors
+  to its partner; only the group's lead button saves a screen position.
+- **Flyouts:** check that a docked button's flyout directions don't open
+  over its partner. The Hidden option (item 7) and per-group directions help
+  here, or flyouts could open away from the dock edge automatically.
+- **Combat:** buttons with secure children can't be moved in combat, so
+  docking and undocking only work out of combat. That's the same rule as
+  dragging today.
+- **Lock:** *Lock the mage buttons* locks the whole group.
+
+**To settle:**
+- [ ] **Snapping:** snap on drop when within a few pixels, or dock only
+      through an explicit option?
+- [ ] **Layout:** row and column only, or any edge?
+- [ ] **Scope:** also dock with the warlock and totem buttons (items 4 and 5)
+      when they exist, through a shared dock in the shared flyout file?

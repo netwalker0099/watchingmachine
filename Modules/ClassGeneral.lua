@@ -33,8 +33,17 @@ local function PlayerHasAura(test)
     return false
 end
 
-local function PlayerHasFlask() return PlayerHasAura(WM.IsFlaskBuff) end
 local function PlayerHasFood()  return PlayerHasAura(WM.IsFoodBuff) end
+
+-- The flask warning, worded for what's actually missing. A flask, or one
+-- battle plus one guardian elixir, is a full set in TBC. nil = covered.
+local function FlaskWarning()
+    local flask, battle, guardian = WM:ElixirState("player")
+    if WM:IsFlaskCovered(flask, battle, guardian) then return nil end
+    if battle then return "No guardian elixir (or flask)" end
+    if guardian then return "No battle elixir (or flask)" end
+    return "No flask or elixirs"
+end
 
 function General:Print(msg)
     WM:ModulePrint("ClassGeneral", msg)
@@ -122,10 +131,11 @@ local function Monitor()
     end
 
     if tools:IsEnabled(CLASS, "flask") then
-        if PlayerHasFlask() then
-            tools:ClearAlert("gen_flask")
+        local warning = FlaskWarning()
+        if warning then
+            tools:SetAlert("gen_flask", warning, ICON_FLASK)
         else
-            tools:SetAlert("gen_flask", "No flask", ICON_FLASK)
+            tools:ClearAlert("gen_flask")
         end
     else
         tools:ClearAlert("gen_flask")
@@ -174,7 +184,11 @@ function General:Explain()
         .. (inRaid and ("  (" .. maxPlayers .. "-man)") or ""))
     print("  25-man only: " .. tostring(GeneralChecksDB and GeneralChecksDB.only25)
         .. "   -> checks active here: " .. tostring(ShouldCheckHere()))
-    print("  flask: " .. (PlayerHasFlask() and "|cFF00FF00yes|r" or "|cFFFF4444no|r"))
+    local flask, battle, guardian = WM:ElixirState("player")
+    local yes, no = "|cFF00FF00yes|r", "|cFFFF4444no|r"
+    print("  flask: " .. (flask and yes or no) .. "   battle elixir: " .. (battle and yes or no)
+        .. "   guardian elixir: " .. (guardian and yes or no)
+        .. "   -> " .. (WM:IsFlaskCovered(flask, battle, guardian) and "|cFF00FF00covered|r" or "|cFFFF4444warning|r"))
     print("  food buff: " .. (PlayerHasFood() and "|cFF00FF00yes|r" or "|cFFFF4444no|r"))
     local hasMain, hasOff = WeaponEnchantState()
     print("  main-hand enchant: " .. (hasMain and "|cFF00FF00yes|r" or "|cFFFF4444no|r")
@@ -200,8 +214,8 @@ function General:Initialize()
     if not tools then return end
 
     tools:RegisterFeature(CLASS, {
-        key = "flask", name = "Warn if no flask",
-        desc = "Checked continuously while you're in a raid instance.",
+        key = "flask", name = "Warn if no flask or elixirs",
+        desc = "A flask, or a battle plus a guardian elixir, counts. Checked continuously while you're in a raid instance.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {
