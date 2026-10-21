@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.12 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.13 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -274,7 +274,18 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - The flyout deliberately **won't expand in combat**: its buttons are secure
   frames that can't be reconfigured mid-fight, and portals aren't castable in
   combat anyway
-- **Lock the portal button** option in the Mage tab stops it being dragged by accident
+- **Mage utility button**: a second draggable button showing the mage class
+  crest. On hover it expands into three groups, each ordered highest level
+  first so the best is nearest the button:
+  - **Mana gems**: Emerald, Ruby, Citrine, Jade, Agate (those you know)
+  - **Armors**: Molten, Mage, Ice, Frost, one icon each
+  - **Food & water**: Ritual of Refreshment (table), Conjure Water, Conjure
+    Food
+
+  Ranked spells show once and cast your highest rank. Each group has its own
+  direction (*Mana gems / Armors / Food & water expand*; defaults left, up,
+  right). Groups sharing a direction form one line in that order.
+- **Lock the mage buttons** option in the Mage tab stops both buttons being dragged by accident
 - `/wmachine portals` lists what the scan found
 
 ### 17. Chat Filter
@@ -430,7 +441,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AuraRangeDB` - Aura Range settings
 - `ClassToolsDB` - Per-class feature toggles and warning frame options
 - `GeneralChecksDB` - General consumable check settings
-- `MageToolsDB` - Portal button position and lock state
+- `MageToolsDB` - Mage button positions, expansion directions and lock state
 
 ## Changelog
 
@@ -440,6 +451,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md)
 (3.11 to 3.11.2; everything from 2.9 to 3.11 is in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)).
+
+### Version 3.13
+- New **mage utility button** (class crest): mana gems, armors and food / water / table, each group highest level nearest the button, with spell tooltips
+- Each group's expansion direction is set in Class Tools > Mage; groups sharing a direction line up in order
+- The lock option now covers both mage buttons
 
 ### Version 3.12
 - Mage portal button is now a portal icon that expands into spell icons, one per portal and teleport, with spell tooltips on hover

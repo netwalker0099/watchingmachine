@@ -2,7 +2,69 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.12** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.13** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.13
+
+### Mage — utility button
+
+A second flyout button beside the portal button, showing the **mage class
+crest**, cut from the default UI's class-circles texture. On hover it
+expands into one icon per spell, in three groups. Each group is ordered
+highest level first, so the best spell sits closest to the button.
+
+| Group | Spells, nearest first |
+|---|---|
+| **Mana gems** | Conjure Mana Emerald, Ruby, Citrine, Jade, Agate |
+| **Armors** | Molten Armor, Mage Armor, Ice Armor, Frost Armor |
+| **Food & water** | Ritual of Refreshment (table), Conjure Water, Conjure Food |
+
+- **Only what you know:** a spell appears only if it's in your spellbook.
+  It is matched by its English name and by the client's own name for its
+  spell ID, so localized clients work.
+- **Ranks:** ranked spells (the armors, Conjure Food and Conjure Water)
+  appear once. Clicking casts by name, which casts your highest rank, and the
+  tooltip shows the highest-rank slot.
+- **Icons and tooltips:** each icon is the spell's own spellbook icon, so
+  each gem shows its gem. Hovering shows the spell's tooltip.
+- **Directions:** each group has its own option in Class Tools > Mage:
+  *Mana gems expand*, *Armors expand* and *Food & water expand*. Defaults are
+  **left**, **up** and **right**. Groups on the same button that share a
+  direction form one line, in the order above.
+- **Mage tab:** *Show the mage utility button* (on by default). *Lock the
+  portal button* becomes **Lock the mage buttons** and covers both.
+- **Combat:** like the portal button, it doesn't open in combat. Changes made
+  in combat apply when combat ends.
+- **Saved data:** new `MageToolsDB` keys `utilityX`/`utilityY`, `gemDir`,
+  `armorDir` and `foodDir`.
+
+### Internals
+
+- **Shared flyout:** the portal flyout is now a reusable flyout object
+  (`NewFlyout`) that both buttons use. A flyout takes any number of groups,
+  each with a direction key. The same-direction rule generalises: each group
+  continues the line of any earlier group sharing its direction.
+- **Portal button unchanged:** the `Mage:BuildFlyout` /
+  `UpdatePortalButtonVisibility` entry points are kept. New counterparts:
+  `Mage:BuildUtilityFlyout`, `UpdateUtilityButtonVisibility`, and
+  `UpdateButtons` for both.
+
+### Tests
+
+`tests/test_mageutility.lua` (30 checks) uses a spellbook with
+interleaved ranks and a localized Emerald. It covers:
+- discovery order, and ranks collapsed to the highest slot
+- the class-crest icon
+- layout for the default, all-same and mixed directions
+- the cast attributes, icons, and highest-rank tooltips
+- hover open and close
+- the empty-button explanation
+- switching the button off
+- the options, and cycling one in the Mage tab
+
+All existing portal-button tests still pass on the shared flyout.
 
 ---
 

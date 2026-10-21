@@ -197,14 +197,15 @@ check("General tab first", tabs[1] == Tab("General"))
 check("current class marked", Tab("Mage"):GetText() == "|cFF00FF00Mage|r"
     and Tab("Warlock"):GetText() == "Warlock")
 check("header names your class", Header():find("Mage", 1, true) and Header():find("your class", 1, true))
-check("mage features shown", #ShownFeatures() == 3 and HasFeature("Warn if armor spell is missing"))
+check("mage features shown", #ShownFeatures() == 4 and HasFeature("Warn if armor spell is missing")
+    and HasFeature("Show the mage utility button"))
 
 W.click(Tab("Warlock"))
 check("switching tab marks it", Tab("Warlock"):GetText() == "|cFF00FF00Warlock|r"
     and Tab("Mage"):GetText() == "Mage")
 check("header follows the tab", Header():find("Warlock", 1, true) and not Header():find("your class", 1, true))
 check("warlock features shown", #ShownFeatures() == 4 and HasFeature("Track soulstone timers")
-    and not HasFeature("Lock the portal button"))
+    and not HasFeature("Lock the mage buttons"))
 
 local calls = {}
 local realSetEnabled = CT.SetEnabled
