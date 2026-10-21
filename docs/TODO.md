@@ -117,10 +117,11 @@ licence that allows it.
 - **"Next melee" abilities:** Heroic Strike, Cleave, Maul and Raptor Strike
   replace the white swing and arrive as `SPELL_DAMAGE` / `SPELL_MISSED`, so
   they must reset the timer too. Slam resets the swing in TBC.
-- **Parry haste:** when *you* are parried nothing happens, but when the
-  target parries *your* attackers the mob speeds up. Only the player's own
-  swing matters here, so the open question is just whether to handle anything
-  beyond our own swings.
+- **Parry haste:** when *you* parry an incoming attack (a `PARRY` miss with
+  you as the target), your own next swing comes sooner. The remaining time is
+  cut by 40% of your swing speed, but never to less than 20% of it. Tanks
+  will notice if this is missed. Confirm the exact rule against the
+  reference.
 - **Other resets:** weapon swaps and reaching the target after moving.
 - **Display:** a bar per hand, built with the panel builder's styling. It
   should be lockable and movable, with the position saved. Show it only in
