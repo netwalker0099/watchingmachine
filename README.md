@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.11.3 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.12 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -260,10 +260,15 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 
 ### 16. Class — Mage
 - **Armor check** — warns when Molten, Mage, Ice or Frost Armor is missing
-- **Portal / teleport button** — one draggable button that expands on hover
-  into every teleport and portal you know, portals listed first. Built from
-  your spellbook, so it only ever shows what you can actually cast, and
-  refreshes when you learn a new one
+- **Portal / teleport button**: a draggable portal icon that expands on
+  hover into an **icon for every portal and teleport you know**, each with
+  its own spell icon. Hover an icon for the spell's tooltip; click to cast.
+  Built from your spellbook, so it only ever shows what you can actually
+  cast, and refreshes when you learn a new one
+- **Expansion direction**: *Portals expand* and *Teleports expand* in the
+  Mage tab, each Up / Right / Down / Left (defaults: portals left, teleports
+  up). If both point the same way, they form one line, portals first with
+  the teleports continuing on the end
 - The spellbook scan derives the `Teleport:` / `Portal:` prefixes from the
   client's own spell names, so it works on non-English clients
 - The flyout deliberately **won't expand in combat**: its buttons are secure
@@ -435,6 +440,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md)
 (3.11 to 3.11.2; everything from 2.9 to 3.11 is in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)).
+
+### Version 3.12
+- Mage portal button is now a portal icon that expands into spell icons, one per portal and teleport, with spell tooltips on hover
+- New Mage options: *Portals expand* and *Teleports expand* (Up / Right / Down / Left); the same direction puts portals first, then teleports
+- Class Tools options can now be choices as well as checkboxes
 
 ### Version 3.11.3
 - Fixed: clicking a portal or teleport in the mage portal button didn't cast it

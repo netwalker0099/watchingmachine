@@ -20,6 +20,17 @@
 -- Enabled state is saved per character in ClassToolsDB, so a feature can ask
 --   CT:IsEnabled("SHAMAN", "totemReminder")
 -- without caring about the UI at all.
+--
+-- A feature can instead be a choice between options, shown as a button
+-- that cycles through them. It keeps its own value (get/set), so nothing is
+-- stored in ClassToolsDB for it:
+--
+--   CT:RegisterFeature("MAGE", {
+--       key = "portalDir", kind = "choice", name = "Portals expand",
+--       options = { { value = "UP", text = "Up" }, ... },
+--       get = function() return MageToolsDB.portalDir end,
+--       set = function(v) MageToolsDB.portalDir = v end,
+--   })
 
 local AddonName, WM = ...
 local ClassTools = {}
@@ -106,6 +117,7 @@ end
 
 function ClassTools:EnsureDefault(class, feature)
     if not ClassToolsDB then return end
+    if feature.kind == "choice" then return end   -- keeps its own value
     ClassToolsDB.enabled[class] = ClassToolsDB.enabled[class] or {}
     if ClassToolsDB.enabled[class][feature.key] == nil then
         ClassToolsDB.enabled[class][feature.key] = feature.default and true or false
@@ -440,7 +452,7 @@ local tabRows = {}        -- layout rows holding the tab buttons
 local tabChoices = {}     -- tabChoices[i] = the Choice widget in tabRows[i]
 local tabSignature = nil  -- the class list the tabs were built for
 local featureArea = nil   -- layout row the feature rows sit in
-local featureRows = {}    -- pooled checkbox + description rows
+local featureRows = {}    -- pooled rows by kind: featureRows.check / .choice
 
 local function CurrentClass()
     return selectedClass or ClassTools:GetPlayerClass()
@@ -498,15 +510,38 @@ function ClassTools:RefreshTabs()
     for _, choice in pairs(tabChoices) do choice:Refresh() end
 end
 
+-- Rows are pooled per kind and re-pointed at a feature when the tab
+-- changes, so every spec reads row.feature at call time
 local function NewFeatureRow(parent, class, feature)
     local row = CreateFrame("Frame", nil, parent)
     row.class, row.feature = class, feature
-    row.check = WM.UI.Checkbox(row, {
-        label = function() return row.feature.name or row.feature.key end,
-        get = function() return ClassTools:IsEnabled(row.class, row.feature.key) end,
-        set = function(v) ClassTools:SetEnabled(row.class, row.feature.key, v) end,
-    })
-    row.check:SetPoint("TOPLEFT", 8, 0)
+    if feature.kind == "choice" then
+        row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.label:SetPoint("TOPLEFT", 14, -5)
+        row.cycle = WM.UI.Cycle(row, setmetatable({ width = 70 }, { __index = function(_, k)
+            local f = row.feature
+            if k == "options" then return f.options end
+            if k == "get" then return f.get end
+            if k == "default" then return f.default end
+            -- read when hovered, so a re-pointed row shows its own tooltip
+            if k == "tooltip" then return function() return row.feature.tooltip end end
+            if k == "set" then
+                return function(v)
+                    if f.set then f.set(v) end
+                    if f.onChange then pcall(f.onChange, v) end
+                end
+            end
+        end }))
+        row.cycle:SetPoint("LEFT", row.label, "RIGHT", 10, 0)
+        row.check = row.cycle   -- what the list refreshes
+    else
+        row.check = WM.UI.Checkbox(row, {
+            label = function() return row.feature.name or row.feature.key end,
+            get = function() return ClassTools:IsEnabled(row.class, row.feature.key) end,
+            set = function(v) ClassTools:SetEnabled(row.class, row.feature.key, v) end,
+        })
+        row.check:SetPoint("TOPLEFT", 8, 0)
+    end
     row.desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.desc:SetPoint("TOPLEFT", 36, -18)
     row.desc:SetWidth(330)
@@ -516,7 +551,9 @@ end
 
 function ClassTools:BuildFeatureList()
     if not mainFrame then return end
-    for _, row in ipairs(featureRows) do row:Hide() end
+    for _, pool in pairs(featureRows) do
+        for _, row in ipairs(pool) do row:Hide() end
+    end
 
     local class = CurrentClass()
     local features = self:GetFeatures(class)
@@ -534,14 +571,19 @@ function ClassTools:BuildFeatureList()
     emptyText:Hide()
 
     local y = 0
-    for i, f in ipairs(features) do
-        local row = featureRows[i]
+    local used = {}
+    for _, f in ipairs(features) do
+        local kind = (f.kind == "choice") and "choice" or "check"
+        featureRows[kind] = featureRows[kind] or {}
+        used[kind] = (used[kind] or 0) + 1
+        local row = featureRows[kind][used[kind]]
         if row then
             row.class, row.feature = class, f
         else
             row = NewFeatureRow(parent, class, f)
-            featureRows[i] = row
+            featureRows[kind][used[kind]] = row
         end
+        if row.label then row.label:SetText(f.name or f.key) end
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
         row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -y)

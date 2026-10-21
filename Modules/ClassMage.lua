@@ -6,7 +6,7 @@ local AddonName, WM = ...
 local Mage = {}
 WM:RegisterModule("ClassMage", Mage)
 
-Mage.version = "3.5"
+Mage.version = "3.6"
 
 local CLASS = "MAGE"
 
@@ -55,7 +55,14 @@ local function LocalizedPrefix(spellID, fallback)
     return fallback
 end
 
+-- Each entry: { name = "Portal: Stormwind", index = spellbook slot, icon = texture }
 local teleportSpells, portalSpells = {}, {}
+
+local function SpellIcon(index, name)
+    local tex = GetSpellBookItemTexture and GetSpellBookItemTexture(index, BOOKTYPE_SPELL or "spell")
+    if not tex and GetSpellTexture then tex = GetSpellTexture(name) end
+    return tex or ICON_PORTAL
+end
 
 function Mage:ScanSpellbook()
     wipe(teleportSpells)
@@ -70,32 +77,62 @@ function Mage:ScanSpellbook()
     while true do
         local name = GetSpellBookItemName(i, BOOKTYPE_SPELL or "spell")
         if not name then break end
+        local list
         if name:sub(1, #telePrefix) == telePrefix then
-            teleportSpells[#teleportSpells + 1] = name
+            list = teleportSpells
         elseif name:sub(1, #portPrefix) == portPrefix then
-            portalSpells[#portalSpells + 1] = name
+            list = portalSpells
         end
+        if list then list[#list + 1] = { name = name, index = i, icon = SpellIcon(i, name) } end
         i = i + 1
         if i > 1024 then break end   -- guard against a malformed spellbook
     end
 
-    table.sort(teleportSpells)
-    table.sort(portalSpells)
+    local function byName(a, b) return a.name < b.name end
+    table.sort(teleportSpells, byName)
+    table.sort(portalSpells, byName)
     return #teleportSpells, #portalSpells
 end
 
 -- ============================================
 -- FLYOUT BUTTON
 -- ============================================
+-- An icon button that, on hover, expands into one icon per teleport and
+-- portal you know. Portals and teleports each fan out in their own
+-- direction (Class Tools > Mage); when both point the same way the
+-- teleports continue the line after the portals.
+--
 -- Casting requires SecureActionButtonTemplate, and secure frames cannot be
--- shown, hidden or reconfigured while in combat. Teleports and portals are
--- not castable in combat anyway, so the flyout simply refuses to expand in
+-- shown, hidden or moved while in combat. Teleports and portals are not
+-- castable in combat anyway, so the flyout simply refuses to expand in
 -- combat rather than pulling in a secure-handler state driver to work around
 -- a restriction that costs nothing here.
 
 local anchor = nil
 local flyoutButtons = {}
-local BTN_W, BTN_H = 150, 20
+local ANCHOR_SIZE, ICON_SIZE, GAP = 36, 32, 4
+
+local DIRECTIONS = {
+    UP    = { 0, 1 },
+    DOWN  = { 0, -1 },
+    LEFT  = { -1, 0 },
+    RIGHT = { 1, 0 },
+}
+Mage.DIRECTION_OPTIONS = {
+    { value = "UP", text = "Up" }, { value = "RIGHT", text = "Right" },
+    { value = "DOWN", text = "Down" }, { value = "LEFT", text = "Left" },
+}
+local DEFAULT_PORTAL_DIR, DEFAULT_TELEPORT_DIR = "LEFT", "UP"
+
+local function PortalDir()
+    local d = MageToolsDB and MageToolsDB.portalDir
+    return DIRECTIONS[d] and d or DEFAULT_PORTAL_DIR
+end
+
+local function TeleportDir()
+    local d = MageToolsDB and MageToolsDB.teleportDir
+    return DIRECTIONS[d] and d or DEFAULT_TELEPORT_DIR
+end
 
 -- Which half of a click casts. On current client builds a secure action
 -- button only acts on the press that matches the ActionButtonUseKeyDown
@@ -115,47 +152,93 @@ local function HideFlyout()
     for _, b in ipairs(flyoutButtons) do b:Hide() end
 end
 
+local function ShowSpellTooltip(b)
+    if not b.spellName then return end
+    GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+    -- The full spell tooltip (name, cast time, reagent) where the client
+    -- can show a spellbook slot; just the name otherwise
+    local ok = b.bookIndex and GameTooltip.SetSpellBookItem
+        and pcall(GameTooltip.SetSpellBookItem, GameTooltip, b.bookIndex, BOOKTYPE_SPELL or "spell")
+    if not ok then
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine(b.spellName, 1, 1, 1)
+    end
+    GameTooltip:Show()
+end
+
+local function NewFlyoutButton(i)
+    -- Secure template only: its click handler is the one that casts
+    local b = CreateFrame("Button", "WM_MagePortalBtn" .. i, anchor, "SecureActionButtonTemplate")
+    b:SetSize(ICON_SIZE, ICON_SIZE)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+    -- Keep the flyout open while moving between its buttons
+    b:SetScript("OnEnter", function(self)
+        Mage:CancelFlyoutClose()
+        ShowSpellTooltip(self)
+    end)
+    b:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+        Mage:ScheduleFlyoutClose()
+    end)
+    return b
+end
+
+-- Offset of the n-th icon (1-based) along a direction from the anchor centre
+local function Offset(dir, n)
+    local d = DIRECTIONS[dir]
+    local dist = ANCHOR_SIZE / 2 + GAP + ICON_SIZE / 2 + (n - 1) * (ICON_SIZE + GAP)
+    return d[1] * dist, d[2] * dist
+end
+Mage.FlyoutOffset = Offset   -- for tests
+
 function Mage:BuildFlyout()
     if InCombatLockdown() then return end
     if not anchor then return end
 
     self:ScanSpellbook()
 
-    local list = {}
-    for _, n in ipairs(portalSpells)   do list[#list + 1] = { name = n, kind = "portal" } end
-    for _, n in ipairs(teleportSpells) do list[#list + 1] = { name = n, kind = "tele" } end
+    -- Lay out each group along its direction; a shared direction means one
+    -- line, portals first
+    local portalDir, teleportDir = PortalDir(), TeleportDir()
+    local placed = {}
+    for n, e in ipairs(portalSpells) do
+        placed[#placed + 1] = { entry = e, dir = portalDir, n = n }
+    end
+    local start = (teleportDir == portalDir) and #portalSpells or 0
+    for n, e in ipairs(teleportSpells) do
+        placed[#placed + 1] = { entry = e, dir = teleportDir, n = start + n }
+    end
 
-    for i, entry in ipairs(list) do
-        local b = flyoutButtons[i]
-        if not b then
-            -- Secure template LAST: later templates override earlier ones,
-            -- and its click handler is the one that casts
-            b = CreateFrame("Button", "WM_MagePortalBtn" .. i, anchor,
-                            "UIPanelButtonTemplate, SecureActionButtonTemplate")
-            b:SetSize(BTN_W, BTN_H)
-            -- Keep the flyout open while moving between its buttons
-            b:SetScript("OnEnter", function() Mage:CancelFlyoutClose() end)
-            b:SetScript("OnLeave", function() Mage:ScheduleFlyoutClose() end)
-            flyoutButtons[i] = b
-        end
+    local clicks = CastClicks()
+    for i, p in ipairs(placed) do
+        local b = flyoutButtons[i] or NewFlyoutButton(i)
+        flyoutButtons[i] = b
         b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -((i - 1) * (BTN_H + 2)) - 2)
-        b:RegisterForClicks(CastClicks())
+        local x, y = Offset(p.dir, p.n)
+        b:SetPoint("CENTER", anchor, "CENTER", x, y)
+        b:RegisterForClicks(clicks)
         b:SetAttribute("type", "spell")
-        b:SetAttribute("spell", entry.name)
-        -- Strip the "Portal: " / "Teleport: " prefix for a readable label
-        local short = entry.name:match("^[^:]+:%s*(.+)$") or entry.name
-        b:SetText((entry.kind == "portal" and "|cFF66CCFF" or "|cFFCCCCCC") .. short .. "|r")
+        b:SetAttribute("spell", p.entry.name)
+        b.spellName, b.bookIndex = p.entry.name, p.entry.index
+        b.icon:SetTexture(p.entry.icon)
         b:Hide()
     end
 
     -- Retire any buttons left over from a previous, longer list
-    for i = #list + 1, #flyoutButtons do
-        flyoutButtons[i]:Hide()
-        flyoutButtons[i]:SetAttribute("spell", nil)
+    for i = #placed + 1, #flyoutButtons do
+        local b = flyoutButtons[i]
+        b:Hide()
+        b:SetAttribute("spell", nil)
+        b.spellName, b.bookIndex = nil, nil
     end
 
-    anchor.count = #list
+    anchor.count = #placed
+    -- The anchor shows your first portal (or teleport) as its own icon
+    local first = portalSpells[1] or teleportSpells[1]
+    anchor.icon:SetTexture(first and first.icon or ICON_PORTAL)
 end
 
 local closePending = false
@@ -178,12 +261,15 @@ end
 function Mage:CreateAnchor()
     if anchor then return anchor end
 
-    local a = CreateFrame("Button", "WM_MagePortalAnchor", UIParent, "UIPanelButtonTemplate")
-    a:SetSize(BTN_W, 24)
+    local a = CreateFrame("Button", "WM_MagePortalAnchor", UIParent)
+    a:SetSize(ANCHOR_SIZE, ANCHOR_SIZE)
     a:SetMovable(true)
     a:SetClampedToScreen(true)
     a:RegisterForDrag("LeftButton")
-    a:SetText("Portals")
+    a.icon = a:CreateTexture(nil, "ARTWORK")
+    a.icon:SetAllPoints()
+    a.icon:SetTexture(ICON_PORTAL)
+    a:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     a:Hide()
 
     if MageToolsDB and MageToolsDB.portalX and MageToolsDB.portalY then
@@ -284,6 +370,8 @@ local eventFrame = CreateFrame("Frame")
 function Mage:InitDB()
     if not MageToolsDB then MageToolsDB = {} end
     if MageToolsDB.portalLocked == nil then MageToolsDB.portalLocked = false end
+    if MageToolsDB.portalDir == nil then MageToolsDB.portalDir = DEFAULT_PORTAL_DIR end
+    if MageToolsDB.teleportDir == nil then MageToolsDB.teleportDir = DEFAULT_TELEPORT_DIR end
 end
 
 function Mage:Initialize()
@@ -298,9 +386,29 @@ function Mage:Initialize()
     })
     tools:RegisterFeature(CLASS, {
         key = "portalButton", name = "Show the portal / teleport button",
-        desc = "A draggable button that expands on hover with every teleport and portal you know. Not available in combat.",
+        desc = "A draggable portal icon that expands on hover into an icon for every portal and teleport you know. Hover an icon for the spell; click to cast. Not available in combat.",
         default = true,
         onToggle = function() Mage:UpdatePortalButtonVisibility() end,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "portalDir", kind = "choice", name = "Portals expand",
+        options = Mage.DIRECTION_OPTIONS, default = DEFAULT_PORTAL_DIR,
+        desc = "Which way the portal icons open from the button.",
+        get = function() return MageToolsDB.portalDir end,
+        set = function(v) MageToolsDB.portalDir = v end,
+        onChange = function() Mage:UpdatePortalButtonVisibility() end,
+        tooltip = { "Portals expand", "Click to cycle: Up > Right > Down > Left.",
+            "If teleports expand the same way, they continue the line after the portals." },
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "teleportDir", kind = "choice", name = "Teleports expand",
+        options = Mage.DIRECTION_OPTIONS, default = DEFAULT_TELEPORT_DIR,
+        desc = "Which way the teleport icons open from the button.",
+        get = function() return MageToolsDB.teleportDir end,
+        set = function(v) MageToolsDB.teleportDir = v end,
+        onChange = function() Mage:UpdatePortalButtonVisibility() end,
+        tooltip = { "Teleports expand", "Click to cycle: Up > Right > Down > Left.",
+            "If portals expand the same way, teleports go on the end of the line after them." },
     })
     tools:RegisterFeature(CLASS, {
         key = "portalLock", name = "Lock the portal button",
@@ -341,6 +449,6 @@ end)
 function Mage:ReportSpells()
     local t, p = self:ScanSpellbook()
     self:Print("Known teleports: " .. (t or 0) .. ", portals: " .. (p or 0))
-    for _, n in ipairs(portalSpells)   do print("  |cFF66CCFF" .. n .. "|r") end
-    for _, n in ipairs(teleportSpells) do print("  |cFFCCCCCC" .. n .. "|r") end
+    for _, e in ipairs(portalSpells)   do print("  |cFF66CCFF" .. e.name .. "|r") end
+    for _, e in ipairs(teleportSpells) do print("  |cFFCCCCCC" .. e.name .. "|r") end
 end

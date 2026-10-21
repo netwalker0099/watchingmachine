@@ -2,7 +2,55 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.11.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.12** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.12
+
+### Mage — portal button with icons and expansion directions
+
+- **Button:** the portal button is now a 36px icon showing your first
+  portal's spell icon (Stormwind's portal icon until you know one). Drag to
+  move; *Lock the portal button* still applies.
+- **Flyout:** hovering opens a 32px **icon for each portal and teleport you
+  know**, using each spell's own icon from your spellbook.
+- **Tooltips:** hovering an icon shows that spell's full tooltip, or just
+  its name on a client that can't show a spellbook tooltip.
+- **Casting:** click an icon to cast. The buttons are plain
+  `SecureActionButtonTemplate` buttons, registered for the press that casts
+  (see 3.11.3).
+- **Two new options in Class Tools > Mage:** *Portals expand* and
+  *Teleports expand*. Each cycles Up > Right > Down > Left. The defaults are
+  portals **left** and teleports **up**.
+  - **Different directions:** each group fans out from the button in its own
+    line.
+  - **Same direction:** one line, portals first, with the teleports
+    continuing on the end.
+  - **Saved** in `MageToolsDB.portalDir` and `MageToolsDB.teleportDir`. A
+    change made in combat applies when combat ends, since secure buttons
+    can't be moved mid-fight.
+- **Combat:** the flyout still doesn't open in combat.
+
+### Class Tools — choice options
+
+Features can now be `kind = "choice"` with `options`, `get`, `set` and
+`onChange`. They're drawn as a label with a button that cycles through the
+options, and they keep their own value rather than an on/off flag in
+`ClassToolsDB`. Feature rows are pooled per kind, so switching class tabs
+reuses them correctly.
+
+### Tests
+
+`tests/test_classmage.lua` is extended to 32 checks:
+- icon buttons, with only the secure template
+- spell icons taken from the spellbook
+- the anchor's icon
+- spell tooltips, and the name fallback
+- the layout for the default, shared, opposite and invalid directions
+- portals-then-teleports order
+- the choice options registered in Class Tools and not stored as on/off
+- cycling the option in the Class Tools window, which rebuilds the flyout
 
 ---
 
