@@ -3,6 +3,11 @@
 Planned work that hasn't been started. Each item notes what's decided and
 what still needs settling before it's built.
 
+1. Mana potion / rune alert
+2. Audio trigger for alerts
+3. Melee swing timer
+4. Warlock button: armors and demon summons
+
 ---
 
 ## 1. Mana potion / rune alert
@@ -90,3 +95,79 @@ rune alerts first, and be built so any Class Tools alert can use it.
       Shipped files add to the addon's size and need a licence check.
 - [ ] **Repeat:** should a sound repeat while the condition persists, for
       example every 10s if you still haven't drunk the potion, or sound once?
+
+---
+
+## 3. Melee swing timer
+
+A movable bar showing time to your next melee swing, main hand and
+off hand.
+
+**Reference:** look at how Leatrix Plus does it before building. Either
+you provide its code, or we read the released addon. Two cautions: check
+that Leatrix Plus actually has a swing timer, and check its licence before
+reusing any code. Reading it for the approach is fine; copying code needs a
+licence that allows it.
+
+**Likely approach (to check against the reference):**
+- **Swing speed:** `UnitAttackSpeed("player")` gives the main- and off-hand
+  swing times. They change with haste, so re-read on `UNIT_ATTACK_SPEED`.
+- **Swing detection:** watch your own `SWING_DAMAGE` / `SWING_MISSED` in
+  `COMBAT_LOG_EVENT_UNFILTERED`. The off-hand flag tells the hands apart.
+- **"Next melee" abilities:** Heroic Strike, Cleave, Maul and Raptor Strike
+  replace the white swing and arrive as `SPELL_DAMAGE` / `SPELL_MISSED`, so
+  they must reset the timer too. Slam resets the swing in TBC.
+- **Parry haste:** when *you* are parried nothing happens, but when the
+  target parries *your* attackers the mob speeds up. Only the player's own
+  swing matters here, so the open question is just whether to handle anything
+  beyond our own swings.
+- **Other resets:** weapon swaps and reaching the target after moving.
+- **Display:** a bar per hand, built with the panel builder's styling. It
+  should be lockable and movable, with the position saved. Show it only in
+  combat or while auto-attack is on.
+- **Possible extra:** a hunter Auto Shot timer (`START_AUTOREPEAT_SPELL` /
+  `STOP_AUTOREPEAT_SPELL`). It works differently from melee, so treat it as
+  optional.
+
+**To settle:**
+- [ ] **Where it lives:** a General tab feature in Class Tools, or a module of
+      its own? It applies to many classes.
+- [ ] **Which classes:** all melee classes, or a per-class toggle?
+- [ ] **Off hand:** show the off-hand bar, or main hand only?
+- [ ] **Tests:** a fake combat log covering swing resets, next-melee
+      abilities and haste changes.
+
+---
+
+## 4. Warlock button: armors and demon summons
+
+A warlock flyout button that works like the mage buttons.
+
+- **Groups:**
+  - **Armors:** Fel Armor, Demon Armor, Demon Skin. One icon each; ranked
+    spells cast your highest rank, as with the mage armors.
+  - **Demons (pet multi-selector):** Summon Imp, Voidwalker, Succubus,
+    Felhunter, and Felguard if talented. Only the ones the warlock knows.
+- **Directions:** each group has its own expansion direction in Class
+  Tools → Warlock. Groups on the same button that share a direction form one
+  line, the same rule as portals and teleports.
+- **Icon:** the warlock class crest, cut from the same class-circles sheet as
+  the mage utility button.
+
+**Groundwork:** the flyout (`NewFlyout`) currently lives inside
+`Modules/ClassMage.lua`. It should move to a shared file, for example
+`Modules/ClassFlyout.lua` loaded before the class modules, so Warlock (and
+later classes) can use it without duplicating it. Spell matching should
+follow the mage approach: English name plus the client's own name for a
+known spell ID.
+
+**To settle:**
+- [ ] **Order:** which group sits nearest the button, and the demon order. By
+      level would be Imp, Voidwalker, Succubus, Felhunter, Felguard; or the
+      most-used demon first.
+- [ ] **Other spells:** include Fel Domination (instant summon) beside the
+      demons, and Create Healthstone / Soulstone / Spellstone / Firestone as
+      another group?
+- [ ] **Soul Shards:** show the shard count on the button, since most summons
+      need one?
+- [ ] **Spell IDs:** confirm the IDs for each spell in game.
