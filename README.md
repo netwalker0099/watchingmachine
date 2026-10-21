@@ -448,9 +448,11 @@ opens the dashboard. Everything the addon does can be reached from it.
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
-[`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md)
-(3.11 to 3.11.2; everything from 2.9 to 3.11 is in
-[`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)).
+[`docs/RELEASE-NOTES-v3.11.3-v3.13.md`](docs/RELEASE-NOTES-v3.11.3-v3.13.md)
+(3.11.3 to 3.13). Earlier: 3.11 to 3.11.2 in
+[`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
+and 2.9 to 3.11 in
+[`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
 
 ### Version 3.13
 - New **mage utility button** (class crest): mana gems, armors and food / water / table, each group highest level nearest the button, with spell tooltips
