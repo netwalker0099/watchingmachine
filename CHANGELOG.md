@@ -77,7 +77,7 @@ flyout open mode and the docked layout.
   - choosing Hidden from the dropdown in the Warlock tab
 - **Updated for the shared lock and dropdowns:** `test_ui`, `test_classmage`,
   `test_mageutility` and `test_panels_core`.
-- **Total:** 943 checks across 17 suites.
+- **Total:** 943 checks across 16 suites.
 
 ### To do
 
