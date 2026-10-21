@@ -21,9 +21,9 @@
 --   CT:IsEnabled("SHAMAN", "totemReminder")
 -- without caring about the UI at all.
 --
--- A feature can instead be a choice between options, shown as a button
--- that cycles through them. It keeps its own value (get/set), so nothing is
--- stored in ClassToolsDB for it:
+-- A feature can instead be a choice between options, shown as a dropdown.
+-- It keeps its own value (get/set), so nothing is stored in ClassToolsDB
+-- for it:
 --
 --   CT:RegisterFeature("MAGE", {
 --       key = "portalDir", kind = "choice", name = "Portals expand",
@@ -518,21 +518,21 @@ local function NewFeatureRow(parent, class, feature)
     if feature.kind == "choice" then
         row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         row.label:SetPoint("TOPLEFT", 14, -5)
-        row.cycle = WM.UI.Cycle(row, setmetatable({ width = 70 }, { __index = function(_, k)
+        row.cycle = WM.UI.Dropdown(row, setmetatable({ width = 130 }, { __index = function(_, k)
             local f = row.feature
-            if k == "options" then return f.options end
-            if k == "get" then return f.get end
-            if k == "default" then return f.default end
-            -- read when hovered, so a re-pointed row shows its own tooltip
-            if k == "tooltip" then return function() return row.feature.tooltip end end
+            if k == "options" then return function() return row.feature.options end end
+            if k == "get" then return function() return row.feature.get and row.feature.get() end end
             if k == "set" then
                 return function(v)
-                    if f.set then f.set(v) end
-                    if f.onChange then pcall(f.onChange, v) end
+                    local cur = row.feature
+                    if cur.set then cur.set(v) end
+                    if cur.onChange then pcall(cur.onChange, v) end
                 end
             end
+            -- read when hovered, so a re-pointed row shows its own tooltip
+            if k == "tooltip" then return function() return row.feature.tooltip end end
         end }))
-        row.cycle:SetPoint("LEFT", row.label, "RIGHT", 10, 0)
+        row.cycle:SetPoint("LEFT", row.label, "RIGHT", 6, 0)
         row.check = row.cycle   -- what the list refreshes
     else
         row.check = WM.UI.Checkbox(row, {

@@ -30,6 +30,7 @@ env.GameTooltip.SetSpellBookItem = function(_, index) tipCalls[#tipCalls + 1] = 
 W.load("Core.lua")
 W.load("UI.lua")
 W.load("Modules/ClassTools.lua")
+W.load("Modules/ClassFlyout.lua")
 W.load("Modules/ClassMage.lua")
 local WM = W.WM
 local Mage, CT = WM.modules.ClassMage, WM.modules.ClassTools
@@ -133,7 +134,7 @@ local kinds = {}
 for _, f in ipairs(CT:GetFeatures("MAGE")) do kinds[f.key] = f.kind or "check" end
 check("show option", kinds.utilityButton == "check")
 check("direction options", kinds.gemDir == "choice" and kinds.armorDir == "choice" and kinds.foodDir == "choice")
-check("one lock for both buttons", kinds.portalLock == "check")
+check("no mage-only lock (the lock is shared, in General)", kinds.portalLock == nil)
 
 local rebuilt = 0
 local orig = Mage.UpdateUtilityButtonVisibility
@@ -144,8 +145,8 @@ local row
 for _, f in ipairs(allFrames) do
     if rawget(f, "label") and rawget(f, "cycle") and f.label:GetText() == "Armors expand" then row = f end
 end
-check("Armors expand in the Mage tab", row ~= nil and row.cycle.button:GetText() == "Up")
-W.click(row.cycle.button)
+check("Armors expand in the Mage tab", row ~= nil and row.cycle.dropdown._ddText == "Up")
+W.openMenu(row.cycle.dropdown)[2].func()   -- Right
 check("cycling it saves and rebuilds", env.MageToolsDB.armorDir == "RIGHT" and rebuilt == 1)
 Mage.UpdateUtilityButtonVisibility = orig
 

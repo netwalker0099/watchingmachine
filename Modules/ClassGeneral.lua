@@ -409,5 +409,8 @@ function General:Initialize()
         GeneralChecksDB.only25 = tdb.only25 and true or false
     end
 
+    -- Flyout buttons (mage, warlock, ...): open mode, docking, lock
+    if WM.Flyout then WM.Flyout.RegisterOptions(tools) end
+
     tools:RegisterMonitor(Monitor)
 end

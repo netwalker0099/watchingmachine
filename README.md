@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.14 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.15 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -225,6 +225,21 @@ CT:RegisterFeature("SHAMAN", {
   two dummy lines up for six seconds so you can find and position the frame
   without waiting for a real warning.
 
+### Flyout buttons (all classes)
+The mage and warlock buttons share one flyout engine (`Modules/ClassFlyout.lua`)
+and a set of options in Class Tools > **General**:
+
+- **Flyout buttons open**: *On hover* (default) or *On click*. In click mode
+  a click opens or closes the flyout, and picking a spell closes it
+- **Dock flyout buttons together**: your class's buttons line up in one
+  group that moves together. Drag any of them to move the group
+- **Docked layout**: row left-to-right / right-to-left, or column down / up
+- **Lock flyout buttons**: no dragging (the whole group when docked)
+- Every group's direction includes **Hidden** to leave it out, and the
+  direction options are **dropdowns**
+- Nothing opens, moves or re-docks in combat; changes made in combat apply
+  when it ends
+
 ### 14. Class — General
 Consumable checks that apply to everyone, shown under a **General** tab that
 always sits first.
@@ -265,6 +280,16 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - Talents are cached for five seconds for speed, and the cache is dropped
   immediately on a respec (`CHARACTER_POINTS_CHANGED` / `PLAYER_TALENT_UPDATE`)
   so the checks never act on an old build
+- **Warlock button**: a flyout button showing the warlock class crest, with
+  three groups (nearest first), each with its own direction or Hidden:
+  - **Demons**: Felguard (only if talented), Succubus, Imp, Felhunter,
+    Voidwalker
+  - **Armors**: Fel Armor, Demon Armor, Demon Skin (highest rank)
+  - **Stones & rituals**: Soulwell (Ritual of Souls), Ritual of Summoning,
+    Healthstone, Soulstone (highest rank)
+
+  Icons for spells that use a Soul Shard show your **shard count**, updated
+  as your bags change. Defaults: demons left, armors up, stones right
 
 ### 16. Class — Mage
 - **Armor check** — warns when Molten, Mage, Ice or Frost Armor is missing
@@ -274,9 +299,9 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   Built from your spellbook, so it only ever shows what you can actually
   cast, and refreshes when you learn a new one
 - **Expansion direction**: *Portals expand* and *Teleports expand* in the
-  Mage tab, each Up / Right / Down / Left (defaults: portals left, teleports
-  up). If both point the same way, they form one line, portals first with
-  the teleports continuing on the end
+  Mage tab, each Up / Right / Down / Left / **Hidden** (defaults: portals
+  left, teleports up). If both point the same way, they form one line,
+  portals first with the teleports continuing on the end
 - The spellbook scan derives the `Teleport:` / `Portal:` prefixes from the
   client's own spell names, so it works on non-English clients
 - The flyout deliberately **won't expand in combat**: its buttons are secure
@@ -293,7 +318,8 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   Ranked spells show once and cast your highest rank. Each group has its own
   direction (*Mana gems / Armors / Food & water expand*; defaults left, up,
   right). Groups sharing a direction form one line in that order.
-- **Lock the mage buttons** option in the Mage tab stops both buttons being dragged by accident
+- Opening on hover or click, docking and locking are shared by every
+  class's flyout buttons: see **Flyout buttons** under Class Tools
 - `/wmachine portals` lists what the scan found
 
 ### 17. Chat Filter
@@ -449,7 +475,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AuraRangeDB` - Aura Range settings
 - `ClassToolsDB` - Per-class feature toggles and warning frame options
 - `GeneralChecksDB` - General consumable check settings
-- `MageToolsDB` - Mage button positions, expansion directions and lock state
+- `MageToolsDB` - Mage button positions and expansion directions
+- `WarlockToolsDB` - Warlock button position and expansion directions
 
 ## Planned work
 
@@ -466,6 +493,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.15
+- **Warlock button**: demons (Felguard only if talented), armors, and Soulwell / Ritual of Summoning / Healthstone / Soulstone, with Soul Shard counts on the spells that use one
+- Every flyout button can open **on hover or on click**, be **docked** together in a row or column, and has a shared **lock** (Class Tools > General)
+- **Hidden** added to every flyout direction; direction and other choice options are now **dropdowns**
 
 ### Version 3.14
 - New mana warnings in Class Tools > General: **drink a mana potion** at 3000 mana below max, or **use a Dark / Demonic Rune** at 1500 below when no potion is ready; both thresholds adjustable

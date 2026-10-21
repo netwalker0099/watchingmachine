@@ -6,11 +6,11 @@ what still needs settling before it's built.
 1. ~~Mana potion / rune alert~~ (done, 3.14)
 2. Audio trigger for alerts
 3. Melee swing timer
-4. Warlock button: armors and demon summons
+4. ~~Warlock button: armors and demon summons~~ (done, 3.15)
 5. Shaman totem bar with quick sets
-6. Flyout buttons: open on hover or on click
-7. Flyout directions: add "Hidden", and use dropdowns
-8. Dock the mage buttons together
+6. ~~Flyout buttons: open on hover or on click~~ (done, 3.15)
+7. ~~Flyout directions: add "Hidden", and use dropdowns~~ (done, 3.15)
+8. ~~Dock flyout buttons together~~ (done, 3.15)
 
 ---
 
@@ -108,38 +108,26 @@ licence that allows it.
 
 ---
 
-## 4. Warlock button: armors and demon summons
+## 4. Warlock button — DONE in 3.15
 
-A warlock flyout button that works like the mage buttons.
+One warlock button (warlock crest) with three groups, each with its own
+direction or Hidden:
 
-- **Groups:**
-  - **Armors:** Fel Armor, Demon Armor, Demon Skin. One icon each; ranked
-    spells cast your highest rank, as with the mage armors.
-  - **Demons (pet multi-selector):** Summon Imp, Voidwalker, Succubus,
-    Felhunter, and Felguard if talented. Only the ones the warlock knows.
-- **Directions:** each group has its own expansion direction in Class
-  Tools → Warlock. Groups on the same button that share a direction form one
-  line, the same rule as portals and teleports.
-- **Icon:** the warlock class crest, cut from the same class-circles sheet as
-  the mage utility button.
-
-**Groundwork:** the flyout (`NewFlyout`) currently lives inside
-`Modules/ClassMage.lua`. It should move to a shared file, for example
-`Modules/ClassFlyout.lua` loaded before the class modules, so Warlock (and
-later classes) can use it without duplicating it. Spell matching should
-follow the mage approach: English name plus the client's own name for a
-known spell ID.
-
-**To settle:**
-- [ ] **Order:** which group sits nearest the button, and the demon order. By
-      level would be Imp, Voidwalker, Succubus, Felhunter, Felguard; or the
-      most-used demon first.
-- [ ] **Other spells:** include Fel Domination (instant summon) beside the
-      demons, and Create Healthstone / Soulstone / Spellstone / Firestone as
-      another group?
-- [ ] **Soul Shards:** show the shard count on the button, since most summons
-      need one?
-- [ ] **Spell IDs:** confirm the IDs for each spell in game.
+- **Demons,** nearest first: Felguard (appears only if talented), Succubus,
+  Imp, Felhunter, Voidwalker. No Fel Domination.
+- **Armors:** Fel Armor, Demon Armor, Demon Skin, each casting its highest
+  rank.
+- **Stones & rituals:** Soulwell (Ritual of Souls), Ritual of Summoning,
+  Healthstone, Soulstone. Stone ranks are separate names ("Create
+  Healthstone (Major)"), so these are matched by prefix and the highest is
+  kept.
+- **Shard count:** shown on every icon whose spell uses a Soul Shard (all the
+  demons except Imp, and all four stones and rituals). It updates on
+  `BAG_UPDATE`, in combat too.
+- **Groundwork:** the flyout engine moved to `Modules/ClassFlyout.lua`
+  (`WM.Flyout`), shared by the mage and warlock buttons.
+- **Still to confirm in game:** the spell IDs, used only for localized
+  clients. English names already match.
 
 ---
 
@@ -179,65 +167,37 @@ set quickly.
 
 ---
 
-## 6. Flyout buttons: open on hover or on click
+## 6. Flyout buttons: open on hover or on click — DONE in 3.15
 
-The mage buttons (and future flyouts such as the warlock and totem buttons)
-open on mouseover today. Add an option to open them on **click** instead.
-
-- **Option:** a per-button choice in Class Tools, *Open: on hover / on
-  click*, saved per button.
-- **Click mode:** clicking the button toggles the flyout open or closed.
-  Moving away no longer closes it; a second click, or picking a spell, does.
-  Left-drag still moves the button, unless locked.
-- **Hover mode:** unchanged.
-- **Combat:** same rule as now; the flyout can't open in combat.
-- **Clicks:** the anchor isn't a secure button, so plain `OnClick` is fine
-  there. The spell icons keep the cast-press registration from 3.11.3.
+A single option for every flyout, in Class Tools > General: *Flyout buttons
+open: On hover / On click*. In click mode a click toggles the flyout, moving
+away doesn't close it, and picking a spell does (`PostClick`).
 
 ---
 
-## 7. Flyout directions: add "Hidden", and use dropdowns
+## 7. Flyout directions: "Hidden" and dropdowns — DONE in 3.15
 
-- **Hidden:** add **Hidden** to every expansion-direction option. A hidden
-  group isn't shown at all; for example *Portals → Hidden* shows only the
-  teleports. If every group on a button is hidden, the button should say so
-  in its tooltip, or hide itself.
-- **Dropdowns:** change the direction options from a click-to-cycle button
-  to a **dropdown** (`WM.UI.Dropdown`) showing Up / Right / Down / Left /
-  Hidden. Class Tools choice features would render as a dropdown for every
-  module that uses them. The pooled feature rows already re-point their spec
-  through `row.feature`, so the dropdown needs the same proxy that the cycle
-  uses today.
-- **Tests:** extend `test_classmage` / `test_mageutility` to cover a hidden
-  group (no icons, the other group starting next to the button) and choosing
-  from the dropdown.
+- **Hidden:** every flyout direction option includes it. A hidden group
+  isn't placed, and the remaining groups start next to the button. If every
+  group is hidden, the button's tooltip says so.
+- **Dropdowns:** Class Tools choice options are now dropdowns, for every
+  class. That covers the directions, the mana thresholds and the flyout
+  settings.
 
 ---
 
-## 8. Dock the mage buttons together
+## 8. Dock flyout buttons together — DONE in 3.15
 
-Let the portal button and the utility button (and future class buttons) be
-**docked** into one group that moves as one.
+Built for every class's flyout buttons, as a setting rather than snapping.
 
-- **Docking:** drag one button next to another and it snaps into place,
-  attached to that button's edge (top, bottom, left or right). Docked buttons
-  move together when the group is dragged.
-- **Undocking:** for example, Shift-drag a button out of the group, or use an
-  "Undock" option in Class Tools.
-- **Saving:** store the dock relationship, e.g. `utility docked to the left
-  of portal`, instead of two independent positions. A docked button anchors
-  to its partner; only the group's lead button saves a screen position.
-- **Flyouts:** check that a docked button's flyout directions don't open
-  over its partner. The Hidden option (item 7) and per-group directions help
-  here, or flyouts could open away from the dock edge automatically.
-- **Combat:** buttons with secure children can't be moved in combat, so
-  docking and undocking only work out of combat. That's the same rule as
-  dragging today.
-- **Lock:** *Lock the mage buttons* locks the whole group.
+- **Setting:** in Class Tools > General, tick *Dock flyout buttons
+  together* and choose a *Docked layout*: row left to right or right to
+  left, or column downwards or upwards.
+- **Group:** the visible buttons line up from the first one (the lead),
+  which keeps its saved position. Dragging any docked button moves the lead,
+  and the rest follow.
+- **Undocking:** each button goes back to its own saved position.
+- **Lock:** one shared *Lock flyout buttons* option replaces the mage-only
+  lock, and carries the old setting over once.
+- **Combat:** docking changes made in combat apply when it ends.
 
-**To settle:**
-- [ ] **Snapping:** snap on drop when within a few pixels, or dock only
-      through an explicit option?
-- [ ] **Layout:** row and column only, or any edge?
-- [ ] **Scope:** also dock with the warlock and totem buttons (items 4 and 5)
-      when they exist, through a shared dock in the shared flyout file?

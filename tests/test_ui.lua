@@ -138,21 +138,28 @@ check("/as auto turns it back on", AS.db.options.enabled == true)
 
 -- Mage portal lock is a Class Tools feature kept in step with MageToolsDB
 load("Modules/ClassTools.lua")
+load("Modules/ClassFlyout.lua")
 load("Modules/ClassMage.lua")
 local CT, Mage = WM.modules.ClassTools, WM.modules.ClassMage
 env.ClassToolsDB = nil
 env.MageToolsDB = nil
 CT:InitDB()
 Mage:InitDB()
+-- The lock is shared by every class's flyouts now (General tab), and a
+-- mage-only lock from before 3.15 carries over
+env.MageToolsDB.portalLocked = true
+WM.Flyout.RegisterOptions(CT)
 local lockFeature
-for _, f in ipairs(CT:GetFeatures("MAGE")) do if f.key == "portalLock" then lockFeature = f end end
-if not lockFeature then Mage:Initialize() end
-for _, f in ipairs(CT:GetFeatures("MAGE")) do if f.key == "portalLock" then lockFeature = f end end
-check("portal lock registered", lockFeature ~= nil and lockFeature.default == false)
-CT:SetEnabled("MAGE", "portalLock", true)
-check("ticking lock sets portalLocked", env.MageToolsDB.portalLocked == true)
-CT:SetEnabled("MAGE", "portalLock", false)
-check("unticking clears it", env.MageToolsDB.portalLocked == false)
+for _, f in ipairs(CT:GetFeatures("GENERAL")) do if f.key == "flyoutLock" then lockFeature = f end end
+check("shared flyout lock registered", lockFeature ~= nil)
+check("old mage lock carried over", env.ClassToolsDB.flyout.locked == true and CT:IsEnabled("GENERAL", "flyoutLock"))
+CT:SetEnabled("GENERAL", "flyoutLock", false)
+check("unticking clears it", env.ClassToolsDB.flyout.locked == false)
+CT:SetEnabled("GENERAL", "flyoutLock", true)
+check("ticking sets it", env.ClassToolsDB.flyout.locked == true)
+local hasMageLock = false
+for _, f in ipairs(CT:GetFeatures("MAGE")) do if f.key == "portalLock" then hasMageLock = true end end
+check("no separate mage lock any more", not hasMageLock)
 
 
 local function src(rel) local h = assert(io.open(REPO .. "/" .. rel)); local s = h:read("*a"); h:close(); return s end

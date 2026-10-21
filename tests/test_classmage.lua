@@ -31,6 +31,7 @@ env.GetCVarBool = function(cvar) if cvar == "ActionButtonUseKeyDown" then return
 W.load("Core.lua")
 W.load("UI.lua")
 W.load("Modules/ClassTools.lua")
+W.load("Modules/ClassFlyout.lua")
 W.load("Modules/ClassMage.lua")
 local Mage = W.WM.modules.ClassMage
 env.WatchingMachineDB = { theme = "Default" }
@@ -150,12 +151,16 @@ local function FindCycle(labelText)
 end
 local row = FindCycle("Portals expand")
 check("panel shows the Portals expand option", row ~= nil)
-check("it shows the current direction", row and row.cycle.button:GetText() == "Left")
-W.click(row.cycle.button)
-check("clicking cycles to the next direction", env.MageToolsDB.portalDir == "UP" and row.cycle.button:GetText() == "Up")
+check("it's a dropdown showing the current direction", row and row.cycle.dropdown._ddText == "Left")
+local items = W.openMenu(row.cycle.dropdown)
+local labels = {}
+for _, it in ipairs(items) do labels[#labels + 1] = it.text end
+check("dropdown lists Up, Right, Down, Left, Hidden", table.concat(labels, ",") == "Up,Right,Down,Left,Hidden")
+items[1].func()
+check("choosing Up saves it and updates the text", env.MageToolsDB.portalDir == "UP" and row.cycle.dropdown._ddText == "Up")
 check("changing it rebuilds the flyout", rebuilt >= 1)
 local trow = FindCycle("Teleports expand")
-check("panel shows the Teleports expand option", trow and trow.cycle.button:GetText() == "Up")
+check("panel shows the Teleports expand option", trow and trow.cycle.dropdown._ddText == "Up")
 Mage.UpdatePortalButtonVisibility = origUpdate
 
 print(("%d passed, %d failed"):format(pass, fail))

@@ -2,7 +2,86 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.14** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.15** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.15
+
+### New — Warlock button
+
+A flyout button showing the **warlock class crest**. It opens into three
+groups, nearest the button first, and each group has its own direction (or
+Hidden) in Class Tools > Warlock:
+
+| Group | Spells | Default |
+|---|---|---|
+| **Demons** | Summon Felguard (only if talented), Succubus, Imp, Felhunter, Voidwalker | Left |
+| **Armors** | Fel Armor, Demon Armor, Demon Skin | Up |
+| **Stones & rituals** | Ritual of Souls (Soulwell), Ritual of Summoning, Create Healthstone, Create Soulstone | Right |
+
+- **Only what you know:** spells you haven't learned don't appear, so
+  Felguard is hidden without the talent.
+- **Highest rank:** armors cast their highest rank. Stone ranks are
+  separate spell names ("Create Healthstone (Major)"), so those match by
+  prefix and keep the highest.
+- **Soul Shard count:** every icon whose spell uses a shard shows your
+  current count: all demons except Imp, plus all four stones and rituals.
+  It updates whenever your bags change, in combat too.
+- **Saved data:** new SavedVariable `WarlockToolsDB` (position and
+  directions). The *Show the warlock button* option is on by default.
+
+### Flyout buttons, for every class
+
+The flyout engine moved out of the Mage module into
+`Modules/ClassFlyout.lua` (`WM.Flyout`). The mage portal button, the mage
+utility button and the warlock button all use it. New shared options in
+Class Tools > **General**:
+
+- **Flyout buttons open:** *On hover* (as before) or *On click*. In click
+  mode, clicking the button opens or closes the flyout, moving away doesn't
+  close it, and casting a spell from it does.
+- **Dock flyout buttons together:**
+  - Your class's visible flyout buttons line up into one group.
+  - The first button keeps its own saved position and the rest attach to it.
+  - Dragging any of them moves the group.
+  - Undocking puts each one back where you left it.
+- **Docked layout:** row left to right (default), row right to left, column
+  downwards, or column upwards.
+- **Lock flyout buttons:** replaces the mage-only *Lock the mage buttons*
+  and carries that setting over once.
+
+**Hidden** is now an option for every flyout group's direction. A hidden
+group isn't shown and the other groups start next to the button. For
+example, *Portals expand: Hidden* shows only the teleports.
+
+**Combat:** nothing opens, rebuilds or re-docks in combat. Changes made
+then apply when combat ends.
+
+### Class Tools — choice options are dropdowns
+
+Choice options are now dropdowns instead of click-to-cycle buttons. That
+covers every flyout direction, the mana potion and rune thresholds, the
+flyout open mode and the docked layout.
+
+### Tests
+
+- **New `tests/test_flyout.lua` (49 checks):**
+  - Hidden groups, including all of them hidden
+  - hover and click opening, and no opening in combat
+  - docking in all four layouts, dragging the group from any button, the
+    shared lock, and dock changes deferred until combat ends
+  - the warlock spell discovery: order, Felguard only when known, highest
+    stone ranks, no Fel Domination
+  - the warlock crest, directions, shard badges and their updates
+  - choosing Hidden from the dropdown in the Warlock tab
+- **Updated for the shared lock and dropdowns:** `test_ui`, `test_classmage`,
+  `test_mageutility` and `test_panels_core`.
+- **Total:** 943 checks across 17 suites.
+
+### To do
+
+Items 4, 6, 7 and 8 are done (`docs/TODO.md`).
 
 ---
 

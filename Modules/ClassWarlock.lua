@@ -6,7 +6,7 @@ local AddonName, WM = ...
 local Warlock = {}
 WM:RegisterModule("ClassWarlock", Warlock)
 
-Warlock.version = "3.5"
+Warlock.version = "3.6"
 
 local CLASS = "WARLOCK"
 
@@ -245,10 +245,95 @@ local function Monitor()
 end
 
 -- ============================================
+-- WARLOCK BUTTON (shared engine: Modules/ClassFlyout.lua)
+-- ============================================
+-- One button, three groups, each nearest-first and with its own direction:
+-- demons, armors, and stones & rituals. Icons for spells that use a Soul
+-- Shard show your shard count.
+
+local SOUL_SHARD = 6265
+
+local function ShardBadge()
+    return tostring(GetItemCount and GetItemCount(SOUL_SHARD) or 0)
+end
+
+local WARLOCK_SPELLS = {
+    -- Felguard only appears if you have the talent (you won't know it otherwise)
+    demons = {
+        { "Summon Felguard",   30146, badge = ShardBadge },
+        { "Summon Succubus",   712,   badge = ShardBadge },
+        { "Summon Imp",        688 },                       -- the one summon without a shard
+        { "Summon Felhunter",  691,   badge = ShardBadge },
+        { "Summon Voidwalker", 697,   badge = ShardBadge },
+    },
+    armor = {
+        { "Fel Armor",   28176 },
+        { "Demon Armor", 706 },
+        { "Demon Skin",  687 },
+    },
+    stones = {
+        { "Ritual of Souls",     29893, badge = ShardBadge },   -- the Soulwell
+        { "Ritual of Summoning", 698,   badge = ShardBadge },
+        -- Ranks are separate names: "Create Healthstone (Major)" etc.
+        { "Create Healthstone",  6201,  badge = ShardBadge, prefix = true },
+        { "Create Soulstone",    693,   badge = ShardBadge, prefix = true },
+    },
+}
+
+local warlockSpells = { demons = {}, armor = {}, stones = {} }
+
+function Warlock:ScanSpellbook()
+    for _, list in pairs(warlockSpells) do wipe(list) end
+    if not IsPlayerWarlock() then return end
+    local found = WM.Flyout.ScanSpells(WARLOCK_SPELLS, ICON_ARMOR)
+    for group, list in pairs(found) do
+        for _, e in ipairs(list) do table.insert(warlockSpells[group], e) end
+    end
+end
+
+function Warlock:GetFlyoutSpells(group)
+    return warlockSpells[group]
+end
+
+local DIR_DEFAULTS = { demonDir = "LEFT", armorDir = "UP", stoneDir = "RIGHT" }
+
+local function WarlockStore() return WarlockToolsDB end
+
+local warlockFlyout = WM.Flyout.New({
+    class = CLASS, feature = "warlockButton",
+    anchorName = "WM_WarlockAnchor", buttonPrefix = "WM_WarlockBtn",
+    title = "Warlock", emptyText = "No demon, armor, stone or ritual spells known yet.",
+    store = WarlockStore, posX = "buttonX", posY = "buttonY", defaultX = 240,
+    defaults = DIR_DEFAULTS,
+    scan = function() Warlock:ScanSpellbook() end,
+    groups = function()
+        return {
+            { entries = warlockSpells.demons, dirKey = "demonDir" },
+            { entries = warlockSpells.armor,  dirKey = "armorDir" },
+            { entries = warlockSpells.stones, dirKey = "stoneDir" },
+        }
+    end,
+    setIcon = function(icon) WM.Flyout.ClassCrest(icon, CLASS, ICON_ARMOR) end,
+})
+Warlock.flyout = warlockFlyout
+
+function Warlock:UpdateButton() warlockFlyout:UpdateVisibility() end
+
+function Warlock:InitDB()
+    if not WarlockToolsDB then WarlockToolsDB = {} end
+    for key, default in pairs(DIR_DEFAULTS) do
+        if WarlockToolsDB[key] == nil then WarlockToolsDB[key] = default end
+    end
+end
+
+-- ============================================
 -- REGISTRATION
 -- ============================================
 
+local buttonEvents = CreateFrame("Frame")
+
 function Warlock:Initialize()
+    self:InitDB()
     local tools = Tools()
     if not tools then return end
 
@@ -273,6 +358,20 @@ function Warlock:Initialize()
         default = true,
     })
 
+    local rebuild = function() Warlock:UpdateButton() end
+    tools:RegisterFeature(CLASS, {
+        key = "warlockButton", name = "Show the warlock button",
+        desc = "A draggable warlock-crest icon that opens into your demons, armors, and stones & rituals (Soulwell, Ritual of Summoning, Healthstone, Soulstone), nearest first. Spells that use a Soul Shard show your shard count. Not available in combat.",
+        default = true,
+        onToggle = rebuild,
+    })
+    local function Dir(key, name, what)
+        WM.Flyout.DirectionFeature(tools, CLASS, key, name, what, WarlockStore, DIR_DEFAULTS[key], rebuild)
+    end
+    Dir("demonDir", "Demons expand", "demon summon")
+    Dir("armorDir", "Armors expand", "armor")
+    Dir("stoneDir", "Stones & rituals expand", "Soulwell, summoning, Healthstone and Soulstone")
+
     tools:RegisterMonitor(Monitor)
 
     local talentWatcher = CreateFrame("Frame")
@@ -282,7 +381,26 @@ function Warlock:Initialize()
     talentWatcher:SetScript("OnEvent", function()
         Warlock:InvalidateTalentCache()
     end)
+
+    if IsPlayerWarlock() then
+        warlockFlyout:CreateAnchor()
+        -- SPELLS_CHANGED picks up a new spell or talent (Felguard)
+        WM:RegisterEvents(buttonEvents, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED" })
+        -- Spellbook isn't reliably populated the instant we initialise
+        WM.RunAfter(2, function() Warlock:UpdateButton() end)
+    end
 end
+
+buttonEvents:SetScript("OnEvent", function(_, event)
+    if not IsPlayerWarlock() then return end
+    -- Secure children can't be touched mid-combat; rebuild once it drops
+    if InCombatLockdown() then return end
+    if event == "PLAYER_REGEN_ENABLED" then
+        Warlock:UpdateButton()
+    else
+        WM.RunAfter(1, function() Warlock:UpdateButton() end)
+    end
+end)
 
 function Warlock:GetSoulstones()
     return soulstones
