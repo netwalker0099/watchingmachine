@@ -18,8 +18,8 @@ what still needs settling before it's built.
 
 Built in Class Tools > General. The open questions were settled as:
 
-- **Cooldowns:** runes are assumed to have their own cooldown, separate from
-  potions. Still to confirm in game.
+- **Cooldowns:** runes have their own cooldown, separate from potions
+  (confirmed in game).
 - **When it runs:** in combat, inside raid instances, following the General
   25-man toggle.
 - **Thresholds:** click-to-cycle choices (potion 2000–5000, rune 1000–3000),

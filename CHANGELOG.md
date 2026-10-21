@@ -46,9 +46,9 @@ in combat, on the *CHECK YOURSELF* frame:
   which potion and rune are ready or on cooldown.
 - **Saved data:** new `GeneralChecksDB` keys `potionAt` and `runeAt`.
 
-To confirm in game: the item IDs, especially the zone potions, and that runes
-have their own cooldown, separate from potions. A wrong ID just never shows
-up in your bags.
+Confirmed in game: runes and potions have separate cooldowns. Still to
+confirm: the item IDs, especially the zone potions. A wrong ID just never
+shows up in your bags.
 
 ### Tests
 
