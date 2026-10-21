@@ -97,6 +97,19 @@ local anchor = nil
 local flyoutButtons = {}
 local BTN_W, BTN_H = 150, 20
 
+-- Which half of a click casts. On current client builds a secure action
+-- button only acts on the press that matches the ActionButtonUseKeyDown
+-- setting (on by default: the mouse-DOWN). Registering for "AnyUp" alone
+-- meant the button never saw the press it acts on, so nothing was cast.
+-- Registering both would cast twice on builds without that check, so
+-- register exactly the one that casts. Re-read on every rebuild, in case
+-- the setting changed.
+local function CastClicks()
+    local keyDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
+    return keyDown and "AnyDown" or "AnyUp"
+end
+Mage.CastClicks = CastClicks   -- for tests
+
 local function HideFlyout()
     if InCombatLockdown() then return end
     for _, b in ipairs(flyoutButtons) do b:Hide() end
@@ -115,10 +128,11 @@ function Mage:BuildFlyout()
     for i, entry in ipairs(list) do
         local b = flyoutButtons[i]
         if not b then
+            -- Secure template LAST: later templates override earlier ones,
+            -- and its click handler is the one that casts
             b = CreateFrame("Button", "WM_MagePortalBtn" .. i, anchor,
-                            "SecureActionButtonTemplate, UIPanelButtonTemplate")
+                            "UIPanelButtonTemplate, SecureActionButtonTemplate")
             b:SetSize(BTN_W, BTN_H)
-            b:RegisterForClicks("AnyUp")
             -- Keep the flyout open while moving between its buttons
             b:SetScript("OnEnter", function() Mage:CancelFlyoutClose() end)
             b:SetScript("OnLeave", function() Mage:ScheduleFlyoutClose() end)
@@ -126,6 +140,7 @@ function Mage:BuildFlyout()
         end
         b:ClearAllPoints()
         b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -((i - 1) * (BTN_H + 2)) - 2)
+        b:RegisterForClicks(CastClicks())
         b:SetAttribute("type", "spell")
         b:SetAttribute("spell", entry.name)
         -- Strip the "Portal: " / "Teleport: " prefix for a readable label

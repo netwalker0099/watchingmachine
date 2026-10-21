@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.11.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.11.3 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -435,6 +435,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md)
 (3.11 to 3.11.2; everything from 2.9 to 3.11 is in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)).
+
+### Version 3.11.3
+- Fixed: clicking a portal or teleport in the mage portal button didn't cast it
 
 ### Version 3.11.2
 - Fixed: the dashboard tools menu (**...** / right-click) opened near the bottom of the screen with ElvUI or a non-default UI scale; it now opens under the card's **...** button

@@ -2,7 +2,42 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.11.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.11.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.11.3
+
+### Fixed — mage portal button didn't cast
+
+The flyout listed your portals and teleports, but clicking one did
+nothing. Two causes, both in how the secure buttons were built:
+
+- **Click registration.** The buttons were registered for `"AnyUp"` only.
+  On current client builds a secure action button acts only on the press
+  that matches the `ActionButtonUseKeyDown` setting. That setting is on by
+  default, so the mouse-down casts, and the buttons never received it. They
+  now register for exactly the press that casts on this client: `AnyDown`
+  with the setting on, `AnyUp` with it off or on builds without it. They
+  don't register both, because builds without the check would then cast
+  twice. This is re-read every time the flyout is rebuilt.
+- **Template order.** The buttons inherited `"SecureActionButtonTemplate,
+  UIPanelButtonTemplate"`. Later templates override earlier ones, so the
+  visual template came after the secure one, whose click handler is what
+  casts. The order is now reversed, with the secure template last.
+
+### Tests
+
+`tests/test_classmage.lua` (14 checks) builds the flyout from a fake
+spellbook. It checks:
+- the template order
+- the click registration under both settings, and on a client without the
+  setting
+- each button's `type`/`spell` attributes
+- portals listed first
+- nothing replaces the secure click handler
+- leftover buttons are cleared
+- no rebuild happens in combat
 
 ---
 
