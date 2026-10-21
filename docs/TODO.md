@@ -10,6 +10,7 @@ what still needs settling before it's built.
 5. Shaman totem bar with quick sets
 6. Flyout buttons: open on hover or on click
 7. Flyout directions: add "Hidden", and use dropdowns
+8. Dock the mage buttons together
 
 ---
 

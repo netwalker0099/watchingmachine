@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.13 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.13.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -458,6 +458,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.13.1
+- Fixed: a battle plus a guardian elixir (e.g. Adept's Elixir + Elixir of Draenic Wisdom) still gave a "No flask" warning. The raid check (now **Flask or Elixirs**) and the personal check accept a flask or both elixirs, from one shared list
+- Elixirs are matched by spell ID as well as name; `/wmachine whybuff` shows the spell ID of anything it can't match
 
 ### Version 3.13
 - New **mage utility button** (class crest): mana gems, armors and food / water / table, each group highest level nearest the button, with spell tooltips

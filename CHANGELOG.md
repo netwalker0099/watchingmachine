@@ -2,7 +2,64 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.13** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.13.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.13.1
+
+### Fixed — elixirs didn't count against the flask warnings
+
+In TBC a flask fills both elixir slots, so **a flask, or one battle elixir
+plus one guardian elixir**, is a full set. Neither check knew that:
+
+- **Personal check (Class Tools General):** it looked only for a flask, so
+  Adept's Elixir plus Elixir of Draenic Wisdom still warned **"No flask"**.
+- **Raid check (Buff Check):** the *Flask* check accepted only a flask. The
+  separate Battle and Guardian elixir checks accepted elixirs, but nothing
+  joined the two.
+
+Both now use one rule from `Core.lua` (`WM:ElixirState`,
+`WM:IsFlaskCovered`):
+
+- **Personal warning:** it now says what's actually missing:
+  - **No flask or elixirs**
+  - **No guardian elixir (or flask)**
+  - **No battle elixir (or flask)**
+
+  The feature is renamed *Warn if no flask or elixirs*.
+- **Raid check:** renamed **Flask or Elixirs**, with the note *Flask, or
+  battle + guardian elixir*. The saved setting key (`flask`) is unchanged.
+
+### Elixir matching
+
+- **Shared lists:** the battle and guardian elixir lists moved from Buff
+  Check into `Core.lua` (`WM.BATTLE_ELIXIRS` / `WM.GUARDIAN_ELIXIRS`), so the
+  raid and personal checks share them, as the food and flask lists already
+  do.
+- **Spell IDs:** elixir auras aren't always named after the item. Adept's
+  Elixir's buff is *Spellpower Elixir*, which is now also on the list. So
+  elixirs are matched by **buff spell ID** as well (`WM.BATTLE_ELIXIR_IDS` /
+  `WM.GUARDIAN_ELIXIR_IDS`, all the TBC elixirs). Names still work where the
+  client doesn't return an ID.
+- **`/wmachine whybuff`:**
+  - prints the **spell ID** beside any aura it can't match, so a missing
+    elixir can be added straight from that line;
+  - matches by spell ID;
+  - adds a *Flask or elixirs: covered / missing* summary line.
+
+### Tests
+
+`tests/test_buffcheck.lua` now has 44 checks, using real elixir buff IDs:
+- the elixir pair, a flask, and one elixir only, in the raid check
+- the battle and guardian checks matched by ID
+- the personal monitor's exact warning text for each case
+- matching by name when there's no ID
+- `whybuff` showing IDs and the summary line
+
+### To do
+
+Added: dock the mage buttons together (`docs/TODO.md`, item 8).
 
 ---
 
