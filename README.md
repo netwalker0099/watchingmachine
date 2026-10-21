@@ -432,8 +432,9 @@ opens the dashboard. Everything the addon does can be reached from it.
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
-[`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)
-(every release from 2.9 to 3.11 in one post).
+[`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md)
+(3.11 to 3.11.2; everything from 2.9 to 3.11 is in
+[`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md)).
 
 ### Version 3.11.2
 - Fixed: the dashboard tools menu (**...** / right-click) opened near the bottom of the screen with ElvUI or a non-default UI scale; it now opens under the card's **...** button
