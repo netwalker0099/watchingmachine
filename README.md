@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.13.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.14 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -229,7 +229,7 @@ CT:RegisterFeature("SHAMAN", {
 Consumable checks that apply to everyone, shown under a **General** tab that
 always sits first.
 
-- **Flask**, **food buff** (Well Fed, or Enlightened from Skullfish Soup) and **weapon enchant** checks, running
+- **Flask or elixirs** (a flask, or a battle plus a guardian elixir), **food buff** (Well Fed, or Enlightened from Skullfish Soup) and **weapon enchant** checks, running
   only while you're inside a raid instance — no nagging in town or while
   questing
 - **25-man only by default**, with a tick to extend it to 10-mans
@@ -237,6 +237,14 @@ always sits first.
   about **sharpening stones / weightstones**
 - The off hand is checked only when a real **weapon** is equipped there —
   shields and held items share the slot but can't take an oil
+- **Mana potion / rune warnings** (mana users, in combat):
+  - **Use a mana potion** once your mana is 3000 below max and a potion is
+    ready. It names the potion and prefers the free raid-zone ones where
+    they work.
+  - **Use a Dark / Demonic Rune** once you're 1500 below and no potion is
+    ready, either on cooldown or none left. Not below 35% health.
+  - Both thresholds are adjustable. A warning stays up until you're 500 back
+    under its threshold, so it doesn't flicker as mana regenerates.
 - `/wmachine consumes` prints exactly what the checks currently see
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
@@ -458,6 +466,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.14
+- New mana warnings in Class Tools > General: **drink a mana potion** at 3000 mana below max, or **use a Dark / Demonic Rune** at 1500 below when no potion is ready; both thresholds adjustable
 
 ### Version 3.13.1
 - Fixed: a battle plus a guardian elixir (e.g. Adept's Elixir + Elixir of Draenic Wisdom) still gave a "No flask" warning. The raid check (now **Flask or Elixirs**) and the personal check accept a flask or both elixirs, from one shared list

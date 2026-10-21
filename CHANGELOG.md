@@ -2,7 +2,70 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.13.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.14** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.14
+
+### Class Tools — mana potion and rune warnings
+
+Two new warnings in the **General** tab, for anyone whose power is mana,
+in combat, on the *CHECK YOURSELF* frame:
+
+| Warning | When |
+|---|---|
+| **Use a mana potion (Super Mana Potion)** | Mana is **3000** or more below max and a mana potion is ready |
+| **Potion on cooldown: use Demonic Rune** | Mana is **1500** or more below max and no potion is ready |
+
+- **Ready** means the item is in your bags, usable where you are, and off
+  cooldown (the global cooldown is ignored).
+- **Which potion:**
+  - Best first: Cenarion Mana Salve, then Bottled Nethergon Energy (both
+    free, and only usable in their own raid), Super, Fel, Mad Alchemist's,
+    Unstable, Major and Superior Mana Potion.
+  - The warning names the potion and uses its icon.
+- **Which rune:** Demonic Rune, then Dark Rune. Runes have their own
+  cooldown, separate from potions.
+- **When the rune is suggested:** when no potion is ready, whether it's on
+  cooldown or you have none left. The warning says which ("Potion on
+  cooldown" / "No mana potion").
+- **Health:** no rune warning below **35% health**, since runes cost health.
+- **No flicker:** once a warning is up it stays until mana is **500 back
+  under its threshold**, so it doesn't flick on and off as mana regenerates.
+- **Options:**
+  - *Warn to drink a mana potion* and *Warn to use a Dark / Demonic Rune*
+    (both on).
+  - *Potion when mana is down by* (2000–5000, default 3000) and *Rune when
+    mana is down by* (1000–3000, default 1500), each a click-to-cycle
+    choice.
+- **Where it runs:** like the other General checks, only inside raid
+  instances (25-man unless *Only in 25-man raids* is unticked). Druids in
+  bear or cat form and other non-mana users are skipped.
+- **`/wmachine consumes`:** shows your mana deficit, the thresholds, and
+  which potion and rune are ready or on cooldown.
+- **Saved data:** new `GeneralChecksDB` keys `potionAt` and `runeAt`.
+
+To confirm in game: the item IDs, especially the zone potions, and that runes
+have their own cooldown, separate from potions. A wrong ID just never shows
+up in your bags.
+
+### Tests
+
+`tests/test_manaalert.lua` (32 checks) covers:
+- the thresholds, including one short of each
+- hysteresis
+- a potion on cooldown, with fallback to the rune
+- the rune on cooldown, with fallback to the other rune
+- the global cooldown not counting as a cooldown
+- no potions carried
+- the health cutoff
+- best-potion order, and zone potions only where usable
+- combat, mana users and raid-instance gating
+- the switches and adjustable thresholds
+- the `consumes` output
+
+`test_panels_core` is updated for the longer General tab.
 
 ---
 

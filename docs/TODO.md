@@ -3,7 +3,7 @@
 Planned work that hasn't been started. Each item notes what's decided and
 what still needs settling before it's built.
 
-1. Mana potion / rune alert
+1. ~~Mana potion / rune alert~~ (done, 3.14)
 2. Audio trigger for alerts
 3. Melee swing timer
 4. Warlock button: armors and demon summons
@@ -14,60 +14,24 @@ what still needs settling before it's built.
 
 ---
 
-## 1. Mana potion / rune alert
+## 1. Mana potion / rune alert — DONE in 3.14
 
-Prompt the player to drink a mana potion, or use a rune when the potion is
-on cooldown, as their mana drops.
+Built in Class Tools > General. The open questions were settled as:
 
-**Rules (as requested):**
-
-| Condition | Alert |
-|---|---|
-| Mana is **3000 or more below max**, and a mana potion is ready | "Use a mana potion" |
-| Potion is **on cooldown**, mana is **1500 or more below max**, and a rune is ready | "Use a Dark / Demonic Rune" |
-
-**How it fits the existing code:**
-- **Where:** a Class Tools feature, using the shared *CHECK YOURSELF* frame
-  (`ClassTools:SetAlert` / `ClearAlert`) and the shared one-second monitor
-  (`RegisterMonitor`), like the other class checks. It probably belongs in
-  the **General** tab, gated to mana users (`UnitPowerType("player") == 0`),
-  rather than being mage-only.
-- **Mana:** `UnitPower("player", 0)` / `UnitPowerMax("player", 0)`, plus
-  `UNIT_POWER_UPDATE` (or the 2.5.6 equivalent; check the event exists, since
-  `WM:RegisterEvents` skips missing ones) if the 1s tick feels too slow.
-- **Ready means in bags and off cooldown:** `GetItemCount(itemID) > 0` and
-  `GetItemCooldown(itemID)` start == 0, checked per item ID.
-- **Item IDs to confirm in game:**
-  - Super Mana Potion `22832`
-  - Major Mana Potion `13444`
-  - Dark Rune `20520`
-  - Demonic Rune `12662`
-
-  Possibly also: Fel Mana Potion, Mad Alchemist's Potion, Auchenai / Bottled
-  Nethergon (battleground and zone potions), and the Cenarion Mana Salve
-  pots.
-
-**To settle before building:**
-- [ ] **Cooldowns:** confirm in game that runes have their own cooldown,
-      separate from potions. The rule above assumes it, which is the usual
-      TBC "potion, then rune" pattern.
-- [ ] **When it runs:** in combat only, raid instances only (like the other
-      General checks, with the 25-man toggle), or anywhere?
-- [ ] **Thresholds:** fixed at 3000 / 1500, or sliders? A percentage option
-      might suit low-mana characters better.
-- [ ] **Flicker:** add hysteresis so the alert doesn't flick on and off
-      around the threshold as mana regenerates. For example, clear only once
-      the deficit is 500 back under the line, or hold the alert for a few
-      seconds.
-- [ ] **Rune side effects:** runes cost health, so maybe suppress the rune
-      alert below some health %.
-- [ ] **Tests:** fake `UnitPower` / `GetItemCount` / `GetItemCooldown` in
-      the wowstub. Cover:
-      - potion ready
-      - potion on cooldown with a rune ready
-      - neither available
-      - not a mana user
-      - out of combat or outside a raid, depending on the rule settled above
+- **Cooldowns:** runes are assumed to have their own cooldown, separate from
+  potions. Still to confirm in game.
+- **When it runs:** in combat, inside raid instances, following the General
+  25-man toggle.
+- **Thresholds:** click-to-cycle choices (potion 2000–5000, rune 1000–3000),
+  defaulting to 3000 / 1500.
+- **Flicker:** a warning clears only once mana is 500 back under its
+  threshold.
+- **Rune and health:** no rune warning below 35% health.
+- **When the rune applies:** when no potion is *ready*, whether on cooldown
+  or none carried.
+- **Still to confirm in game:** the item IDs, especially Cenarion Mana Salve
+  `32903`, Bottled Nethergon Energy `32902`, Fel Mana Potion `31677`, Mad
+  Alchemist's Potion `34440` and Unstable Mana Potion `28101`.
 
 ---
 

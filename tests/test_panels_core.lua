@@ -241,7 +241,9 @@ check("thirty features listed", #ShownFeatures() == 30)
 check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
-check("short list stops scrolling", not cp.scrollBar:IsShown() and #ShownFeatures() == 4)
+check("General lists its six checkbox options (mana warnings included)", #ShownFeatures() == 6)
+W.click(Tab("Rogue"))
+check("short list stops scrolling", not cp.scrollBar:IsShown() and #ShownFeatures() == 1)
 
 -- Player's own class gets a tab even with nothing built for it
 env.UnitClass = function() return "Hunter", "HUNTER" end
