@@ -7,6 +7,9 @@ what still needs settling before it's built.
 2. Audio trigger for alerts
 3. Melee swing timer
 4. Warlock button: armors and demon summons
+5. Shaman totem bar with quick sets
+6. Flyout buttons: open on hover or on click
+7. Flyout directions: add "Hidden", and use dropdowns
 
 ---
 
@@ -172,3 +175,74 @@ known spell ID.
 - [ ] **Soul Shards:** show the shard count on the button, since most summons
       need one?
 - [ ] **Spell IDs:** confirm the IDs for each spell in game.
+
+---
+
+## 5. Shaman totem bar with quick sets
+
+A bar for building **totem sets** (one totem per element) and dropping a
+set quickly.
+
+- **Per-element pickers:** one button per element (Earth, Fire, Water, Air),
+  each expanding into the totems you know for that element, using the mage
+  flyout pattern. Picking one sets it as that element's slot in the current
+  set.
+- **Sets:** save named sets, e.g. *Melee group* (Strength of Earth /
+  Windfury / Mana Spring / Searing) and *Caster group* (Wrath of Air / Totem
+  of Wrath / Mana Spring / ...). Switch between them from the bar.
+- **Dropping a set:** a secure button can cast **only one spell per click**;
+  the game allows nothing more. So "drop the set" is a button that casts the
+  set's totems in order, one per press. The likely mechanism is a macro
+  attribute with `/castsequence reset=combat/<n> TotemA, TotemB, TotemC,
+  TotemD` (TBC has `/castsequence`), rebuilt whenever the set changes.
+  Totems share a 1-second global cooldown, so the drop takes four presses.
+- **Status:** show which totems are down and their time left, if the client
+  has `GetTotemInfo` / `PLAYER_TOTEM_UPDATE`. Check this on 2.5.6.
+- **Combat:** changing a set changes secure attributes, so it can only
+  happen out of combat. Dropping a set works in combat.
+- **Aura Range:** already warns when you walk out of range of a totem, so
+  the two should work together. Possibly link the totem bar's status to it.
+
+**To settle:**
+- [ ] **Where it lives:** inside Class Tools as a Shaman tab feature, or as a
+      standalone bar module?
+- [ ] **Drop method:** `/castsequence` vs. one button per element (four
+      buttons, each casting that element's totem).
+- [ ] **Sets:** how many, whether they're named, and whether they're saved
+      per character or account-wide.
+- [ ] **Keybinding:** a binding for "drop next totem in set" (Bindings.xml).
+
+---
+
+## 6. Flyout buttons: open on hover or on click
+
+The mage buttons (and future flyouts such as the warlock and totem buttons)
+open on mouseover today. Add an option to open them on **click** instead.
+
+- **Option:** a per-button choice in Class Tools, *Open: on hover / on
+  click*, saved per button.
+- **Click mode:** clicking the button toggles the flyout open or closed.
+  Moving away no longer closes it; a second click, or picking a spell, does.
+  Left-drag still moves the button, unless locked.
+- **Hover mode:** unchanged.
+- **Combat:** same rule as now; the flyout can't open in combat.
+- **Clicks:** the anchor isn't a secure button, so plain `OnClick` is fine
+  there. The spell icons keep the cast-press registration from 3.11.3.
+
+---
+
+## 7. Flyout directions: add "Hidden", and use dropdowns
+
+- **Hidden:** add **Hidden** to every expansion-direction option. A hidden
+  group isn't shown at all; for example *Portals → Hidden* shows only the
+  teleports. If every group on a button is hidden, the button should say so
+  in its tooltip, or hide itself.
+- **Dropdowns:** change the direction options from a click-to-cycle button
+  to a **dropdown** (`WM.UI.Dropdown`) showing Up / Right / Down / Left /
+  Hidden. Class Tools choice features would render as a dropdown for every
+  module that uses them. The pooled feature rows already re-point their spec
+  through `row.feature`, so the dropdown needs the same proxy that the cycle
+  uses today.
+- **Tests:** extend `test_classmage` / `test_mageutility` to cover a hidden
+  group (no icons, the other group starting next to the button) and choosing
+  from the dropdown.
