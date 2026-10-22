@@ -189,6 +189,62 @@ cases, then build the features on what Watching Machine already has. Their
 licences need checking before any code is reused, the same caution as the
 Leatrix Plus note in item 3. Copying is out unless a licence allows it.
 
+### Talking to Nova users: their sync protocol comes first
+
+Watching Machine must be able to **listen to and broadcast on Nova's own
+addon messages**:
+- world buff, Songflower, tuber and Darkmoon Faire timers, with their layer
+- buff dropped / NPC killed / NPC walking notices
+- instance reset notices (NIT)
+
+That way a Watching Machine user and a Nova user in the same guild or group
+share one set of timers. So before items 9 and 13 are built, the protocol is
+worked out from Nova's released code and written down in
+`docs/NOVA-PROTOCOL.md`.
+
+**What to record**, for NWB and NIT each:
+- **Prefixes:** the addon-message prefixes, and which channels each one is
+  sent on (GUILD, PARTY / RAID, YELL, WHISPER, a custom channel), and when.
+- **Libraries:** whether messages go through AceComm (which splits long
+  messages into parts) and are packed with AceSerializer and / or LibDeflate,
+  or are plain strings. The exact encode / decode steps, so we can produce
+  byte-identical messages.
+- **Message types:** every type with its fields in order: timers per buff and
+  per layer, Songflower spawns, reset notices, version / handshake messages,
+  and requests ("send me your timers").
+- **Version checks:** which versions accept which messages, and how old or
+  newer senders are handled.
+- **Trust rules:** whose data is accepted (guild only? sanity limits on
+  timestamps? who is "the one sender" for guild warnings), so ours follows
+  the same rules and never feeds bad timers into Nova users' data.
+- **Throttling:** how often each message may be sent, so we never get Nova
+  users or ourselves disconnected for addon-message spam.
+- **Guild-note flags:** how the `#nwb1`–`#nwb8` tags are read, so we honour
+  them.
+
+**How we use it:**
+- **Separate code:** a `NovaCompat` part kept apart from our own `WM`
+  messages. It decodes their messages into our timer data and encodes ours
+  into their format.
+- **Options:** listening on, broadcasting off by default, each switchable.
+- **Tests:** recorded Nova messages decoded in the test harness, and our
+  encoded ones decoded back.
+
+**Licence:** implementing a compatible message format for interoperability
+doesn't copy their code. Their source is read to learn the format, and our
+encoder / decoder is written fresh. If we bundle a library they use
+(AceSerializer, LibDeflate), we take it from its own source under its own
+licence.
+
+**Blocked for now:** the released addon zips aren't reachable from the
+cloud session. The mirror's GitHub releases need API access the session
+doesn't have, and CurseForge (`www.curseforge.com`, `edge.forgecdn.net`),
+Wago and WoWInterface are blocked by the network policy. Either:
+- allow `edge.forgecdn.net` and `www.curseforge.com` in the environment's
+  network settings, or
+- upload the `NovaWorldBuffs` and `NovaInstanceTracker` folders from
+  `Interface\AddOns`.
+
 What all five should share instead of building their own:
 
 | Need | Already in Watching Machine |
