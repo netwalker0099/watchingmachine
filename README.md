@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.16 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.16.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -522,6 +522,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.16.1
+- Fixed: in Class Tools, option dropdowns (e.g. the mage *expand* directions) covered the first line of their description. The description now sits below the dropdown, and the dropdowns line up in one column
+- The Totem Sets editor is a little wider, so its two dropdown columns can't touch
 
 ### Version 3.16
 - **Shaman totem button**: hover to pick a totem set, click to drop it one totem per click (Air, Water, Earth, then Fire); starts again from Air when your totems are gone, after combat, or on Ctrl-click

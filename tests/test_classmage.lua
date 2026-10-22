@@ -159,6 +159,13 @@ check("dropdown lists Up, Right, Down, Left, Hidden", table.concat(labels, ",") 
 items[1].func()
 check("choosing Up saves it and updates the text", env.MageToolsDB.portalDir == "UP" and row.cycle.dropdown._ddText == "Up")
 check("changing it rebuilds the flyout", rebuilt >= 1)
+-- The dropdown sits level with its label and the description starts below
+-- it (beside it, the dropdown covered the description's first line)
+local _, _, _, _, labelY = row.label:GetPoint(1)
+local _, _, _, _, descY = row.desc:GetPoint(1)
+check("description starts below the dropdown", descY <= -34 and labelY > descY + 20)
+check("labels share a fixed-width column", row.label:GetWidth() == 185)
+check("row tall enough for the description under the dropdown", row:GetHeight() >= 34 + 22)
 local trow = FindCycle("Teleports expand")
 check("panel shows the Teleports expand option", trow and trow.cycle.dropdown._ddText == "Up")
 Mage.UpdatePortalButtonVisibility = origUpdate

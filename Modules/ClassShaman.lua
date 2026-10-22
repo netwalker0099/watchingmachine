@@ -355,7 +355,7 @@ end
 
 function Shaman:CreateEditor()
     if self.editor then return self.editor end
-    local panel = WM.UI:CreatePanel({ name = "WM_TotemSetsFrame", title = "Totem Sets", titleColor = "0070DE", width = 400 })
+    local panel = WM.UI:CreatePanel({ name = "WM_TotemSetsFrame", title = "Totem Sets", titleColor = "0070DE", width = 420 })
     local L = panel.layout
     L:Note("Hover the totem button to pick a set; click it to drop the set one totem per click, Air, Water, Earth, then Fire. Auto picks the premade's best totem you know.")
     for i = 1, NUM_SETS do
@@ -372,18 +372,18 @@ function Shaman:CreateEditor()
             onClick = function() Shaman:SelectSet(i) end,
         }, 8)
         for pair = 0, 1 do
-            local r = L:Row(28)
+            local r = L:Row(30)
             for col = 1, 2 do
                 local element = ELEMENTS[pair * 2 + col]
                 r:Dropdown({
-                    label = ELEMENT_NAMES[element] .. ":", width = 115,
+                    label = ELEMENT_NAMES[element] .. ":", width = 110,
                     options = ElementOptions(i, element),
                     get = function() return Store().sets[i][element] or AUTO end,
                     set = function(v)
                         Store().sets[i][element] = (v ~= AUTO) and v or nil
                         Shaman:Refresh()
                     end,
-                }, col == 1 and 12 or 192)
+                }, col == 1 and 12 or 196)
             end
         end
     end

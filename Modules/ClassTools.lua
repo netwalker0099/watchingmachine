@@ -510,14 +510,23 @@ function ClassTools:RefreshTabs()
     for _, choice in pairs(tabChoices) do choice:Refresh() end
 end
 
+-- Choice rows: label column width, and where the description starts (the
+-- dropdown's art is ~26px tall, centred on the label)
+local CHOICE_LABEL_W, CHOICE_DESC_TOP = 185, 34
+
 -- Rows are pooled per kind and re-pointed at a feature when the tab
 -- changes, so every spec reads row.feature at call time
 local function NewFeatureRow(parent, class, feature)
     local row = CreateFrame("Frame", nil, parent)
     row.class, row.feature = class, feature
     if feature.kind == "choice" then
+        -- Label in a fixed-width column so every dropdown lines up, and
+        -- level with the dropdown (which is taller than a checkbox)
         row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        row.label:SetPoint("TOPLEFT", 14, -5)
+        row.label:SetPoint("TOPLEFT", 14, -9)
+        row.label:SetWidth(CHOICE_LABEL_W)
+        row.label:SetJustifyH("LEFT")
+        if row.label.SetWordWrap then row.label:SetWordWrap(false) end
         row.cycle = WM.UI.Dropdown(row, setmetatable({ width = 130 }, { __index = function(_, k)
             local f = row.feature
             if k == "options" then return function() return row.feature.options end end
@@ -543,7 +552,10 @@ local function NewFeatureRow(parent, class, feature)
         row.check:SetPoint("TOPLEFT", 8, 0)
     end
     row.desc = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.desc:SetPoint("TOPLEFT", 36, -18)
+    -- Below the dropdown on choice rows: beside it, the dropdown covered
+    -- the first line of the description
+    row.descTop = (feature.kind == "choice") and CHOICE_DESC_TOP or 18
+    row.desc:SetPoint("TOPLEFT", 36, -row.descTop)
     row.desc:SetWidth(330)
     row.desc:SetJustifyH("LEFT")
     return row
@@ -590,7 +602,8 @@ function ClassTools:BuildFeatureList()
         row.check:Refresh()
         row.desc:SetText(f.desc and ("|cFF888888" .. f.desc .. "|r") or "")
         -- Room for a description that wraps onto more lines
-        local h = f.desc and math.max(40, math.floor(18 + row.desc:GetStringHeight() + 6)) or 26
+        local h = f.desc and math.max(row.descTop + 22, math.floor(row.descTop + row.desc:GetStringHeight() + 6))
+            or (row.descTop + 8)
         row:SetHeight(h)
         row:Show()
         y = y + h

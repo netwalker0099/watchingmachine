@@ -2,7 +2,27 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.16** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.16.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.16.1
+
+### Fixed — dropdowns covering option text in Class Tools
+
+- **The bug:** every dropdown option in Class Tools (the mage *Portals /
+  Teleports / Mana gems / Armors / Food & water expand*, the warlock and
+  shaman directions, and the General flyout and mana options) drew over the
+  first line of its own description. The dropdown is taller than a
+  checkbox, but its description started at the same height as a
+  checkbox's.
+- **The fix:** dropdown rows now put the description below the dropdown
+  and are sized to fit it. Labels sit in a fixed-width column, so the
+  dropdowns line up and a long label can't push one into the next.
+- **Checked elsewhere:** the other dropdowns (Mail & Trade, Whisper Logs,
+  ArmorySnap) have room. The Totem Sets editor's two columns came within a
+  few pixels of each other and of the panel edge; the panel is now wider
+  and the columns spaced further apart.
 
 ---
 
