@@ -2,7 +2,27 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.19** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.20** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.20
+
+### Swing timer: resizable
+
+- **Grip:** while the swing timer is unlocked, a size grip sits in its
+  bottom-right corner. Drag right for wider bars, down for taller ones.
+  `/wmachine swing` shows the timer for 10 seconds, and it stays up while
+  you're resizing.
+- **Options** in Class Tools > General: *Swing timer width* (140–420 in the
+  list) and *Swing timer bar height* (10–28). The grip allows 100–600 wide
+  and 8–40 tall.
+- Everything scales with the size: the spark, the sync mark, the latency
+  and hunter zones. The labels hide when the bars are too thin for them.
+- **Lock the swing timer** now also stops resizing and hides the grip.
+- `/wmachine swing reset` puts the timer back in the centre at its default
+  size (220 × 14).
+- Saved in `SwingTimerDB` (`width`, `barHeight`).
 
 ---
 

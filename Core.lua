@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.19"
+WM.version = "3.20"
 WM.modules = {}
 
 -- ============================================
@@ -1587,7 +1587,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
     print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
     print("|cFFFFFF00/wmachine totems|r - Edit your totem sets (shaman)")
-    print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to position it")
+    print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
+    print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine status|r - One-line status for every module")
@@ -1770,6 +1771,13 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:ReportSpells()
         else
             WM:Print("ClassMage module not available")
+        end
+
+    elseif cmd == "swing reset" then
+        local module = WM.modules.SwingTimer
+        if module and module.ResetPosition then
+            module:ResetPosition()
+            WM:Print("Swing timer moved back to the centre at its default size.")
         end
 
     elseif cmd == "swing" or cmd == "swingtimer" then

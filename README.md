@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.19 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.20 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -287,9 +287,14 @@ always sits first.
     line under the bars says *In sync*, *Off hand first* or *Out of sync*.
     *Off hand lands after by* sets the lag (0.15s default). Sync only holds
     with equal weapon speeds; the timer says so when they differ
+  - **Resizable**: drag the grip in its bottom-right corner while it's
+    unlocked (right for wider, down for taller bars), or pick *Swing timer
+    width* (100–600) and *bar height* (8–40) in Class Tools > General
   - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
-    mark*, *Off hand lands after by*, *Lock the swing timer*.
-    `/wmachine swing` shows it for 10 seconds so you can drag it into place
+    mark*, *Off hand lands after by*, width, bar height, *Lock the swing
+    timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
+    so you can move and resize it; `/wmachine swing reset` puts back the
+    default place and size
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
 `Unstable Flask of the Sorcerer` count alongside the standard flasks.
@@ -507,7 +512,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine soulstone` - Soulstone timers in your group (warlock)
 - `/wmachine portals` - List the teleports and portals you know (mage)
 - `/wmachine totems` - Edit your totem sets (shaman)
-- `/wmachine swing` - Show the swing timer for 10 seconds to position it
+- `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
+- `/wmachine swing reset` - Swing timer back to its default place and size
 - `/wmachine consumes` - Show what the general raid consumable checks see
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
@@ -547,7 +553,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `GeneralChecksDB` - General consumable check settings
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
-- `SwingTimerDB` - Swing timer position, lock and weapon-sync lag
+- `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -565,6 +571,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.20
+- The **swing timer is resizable**: drag its corner while unlocked, or choose a width and bar height in Class Tools > General
 
 ### Version 3.19
 - **Watching Machine button in the game menu** (Escape), above Log Out, opening the dashboard; can be turned off in Settings

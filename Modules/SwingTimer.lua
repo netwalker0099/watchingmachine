@@ -45,7 +45,11 @@ WM.SwingTimer = Swing
 
 Swing.version = "3.17"
 
-local BAR_W, BAR_H, BAR_GAP = 220, 14, 3
+local BAR_GAP = 3
+-- Size: saved, set by dragging the corner grip (unlocked) or in Class Tools
+local DEFAULT_W, DEFAULT_H = 220, 14
+local MIN_W, MAX_W, MIN_H, MAX_H = 100, 600, 8, 40
+Swing.SIZE_LIMITS = { MIN_W, MAX_W, MIN_H, MAX_H }
 local WINDUP = 0.5          -- Auto Shot wind-up
 local EXTRA_WINDOW = 0.04   -- an extra attack lands within this of its proc
 local SYNC_WINDOW = 0.1     -- "SYNC NOW" this close to the mark
@@ -108,9 +112,15 @@ local function DB()
     local db = SwingTimerDB
     if db.locked == nil then db.locked = false end
     if db.syncLag == nil then db.syncLag = 0.15 end
+    if type(db.width) ~= "number" then db.width = DEFAULT_W end
+    if type(db.barHeight) ~= "number" then db.barHeight = DEFAULT_H end
+    db.width = math.max(MIN_W, math.min(MAX_W, math.floor(db.width + 0.5)))
+    db.barHeight = math.max(MIN_H, math.min(MAX_H, math.floor(db.barHeight + 0.5)))
     return db
 end
 Swing.DB = DB
+
+local BAR_W, BAR_H = DEFAULT_W, DEFAULT_H   -- the current size, from DB
 
 local function Tools() return WM.modules.ClassTools end
 
@@ -473,10 +483,8 @@ local function NewBar(parent, label)
     bar.latency:SetPoint("BOTTOMRIGHT")
     bar.latency:SetColorTexture(unpack(COLORS.latency))
     bar.mark = bar:CreateTexture(nil, "OVERLAY")
-    bar.mark:SetSize(3, BAR_H + 6)
     bar.mark:Hide()
     bar.spark = bar:CreateTexture(nil, "OVERLAY")
-    bar.spark:SetSize(2, BAR_H + 4)
     bar.spark:SetColorTexture(1, 1, 1, 1)
     bar.label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bar.label:SetPoint("LEFT", 4, 0)
@@ -524,19 +532,108 @@ function Swing:CreateFrame()
     f.oh = NewBar(f, "Off")
     f.ranged = NewBar(f, "Auto Shot")
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+
+    -- Resize grip, bottom-right, while unlocked: drag right for wider,
+    -- down for taller bars
+    local grip = CreateFrame("Button", "WM_SwingTimerGrip", f)
+    grip:SetSize(14, 14)
+    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 7, -7)
+    grip:SetFrameLevel((f:GetFrameLevel() or 1) + 5)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetScript("OnMouseDown", function() Swing:StartResize() end)
+    grip:SetScript("OnMouseUp", function() Swing:StopResize() end)
+    grip:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Resize", 1, 0.8, 0)
+        GameTooltip:AddLine("Drag right for wider bars, down for taller ones.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.grip = grip
+
     f:Hide()
     frame = f
     self.frame = f
+    self:ApplySize()
+    self:ApplyLock()
     return f
 end
 
+-- Size every bar from the saved width / bar height
+function Swing:ApplySize()
+    local db = DB()
+    BAR_W, BAR_H = db.width, db.barHeight
+    if not frame then return end
+    frame:SetWidth(BAR_W)
+    for _, key in ipairs({ "mh", "oh", "ranged" }) do
+        local bar = frame[key]
+        bar:SetSize(BAR_W, BAR_H)
+        bar.mark:SetSize(3, BAR_H + 6)
+        bar.spark:SetSize(2, BAR_H + 4)
+        -- Labels only where they fit
+        local fits = BAR_H >= 10
+        bar.label:SetShown(fits and BAR_W >= 140)
+        bar.time:SetShown(fits)
+    end
+end
+
+function Swing:SetSize(width, barHeight)
+    local db = DB()
+    if width then db.width = width end
+    if barHeight then db.barHeight = barHeight end
+    DB()   -- clamps
+    self:ApplySize()
+    self:Draw()
+end
+
+-- Manual sizing: the frame's height follows its bars, so the grip changes
+-- the width and the bar height rather than sizing the frame directly
+local resizing
+local function Cursor()
+    local x, y = GetCursorPosition()
+    local scale = (frame and frame:GetEffectiveScale()) or 1
+    if not scale or scale == 0 then scale = 1 end
+    return (x or 0) / scale, (y or 0) / scale
+end
+
+function Swing:StartResize()
+    if DB().locked or not frame then return end
+    local x, y = Cursor()
+    resizing = { x = x, y = y, w = BAR_W, h = BAR_H }
+    -- Keep it on screen while resizing, in or out of a fight
+    testUntil = math.max(testUntil, GetTime() + 10)
+end
+
+function Swing:UpdateResize()
+    if not resizing then return end
+    local x, y = Cursor()
+    -- Cursor down (y falls) makes the bars taller
+    self:SetSize(resizing.w + (x - resizing.x), resizing.h + (resizing.y - y))
+    testUntil = math.max(testUntil, GetTime() + 3)
+end
+
+function Swing:StopResize()
+    if not resizing then return end
+    self:UpdateResize()
+    resizing = nil
+end
+
+function Swing:IsResizing() return resizing ~= nil end
+
 function Swing:ApplyLock()
-    if frame then frame:EnableMouse(not DB().locked) end
+    if not frame then return end
+    local locked = DB().locked
+    frame:EnableMouse(not locked)
+    if frame.grip then frame.grip:SetShown(not locked) end
 end
 
 function Swing:ResetPosition()
     local db = DB()
     db.x, db.y = nil, nil
+    db.width, db.barHeight = DEFAULT_W, DEFAULT_H
+    self:ApplySize()
     if frame then
         frame:ClearAllPoints()
         frame:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
@@ -677,7 +774,7 @@ function Swing:Test()
     self:CreateFrame()
     self:Draw(now)
     WM:ModulePrint("SwingTimer", "Showing the swing timer for 10 seconds."
-        .. (DB().locked and " It's locked: unlock it in Class Tools > General to move it." or " Drag it to move it."))
+        .. (DB().locked and " It's locked: unlock it in Class Tools > General to move it." or " Drag it to move it, or its corner to resize it."))
 end
 
 function Swing:EndTest() testUntil = 0 end
@@ -685,6 +782,16 @@ function Swing:EndTest() testUntil = 0 end
 -- ============================================
 -- OPTIONS (Class Tools > General; registered by ClassGeneral)
 -- ============================================
+
+Swing.WIDTH_OPTIONS = {
+    { value = 140, text = "140" }, { value = 180, text = "180" }, { value = 220, text = "220 (default)" },
+    { value = 260, text = "260" }, { value = 300, text = "300" }, { value = 360, text = "360" },
+    { value = 420, text = "420" },
+}
+Swing.HEIGHT_OPTIONS = {
+    { value = 10, text = "10" }, { value = 14, text = "14 (default)" }, { value = 18, text = "18" },
+    { value = 22, text = "22" }, { value = 28, text = "28" },
+}
 
 Swing.LAG_OPTIONS = {
     { value = 0.1, text = "0.10 s" }, { value = 0.15, text = "0.15 s" },
@@ -717,8 +824,22 @@ function Swing.RegisterOptions(tools)
         set = function(v) DB().syncLag = v end,
     })
     tools:RegisterFeature("GENERAL", {
+        key = "swingWidth", kind = "choice", name = "Swing timer width",
+        options = Swing.WIDTH_OPTIONS, default = DEFAULT_W,
+        desc = "Or drag the swing timer's corner while it's unlocked.",
+        get = function() return DB().width end,
+        set = function(v) Swing:SetSize(v, nil) end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "swingHeight", kind = "choice", name = "Swing timer bar height",
+        options = Swing.HEIGHT_OPTIONS, default = DEFAULT_H,
+        desc = "Height of each bar.",
+        get = function() return DB().barHeight end,
+        set = function(v) Swing:SetSize(nil, v) end,
+    })
+    tools:RegisterFeature("GENERAL", {
         key = "swingLock", name = "Lock the swing timer",
-        desc = "Stops it being dragged, and lets clicks pass through it.",
+        desc = "Stops it being dragged or resized, and lets clicks pass through it.",
         default = false,
         onToggle = function(v) DB().locked = v and true or false; Swing:ApplyLock() end,
     })
@@ -764,6 +885,7 @@ function Swing:Initialize()
                 Rescale(hands.ranged, s, now)
             end
         end
+        if resizing then Swing:UpdateResize() end
         Swing:Draw(now)
     end)
 end

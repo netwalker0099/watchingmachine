@@ -287,5 +287,50 @@ check("and ends", not f:IsShown())
 env.CombatLogGetCurrentEventInfo = false
 Swing:OnEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
+-- ---- Resizing ----
+env.UnitClass = function() return "Warrior", "WARRIOR" end
+env.CombatLogGetCurrentEventInfo = function() return unpack(cleu, 1, 24) end
+Swing:Refresh()
+local sdb = Swing.DB()
+check("default size", sdb.width == 220 and sdb.barHeight == 14 and f.mh:GetWidth() == 220 and f.mh:GetHeight() == 14)
+check("grip shown while unlocked", f.grip:IsShown())
+local cx, cy = 500, 400
+env.GetCursorPosition = function() return cx, cy end
+f.GetEffectiveScale = function() return 1 end
+W.fire(f.grip, "OnMouseDown")
+check("resizing keeps the timer on screen", Swing:IsResizing() and Swing:IsActive(now))
+cx, cy = 580, 390                 -- 80 right, 10 down
+Swing:UpdateResize()
+check("drag right: wider", sdb.width == 300 and f.mh:GetWidth() == 300 and f:GetWidth() == 300)
+check("drag down: taller bars", sdb.barHeight == 24 and f.mh:GetHeight() == 24)
+check("spark and mark follow the bar height", f.mh.spark:GetHeight() == 28 and f.mh.mark:GetHeight() == 30)
+cx, cy = 2000, 2000
+W.fire(f.grip, "OnMouseUp")
+check("size clamped to its limits", sdb.width == 600 and sdb.barHeight == 8 and not Swing:IsResizing())
+check("labels hidden when the bars are too thin", not f.mh.label:IsShown() and not f.mh.time:IsShown())
+-- Drawing uses the new width
+H.mh.speed, H.mh.expires = 2.0, now + 1.0
+Swing:OnEvent("PLAYER_ENTER_COMBAT")
+Swing:Draw(now)
+check("spark placed on the resized bar", near(select(4, f.mh.spark:GetPoint(1)), 300))
+-- Class Tools dropdowns
+Swing:SetSize(260, 18)
+check("width and height options apply", sdb.width == 260 and f.mh:GetWidth() == 260 and f.mh:GetHeight() == 18
+    and f.mh.label:IsShown())
+check("stack height follows the bar height", f:GetHeight() == 18 + 3 + 18 or f:GetHeight() == 18)
+-- Locked: no grip, no resizing
+CT:SetEnabled("GENERAL", "swingLock", true)
+check("locked: grip hidden", not f.grip:IsShown())
+W.fire(f.grip, "OnMouseDown")
+check("locked: can't resize", not Swing:IsResizing())
+CT:SetEnabled("GENERAL", "swingLock", false)
+check("unlocked: grip back", f.grip:IsShown())
+-- Bad saved values are repaired
+sdb.width, sdb.barHeight = "wide", 99
+Swing.DB()
+check("bad saved size repaired", sdb.width == 220 and sdb.barHeight == 40)
+Swing:ResetPosition()
+check("reset puts the default size back", sdb.width == 220 and sdb.barHeight == 14 and f.mh:GetWidth() == 220)
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end
