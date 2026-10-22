@@ -2,7 +2,26 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.20** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.20.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.20.1
+
+### Fixed — game menu button with ElvUI
+
+- **Overlap:** the Watching Machine button sat on top of ElvUI's.
+  - **Cause:** ElvUI's button isn't part of the menu's layout. After each
+    layout, ElvUI anchors it under Macros and pushes Log Out, Exit Game and
+    Return to Game down. Ours was laid out into that same slot.
+  - **Fix:** ours now works the same way. After each layout it goes under
+    Macros, or under ElvUI's button (or another addon's menu button) if one
+    is there, and pushes the buttons below down by its own height. The two
+    shifts add up, so both buttons fit whichever addon runs first.
+- **Look:** with ElvUI loaded, the button now takes ElvUI's button skin, the
+  same one ElvUI gives the menu's own buttons. If ElvUI's Blizzard skins
+  (or its *Misc* skins) are turned off, it keeps the default look like the
+  rest of the menu.
 
 ---
 

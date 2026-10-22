@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.20 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.20.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -525,6 +525,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 ### Game Menu Button
 - A **Watching Machine** button in the menu Escape opens, just above
   **Log Out** (like ElvUI's). Click it to open the dashboard
+- With **ElvUI** it sits under ElvUI's button instead of on top of it, and
+  takes ElvUI's button skin (unless ElvUI's Blizzard skins are off)
 - Turn it off in Settings: *Watching Machine button in the game menu (Esc)*
 
 ### Minimap Button
@@ -571,6 +573,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.20.1
+- Fixed: the game menu button sat on top of ElvUI's and kept the default look. It now goes under ElvUI's button (or any other addon's) and takes ElvUI's skin
 
 ### Version 3.20
 - The **swing timer is resizable**: drag its corner while unlocked, or choose a width and bar height in Class Tools > General

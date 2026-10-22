@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.20"
+WM.version = "3.20.1"
 WM.modules = {}
 
 -- ============================================
