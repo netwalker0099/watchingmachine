@@ -2,7 +2,26 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.17** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.18** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.18
+
+### New — Righteous Fury check (Class Tools > Paladin)
+
+*Warn if Righteous Fury is missing* (on by default) puts **Righteous Fury
+is missing** in the CHECK YOURSELF frame, the same way the mage and warlock
+armor checks work.
+
+- **Protection paladins only:** most talent points in Protection, or Holy
+  Shield / Avenger's Shield learned. Holy and Retribution paladins are
+  never warned.
+- **No warning** before you've learned Righteous Fury, or while you're
+  dead.
+- **Spec changes** are picked up at once: the spec is cached for a few
+  seconds and dropped on a respec.
+- Paladins now have their own tab in Class Tools.
 
 ---
 

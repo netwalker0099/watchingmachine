@@ -192,7 +192,7 @@ local function HasFeature(label)
 end
 
 local tabs = Tabs()
-check("a tab per populated class", #tabs == 4 and Tab("General") and Tab("Mage") and Tab("Warlock") and Tab("Shaman"))
+check("a tab per populated class", #tabs == 5 and Tab("General") and Tab("Mage") and Tab("Warlock") and Tab("Shaman") and Tab("Paladin"))
 check("General tab first", tabs[1] == Tab("General"))
 check("current class marked", Tab("Mage"):GetText() == "|cFF00FF00Mage|r"
     and Tab("Warlock"):GetText() == "Warlock")
@@ -222,7 +222,7 @@ check("feature checkbox has description", ss:GetParent().desc:GetText():find("So
 
 -- A feature registered after the panel exists adds its tab
 CT:RegisterFeature("DRUID", { key = "motw", name = "Warn if Mark of the Wild is missing", desc = "Test.", default = true })
-check("late registration adds a tab", Tab("Druid") ~= nil and #Tabs() == 5)
+check("late registration adds a tab", Tab("Druid") ~= nil and #Tabs() == 6)
 check("selected tab kept", Tab("Warlock"):GetText() == "|cFF00FF00Warlock|r")
 W.click(Tab("Druid"))
 check("late feature shows", #ShownFeatures() == 1 and HasFeature("Warn if Mark of the Wild is missing"))
@@ -235,7 +235,7 @@ for i = 1, 30 do
     CT:RegisterFeature("SHAMAN", { key = "f" .. i, name = "Feature " .. i, desc = "Something to check, number " .. i .. "." })
 end
 CT:RegisterFeature("ROGUE", { key = "poison", name = "Warn if no poison", default = true })
-check("tabs wrap onto a second row", #Tabs() == 6 and not rows[2].hidden)
+check("tabs wrap onto a second row", #Tabs() == 7 and not rows[2].hidden)
 W.click(Tab("Shaman"))
 check("thirty features listed, plus the totem button", #ShownFeatures() == 31)
 check("long list stays within 486", cp:GetHeight() <= 486)

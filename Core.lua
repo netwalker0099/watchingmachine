@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.17"
+WM.version = "3.18"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -275,6 +275,7 @@ local MODULE_COLORS = {
     ClassMage = "3FC7EB",
     ClassShaman = "0070DE",
     SwingTimer = "FFAA33",
+    ClassPaladin = "F58CBA",
 }
 
 function WM:ModulePrint(moduleName, msg)

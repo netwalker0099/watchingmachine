@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.17 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.18 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -378,7 +378,14 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - *Totem sets expand* sets the flyout's direction (or Hidden). Changes made
   in combat apply when it ends; dropping a set works in combat
 
-### 18. Chat Filter
+### 18. Class — Paladin
+- **Righteous Fury check** — warns when Righteous Fury is missing, the same
+  way the mage and warlock armor checks do. Only for **Protection**
+  paladins: most talent points in Protection, or Holy Shield / Avenger's
+  Shield learned. Holy and Retribution paladins are never nagged, and
+  nothing shows before you've learned the spell or while you're dead
+
+### 19. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -553,6 +560,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.18
+- New **Paladin** tab in Class Tools: Protection paladins are warned when **Righteous Fury** is missing
 
 ### Version 3.17
 - **Swing timer** for warriors, rogues, Retribution paladins and Enhancement shamans, and an **Auto Shot timer** for hunters, with your latency shown at the end of each bar
