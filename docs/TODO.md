@@ -11,6 +11,11 @@ what still needs settling before it's built.
 6. ~~Flyout buttons: open on hover or on click~~ (done, 3.15)
 7. ~~Flyout directions: add "Hidden", and use dropdowns~~ (done, 3.15)
 8. ~~Dock flyout buttons together~~ (done, 3.15)
+9. Instance tracker: lockouts, instance log and run stats
+10. Gold trade alerts and trade log by instance
+11. Alt tracking: "Your Characters"
+12. PvP instance log: battleground and arena stats
+13. World buff timers, Songflowers and Darkmoon Faire
 
 ---
 
@@ -167,4 +172,231 @@ Built for every class's flyout buttons, as a setting rather than snapping.
 - **Lock:** one shared *Lock flyout buttons* option replaces the mage-only
   lock, and carries the old setting over once.
 - **Combat:** docking changes made in combat apply when it ends.
+
+---
+
+## Items 9–13: guidance from Nova Instance Tracker and Nova World Buffs
+
+Items 9–13 take their feature lists from two addons by Novaspark:
+
+- **Nova Instance Tracker (NIT):**
+  <https://github.com/curseforge-mirror/nova-instance-tracker/releases>
+- **Nova World Buffs (NWB):**
+  <https://github.com/curseforge-mirror/nova-world-buffs/releases>
+
+They're **guidance only**: read them for the approach, events and edge
+cases, then build the features on what Watching Machine already has. Their
+licences need checking before any code is reused, the same caution as the
+Leatrix Plus note in item 3. Copying is out unless a licence allows it.
+
+What all five should share instead of building their own:
+
+| Need | Already in Watching Machine |
+|---|---|
+| Windows, lists, options | `WM.UI` panel builder (`Layout:Fill` lists, sections, dropdowns, resizable panels) |
+| A home | Dashboard cards (with on/off switch and **...** tools menu), slash commands under `/wmachine` |
+| Guild / group messages between users | The addon-message code in PvP Tracker (`SafeSendAddonMessage`, prefix registration); move it to Core as a shared helper first |
+| Chat output | `WM:ModulePrint`, Chat Filter's message filter (for clickable links) |
+| Per-character saved data | Mail & Trade Logger's `characters[charKey]` layout and character selector |
+| Minimap hover | The minimap tooltip already lists every module's status |
+| Group roster, zone and instance detection | Debuff Tracker, Buff Check, ArmorySnap and Auto Logger already read these; share one helper rather than a sixth copy |
+
+---
+
+## 9. Instance tracker: lockouts, instance log and run stats
+
+Tracks every instance you enter, on every character and realm, and the
+limits on entering them.
+
+**Lockouts:**
+- **The two limits:** time left on the **5 instances per hour** and **30 per
+  24 hours** limits, across all your characters.
+- **Which limit you're on:** say whether you're currently blocked by the
+  hourly or the daily limit, so you can tell them apart.
+- **Timed from when you leave** an instance, not when you enter it.
+- **Same instance again:** re-entering the same instance ID (for example
+  another Scarlet Monastery wing on the same ID, or a run you zoned out of)
+  doesn't add a duplicate or count again.
+- **Minimap hover** shows your lockouts.
+
+**Resets:**
+- **Telling the group:** when you reset instances, tell your group.
+- **When the leader resets:** tell you if your leader resets, when they run
+  Watching Machine, or NIT / NWB (that needs NIT's addon-message format).
+
+**Instance log:**
+- **Opening it:** open it from `/wmachine instances`, the dashboard card, or by
+  clicking the addon's line in chat.
+- **Deleting a wrong entry:** a clickable **[X]** in chat deletes an entry
+  that wasn't really a new instance.
+- **Hovering an entry** shows the run's stats:
+  - every group member's name, level and class
+  - the time you entered and left, and the time spent inside
+  - mobs killed, XP earned, average XP per mob, and the group's average level
+  - raw gold looted from mobs
+  - your level going in and coming out (to see where you dinged)
+  - every reputation gain (useful for raids)
+- **Leaving an instance:** optionally print the run's stats to your chat
+  window, or to the group.
+
+**Builds on:**
+- Auto Logger's instance detection
+- ArmorySnap's roster reading
+- the panel builder for the log
+- Chat Filter's chat hook for the clickable links and [X]
+
+**To settle:**
+- [ ] **Limits on 2.5.6:** confirm the 5 per hour and 30 per 24 hours limits
+      apply on Anniversary realms, and how the client reports them. Does the
+      error text or `GetSavedInstanceInfo` tell hourly from daily?
+- [ ] **Instance ID:** how NIT works out the instance ID on this client:
+      `GetInstanceInfo`, the GUIDs of mobs inside, or something else.
+- [ ] **Leaving vs disconnecting:** a disconnect or `/reload` inside must not
+      end the run.
+- [ ] **Raids:** do raids count toward these limits, or appear in the log only?
+- [ ] **Compatibility:** listen for NIT / NWB reset messages, send our own, or
+      both? It needs their message prefix and format.
+- [ ] **Storage:** how many runs to keep per character (a size cap, or by age
+      as ArmorySnap does).
+
+---
+
+## 10. Gold trade alerts and trade log by instance
+
+This is mostly an extension of the **Mail & Trade Logger**, which already
+logs trades per character.
+
+- **Chat line:** a line in your chat window whenever you give gold to, or
+  receive it from, another player, with the amount and the player.
+- **Trade log:** the existing trade log gains an **instance** column: where
+  you were when the trade happened (useful for boosters and buyers). It
+  needs item 9's "current instance".
+- **Option:** the chat line can be turned off, in Mail & Trade settings.
+
+**To settle:**
+- [ ] **Chat lines:** for gold only, or for item trades too?
+- [ ] **Old entries:** trades logged before this have no instance; show them
+      as "—".
+
+---
+
+## 11. Alt tracking: "Your Characters"
+
+A **Your Characters** window listing every character, grouped by realm.
+
+- **Opening it:** from the dashboard tools menu, right-clicking the minimap
+  button, or a button in the instance log window.
+- **Each character shows** level, XP and **rested XP**.
+- **Hover a realm** for your total gold on it.
+- **Hover a character** for its details:
+  - level, XP and rested XP
+  - gold, free bag slots and armor durability
+  - profession skills
+  - counts of important reagents: buff reagents, Soul Shards and the like
+  - for hunters, ammo count and pet details
+- **Updates on** logout, and when the values change while you play.
+
+**Builds on:** Mail & Trade Logger already keeps a per-character list and a
+character selector; this should share that one character registry instead
+of starting another.
+
+**To settle:**
+- [ ] **Which reagents:** per class, the reagents that matter (Symbol of
+      Kings, Sacred Candle, Arcane Powder, Soul Shards, Ankh, ...).
+- [ ] **Durability:** read it from equipped items' durability at logout.
+- [ ] **Deleted characters:** a way to remove characters you've deleted.
+
+---
+
+## 12. PvP instance log: battleground and arena stats
+
+Logs every battleground and arena you enter, like item 9's log but for PvP.
+
+- **Battlegrounds:** the battleground, its length, the result, and your
+  scoreboard line (killing blows, honorable kills, deaths, honor).
+- **Arenas:** bracket, team, opponents, result and rating change.
+- **Totals:** totals per battleground and per bracket, and a win rate.
+
+**Builds on:** PvP Enemy Tracker already ignores battleground and arena
+deaths. This would be its counterpart, in the same module or one beside
+it.
+
+**To settle:**
+- [ ] **Scoreboard APIs on 2.5.6:** which scoreboard APIs exist
+      (`GetBattlefieldScore`, `GetBattlefieldWinner`, the arena team calls).
+- [ ] **Where it lives:** inside PvP Tracker, or its own dashboard card?
+
+---
+
+## 13. World buff timers, Songflowers and Darkmoon Faire
+
+Timers for the Classic world buffs, so nobody misses a drop.
+
+**Buff timers:**
+- **The buffs:** Rallying Cry of the Dragonslayer (Onyxia / Nefarian),
+  Warchief's Blessing (Rend), Spirit of Zandalar (ZG heart). The timers run
+  from the NPC's yell when the buff drops.
+- **Warnings:** at 30, 15, 10, 5 and 1 minutes before a buff can drop again.
+  They go to the chat window, the middle of the screen and guild chat, and
+  each channel and each warning time can be switched on or off.
+- **Guild warnings:** only **one** user online sends guild warnings at a
+  time, so the guild isn't spammed.
+- **NPC killed:** if a buff NPC is killed in front of a member with the addon
+  (the mind-control reset), guild chat is told and the timer reset.
+- **Showing the timers:**
+  - anyone types `!wb` in guild chat
+  - `/wmachine wb` to yourself, `/wmachine wb party` (or any channel) to
+    others
+  - automatically on login
+  - on the Orgrimmar / Stormwind world map
+
+**Songflowers:**
+- **On the map:** Songflowers appear on the Felwood world map and minimap,
+  each with its timer.
+- **Commands:** `/sf`-style commands to show the timers to yourself or a
+  channel, and to open the Felwood map.
+- **Shift-click** a flower's icon to send its timer, location and coordinates
+  to guild chat.
+- **Seeing a flower picked** tells your guild when it respawns (optional).
+- **Shared timers:** a line when you receive a new Songflower timer from
+  someone (optional).
+- **Also tracked:** Whipper Root Tubers and Night Dragon's Breath.
+
+**Your buffs across alts:** a window showing which world buffs each character
+has, opened from a command, the chat prefix, or a map icon.
+
+**Darkmoon Faire:**
+- **When and where:** when it arrives and leaves, and where it will be next,
+  with a map marker.
+- **Your buff cooldown:** how long until you can get the Faire's buff again.
+
+**Layered realms:** timers kept for each layer at once, and which layer you
+are on in every zone.
+
+**For guild masters:** let a guild turn off messages from a public-note tag.
+NWB uses `#nwb1`–`#nwb8`: off for everything, timers, buff dropped, the
+`!wb` command, Songflowers, timers from outside the guild, NPC killed, and
+NPC walking. We'd use our own tag (e.g. `#wm1`–`#wm8`), and perhaps honour
+NWB's too.
+
+**First run:** after installing, point people at the settings, since the
+default warnings can be a lot.
+
+**Localization:** timers come from each NPC's yell, so every client language
+needs each NPC's two yell texts.
+
+**To settle:**
+- [ ] **Worth it on TBC:** check how these Classic world buffs behave on
+      Anniversary realms. Are they removed or suppressed in Outland content?
+      If so, the timers matter mostly for levelling, Classic raids and
+      Songflower / DMF use. Decide the scope from that, maybe Darkmoon Faire
+      and Songflowers first.
+- [ ] **Layers:** detecting layers on Anniversary realms (NWB reads the zone
+      ID from NPC GUIDs). Check that it still works.
+- [ ] **Sharing timers:** guild-only, or also between guilds (NWB shares
+      outside the guild unless `#nwb6`)? Who is trusted to send?
+- [ ] **NWB compatibility:** should timers from NWB users be read?
+- [ ] **Map pins:** map and minimap pins need a world-map and minimap pin
+      layer, the first map UI in the addon.
+- [ ] **Where it lives:** a module of its own, with its own dashboard card.
 
