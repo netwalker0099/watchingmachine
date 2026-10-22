@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.18"
+WM.version = "3.19"
 WM.modules = {}
 
 -- ============================================
@@ -634,6 +634,9 @@ function WM:OnSecurityCheckPassed()
         end
     end
     
+    -- Watching Machine button in the Escape menu
+    pcall(self.SetupGameMenuButton, self)
+
     -- Start dashboard update timer
     RunTicker(2, function()
         self:UpdateDashboard()
@@ -649,6 +652,7 @@ local coreDefaults = {
     minimapHidden = false,
     theme = "Default",
     verboseChat = false,    -- Show diagnostic/sync messages in chat
+    gameMenuButton = true,  -- Watching Machine button in the Escape menu
 }
 
 local function InitCoreDB()
@@ -1504,6 +1508,16 @@ function WM:CreateSettingsPanel()
         tooltip = { "Verbose Chat Mode", "Shows low-priority messages like guild sync status, leaderboard"
             .. " updates, roster refreshes, and other backend activity. Useful for diagnostics."
             .. " Off by default to reduce chat noise." },
+    })
+    L:Checkbox({
+        label = "Watching Machine button in the game menu (Esc)",
+        get = function() return not (WatchingMachineDB and WatchingMachineDB.gameMenuButton == false) end,
+        set = function(v)
+            if WatchingMachineDB then WatchingMachineDB.gameMenuButton = v and true or false end
+        end,
+        tooltip = { "Game Menu Button", "Adds a Watching Machine button above Log Out in the menu"
+            .. " Escape opens, like ElvUI's. Click it to open the dashboard. Takes effect the next"
+            .. " time the menu opens." },
     })
     L:Row(20):Text({
         font = "GameFontNormalSmall",

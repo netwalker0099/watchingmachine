@@ -2,7 +2,25 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.18** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.19** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.19
+
+### New — Game menu button
+
+A **Watching Machine** button in the menu that Escape opens, the way ElvUI
+adds its own. It sits at the end of the AddOns / Macros group, just above
+**Log Out**, and opens the dashboard.
+
+- **Turning it off:** Settings > *Watching Machine button in the game menu
+  (Esc)*. It takes effect the next time the menu opens.
+- **How it's added:** the 2.5.6 client rebuilds its game menu each time it
+  opens. The addon adds its own button to the menu's layout after every
+  rebuild, without taking a button from Blizzard's pool or changing
+  Blizzard's buttons. Changing them could get *Log Out* and *Exit Game*
+  blocked as "an AddOn". Older menus with fixed buttons are handled too.
 
 ---
 

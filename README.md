@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.18 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.19 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -516,6 +516,11 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine clearerrors` - Clear error log
 - `/wmachine help` - Show command help
 
+### Game Menu Button
+- A **Watching Machine** button in the menu Escape opens, just above
+  **Log Out** (like ElvUI's). Click it to open the dashboard
+- Turn it off in Settings: *Watching Machine button in the game menu (Esc)*
+
 ### Minimap Button
 - **Left-click**: Toggle dashboard
 - **Right-click**: Settings (theme, minimap)
@@ -560,6 +565,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.19
+- **Watching Machine button in the game menu** (Escape), above Log Out, opening the dashboard; can be turned off in Settings
 
 ### Version 3.18
 - New **Paladin** tab in Class Tools: Protection paladins are warned when **Righteous Fury** is missing
