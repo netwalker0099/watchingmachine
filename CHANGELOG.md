@@ -2,7 +2,67 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.21** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.22** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.22
+
+### New — Instance Tracker
+
+A new module (dashboard **Logging** group, `/wmachine instances`) that logs
+every dungeon and raid on every character and keeps the instance limits.
+
+**Lockouts:**
+- **The limits:** instances entered this hour (limit 5) and in the last 24
+  hours (limit 30), across all your characters, with when the next one frees
+  up.
+- **Which lockout:** whether you're on an **hourly** or a **daily** lockout,
+  and for how long.
+- **Timed from leaving:** a run counts from when you leave it, or from when
+  you entered while you're still inside.
+- **Where it shows:** in the window, on the dashboard card and in the minimap
+  tooltip. `/wmachine lockouts` prints them, and so does the game's "too many
+  instances" message. When a full limit frees up, it tells you.
+
+**The same instance is counted once:**
+- **How it's recognised:** the server gives every instance its own number,
+  carried in the GUID of every creature inside.
+- **Merging:** going back into the same number adds to the earlier run
+  instead of logging and counting a new one. That covers a corpse run,
+  another Scarlet Monastery wing on the same ID, a disconnect, or logging
+  out inside.
+- **Resets:** after one, the next visit is a new run.
+
+**Each run keeps:**
+- the group: name, level and class
+- time in and out, and time inside
+- mobs killed by you and your group
+- XP, and XP per mob
+- gold looted
+- your level going in and coming out
+- every reputation gain
+
+Hover a run in the log for all of it, and right-click to delete one.
+
+**Leaving an instance** prints the run's stats to your chat window (the
+default), to your group, or not at all.
+
+**Resets:** as group leader, resetting posts "[WM] <instance> has been
+reset." in party or raid chat.
+
+**Options:** merge the same instance, reset announcements, the "you can
+enter again" message, and where run stats go.
+
+**Saved data:** new SavedVariable `InstanceTrackerDB` (one log for all
+characters).
+
+**Still to come:**
+- reset notices to and from Nova Instance Tracker users
+  (docs/NOVA-PROTOCOL.md)
+- clickable chat lines
+- gold trade alerts (TODO 10)
+- the alts window (TODO 11)
 
 ---
 

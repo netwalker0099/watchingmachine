@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.21 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.22 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines fourteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines fifteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -390,7 +390,32 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   Shield learned. Holy and Retribution paladins are never nagged, and
   nothing shows before you've learned the spell or while you're dead
 
-### 19. Chat Filter
+### 19. Instance Tracker
+Logs every dungeon and raid you enter, on every character, and keeps the
+instance limits (Logging group on the dashboard; `/wmachine instances`).
+
+- **Lockouts:** how many instances you've entered this hour (limit **5**) and
+  in the last 24 hours (limit **30**), across all your characters, and when
+  the next one frees up. It says whether you're on an **hourly** or a
+  **daily** lockout. Runs are timed from when you **leave**, as the server
+  does. `/wmachine lockouts` prints them, and so does the game's "too many
+  instances" message. It tells you when you can enter a new instance again
+- **Same instance, counted once:** the server numbers every instance, and
+  the addon reads that number from the creatures inside. Going back into the
+  same one (a corpse run, another wing on the same ID, a disconnect, logging
+  out inside) adds to the earlier run instead of logging and counting a new
+  one. A reset makes the next visit a new run
+- **Each run keeps:** the group (name, level, class), time in and out and time
+  inside, mobs killed by the group, XP (and XP per mob), gold looted, your
+  level going in and out, and every reputation gain. Hover a run in the log
+  to see it all; right-click to delete one
+- **Leaving an instance** prints the run's stats to your chat window, to your
+  group, or not at all
+- **Resets:** as group leader, a reset tells your group in party or raid chat
+- Options: merge the same instance, reset announcements, the "you can enter
+  again" message, and where run stats go
+
+### 20. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -518,6 +543,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine soulstone` - Soulstone timers in your group (warlock)
 - `/wmachine portals` - List the teleports and portals you know (mage)
 - `/wmachine totems` - Edit your totem sets (shaman)
+- `/wmachine instances` - Instance log and lockouts
+- `/wmachine lockouts` - Print your instance lockouts
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
 - `/wmachine swing reset` - Swing timer back to its default place and size
 - `/wmachine consumes` - Show what the general raid consumable checks see
@@ -562,6 +589,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
 - `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
+- `InstanceTrackerDB` - Instance log (every character) and its options
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -581,6 +609,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.22
+- New **Instance Tracker**: instance lockouts (5 an hour, 30 a day, timed from leaving, hourly or daily), a log of every run on every character with group, time, mobs, XP, gold, levels and reputation, the same instance counted once, and reset announcements
 
 ### Version 3.21
 - The **dashboard is resizable** and opens at a size that shows every module; cards flow into columns as it gets wider, and **Fit** snaps back to the show-everything size

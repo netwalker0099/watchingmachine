@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.21"
+WM.version = "3.22"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -276,6 +276,7 @@ local MODULE_COLORS = {
     ClassShaman = "0070DE",
     SwingTimer = "FFAA33",
     ClassPaladin = "F58CBA",
+    InstanceTracker = "66CCFF",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1032,7 +1033,7 @@ end
 local MODULE_GROUPS = {
     { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
-    { title = "Logging", modules = { "AutoLogger", "MailLogger" } },
+    { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker" } },
 }
 
 local MODULE_INFO = {
@@ -1065,6 +1066,15 @@ local MODULE_INFO = {
         title = "Services Parser", desc = "Parse boost advertisements",
         about = "Reads boost adverts from the Services channel and sorts them by dungeon, with a separate tab for summons and portals.",
         command = "services", color = {0, 0.8, 1}, icon = "Interface\\Icons\\Spell_Nature_Polymorph",
+    },
+    InstanceTracker = {
+        title = "Instance Tracker", desc = "Lockouts and a log of every run",
+        about = "Logs every dungeon and raid on all your characters, with the group, time inside, mobs, XP, gold and reputation, and keeps the 5-an-hour and 30-a-day instance limits, timed from when you leave.",
+        command = "instances", color = {0.4, 0.8, 1}, icon = "Interface\\Icons\\INV_Misc_Key_14",
+        tools = {
+            { text = "Print my lockouts", desc = "How many instances this hour and today, and when the next one frees up.",
+              func = function() Call("InstanceTracker", "PrintLockouts") end },
+        },
     },
     WhisperLogs = {
         title = "WarcraftLogs Lookup", desc = "WCL links for whispers & group",
@@ -1694,6 +1704,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
     print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
     print("|cFFFFFF00/wmachine totems|r - Edit your totem sets (shaman)")
+    print("|cFFFFFF00/wmachine instances|r - Instance log and lockouts")
+    print("|cFFFFFF00/wmachine lockouts|r - Print your instance lockouts")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
     print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
@@ -1879,6 +1891,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         else
             WM:Print("ClassMage module not available")
         end
+
+    elseif cmd == "instances" or cmd == "instance" or cmd == "it" then
+        local module = WM.modules.InstanceTracker
+        if module and module.Toggle then module:Toggle() else WM:Print("InstanceTracker module not available") end
+
+    elseif cmd == "lockouts" or cmd == "lockout" then
+        local module = WM.modules.InstanceTracker
+        if module and module.PrintLockouts then module:PrintLockouts() else WM:Print("InstanceTracker module not available") end
 
     elseif cmd == "swing reset" then
         local module = WM.modules.SwingTimer

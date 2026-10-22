@@ -11,7 +11,7 @@ what still needs settling before it's built.
 6. ~~Flyout buttons: open on hover or on click~~ (done, 3.15)
 7. ~~Flyout directions: add "Hidden", and use dropdowns~~ (done, 3.15)
 8. ~~Dock flyout buttons together~~ (done, 3.15)
-9. Instance tracker: lockouts, instance log and run stats
+9. Instance tracker: lockouts, instance log and run stats (core done, 3.22)
 10. Gold trade alerts and trade log by instance
 11. Alt tracking: "Your Characters"
 12. PvP instance log: battleground and arena stats
@@ -260,6 +260,22 @@ What all five should share instead of building their own:
 ---
 
 ## 9. Instance tracker: lockouts, instance log and run stats
+
+**Built in 3.22 (`Modules/InstanceTracker.lua`):**
+- lockouts (hourly / daily, timed from leaving)
+- the run log with stats
+- same-instance merging by zone UID
+- reset handling and the leader's announcement
+- run stats on leaving
+
+**Still to do:**
+- [ ] **Nova Instance Tracker compatibility:** send `instanceResetNoMsg
+      1.00 <instance>` to the group when leader, and show NIT users'
+      notices (with our own leader check). It needs LibSerialize,
+      LibDeflate and AceComm. See docs/NOVA-PROTOCOL.md part 1.
+- [ ] **Clickable chat:** chat lines that open the log, and the **[X]** to
+      delete a run.
+- [ ] **Minimap button:** right-click to open the alts window (with TODO 11).
 
 Tracks every instance you enter, on every character and realm, and the
 limits on entering them.
