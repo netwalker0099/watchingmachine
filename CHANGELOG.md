@@ -2,7 +2,27 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.20.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.21** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.21
+
+### Dashboard: sized to fit, and resizable
+
+- **Opens showing every card:** the dashboard used to be a fixed 420 × 700
+  window with one column, so the 14 cards needed scrolling on most screens.
+  Its first size is now worked out from your screen. If one column would be
+  taller than the screen, it uses two columns (up to four), wide enough for
+  every card to show.
+- **Resizable:** drag the size grip in the bottom-right corner, between 380
+  and 1300 wide and up to your screen's height. The cards reflow as you drag
+  into as many columns as fit, at least 340 wide each, and their text
+  narrows or widens with them. The size is remembered.
+- **Fit:** a button at the top left puts back the size that shows every
+  card.
+- Anything that still doesn't fit (a short window, or a very small screen)
+  scrolls as before.
 
 ---
 

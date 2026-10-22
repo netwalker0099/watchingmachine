@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.20.1"
+WM.version = "3.21"
 WM.modules = {}
 
 -- ============================================
@@ -870,20 +870,28 @@ end
 -- ============================================
 
 local dashboard = nil
+-- Width of the dashboard the card area doesn't get: side padding and the
+-- card list's scroll bar
+local DASH_SIDE = 50
 
 function WM:CreateDashboard()
     if dashboard then return end
 
     -- The card list scrolls inside the fill area; the panel is 700 tall
     -- but never taller than the screen.
+    -- First open: a size that shows every card (more columns on a short
+    -- screen). After that it's resizable and remembers its size.
+    local fitW, fitH = self:DashboardFitSize()
     local frame = self.UI:CreatePanel({
         name = "WatchingMachineDashboard",
         title = "Watching Machine",
-        width = 420,
-        height = 700,
-        minHeight = 400,
+        width = fitW,
+        height = fitH,
+        minHeight = 300,
         scroll = false,
         strata = "MEDIUM",
+        resizable = { 380, 300, 1300, 1400 },
+        onResize = function() WM:LayoutCards() end,
         -- Saved as WatchingMachineDB.dashboardPos before the builder
         legacyPosition = WatchingMachineDB and WatchingMachineDB.dashboardPos,
     })
@@ -904,7 +912,7 @@ function WM:CreateDashboard()
     cardsScroll:SetPoint("BOTTOMRIGHT", -20, 0)
 
     local cardsContainer = CreateFrame("Frame", nil, cardsScroll)
-    cardsContainer:SetSize(370, 1)
+    cardsContainer:SetSize(fitW - DASH_SIDE, 1)
     cardsScroll:SetScrollChild(cardsContainer)
 
     frame.cardsScroll = cardsScroll
@@ -943,6 +951,25 @@ function WM:CreateDashboard()
         onClick = function() WM:ToggleSettings() end,
         tooltip = { "Settings", "UI theme and verbose chat." },
     }, "RIGHT")
+
+    -- Fit: back to the size that shows every card
+    local fitBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    fitBtn:SetSize(40, 18)
+    fitBtn:SetPoint("TOPLEFT", 12, -12)
+    fitBtn:SetText("Fit")
+    fitBtn:SetScript("OnClick", function() WM:FitDashboard() end)
+    fitBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Fit", 1, 0.8, 0)
+        GameTooltip:AddLine("Size the dashboard to show every module, in more columns if the screen is short."
+            .. " Drag the bottom-right corner to resize it yourself.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    fitBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame.fitBtn = fitBtn
+
+    -- Cards reflow live while the corner is dragged
+    frame:HookScript("OnSizeChanged", function() WM:LayoutCards() end)
 
     frame:Finish()
     dashboard = frame
@@ -1239,29 +1266,111 @@ function WM:SetCardIcon(icon, info)
 end
 
 local CARD_H, CARD_GAP, GROUP_H = 46, 3, 20
+-- Card grid: as many columns of cards at least CARD_MIN_W wide as fit
+local CARD_W, CARD_MIN_W, COL_GAP = 370, 340, 6
+local DASH_CHROME = 40 + 12 + 44 + 8   -- title band, subtitle, footer
+WM.DASH_CARD = { CARD_H = CARD_H, CARD_GAP = CARD_GAP, GROUP_H = GROUP_H, CARD_W = CARD_W,
+    CARD_MIN_W = CARD_MIN_W, COL_GAP = COL_GAP, SIDE = DASH_SIDE, CHROME = DASH_CHROME }
+
+local function Columns(width)
+    return math.max(1, math.floor((width + COL_GAP) / (CARD_MIN_W + COL_GAP)))
+end
+
+-- Height of the card list laid out in this many columns
+local function CardsHeight(cols)
+    local h = 0
+    for _, group in ipairs(MODULE_GROUPS) do
+        h = h + GROUP_H + math.ceil(#group.modules / cols) * (CARD_H + CARD_GAP) + 4
+    end
+    return h
+end
+
+-- The smallest number of columns that shows every card on screen, and the
+-- dashboard size for it
+function WM:DashboardFitSize()
+    local screenH = (UIParent and UIParent:GetHeight()) or 768
+    local screenW = (UIParent and UIParent:GetWidth()) or 1024
+    if not screenH or screenH <= 0 then screenH = 768 end
+    if not screenW or screenW <= 0 then screenW = 1024 end
+    local room = screenH - 16
+    local cols = 1
+    while cols < 4 and CardsHeight(cols) + DASH_CHROME > room
+        and DASH_SIDE + (cols + 1) * CARD_W + cols * COL_GAP <= screenW - 16 do
+        cols = cols + 1
+    end
+    local w = DASH_SIDE + cols * CARD_W + (cols - 1) * COL_GAP
+    local h = math.min(room, CardsHeight(cols) + DASH_CHROME)
+    return w, math.floor(h), cols
+end
+
+function WM:FitDashboard()
+    if not dashboard then return end
+    local w, h = self:DashboardFitSize()
+    dashboard:SetWidth(w)
+    dashboard:GetState().size = { w, h }
+    dashboard:Reflow()
+    self:LayoutCards()
+end
+
+-- Place the group headers and cards in as many columns as fit
+function WM:LayoutCards()
+    if not dashboard or not dashboard.cardsContainer or not dashboard.groupHeaders then return end
+    local container = dashboard.cardsContainer
+    local width = (dashboard:GetWidth() or 0) - DASH_SIDE
+    if width < CARD_MIN_W then width = CARD_MIN_W end
+    container:SetWidth(width)
+    local cols = Columns(width)
+    local cardW = math.floor((width - (cols - 1) * COL_GAP) / cols)
+    local y = 0
+    for gi, group in ipairs(MODULE_GROUPS) do
+        local header = dashboard.groupHeaders[gi]
+        if header then
+            header:ClearAllPoints()
+            header:SetPoint("TOPLEFT", container, "TOPLEFT", 4, -(y + 4))
+        end
+        y = y + GROUP_H
+        local n = 0
+        for _, moduleName in ipairs(group.modules) do
+            local card = dashboard.moduleCards[moduleName]
+            if card then
+                local col, row = n % cols, math.floor(n / cols)
+                card:ClearAllPoints()
+                card:SetPoint("TOPLEFT", container, "TOPLEFT", col * (cardW + COL_GAP), -(y + row * (CARD_H + CARD_GAP)))
+                card:SetSize(cardW, CARD_H)
+                local textWidth = cardW - (card.textReserve or 119)
+                for _, fs in ipairs({ card.titleText, card.descText, card.statusText }) do
+                    if fs then fs:SetWidth(textWidth) end
+                end
+                n = n + 1
+            end
+        end
+        y = y + math.ceil(n / cols) * (CARD_H + CARD_GAP) + 4
+    end
+    -- Scroll child must be tall enough for everything, or the lower cards
+    -- are unreachable
+    container:SetHeight(math.max(y, 1))
+    dashboard.cardColumns = cols
+end
 
 function WM:CreateModuleCards()
     if not dashboard or not dashboard.cardsContainer then return end
 
     local container = dashboard.cardsContainer
     local width = container:GetWidth()
-    local yOffset = 0
+    dashboard.groupHeaders = {}
 
-    for _, group in ipairs(MODULE_GROUPS) do
+    for gi, group in ipairs(MODULE_GROUPS) do
         local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        header:SetPoint("TOPLEFT", 4, -(yOffset + 4))
         header:SetText(group.title)
         WM:ThemeText(header, "headerColor")
-        yOffset = yOffset + GROUP_H
+        dashboard.groupHeaders[gi] = header
 
         for _, moduleName in ipairs(group.modules) do
             local info = MODULE_INFO[moduleName]
             local module = self.modules[moduleName]
 
             local card = CreateFrame("Frame", nil, container, "BackdropTemplate")
-            card:SetSize(width, CARD_H)
-            card:SetPoint("TOPLEFT", 0, -yOffset)
-            card:SetPoint("TOPRIGHT", 0, -yOffset)
+            card:SetSize(width, CARD_H)   -- placed by LayoutCards
             WM:SkinCard(card, info.color)
             WM:RegisterSkinnedCard(card, info.color)
             card.info, card.moduleName = info, moduleName
@@ -1329,8 +1438,9 @@ function WM:CreateModuleCards()
 
             -- Text column stops short of the controls; long text truncates
             -- rather than running underneath them
-            local textWidth = width - 50 - (8 + 55) - 6
-                - (card.toolsBtn and 27 or 0) - (card.switch and 26 or 0)
+            card.textReserve = 50 + (8 + 55) + 6
+                + (card.toolsBtn and 27 or 0) + (card.switch and 26 or 0)
+            local textWidth = width - card.textReserve
 
             local titleText = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             titleText:SetPoint("TOPLEFT", 50, -6)
@@ -1363,14 +1473,11 @@ function WM:CreateModuleCards()
             end)
 
             dashboard.moduleCards[moduleName] = card
-            yOffset = yOffset + CARD_H + CARD_GAP
+            card.titleText, card.descText = titleText, descText
         end
-        yOffset = yOffset + 4
     end
 
-    -- Scroll child must be tall enough for everything, or the lower cards
-    -- are unreachable
-    container:SetHeight(math.max(yOffset, 1))
+    self:LayoutCards()
     self:UpdateDashboard()
 end
 

@@ -71,7 +71,10 @@ local dash = WM.dashboard
 dash:Show()
 check("dashboard built by the builder", dash.layout ~= nil and dash:GetName() == "WatchingMachineDashboard")
 check("dashboard is a fill panel", dash.opts.scroll == false and dash.layout.fill ~= nil)
-check("dashboard 700 tall at 768", dash:GetHeight() == 700)
+-- 14 cards don't fit one column on a 768-high screen: two columns
+check("dashboard opens at a size that shows every card", dash:GetWidth() == 50 + 2 * 370 + 6
+    and dash:GetHeight() == 3 * 20 + 8 * 49 + 12 + 104)
+check("dashboard is resizable", dash.sizeGrip ~= nil)
 check("card scroll keeps its name", env.WM_DashboardCardScroll == dash.cardsScroll)
 check("card scroll sits in the fill area", dash.cardsScroll:GetParent() == dash.layout.fill.frame)
 check("cards container in the scroll frame", dash.cardsContainer:GetParent() == dash.cardsScroll)
@@ -91,7 +94,33 @@ for _, card in pairs(dash.moduleCards) do
 end
 check("every module card created", n == 14)
 check("cards live in cardsContainer", inside)
-check("container sized to the cards", dash.cardsContainer:GetHeight() > 14 * 46)
+check("container sized to the cards", dash.cardsContainer:GetHeight() == 3 * 20 + 8 * 49 + 12)
+check("two columns of cards", dash.cardColumns == 2)
+local function CardAt(name) local _, _, _, x, y = dash.moduleCards[name]:GetPoint(1); return x, y end
+local bx, by = CardAt("BuffCheck")
+local dx, dy = CardAt("DebuffTracker")
+local cx, cy = CardAt("ClassTools")
+check("cards fill a row before the next", bx == 0 and dx == 376 and dy == by and cx == 0 and cy == by - 49)
+check("card width split between columns", dash.moduleCards.BuffCheck:GetWidth() == 370)
+-- Narrower: one column, every card stacked
+dash:SetWidth(400)
+WM:LayoutCards()
+check("narrow: one column", dash.cardColumns == 1 and select(4, dash.moduleCards.DebuffTracker:GetPoint(1)) == 0
+    and dash.cardsContainer:GetHeight() == 3 * 20 + 14 * 49 + 12)
+check("card text narrows with the card", dash.moduleCards.BuffCheck.titleText:GetWidth()
+    == 350 - dash.moduleCards.BuffCheck.textReserve)
+-- Wide: three columns
+dash:SetWidth(50 + 3 * 340 + 12)
+WM:LayoutCards()
+check("wide: three columns", dash.cardColumns == 3)
+-- Fit puts the every-card size back and saves it
+WM:FitDashboard()
+check("Fit: back to the size that shows every card", dash:GetWidth() == 796 and dash.cardColumns == 2
+    and dash:GetHeight() == 568)
+local saved = env.WatchingMachineDB.panels.WatchingMachineDashboard.size
+check("Fit saves the size", saved and saved[1] == 796 and saved[2] == 568)
+W.click(dash.fitBtn)
+check("Fit button", dash:GetWidth() == 796)
 
 -- Footer
 check("minimap button says hide", dash.minimapBtn:GetText() == "Hide Minimap")
@@ -140,9 +169,9 @@ W.click(verbose)
 check("verbose checkbox clears", env.WatchingMachineDB.verboseChat == false)
 
 -- dashboard fits a short screen
-env.UIParent:SetHeight(600)
+env.UIParent:SetHeight(500)
 dash:Hide(); dash:Show()
-check("dashboard shrinks to a short screen", dash:GetHeight() == 600 - 16)
+check("dashboard shrinks to a short screen", dash:GetHeight() == 500 - 16)
 env.UIParent:SetHeight(768)
 
 -- ============ Class Tools ============

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.20.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.21 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -468,6 +468,12 @@ never loads them, because they aren't listed in the `.toc`.
 opens the dashboard. Everything the addon does can be reached from it.
 
 - Cards are grouped into **Raid**, **Guild & Social** and **Logging**.
+- **Sized to fit:** the first time it opens, the dashboard picks a size that
+  shows every card without scrolling, using two (or more) columns of cards
+  when one column would be taller than your screen.
+- **Resizable:** drag the bottom-right corner. Cards reflow into as many
+  columns as fit the width, and the size is remembered. **Fit** (top left)
+  goes back to the size that shows every card.
 - **Hover a card** to see what the module does, its full status, and its
   slash command.
 - The **on/off switch** on a card turns the module on or off. Only modules
@@ -573,6 +579,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.21
+- The **dashboard is resizable** and opens at a size that shows every module; cards flow into columns as it gets wider, and **Fit** snaps back to the show-everything size
 
 ### Version 3.20.1
 - Fixed: the game menu button sat on top of ElvUI's and kept the default look. It now goes under ElvUI's button (or any other addon's) and takes ElvUI's skin
