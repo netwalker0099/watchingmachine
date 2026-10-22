@@ -13,12 +13,12 @@ not committed. Uncertain points are marked.
 
 ## Our decisions
 
-- **NIT (instance resets): listen and send.**
-  - The format is simple and has no protection against third parties.
-  - We send `instanceResetNoMsg 1.00 <instance>` to the group when we're
-    the leader and reset.
+- **NIT (instance resets): listen only** (built in 3.23,
+  `Modules/NovaCompat.lua`).
   - We show NIT users' reset notices, checking they come from the group
-    leader (NIT itself doesn't check).
+    leader (NIT itself doesn't check), and mark the instance as reset.
+  - We don't send in their format; our own reset announcement is a normal
+    party / raid chat line.
 - **NWB: listen only, and only after review.**
   - On TBC, NWB syncs little: Terokkar tower timers, the dailies, and layer
     data.

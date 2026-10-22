@@ -2,7 +2,40 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.22** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.23** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.23
+
+### New — Reset notices from Nova Instance Tracker users
+
+When your group leader runs **Nova Instance Tracker** and resets instances,
+their addon tells the group in a hidden addon message. Watching Machine now
+reads it.
+
+- **Leader resets with Nova's chat announcement off:** you see "The
+  Deadmines has been reset by the group leader (Name, Nova Instance
+  Tracker)."
+- **Leader resets with it on:** Nova has already posted to party chat, so
+  nothing is repeated.
+- **Either way,** that instance is marked as reset in your log, so going back
+  in starts a new run.
+- **Nova World Buffs** sends a similar notice, but only when a reset *fails*
+  (players still inside). That's a bug in Nova World Buffs, worked out from
+  its code. It's shown as "tried to reset ..., but players are still
+  inside".
+- **Trust:** only the leader of your own group is believed (Nova itself
+  doesn't check), and only group channels are read.
+- **Listen only:** Watching Machine never sends in Nova's format.
+- **Option:** *Show resets from leaders using Nova Instance Tracker* in the
+  Instance Tracker window (on by default).
+- **How it's read:** Nova's messages are packed and compressed, so
+  `Modules/NovaCompat.lua` unpacks them with its own decoder (message
+  reassembly, decompression and unpacking), written from the format
+  described in `docs/NOVA-PROTOCOL.md`. No Nova or library code is
+  included. The tests decode messages compressed by zlib in the same format
+  Nova produces.
 
 ---
 

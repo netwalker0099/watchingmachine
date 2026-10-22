@@ -269,10 +269,9 @@ What all five should share instead of building their own:
 - run stats on leaving
 
 **Still to do:**
-- [ ] **Nova Instance Tracker compatibility:** send `instanceResetNoMsg
-      1.00 <instance>` to the group when leader, and show NIT users'
-      notices (with our own leader check). It needs LibSerialize,
-      LibDeflate and AceComm. See docs/NOVA-PROTOCOL.md part 1.
+- [x] **Nova Instance Tracker compatibility (3.23, listen only):** NIT
+      users' reset notices are shown, with our own leader check, and the
+      instance is marked reset. Decided: we don't send in Nova's format.
 - [ ] **Clickable chat:** chat lines that open the log, and the **[X]** to
       delete a run.
 - [ ] **Minimap button:** right-click to open the alts window (with TODO 11).

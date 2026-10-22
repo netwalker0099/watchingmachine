@@ -36,6 +36,7 @@ local DEFAULTS = {
     announceReset = true,       -- tell your group when you reset
     mergeSame = true,           -- same instance number: merge, don't log again
     lockoutReady = true,        -- say when you can enter a new instance again
+    novaListen = true,          -- show Nova Instance Tracker users' reset notices
 }
 IT.DEFAULTS = DEFAULTS
 
@@ -604,6 +605,14 @@ function IT:CreateUI()
             .. " in party or raid chat." },
     })
     L:Checkbox({
+        label = "Show resets from leaders using Nova Instance Tracker",
+        get = function() return DB().novaListen end, set = function(v) DB().novaListen = v end,
+        tooltip = { "Nova Instance Tracker", "When your group leader runs Nova Instance Tracker (or Nova World"
+            .. " Buffs) and resets, their addon tells the group; this shows it and marks the instance as reset."
+            .. " Only the leader of your own group is believed. Watching Machine only listens: it never sends in"
+            .. " Nova's format." },
+    })
+    L:Checkbox({
         label = "Say when I can enter a new instance again",
         get = function() return DB().lockoutReady end, set = function(v) DB().lockoutReady = v end,
     })
@@ -712,6 +721,7 @@ function IT:Initialize()
         "CHAT_MSG_COMBAT_FACTION_CHANGE", "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP",
         "GROUP_ROSTER_UPDATE", "PLAYER_LOGOUT", "PLAYER_CAMPING",
     })
+    if WM.Nova then WM.Nova:Start() end
     -- Already inside when the addon starts (login or /reload in an instance)
     if InstanceKind() then self:Enter() end
     wasLocked = self:Lockouts().locked
