@@ -4,8 +4,8 @@
 ## Title: Watching Machine
 ## Notes: Comprehensive monitoring suite - Keywords, Chat Filter, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker, Buff Check, ArmorySnap, Aura Range, Class Tools
 ## Author: Robert
-## Version: 3.16.1
-## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB
+## Version: 3.17
+## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB
 
 Core.lua
 UI.lua
@@ -24,6 +24,7 @@ Modules/ArmorySnap.lua
 Modules/AuraRange.lua
 Modules/ClassTools.lua
 Modules/ClassFlyout.lua
+Modules/SwingTimer.lua
 Modules/ClassGeneral.lua
 Modules/ClassWarlock.lua
 Modules/ClassMage.lua

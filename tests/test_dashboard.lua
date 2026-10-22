@@ -156,7 +156,7 @@ end
 env.UnitClass = function() return "Mage", "MAGE" end
 check("mage sees consumables + portals", VisibleCount(WM.MODULE_INFO.ClassTools) == 2)
 env.UnitClass = function() return "Warrior", "WARRIOR" end
-check("warrior sees only consumables", VisibleCount(WM.MODULE_INFO.ClassTools) == 1)
+check("warrior sees consumables + swing timer", VisibleCount(WM.MODULE_INFO.ClassTools) == 2)
 
 -- ---- right-click opens the tools menu ----
 local added, toggled = {}, 0

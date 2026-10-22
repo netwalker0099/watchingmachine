@@ -412,5 +412,8 @@ function General:Initialize()
     -- Flyout buttons (mage, warlock, ...): open mode, docking, lock
     if WM.Flyout then WM.Flyout.RegisterOptions(tools) end
 
+    -- Swing / Auto Shot timer
+    if WM.SwingTimer then WM.SwingTimer.RegisterOptions(tools) end
+
     tools:RegisterMonitor(Monitor)
 end

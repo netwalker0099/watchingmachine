@@ -5,7 +5,7 @@ what still needs settling before it's built.
 
 1. ~~Mana potion / rune alert~~ (done, 3.14)
 2. Audio trigger for alerts
-3. Melee swing timer
+3. ~~Melee swing timer~~ (done, 3.17)
 4. ~~Warlock button: armors and demon summons~~ (done, 3.15)
 5. ~~Shaman totem bar with quick sets~~ (done, 3.16)
 6. ~~Flyout buttons: open on hover or on click~~ (done, 3.15)
@@ -66,45 +66,25 @@ rune alerts first, and be built so any Class Tools alert can use it.
 
 ---
 
-## 3. Melee swing timer
+## 3. Melee swing timer — DONE in 3.17
 
-A movable bar showing time to your next melee swing, main hand and
-off hand.
+Built as `Modules/SwingTimer.lua`, with its options in Class Tools >
+General. Settled as:
 
-**Reference:** look at how Leatrix Plus does it before building. Either
-you provide its code, or we read the released addon. Two cautions: check
-that Leatrix Plus actually has a swing timer, and check its licence before
-reusing any code. Reading it for the approach is fine; copying code needs a
-licence that allows it.
-
-**Likely approach (to check against the reference):**
-- **Swing speed:** `UnitAttackSpeed("player")` gives the main- and off-hand
-  swing times. They change with haste, so re-read on `UNIT_ATTACK_SPEED`.
-- **Swing detection:** watch your own `SWING_DAMAGE` / `SWING_MISSED` in
-  `COMBAT_LOG_EVENT_UNFILTERED`. The off-hand flag tells the hands apart.
-- **"Next melee" abilities:** Heroic Strike, Cleave, Maul and Raptor Strike
-  replace the white swing and arrive as `SPELL_DAMAGE` / `SPELL_MISSED`, so
-  they must reset the timer too. Slam resets the swing in TBC.
-- **Parry haste:** when *you* parry an incoming attack (a `PARRY` miss with
-  you as the target), your own next swing comes sooner. The remaining time is
-  cut by 40% of your swing speed, but never to less than 20% of it. Tanks
-  will notice if this is missed. Confirm the exact rule against the
-  reference.
-- **Other resets:** weapon swaps and reaching the target after moving.
-- **Display:** a bar per hand, built with the panel builder's styling. It
-  should be lockable and movable, with the position saved. Show it only in
-  combat or while auto-attack is on.
-- **Possible extra:** a hunter Auto Shot timer (`START_AUTOREPEAT_SPELL` /
-  `STOP_AUTOREPEAT_SPELL`). It works differently from melee, so treat it as
-  optional.
-
-**To settle:**
-- [ ] **Where it lives:** a General tab feature in Class Tools, or a module of
-      its own? It applies to many classes.
-- [ ] **Which classes:** all melee classes, or a per-class toggle?
-- [ ] **Off hand:** show the off-hand bar, or main hand only?
-- [ ] **Tests:** a fake combat log covering swing resets, next-melee
-      abilities and haste changes.
+- **Reference:** the rules come from the established TBC timers
+  (LibClassicSwingTimerAPI, WeakAuras, WeaponSwingTimer, Quartz) and
+  enhancement guides, not from Leatrix Plus. No code was copied.
+- **Which classes:** warriors, rogues, Retribution paladins and Enhancement
+  shamans (spec read from talents), plus hunters with an Auto Shot bar. An
+  option covers every class.
+- **Off hand:** shown whenever you dual wield.
+- **Latency:** shown as a zone at the end of each bar; press-now marks are
+  moved earlier by it.
+- **Shaman sync:** a mark for the sync macro, plus an in-sync readout.
+- **Tests:** `tests/test_swing.lua` drives a fake combat log.
+- **Still to confirm in game:** how Windfury Weapon's extra attack is
+  logged, and whether the Auto Shot wind-up scales with haste.
+- **Not built:** a Windfury cooldown bar and Flurry charges.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.16.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.17 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -261,6 +261,35 @@ always sits first.
   - Both thresholds are adjustable. A warning stays up until you're 500 back
     under its threshold, so it doesn't flicker as mana regenerates.
 - `/wmachine consumes` prints exactly what the checks currently see
+- **Swing timer**: a bar per hand showing the time to your next swing, for
+  warriors, rogues, Retribution paladins and Enhancement shamans (spec read
+  from your talents), and an **Auto Shot** bar for hunters
+  - A white line moves left to right as the swing comes round; the fill
+    turns red in the last stretch, which is your **latency** (drawn in red at
+    the end of the bar)
+  - Follows TBC's rules: Heroic Strike / Cleave replace the swing; finishing
+    a cast (Slam, Lightning Bolt, a heal) restarts it; instants (Stormstrike,
+    shocks) don't; haste such as Flurry rescales it; **parrying** takes 40%
+    of your swing off (never below 20% left); a weapon swap restarts it;
+    Windfury extra attacks don't count as a new swing
+  - **Hunters**: the Auto Shot bar is green while a Steady Shot is safe to
+    start, red where starting one would delay (clip) the next shot (cast time
+    plus latency before the wind-up), and yellow for the final half-second
+    wind-up, when moving delays the shot
+  - **Enhancement weapon sync**: you want the off hand to land just after
+    the main hand (Windfury Weapon's 3s cooldown is shared, so the main hand
+    should get the proc, and close hits share one Flurry charge). A blue mark
+    on the main-hand bar shows when to press the sync macro
+    (`/cleartarget`, `/targetlasttarget`, `/startattack`). It stops and
+    restarts your attack, which puts an off hand that's past halfway back to
+    halfway. The mark sits at *off-hand speed ÷ 2 − lag − latency* before
+    the main-hand swing, turns green with **SYNC NOW** when it's time, and a
+    line under the bars says *In sync*, *Off hand first* or *Out of sync*.
+    *Off hand lands after by* sets the lag (0.15s default). Sync only holds
+    with equal weapon speeds; the timer says so when they differ
+  - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
+    mark*, *Off hand lands after by*, *Lock the swing timer*.
+    `/wmachine swing` shows it for 10 seconds so you can drag it into place
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
 `Unstable Flask of the Sorcerer` count alongside the standard flasks.
@@ -471,6 +500,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine soulstone` - Soulstone timers in your group (warlock)
 - `/wmachine portals` - List the teleports and portals you know (mage)
 - `/wmachine totems` - Edit your totem sets (shaman)
+- `/wmachine swing` - Show the swing timer for 10 seconds to position it
 - `/wmachine consumes` - Show what the general raid consumable checks see
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
@@ -505,6 +535,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `GeneralChecksDB` - General consumable check settings
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
+- `SwingTimerDB` - Swing timer position, lock and weapon-sync lag
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -522,6 +553,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.17
+- **Swing timer** for warriors, rogues, Retribution paladins and Enhancement shamans, and an **Auto Shot timer** for hunters, with your latency shown at the end of each bar
+- Hunters: the bar shows when a Steady Shot is safe, when it would clip the next shot, and the wind-up
+- Enhancement shamans: a **weapon sync** mark for your sync macro, with *SYNC NOW* and an in-sync / out-of-sync readout
 
 ### Version 3.16.1
 - Fixed: in Class Tools, option dropdowns (e.g. the mage *expand* directions) covered the first line of their description. The description now sits below the dropdown, and the dropdowns line up in one column

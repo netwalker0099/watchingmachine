@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.16.1"
+WM.version = "3.17"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -274,6 +274,7 @@ local MODULE_COLORS = {
     ClassWarlock = "8787ED",
     ClassMage = "3FC7EB",
     ClassShaman = "0070DE",
+    SwingTimer = "FFAA33",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1129,6 +1130,10 @@ local MODULE_INFO = {
               func = function() Call("ClassWarlock", "ReportSoulstones") end },
             { text = "List my portals and teleports", visible = function() return PlayerClass() == "MAGE" end,
               func = function() Call("ClassMage", "ReportSpells") end },
+            { text = "Show the swing timer (10s, to position it)",
+              visible = function() local c = PlayerClass(); return c == "WARRIOR" or c == "ROGUE"
+                  or c == "PALADIN" or c == "SHAMAN" or c == "HUNTER" end,
+              func = function() Call("SwingTimer", "Test") end },
             { text = "Edit totem sets", visible = function() return PlayerClass() == "SHAMAN" end,
               func = function() Call("ClassShaman", "ToggleEditor") end },
         },
@@ -1567,6 +1572,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
     print("|cFFFFFF00/wmachine portals|r - List your teleport/portal spells (mage)")
     print("|cFFFFFF00/wmachine totems|r - Edit your totem sets (shaman)")
+    print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to position it")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine status|r - One-line status for every module")
@@ -1749,6 +1755,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:ReportSpells()
         else
             WM:Print("ClassMage module not available")
+        end
+
+    elseif cmd == "swing" or cmd == "swingtimer" then
+        local module = WM.modules.SwingTimer
+        if module and module.Test then
+            module:Test()
+        else
+            WM:Print("SwingTimer module not available")
         end
 
     elseif cmd == "totems" or cmd == "totem" then

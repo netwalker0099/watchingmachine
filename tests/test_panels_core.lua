@@ -241,8 +241,9 @@ check("thirty features listed, plus the totem button", #ShownFeatures() == 31)
 check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
-check("General lists its checkbox options (mana warnings, flyout dock and lock included)",
-    #ShownFeatures() == 8 and HasFeature("Dock flyout buttons together") and HasFeature("Lock flyout buttons"))
+check("General lists its checkbox options (mana warnings, flyout dock and lock, swing timer included)",
+    #ShownFeatures() == 12 and HasFeature("Dock flyout buttons together") and HasFeature("Lock flyout buttons")
+    and HasFeature("Swing timer") and HasFeature("Shaman weapon sync mark"))
 W.click(Tab("Rogue"))
 check("short list stops scrolling", not cp.scrollBar:IsShown() and #ShownFeatures() == 1)
 

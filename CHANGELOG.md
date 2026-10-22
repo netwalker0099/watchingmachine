@@ -2,7 +2,88 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.16.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.17** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.17
+
+### New — Swing timer (Class Tools > General)
+
+A movable bar per hand showing the time to your next melee swing, or to your
+next Auto Shot for hunters. A white spark moves left to right as the swing
+comes round.
+
+**Who gets it:** warriors and rogues; paladins with most points in
+Retribution (or Crusader Strike); shamans with most points in Enhancement
+(or Stormstrike / Dual Wield); hunters (Auto Shot). *Swing timer for every
+class and spec* shows it for anyone. It appears while you're attacking or
+shooting, and goes once you stop and leave combat.
+
+**How it keeps time (TBC rules):**
+
+| What happens | Effect |
+|---|---|
+| A swing lands or misses (dodge, parry, block, miss) | Restarts that hand |
+| Heroic Strike, Cleave, Maul, Raptor Strike | Replace the swing: restart the main hand |
+| A cast-time spell finishes (Slam, Lightning Bolt, a heal) | Restarts both hands. Interrupted casts and instants (Stormstrike, shocks) don't |
+| Haste changes (Flurry, Bloodlust, drums) | The time left is rescaled |
+| You parry an attack | Main hand: time left drops by 40% of your swing, but never below 20% |
+| Weapon swap | Restarts every hand |
+| You start attacking | An off hand past halfway goes back to halfway |
+| Windfury extra attack | Not counted as a new swing |
+
+**Latency:** the bars aren't shifted (every swing is reported equally late);
+instead the last part of each bar, as long as your world latency, is drawn
+in red and the fill turns red inside it. Anything that tells you *when to
+press* (the sync mark, the hunter clip zone) is moved earlier by your
+latency.
+
+**Hunters:** the Auto Shot bar is split into three parts:
+- **green** while a Steady Shot is safe to start;
+- **red** where starting one would delay (clip) the next shot: from a
+  Steady Shot's cast time plus latency before the wind-up;
+- **yellow** for the final 0.5s wind-up, when moving delays the shot.
+
+Auto Shot restarts the bar, Aimed Shot resets it, Steady Shot doesn't.
+
+**Enhancement weapon sync:** with two weapons of the same speed, you want
+the off hand to land just after the main hand. Windfury Weapon has a 3
+second cooldown shared by both hands, so the main hand should be the hand
+that gets the proc, and two hits close together share one Flurry charge.
+The usual sync macro is:
+
+```
+/cleartarget
+/targetlasttarget
+/startattack
+```
+
+It stops and restarts your attack. That can only *delay* the off hand: if it
+was past halfway, it lands half a swing after the press. So pressing when
+the main hand has *off-hand speed ÷ 2 − lag* left lands the off hand *lag*
+seconds after the main hand.
+
+- **The mark:** a blue line on the main-hand bar at that point, moved earlier
+  by your latency. It's faint while you're in sync.
+- **SYNC NOW:** shown, and the mark turns green, when you're out of sync, the
+  mark is reached and the off hand is past halfway (otherwise pressing
+  wouldn't move it).
+- **Readout** under the bars: *In sync* (off hand 0–0.4s after the main
+  hand), *Off hand first*, or *Out of sync*, with the gap. It notes when your
+  weapon speeds differ, since sync then drifts every swing.
+- **Off hand lands after by:** 0.10, 0.15 (default), 0.20 or 0.30s.
+
+**Options:** *Swing timer* (on by default), *Swing timer for every class and
+spec*, *Shaman weapon sync mark*, *Off hand lands after by*, *Lock the swing
+timer*. `/wmachine swing` (or the Class Tools card's tools menu) shows it for
+10 seconds to drag it into place.
+
+**Saved data:** new SavedVariable `SwingTimerDB`.
+
+**Still to confirm in game:** how the client logs Windfury Weapon's extra
+attack, and whether the Auto Shot wind-up shortens with haste (the timer
+uses a fixed 0.5s).
 
 ---
 
