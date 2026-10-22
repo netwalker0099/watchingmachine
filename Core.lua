@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.23"
+WM.version = "3.24"
 WM.modules = {}
 
 -- ============================================
@@ -282,6 +282,63 @@ local MODULE_COLORS = {
 function WM:ModulePrint(moduleName, msg)
     local color = MODULE_COLORS[moduleName] or "FFFFFF"
     DEFAULT_CHAT_FRAME:AddMessage("|cFF" .. color .. "[WM:" .. moduleName .. "]|r " .. msg)
+end
+
+-- ============================================
+-- CLICKABLE CHAT LINKS
+-- ============================================
+-- A module registers a kind of link, then prints text made by WM:ChatLink.
+-- Clicking it in chat calls the handler with the link's argument and the
+-- mouse button. The link is "|Hwmlink:<kind>:<arg>|h<text>|h".
+--
+-- On the 2.5.6 client, LinkUtil.RegisterLinkHandler claims the "wmlink"
+-- type, so SetItemRef stops there and the item tooltip never sees it. On
+-- older clients, SetItemRef is hooked and the item tooltip is told to
+-- ignore our links.
+
+local chatLinkHandlers = {}
+
+function WM:RegisterChatLink(kind, handler)
+    chatLinkHandlers[kind] = handler
+end
+
+function WM:ChatLink(kind, arg, text)
+    return "|Hwmlink:" .. kind .. ":" .. tostring(arg or "") .. "|h" .. text .. "|h"
+end
+
+-- Returns true if the link was ours
+function WM:HandleChatLink(link, button)
+    if type(link) ~= "string" then return false end
+    local kind, arg = link:match("^wmlink:([^:]+):?(.*)$")
+    if not kind then return false end
+    local handler = chatLinkHandlers[kind]
+    if handler then
+        local ok, err = pcall(handler, arg, button)
+        if not ok then geterrorhandler()(err) end
+    end
+    return true
+end
+
+function WM:SetupChatLinks()
+    if self.chatLinksReady then return end
+    self.chatLinksReady = true
+    if LinkUtil and type(LinkUtil.RegisterLinkHandler) == "function" then
+        LinkUtil.RegisterLinkHandler("wmlink", function(link, _, _, context)
+            WM:HandleChatLink(link, context and context.button)
+            return LinkProcessorResponse and LinkProcessorResponse.Handled
+        end)
+        return
+    end
+    if hooksecurefunc and SetItemRef then
+        hooksecurefunc("SetItemRef", function(link, _, button) WM:HandleChatLink(link, button) end)
+    end
+    if ItemRefTooltip and ItemRefTooltip.SetHyperlink then
+        local original = ItemRefTooltip.SetHyperlink
+        ItemRefTooltip.SetHyperlink = function(tip, link, ...)
+            if type(link) == "string" and link:find("^wmlink:") then return end
+            return original(tip, link, ...)
+        end
+    end
 end
 
 -- Verbose/diagnostic print — only shows when verbose mode is enabled
@@ -637,6 +694,7 @@ function WM:OnSecurityCheckPassed()
     
     -- Watching Machine button in the Escape menu
     pcall(self.SetupGameMenuButton, self)
+    pcall(self.SetupChatLinks, self)
 
     -- Start dashboard update timer
     RunTicker(2, function()

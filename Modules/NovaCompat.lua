@@ -336,12 +336,12 @@ function Nova:OnAddonMessage(prefix, message, distribution, sender)
             -- They also posted it to group chat themselves
             return "quiet"
         end
-        IT:Print(data .. " has been reset by the group leader (" .. who .. ", Nova Instance Tracker).")
+        IT:PrintLink(data .. " has been reset by the group leader (" .. who .. ", Nova Instance Tracker).")
         return "shown"
     elseif cmd == "instanceResetOther" then
         -- From Nova World Buffs. Its sender only fires when the reset fails
         -- (players still inside): see docs/NOVA-PROTOCOL.md, part 1 section 6
-        IT:Print("The group leader (" .. who .. ") tried to reset " .. data
+        IT:PrintLink("The group leader (" .. who .. ") tried to reset " .. data
             .. ", but players are still inside (Nova World Buffs).")
         return "shown"
     end

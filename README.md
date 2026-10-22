@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.23 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.24 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -409,6 +409,11 @@ instance limits (Logging group on the dashboard; `/wmachine instances`).
   inside, mobs killed by the group, XP (and XP per mob), gold looted, your
   level going in and out, and every reputation gain. Hover a run in the log
   to see it all; right-click to delete one
+- **Entering an instance** prints "Entered The Deadmines (3/5 this hour, 7/30
+  today)." with a **red X**: click the X to delete that run (when it
+  shouldn't count), or click the line to open the log
+- **Every line it prints is clickable** and opens the log: entering,
+  leaving, the same-instance merge, lockouts, and Nova reset notices
 - **Leaving an instance** prints the run's stats to your chat window, to your
   group, or not at all
 - **Resets:** as group leader, a reset tells your group in party or raid chat
@@ -418,7 +423,8 @@ instance limits (Logging group on the dashboard; `/wmachine instances`).
   marked as reset in your log. Only your own group's leader is believed.
   Watching Machine only listens; it never sends in Nova's format
 - Options: merge the same instance, reset announcements, Nova reset notices,
-  the "you can enter again" message, and where run stats go
+  the "you can enter again" message, the "Entered" message, and where run
+  stats go
 
 ### 20. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
@@ -614,6 +620,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.24
+- Instance Tracker chat lines are **clickable** (open the log), and entering an instance prints a line with a **red X** to delete that run
 
 ### Version 3.23
 - Instance Tracker shows **reset notices from group leaders running Nova Instance Tracker** (or Nova World Buffs), and marks the instance as reset; listen only

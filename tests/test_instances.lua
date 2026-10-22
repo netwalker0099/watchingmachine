@@ -197,7 +197,8 @@ IT.DB().statsOnLeave = "off"
 n = #sent
 local p = #W.printed
 Zone("Gnomeregan", 90); now = now + 10; Zone(nil)
-check("stats off: nothing", #sent == n and #W.printed == p)
+check("stats off: only the entered line", #sent == n and #W.printed == p + 1
+    and W.printed[#W.printed]:find("Entered Gnomeregan", 1, true) ~= nil)
 IT.DB().statsOnLeave = "self"
 grouped = false
 
@@ -237,6 +238,64 @@ W.fire(f.rows[2], "OnClick", "RightButton")
 check("right-click deletes the run", #runs == before - 1 and runs[2] ~= victim)
 IT:Toggle()
 check("toggle closes", not f:IsShown())
+
+-- ---- Clickable chat lines and the X ----
+local handler
+env.LinkUtil = { RegisterLinkHandler = function(kind, fn) if kind == "wmlink" then handler = fn end end }
+env.LinkProcessorResponse = { Handled = 2, Unhandled = 1 }
+WM.chatLinksReady = nil
+WM:SetupChatLinks()
+check("link type claimed with LinkUtil", handler ~= nil)
+local p0 = #W.printed
+Zone("Scholomance", 289)
+local scholo = IT:Current()
+local line = W.printed[#W.printed]
+check("entered line printed with counts", #W.printed == p0 + 1 and line:find("Entered Scholomance (", 1, true) ~= nil
+    and line:find("this hour", 1, true) ~= nil)
+local logLink = line:match("(wmlink:itlog:[^|]*)|h")
+local delLink = line:match("(wmlink:itdel:%d+)|h")
+check("the line opens the log", logLink ~= nil)
+check("and has a red X for this run", delLink == "wmlink:itdel:" .. scholo.id
+    and line:find("UI%-GroupLoot%-Pass%-Up") ~= nil)
+check("every run has an id", (function() for _, r in ipairs(runs) do if not r.id then return false end end return true end)())
+if f:IsShown() then f:Hide() end
+check("clicking the line returns Handled", handler(logLink, "[x]", {}, { button = "LeftButton" }) == 2)
+check("and opens the log", f:IsShown())
+f:Hide()
+local confirmText
+WM.Confirm = function(_, text, fn) confirmText = text; fn() end
+local before2 = #runs
+handler(delLink, "x", {}, { button = "LeftButton" })
+check("the X asks, then deletes that run", confirmText:find("Delete Scholomance", 1, true) ~= nil
+    and #runs == before2 - 1 and IT:RunById(scholo.id) == nil and IT:Current() == nil)
+check("and says so", W.printed[#W.printed]:find("Deleted Scholomance", 1, true) ~= nil)
+handler(delLink, "x", {}, { button = "LeftButton" })
+check("clicking an old X: already gone", W.printed[#W.printed]:find("no longer in the log", 1, true) ~= nil)
+check("other links aren't ours", WM:HandleChatLink("item:1234", "LeftButton") == false)
+IT:PrintLockouts()
+check("lockout lines are clickable", W.printed[#W.printed]:find("wmlink:itlog:", 1, true) ~= nil)
+Zone(nil)
+IT.DB().enterMessage = false
+local p1 = #W.printed
+Zone("Stratholme", 329)
+check("entered line can be turned off", #W.printed == p1)
+Zone(nil)
+-- Older clients: SetItemRef hook and the item tooltip guard
+env.LinkUtil = false   -- (nil would read as a stub frame)
+local hooked
+env.hooksecurefunc = function(name, fn) if name == "SetItemRef" then hooked = fn end end
+env.SetItemRef = function() end
+local shownLink
+env.ItemRefTooltip = { SetHyperlink = function(_, link) shownLink = link end }
+WM.chatLinksReady = nil
+WM:SetupChatLinks()
+f:Hide()
+hooked("wmlink:itlog:", "x", "LeftButton")
+check("older client: SetItemRef hook opens the log", f:IsShown())
+env.ItemRefTooltip:SetHyperlink("wmlink:itlog:")
+check("item tooltip ignores our links", shownLink == nil)
+env.ItemRefTooltip:SetHyperlink("item:1234")
+check("but still shows real ones", shownLink == "item:1234")
 
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

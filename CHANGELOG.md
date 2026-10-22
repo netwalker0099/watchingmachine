@@ -2,7 +2,31 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.23** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.24** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.24
+
+### Instance Tracker: clickable chat lines and the X
+
+- **Entering an instance** now prints a line with your counts: "Entered The
+  Deadmines (3/5 this hour, 7/30 today)."
+  - **The red X** at its end deletes that run, after asking. Use it when an
+    instance shouldn't count, for example one the tracker logged by mistake.
+  - Turn the line off with *Say when I enter an instance*.
+- **Every line the tracker prints opens the log** when clicked: entering,
+  leaving (run stats), the same-instance merge, lockouts, "you can enter a
+  new instance now", and Nova reset notices.
+- **Shared chat links:** links are built by a small helper in Core
+  (`WM:RegisterChatLink`, `WM:ChatLink`) that any module can use.
+  - **On the 2.5.6 client** it claims its own link type with Blizzard's
+    `LinkUtil.RegisterLinkHandler`, so clicking never opens the item
+    tooltip.
+  - **On older clients** it hooks `SetItemRef` and tells the item tooltip to
+    ignore its links.
+- **Run IDs:** every run now has an ID (older runs get one on login), which
+  the X uses.
 
 ---
 

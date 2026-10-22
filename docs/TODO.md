@@ -272,8 +272,8 @@ What all five should share instead of building their own:
 - [x] **Nova Instance Tracker compatibility (3.23, listen only):** NIT
       users' reset notices are shown, with our own leader check, and the
       instance is marked reset. Decided: we don't send in Nova's format.
-- [ ] **Clickable chat:** chat lines that open the log, and the **[X]** to
-      delete a run.
+- [x] **Clickable chat (3.24):** chat lines open the log, and the "Entered"
+      line has a red **X** to delete that run.
 - [ ] **Minimap button:** right-click to open the alts window (with TODO 11).
 
 Tracks every instance you enter, on every character and realm, and the

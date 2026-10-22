@@ -36,6 +36,7 @@ local DEFAULTS = {
     announceReset = true,       -- tell your group when you reset
     mergeSame = true,           -- same instance number: merge, don't log again
     lockoutReady = true,        -- say when you can enter a new instance again
+    enterMessage = true,        -- "Entered X (n/5 this hour) [X]" in chat
     novaListen = true,          -- show Nova Instance Tracker users' reset notices
 }
 IT.DEFAULTS = DEFAULTS
@@ -48,6 +49,11 @@ local function DB()
     if type(InstanceTrackerDB) ~= "table" then InstanceTrackerDB = {} end
     local db = InstanceTrackerDB
     if type(db.runs) ~= "table" then db.runs = {} end
+    if type(db.nextId) ~= "number" then db.nextId = 1 end
+    -- Every run has an id, for chat links (runs from before ids get one)
+    for _, run in ipairs(db.runs) do
+        if not run.id then run.id = db.nextId; db.nextId = db.nextId + 1 end
+    end
     for k, v in pairs(DEFAULTS) do
         if db[k] == nil then db[k] = v end
     end
@@ -71,6 +77,30 @@ local function CharKey()
 end
 
 function IT:Print(msg) WM:ModulePrint("InstanceTracker", msg) end
+
+-- ============================================
+-- CHAT LINKS
+-- ============================================
+-- Any line the tracker prints can be clicked to open the log. The red X on
+-- the "Entered ..." line deletes that run (for an instance it got wrong).
+
+local X_ICON = "|TInterface\\Buttons\\UI-GroupLoot-Pass-Up:14:14:0:-1|t"
+
+local function LogLink(text)
+    if not WM.ChatLink then return text end
+    return WM:ChatLink("itlog", "", text)
+end
+IT.LogLink = LogLink
+
+local function DeleteLink(run)
+    if not (WM.ChatLink and run.id) then return "" end
+    return " " .. WM:ChatLink("itdel", run.id, X_ICON)
+end
+
+-- A printed line: the module prefix, then clickable text
+function IT:PrintLink(msg, run)
+    self:Print(LogLink(msg) .. (run and DeleteLink(run) or ""))
+end
 
 -- A client string, or the English one if it's missing
 local function Text(value, english)
@@ -182,8 +212,16 @@ function IT:Enter()
             levelIn = UnitLevel("player"), levelOut = nil,
             mobs = 0, xp = 0, gold = 0, rep = {}, group = {},
         }
-        table.insert(DB().runs, 1, current)
-        while #DB().runs > MAX_RUNS do table.remove(DB().runs) end
+        local db = DB()
+        current.id = db.nextId
+        db.nextId = db.nextId + 1
+        table.insert(db.runs, 1, current)
+        while #db.runs > MAX_RUNS do table.remove(db.runs) end
+        if db.enterMessage then
+            local l = self:Lockouts(now)
+            self:PrintLink(string.format("Entered %s (%d/%d this hour, %d/%d today).",
+                name, l.hour, l.hourLimit, l.day, l.dayLimit), current)
+        end
     end
     SnapshotXP()
     self:UpdateGroup()
@@ -230,7 +268,7 @@ function IT:SeeGUID(guid)
             table.remove(runs, i - 1)
             table.insert(runs, 1, old)
             current = old
-            self:Print("Back in the same " .. old.name .. " (same instance), so it isn't counted again.")
+            self:PrintLink("Back in the same " .. old.name .. " (same instance), so it isn't counted again.")
             self:RefreshUI()
             return
         end
@@ -258,7 +296,7 @@ function IT:ReportRun(run)
     if mode == "group" and IsInGroup() then
         SendChatMessage("[WM] " .. text, IsInRaid() and "RAID" or "PARTY")
     else
-        self:Print(text)
+        self:PrintLink(text)
     end
 end
 
@@ -314,7 +352,7 @@ end
 
 function IT:PrintLockouts()
     local text = self:LockoutText()
-    for line in text:gmatch("[^\n]+") do self:Print(line) end
+    for line in text:gmatch("[^\n]+") do self:PrintLink(line) end
 end
 
 -- Say once when a full limit has room again
@@ -322,7 +360,7 @@ local wasLocked
 function IT:CheckLockoutReady()
     local l = self:Lockouts()
     if wasLocked and not l.locked and DB().lockoutReady then
-        self:Print("|cFF33FF33You can enter a new instance now.|r")
+        self:PrintLink("|cFF33FF33You can enter a new instance now.|r")
     end
     wasLocked = l.locked
 end
@@ -491,6 +529,26 @@ function IT:ShowRunTooltip(owner, run)
     GameTooltip:Show()
 end
 
+function IT:RunById(id)
+    id = tonumber(id)
+    for _, run in ipairs(DB().runs) do
+        if run.id == id then return run end
+    end
+end
+
+-- From the chat X: ask, then delete
+function IT:ConfirmDelete(run)
+    if not run then
+        self:Print("That run is no longer in the log.")
+        return
+    end
+    WM:Confirm("Delete " .. run.name .. " (" .. date("%d %b %H:%M", run.entered) .. ") from the instance log?"
+        .. " It stops counting toward your lockouts.", function()
+        IT:DeleteRun(run)
+        IT:Print("Deleted " .. run.name .. " from the instance log.")
+    end)
+end
+
 function IT:DeleteRun(run)
     local runs = DB().runs
     for i, r in ipairs(runs) do
@@ -530,9 +588,7 @@ local function NewRow(parent)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row:SetScript("OnClick", function(self, button)
         if button == "RightButton" and self.run then
-            local run = self.run
-            WM:Confirm("Delete " .. run.name .. " (" .. When(run.entered) .. ") from the instance log?"
-                .. " It stops counting toward your lockouts.", function() IT:DeleteRun(run) end)
+            IT:ConfirmDelete(self.run)
         end
     end)
     return row
@@ -615,6 +671,12 @@ function IT:CreateUI()
     L:Checkbox({
         label = "Say when I can enter a new instance again",
         get = function() return DB().lockoutReady end, set = function(v) DB().lockoutReady = v end,
+    })
+    L:Checkbox({
+        label = "Say when I enter an instance",
+        get = function() return DB().enterMessage end, set = function(v) DB().enterMessage = v end,
+        tooltip = { "Entering an instance", "\"Entered <instance> (3/5 this hour, 7/30 today).\" Click the line"
+            .. " to open the log; click the red X to delete that run if it shouldn't count." },
     })
     L:Dropdown({
         label = "Run stats when leaving:", width = 130, options = IT.STATS_OPTIONS,
@@ -722,6 +784,13 @@ function IT:Initialize()
         "GROUP_ROSTER_UPDATE", "PLAYER_LOGOUT", "PLAYER_CAMPING",
     })
     if WM.Nova then WM.Nova:Start() end
+    if WM.RegisterChatLink then
+        WM:RegisterChatLink("itlog", function()
+            local p = IT:CreateUI()
+            if not p:IsShown() then p:Show() end
+        end)
+        WM:RegisterChatLink("itdel", function(id) IT:ConfirmDelete(IT:RunById(id)) end)
+    end
     -- Already inside when the addon starts (login or /reload in an instance)
     if InstanceKind() then self:Enter() end
     wasLocked = self:Lockouts().locked
