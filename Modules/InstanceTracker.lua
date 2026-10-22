@@ -506,6 +506,15 @@ function IT:ShowRunTooltip(owner, run)
         if run.mobs > 0 then GameTooltip:AddDoubleLine("XP per mob", Commas(run.xp / run.mobs), 0.8, 0.8, 0.8, 1, 1, 1) end
     end
     GameTooltip:AddDoubleLine("Gold looted", Money(run.gold), 0.8, 0.8, 0.8, 1, 1, 1)
+    -- Trades are logged by Mail & Trade Logger, tagged with the run
+    local ML = WM.modules.MailLogger
+    if ML and ML.GoldTradedInRun then
+        local received, given, count = ML:GoldTradedInRun(run.id, run.char)
+        if count > 0 then
+            GameTooltip:AddDoubleLine("Gold traded (" .. count .. (count == 1 and " trade)" or " trades)"),
+                "|cFF33FF33+" .. Money(received) .. "|r  |cFFFF6633-" .. Money(given) .. "|r", 0.8, 0.8, 0.8, 1, 1, 1)
+        end
+    end
     local levels = "Level " .. (run.levelIn or "?")
     if run.levelOut and run.levelOut ~= run.levelIn then levels = levels .. " → " .. run.levelOut .. " (ding!)" end
     GameTooltip:AddDoubleLine("Your level", levels, 0.8, 0.8, 0.8, 1, 1, 1)

@@ -2,7 +2,31 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.24** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.25** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.25
+
+### New — Gold trade alerts (Mail & Trade Logger)
+
+Trades stay in the existing Mail & Trade log; this adds to it.
+
+- **Chat line** whenever gold changes hands in a trade, with who, what each
+  side gave, and where. For example: "Trade with Booster: received 500g,
+  gave 2 item(s) (in The Deadmines)." Click it to open the trade log.
+  - It shows even with the general chat notifications off.
+  - It has its own option, *Chat line when gold is traded* (on).
+  - Trades of items only still get a line when notifications are on.
+- **Trades record the instance** you were in. The Trades tab shows it ("in The
+  Deadmines"), and older trades just show no instance.
+- **With the Instance Tracker:** each trade is tied to the run you were in,
+  and the run's tooltip in the instance log shows **gold traded**, received
+  and given, with the number of trades.
+- **Fixed:** completed trades were only detected on English clients (the
+  "Trade complete" text was hard-coded). They now use the client's own text.
+- **Fixed:** the old chat line only mentioned gold received; it now shows both
+  directions.
 
 ---
 

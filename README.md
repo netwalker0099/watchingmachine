@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.24 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.25 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -31,6 +31,12 @@ Long-term logging of items and gold received via mail and trades.
 - Filter by Gold, Items, AH Sales, AH Buys, Expired
 - Duplicate-proof bulk mail pulling (Postal-style addons and retry-spam handled)
 - "Open All Mail" button pulls are logged too
+- **Gold trade alerts**: a chat line whenever you give or receive gold in a
+  trade ("Trade with Booster: received 500g, gave 2 item(s) (in The
+  Deadmines)"). Click it to open the trade log. Useful for boosters and
+  buyers
+- **Trades record where you were**: the trade log shows the instance you were
+  in, and an Instance Tracker run's tooltip shows the gold traded during it
 
 ### 4. Services Parser
 Parse services channel for boost advertisements by dungeon.
@@ -620,6 +626,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.25
+- **Gold trade alerts** in chat (who, how much each way, and where), and the trade log records the instance you were in; Instance Tracker runs show the gold traded during them
 
 ### Version 3.24
 - Instance Tracker chat lines are **clickable** (open the log), and entering an instance prints a line with a **red X** to delete that run

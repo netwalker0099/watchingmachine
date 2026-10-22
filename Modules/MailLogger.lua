@@ -15,6 +15,7 @@ local globalDefaults = {
     logItems = true,
     logAuctionHouse = true,
     logTrades = true,
+    tradeGoldAlerts = true,   -- a chat line whenever gold changes hands in a trade
 }
 
 local charDefaults = {
@@ -88,6 +89,9 @@ function MailLogger:Initialize()
     currentCharKey = GetCharacterKey()
     selectedCharKey = currentCharKey
     self:InitDB()
+    if WM.RegisterChatLink then
+        WM:RegisterChatLink("mltrades", function() MailLogger:ShowTrades() end)
+    end
 end
 
 function MailLogger:InitDB()
@@ -196,11 +200,54 @@ function MailLogger:AddLogEntry(entryType, data)
     end
 end
 
+-- Where you are when a trade happens: the instance (and the Instance
+-- Tracker run, so a run can show the gold traded during it) or the zone
+local function TradePlace()
+    local IT = WM.modules.InstanceTracker
+    local run = IT and IT.Current and IT:Current()
+    if run then return run.name, run.id end
+    local inside, kind = false, nil
+    if IsInInstance then inside, kind = IsInInstance() end
+    if inside and (kind == "party" or kind == "raid") and GetInstanceInfo then
+        return (GetInstanceInfo()), nil
+    end
+    return nil, nil
+end
+
+-- "received 500g + 2 items, gave 20g"
+local function TradeSummary(received, given)
+    local parts = {}
+    local function Side(label, side)
+        if not side then return end
+        local bits = {}
+        if side.money and side.money > 0 then bits[#bits + 1] = FormatMoney(side.money) end
+        if side.items and #side.items > 0 then bits[#bits + 1] = #side.items .. " item(s)" end
+        if #bits > 0 then parts[#parts + 1] = label .. " " .. table.concat(bits, " + ") end
+    end
+    Side("|cFF00FF00received|r", received)
+    Side("|cFFFF6600gave|r", given)
+    return table.concat(parts, ", ")
+end
+MailLogger.TradeSummary = TradeSummary
+
 function MailLogger:AddTradeLogEntry(data)
     if not MailLoggerDB or not currentCharKey then return end
+    local instance, runId = TradePlace()
+    local goldMoved = (data.received.money or 0) > 0 or (data.given.money or 0) > 0
+
+    -- The chat line: always when gold changed hands (unless turned off),
+    -- otherwise only with the general notifications on
+    if (goldMoved and MailLoggerDB.tradeGoldAlerts) or MailLoggerDB.showNotifications then
+        local msg = "Trade with |cFFFFFF00" .. (data.partner or "Unknown") .. "|r: "
+            .. TradeSummary(data.received, data.given)
+            .. (instance and (" |cFF888888(in " .. instance .. ")|r") or "")
+        if WM.ChatLink then msg = WM:ChatLink("mltrades", "", msg) end
+        self:Print(msg)
+    end
+
     if not MailLoggerDB.logTrades then return end
     if not MailLoggerDB.characters or not MailLoggerDB.characters[currentCharKey] then return end
-    
+
     local entry = {
         timestamp = GetTimestamp(),
         date = GetDateString(),
@@ -208,26 +255,40 @@ function MailLogger:AddTradeLogEntry(data)
         partner = data.partner,
         received = data.received,
         given = data.given,
+        instance = instance,
+        runId = runId,
     }
-    
+
     local tradeLog = MailLoggerDB.characters[currentCharKey].tradeLog
     if not tradeLog then return end
     table.insert(tradeLog, 1, entry)
-    
+
     while #tradeLog > MailLoggerDB.maxLogEntries do
         table.remove(tradeLog)
     end
-    
-    if MailLoggerDB.showNotifications then
-        local msg = "Trade with " .. (data.partner or "Unknown")
-        if data.received.money > 0 then
-            msg = msg .. " | Received: " .. FormatMoney(data.received.money)
+    if self.mainFrame and self.mainFrame:IsShown() and self.currentTab == "trades" then self:RefreshTradesLog() end
+end
+
+-- Gold traded during an Instance Tracker run: received, given, trade count
+function MailLogger:GoldTradedInRun(runId, charKey)
+    local received, given, count = 0, 0, 0
+    if not runId or not MailLoggerDB or not MailLoggerDB.characters then return 0, 0, 0 end
+    local char = MailLoggerDB.characters[charKey or currentCharKey]
+    for _, entry in ipairs(char and char.tradeLog or {}) do
+        if entry.runId == runId then
+            count = count + 1
+            received = received + ((entry.received and entry.received.money) or 0)
+            given = given + ((entry.given and entry.given.money) or 0)
         end
-        if #data.received.items > 0 then
-            msg = msg .. " + " .. #data.received.items .. " item(s)"
-        end
-        self:Print(msg)
     end
+    return received, given, count
+end
+
+-- Open the window on the Trades tab (the trade chat line's link)
+function MailLogger:ShowTrades()
+    local frame = self:CreateUI()
+    if not frame:IsShown() then frame:Show() end
+    self:ShowTab("trades")
 end
 
 -- ============================================
@@ -555,7 +616,9 @@ local SETTINGS = {
     { key = "logAuctionHouse", label = "Log auction house transactions",
       tip = "Record auction sales, purchases and expired auctions. Off: auction house mail isn't logged at all, not even as plain gold or items." },
     { key = "logTrades", label = "Log trades",
-      tip = "Record completed trades: who with, and the gold and items each side gave." },
+      tip = "Record completed trades: who with, the gold and items each side gave, and the instance you were in." },
+    { key = "tradeGoldAlerts", label = "Chat line when gold is traded",
+      tip = "A line in your chat window whenever you give or receive gold in a trade, with who and where. Click it to open the trade log." },
 }
 
 -- A scroll list inside a tab frame; rows are pooled and reused
@@ -812,7 +875,8 @@ function MailLogger:RefreshTradesLog()
         shown = i
 
         local row = GetListRow(self.tradesScrollChild, self.tradeRows, i, entryHeight, "GameFontHighlightSmall")
-        row.header:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r Trade with |cFFFFFF00" .. (entry.partner or "Unknown") .. "|r")
+        row.header:SetText("|cFF888888" .. (entry.timestamp or "") .. "|r Trade with |cFFFFFF00" .. (entry.partner or "Unknown") .. "|r"
+            .. (entry.instance and ("  |cFF66CCFFin " .. entry.instance .. "|r") or ""))
 
         local receivedStr = ""
         if entry.received then
@@ -952,7 +1016,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
         MailLogger:CacheTrade()
         
     elseif event == "UI_INFO_MESSAGE" then
-        if arg2 and arg2:find("Trade complete") then
+        -- ERR_TRADE_COMPLETE is the client's own "Trade complete." text
+        local complete = type(ERR_TRADE_COMPLETE) == "string" and ERR_TRADE_COMPLETE or "Trade complete"
+        if type(arg2) == "string" and (arg2 == complete or arg2:find("Trade complete", 1, true)) then
             tradeSuccessful = true
         end
         

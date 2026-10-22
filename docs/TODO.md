@@ -12,7 +12,7 @@ what still needs settling before it's built.
 7. ~~Flyout directions: add "Hidden", and use dropdowns~~ (done, 3.15)
 8. ~~Dock flyout buttons together~~ (done, 3.15)
 9. Instance tracker: lockouts, instance log and run stats (core done, 3.22)
-10. Gold trade alerts and trade log by instance
+10. ~~Gold trade alerts and trade log by instance~~ (done, 3.25)
 11. Alt tracking: "Your Characters"
 12. PvP instance log: battleground and arena stats
 13. World buff timers, Songflowers and Darkmoon Faire
@@ -332,7 +332,15 @@ limits on entering them.
 
 ---
 
-## 10. Gold trade alerts and trade log by instance
+## 10. Gold trade alerts and trade log by instance — DONE in 3.25
+
+Built into Mail & Trade Logger:
+- the gold chat line (clickable, opens the trade log), with its own option
+- an instance tag on every trade, tied to the Instance Tracker run so the
+  run's tooltip shows the gold traded during it
+
+Settled: the line is for gold, plus item-only trades when notifications
+are on, and older trades show no instance.
 
 This is mostly an extension of the **Mail & Trade Logger**, which already
 logs trades per character.
