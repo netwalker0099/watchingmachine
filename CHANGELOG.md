@@ -2,7 +2,16 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.26** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.26.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.26.1
+
+- **New Potion sound:** `Media/Sounds/potion.ogg` is replaced with a new
+  recording, the default for the mana potion warning. The file name is
+  unchanged, so your sound choices carry over. Restart the game, not just
+  `/reload`, to hear the new file.
 
 ---
 
