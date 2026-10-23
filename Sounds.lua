@@ -19,6 +19,8 @@ Sounds.OPTIONS = {
     { value = "kit:8960", text = "Ready check" },
     { value = "kit:12867", text = "Alarm clock" },
     { value = "kit:8332", text = "PvP flag captured" },
+    { value = "kit:891", text = "Coins" },
+    { value = "kit:888", text = "Level up" },
     { value = "none", text = "None" },
 }
 

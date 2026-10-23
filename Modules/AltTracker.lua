@@ -449,6 +449,8 @@ function Alts:ShowTooltip(owner, c)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Last seen " .. Ago(c.seen) .. (c.zone and (" in " .. c.zone) or ""), 0.6, 0.6, 0.6)
+    local crit = WM.Crits and WM.Crits.BestLine and WM.Crits:BestLine(c.key)
+    if crit then GameTooltip:AddLine(crit, 1, 1, 1) end
     local att = WM.Attunements and WM.Attunements.TooltipLines and WM.Attunements:TooltipLines(c.key)
     if att then
         GameTooltip:AddLine(" ")

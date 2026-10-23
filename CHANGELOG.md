@@ -2,7 +2,75 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.42** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.43** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.43
+
+### New — Hazard Alerts
+
+A sound the moment you're standing in something that hurts
+(`/wmachine gtfo`, or the dashboard card in the Raid group).
+
+| Alert | Means | Default sound |
+|---|---|---|
+| High damage | Move now | Raid warning |
+| Low damage | You're taking damage you could avoid | Ready check |
+| Fail | You failed a mechanic | Alarm clock |
+| Friendly fire | Your own spell is hurting your group | PvP flag captured |
+
+- **What it knows:**
+  - about 265 hazards in TBC raids and dungeons (void zones, fire, poison
+    clouds, cleaves, and the like), and some Classic ones
+  - lava, slime and fire on the ground, drowning and fatigue
+- **Only when it matters:**
+  - Tanks hear the tank version, or nothing for hazards a tank is meant to
+    stand in. You count as a tank in Righteous Fury, Bear Form or Defensive
+    Stance, or if you're the main tank.
+  - Heroics can sound different.
+  - Some hazards only count from the creature that casts them, others
+    only when the debuff lands, or only when it hurts.
+  - Hits under 2% of your health, misses, and old content far below your
+    level stay quiet. *Alert in low-level content too* turns that off.
+  - Alerts are at least 0.2 seconds apart.
+- **Options:** a sound per alert (any addon or game sound, or None), the
+  channel, *Test* buttons, an optional on-screen warning, and switches for
+  drowning, fatigue and lava.
+- **Recent alerts** in the window.
+- **Mute one:** `/wmachine gtfo mute <spell ID>` (and `unmute`).
+- **Written for Watching Machine:** new code, and the hazard list was
+  compiled with the help of the GTFO addon's research. Only the facts are
+  kept (spell IDs and how bad each is), in our own format.
+
+### New — Crit Tracker
+
+Your biggest hits, crits and heals (`/wmachine crits`, or the dashboard
+card in the Logging group).
+
+- **Per spell, ability, melee and ranged attack, and heal:**
+  - the best normal hit and best crit
+  - the crit rate
+  - who, where and when
+- **PvP kept apart** (or not counted: *Count hits on players*).
+- **New best crit:**
+  - a chat line ("New best crit: Fireball 4,700 (was 4,500, on Attumen)")
+    with a sound
+  - optional big text on screen
+  - optionally, a line to your party or raid
+  - The first crit of a spell doesn't count as a record. *Quiet below*
+    keeps small (levelling) records quiet.
+- **Spell tooltips** show your records for that spell.
+- **The window:**
+  - records, best crit first, by kind, creatures or players, and character
+  - hover for details; right-click to share in say, party, raid or guild
+  - *Reset* clears a character's records
+- **Your Characters** tooltips show each character's best crit.
+- Written for Watching Machine, inspired by CritTrackerTBC.
+
+### Also
+
+- Two more alert sounds for every sound dropdown: *Coins* and *Level up*.
 
 ---
 

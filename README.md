@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.42 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.43 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -659,7 +659,52 @@ Every raid attunement and key, for each of your characters (Raid group;
   their progress (its own addon message; one answer per 30 seconds each)
 - **Chat:** "Attuned: Karazhan!" when you finish one (*Say when done*)
 
-### 26. Chat Filter
+### 26. Hazard Alerts
+A sound the moment you're standing in something that hurts (Raid group;
+`/wmachine gtfo`).
+
+- **Four alerts, each with its own sound:**
+  - **High damage:** move now.
+  - **Low damage:** you're taking damage you could avoid.
+  - **Fail:** you failed a mechanic.
+  - **Friendly fire:** your own spell is hurting your group.
+- **What it knows:** about 265 hazards in TBC raids and dungeons (void
+  zones, fire, poison clouds, cleaves...) and some Classic ones, plus lava,
+  slime and fire on the ground, drowning and fatigue
+- **Smart about it:**
+  - Tanks hear the tank version, or nothing where standing in it is their
+    job. You count as a tank in Righteous Fury, Bear Form or Defensive
+    Stance, or if you're marked main tank.
+  - Heroics can use a different alert.
+  - Some hazards only count from the creature that casts them.
+  - Hits under 2% of your health, and old content far below your level,
+    stay quiet (unless *Alert in low-level content too*).
+- **Sounds:** pick one per alert (any addon or game sound, or None) and the
+  channel; *Test* buttons; optional on-screen warning
+- **Recent alerts** listed in the window; `/wmachine gtfo mute <spell ID>`
+  silences one you don't care about (`unmute` to undo)
+
+### 27. Crit Tracker
+Your biggest hits, crits and heals (Logging group; `/wmachine crits`).
+
+- **For every spell, ability, melee and ranged attack and heal:** the best
+  normal hit and the best crit, the crit rate, who it was on, where and
+  when
+- **PvP apart:** hits on players are kept as their own records (or not
+  counted at all)
+- **A new best crit** says so in chat ("New best crit: Fireball 4,700, was
+  4,500, on Attumen"), with a sound you pick, optional big text on screen,
+  and optionally a line to your party or raid. The first crit of a spell
+  doesn't count as a record. *Quiet below* keeps levelling records
+  quiet
+- **Spell tooltips** show your records for that spell
+- **The window:** records best crit first, filtered by kind (spells,
+  abilities, melee, ranged, heals), creatures or players, and character.
+  Hover a record for the details; right-click to share it in say, party,
+  raid or guild. *Reset* clears a character's records
+- **Your Characters** tooltips show each character's best crit
+
+### 28. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -792,6 +837,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine alts` - Your Characters
 - `/wmachine bgs` - Battleground and arena log
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
+- `/wmachine gtfo` - Hazard Alerts (`gtfo test`, `gtfo mute <spell ID>`, `gtfo unmute <spell ID>`)
+- `/wmachine crits` - Crit Tracker
 - `/wmachine attune` - Attunements: raids, keys and heroic keys per character
 - `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
@@ -847,6 +894,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `LootBrowserDB` - Loot Browser: last expansion and instance, Normal / Heroic, set filter
 - `WMGearScoreDB` - GearScore options, frame positions, others' scores (kept a week)
 - `AttunementsDB` - Attunement progress per character, guild survey answers
+- `HazardsDB` - Hazard Alerts options, sounds and muted spells
+- `WMCritsDB` - Crit Tracker records per character, and options
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -868,6 +917,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.43
+- New **Hazard Alerts** (GTFO-style): a sound when you stand in the bad, by severity, tank- and heroic-aware, with lava, drowning and fatigue
+- New **Crit Tracker**: best hit, crit and heal per spell with crit rates, new-record alerts, spell tooltips, PvP apart, per character
 
 ### Version 3.42
 - **Your Characters**: a GearScore column; click a character for their gear (paper doll); bags, bank, attunement and lockout views per character; item search across all characters

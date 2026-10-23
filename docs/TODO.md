@@ -646,7 +646,10 @@ Loot council for raids, with RCLootCouncil as the model.
       two hours work the same on 2.5.6.
 
 
-## 19. GTFO-style "get out of the bad" warnings
+## 19. GTFO-style "get out of the bad" warnings — DONE in 3.43
+
+Built as `Modules/Hazards.lua` + `Data/Hazards.lua` (our own code; the
+spell facts compiled with the GTFO addon's research).
 
 Sounds when you're standing in something that hurts, like the GTFO addon.
 
@@ -688,7 +691,9 @@ Makes the Ogri'la and Sha'tari Skyguard dailies easier, like Ogri'Lazy.
       buttons needs secure action buttons, and those can't change in
       combat).
 
-## 22. Crit tracker (CritTracker-style)
+## 22. Crit tracker (CritTracker-style) — DONE in 3.43
+
+Built as `Modules/Crits.lua` (our own code, inspired by CritTrackerTBC).
 
 Your highest hits, crits and heals, like the CritTracker addon.
 

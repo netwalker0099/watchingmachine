@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.42"
+WM.version = "3.43"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -340,6 +340,8 @@ local MODULE_COLORS = {
     LootBrowser = "FFB366",
     GearScore = "A335EE",
     Attunements = "66CCFF",
+    Hazards = "FF6633",
+    Crits = "FF8800",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1152,9 +1154,9 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
-    { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
+    { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
 }
 
 local MODULE_INFO = {
@@ -1225,6 +1227,19 @@ local MODULE_INFO = {
         tools = {
             { text = "Survey the guild", func = function() Call("Attunements", "Survey") end },
         },
+    },
+    Hazards = {
+        title = "Hazard Alerts", desc = "A sound when you stand in the bad",
+        about = "Plays a sound the moment you're standing in something that hurts: void zones, fire, poison clouds and cleaves in TBC raids and dungeons, plus lava, slime, drowning and fatigue. High damage, low damage, fail and friendly fire each have their own sound; tanks hear the tank version.",
+        command = "gtfo", color = {1, 0.4, 0.2}, icon = "Interface\\Icons\\Spell_Fire_Fire",
+        tools = {
+            { text = "Test the high-damage sound", func = function() Call("Hazards", "Command", "test") end },
+        },
+    },
+    Crits = {
+        title = "Crit Tracker", desc = "Your biggest hits, crits and heals",
+        about = "Your best normal hit and best crit for every spell, ability, melee and ranged attack and heal, with the crit rate, who it was on and where. A new best crit says so in chat (with a sound, if you like). Per character, PvP kept apart, and on spell tooltips.",
+        command = "crits", color = {1, 0.53, 0}, icon = "Interface\\Icons\\Ability_CriticalStrike",
     },
     PvPLog = {
         title = "Battlegrounds & Arenas", desc = "Results and stats of every match",
@@ -1872,6 +1887,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
     print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
     print("|cFFFFFF00/wmachine loot|r - Loot Browser (what every dungeon and raid boss drops)")
+    print("|cFFFFFF00/wmachine gtfo|r - Hazard Alerts (gtfo test / mute <spell ID> / unmute <spell ID>)")
+    print("|cFFFFFF00/wmachine crits|r - Crit Tracker: your best hits, crits and heals")
     print("|cFFFFFF00/wmachine attune|r - Attunements: raid attunements and keys for each character")
     print("|cFFFFFF00/wmachine gs|r - GearScore for your group (gs unlock / lock / reset / report)")
     print("|cFFFFFF00/wmachine wb [guild|party|raid]|r - Print the world timers, or send them to a channel")
@@ -2081,6 +2098,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "attune" or cmd == "attunements" or cmd == "att" then
         local module = WM.modules.Attunements
         if module and module.Toggle then module:Toggle() else WM:Print("Attunements module not available") end
+
+    elseif cmd == "gtfo" or cmd == "hazards" or cmd:match("^gtfo ") then
+        local module = WM.modules.Hazards
+        if module and module.Command then module:Command(cmd:match("^gtfo (.+)$")) else WM:Print("Hazards module not available") end
+
+    elseif cmd == "crits" or cmd == "crit" or cmd == "ct" then
+        local module = WM.modules.Crits
+        if module and module.Toggle then module:Toggle() else WM:Print("Crits module not available") end
 
     elseif cmd == "loot" or cmd == "atlas" or cmd == "al" then
         local module = WM.modules.LootBrowser
