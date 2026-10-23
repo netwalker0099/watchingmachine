@@ -2,7 +2,32 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.39** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.40** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.40
+
+### New — search in the Loot Browser
+
+A *Search:* box under the expansion and category picker.
+
+- **What it searches:** item names on every page this client has: dungeon
+  and raid drops, faction and PvP rewards, set pieces, and crafted items
+  (or the recipe's name, for enchants). Instance and boss names too.
+- **When:** as you type, from three letters (Enter searches from two).
+  Escape or *Clear* takes you back.
+- **Results:**
+  - up to 300 items, best quality first
+  - split into *Drops*, *Reputation*, *PvP* and *Crafted*
+  - each with where it's from ("Attumen the Huntsman (Karazhan)")
+  - Alt-click and right-click work as everywhere else
+- **Places:** matching instances and bosses are listed under the results;
+  click one to open that page.
+- **Names the game doesn't have yet:** item names only exist for items the
+  client has seen. The first search asks for the rest, 25 at a time, five
+  times a second. The status shows how many are left, and results fill in
+  as they arrive.
 
 ---
 

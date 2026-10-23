@@ -15,7 +15,7 @@ local LB = {}
 WM:RegisterModule("LootBrowser", LB)
 WM.LootBrowser = LB
 
-LB.version = "3.39"
+LB.version = "3.40"
 
 local DEFAULTS = {
     expansion = nil,       -- expansion shown (0 / 1 / 2; nil: the client's own)
@@ -73,6 +73,7 @@ local CATEGORIES = {
 LB.CATEGORIES = CATEGORIES
 
 local built = {}      -- tag -> page list (built on first use)
+local searchPages = {} -- the result pages of the search shown
 local lookups = {}    -- sets / crafts tables, built on first use
 
 local function Data() return WM.LootData or {} end
@@ -149,6 +150,7 @@ end
 -- faction pages left out
 function LB:Instances(tag)
     if tag == "mine" then return self:MyPages() end
+    if tag == "search" then return searchPages end
     local list = Build(tag)
     if not list then return {} end
     if not list.sorted then
@@ -172,7 +174,7 @@ function LB:Instances(tag)
 end
 
 function LB:Instance(tag, id)
-    for _, inst in ipairs(tag == "mine" and self:MyPages() or Build(tag) or {}) do
+    for _, inst in ipairs(tag == "mine" and self:MyPages() or tag == "search" and searchPages or Build(tag) or {}) do
         if inst.id == id then return inst end
     end
 end
@@ -289,6 +291,10 @@ LB.SetClass = SetClass
 function LB:Entries(boss, diff, myClassOnly)
     local out = {}
     if not boss then return out end
+    if boss.entries then
+        for i, e in ipairs(boss.entries) do out[i] = { item = e.item, craft = e.craft } end
+        return out
+    end
     local list = ListFor(boss, diff) or ListFor(boss, "n")
     if not list then
         local d = self:Diffs(boss)[1]
@@ -350,7 +356,8 @@ local function SpellInfo(id)
     if not f then return nil end
     local ok, a, _, icon = pcall(f, id)
     if not ok then return nil end
-    if type(a) == "table" then return a.name, a.iconID end
+    if type(a) == "table" then a, icon = a.name, a.iconID end
+    if type(a) ~= "string" then return nil end
     return a, icon
 end
 
@@ -784,13 +791,165 @@ end
 LB.ClassLabel = ClassLabel
 
 -- ============================================
+-- SEARCH
+-- ============================================
+-- By item name across every page this client has (drops, faction and PvP
+-- rewards, set pieces, crafts), and by instance / boss name. Item names
+-- exist only for items the client has seen, so the rest are looked up in
+-- small batches (throttled) and the results grow as the names arrive.
+
+local MAX_RESULTS = 300
+local LOOKUP_BATCH, LOOKUP_EVERY = 25, 0.2
+local searchIndex          -- { items = { id = cat }, crafts = { spell = cat } }
+local lookupQueue, lookupAt, lookupTicker = nil, 1, nil
+local SEARCH_SECTIONS = { { "dungeons", "Drops" }, { "factions", "Reputation" }, { "pvp", "PvP" }, { "crafting", "Crafted" } }
+
+function LB:SearchIndex()
+    if searchIndex then return searchIndex end
+    local items, crafts = {}, {}
+    for _, x in ipairs(self:Expansions()) do
+        for cat, tag in pairs(x.tags) do
+            for _, inst in ipairs(self:Instances(tag)) do
+                for _, b in ipairs(self:Bosses(inst)) do
+                    for k, list in pairs(b) do
+                        if type(k) == "string" and type(list) == "table" then
+                            for _, e in ipairs(list) do
+                                for _, id in ipairs(type(e) == "table" and e or { e }) do
+                                    if id > 0 then
+                                        if b.craft then
+                                            crafts[id] = crafts[id] or cat
+                                        elseif b.set then
+                                            for _, piece in ipairs(LB.SetInfo(id) or {}) do items[piece] = items[piece] or cat end
+                                        else
+                                            items[id] = items[id] or cat
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    searchIndex = { items = items, crafts = crafts }
+    return searchIndex
+end
+
+local function Lower(s) return type(s) == "string" and s:lower() or nil end
+
+-- Ask the client for names it doesn't have, a batch at a time
+function LB:LookupNames(ids)
+    lookupQueue, lookupAt = ids, 1
+    if lookupTicker or #ids == 0 then return end
+    local request = (C_Item and C_Item.RequestLoadItemDataByID) or function(id) ItemInfo(id) end
+    local function Step()
+        if not lookupQueue then return end
+        local stop = math.min(#lookupQueue, lookupAt + LOOKUP_BATCH - 1)
+        for i = lookupAt, stop do pcall(request, lookupQueue[i]) end
+        lookupAt = stop + 1
+        if lookupAt > #lookupQueue then
+            lookupQueue, lookupTicker = nil, nil
+            return
+        end
+        lookupTicker = WM.RunAfter(LOOKUP_EVERY, Step) or true
+    end
+    lookupTicker = true
+    Step()
+end
+
+function LB:LookupsLeft()
+    return lookupQueue and (#lookupQueue - lookupAt + 1) or 0
+end
+
+-- Items and crafts whose name has the text in it, and pages / bosses
+-- named after it. Returns { items = { entry }, places = { place }, unknown }
+function LB:Search(text)
+    local q = Lower(text and strtrim and strtrim(text) or text)
+    local out = { items = {}, places = {}, unknown = 0 }
+    if not q or #q < 2 then return out end
+    local idx = self:SearchIndex()
+    local missing = {}
+    for id, cat in pairs(idx.items) do
+        local name, _, quality = ItemInfo(id)
+        if not name then
+            missing[#missing + 1] = id
+        elseif name:lower():find(q, 1, true) then
+            out.items[#out.items + 1] = { item = id, cat = cat, name = name, quality = quality or 1 }
+        end
+    end
+    for spell, cat in pairs(idx.crafts) do
+        local c = LB.CraftInfo(spell)
+        local made = c and c[1] and c[1] > 0 and c[1]
+        local name, quality
+        if made then
+            local n, _, qq = ItemInfo(made)
+            name, quality = n, qq
+            if not n then missing[#missing + 1] = made end
+        else
+            name = SpellInfo(spell)
+        end
+        if name and name:lower():find(q, 1, true) then
+            out.items[#out.items + 1] = { craft = spell, cat = cat, name = name, quality = quality or 1 }
+        end
+    end
+    table.sort(out.items, function(a, b)
+        if a.quality ~= b.quality then return a.quality > b.quality end
+        return a.name < b.name
+    end)
+    while #out.items > MAX_RESULTS do table.remove(out.items) end
+    -- Pages and bosses by name
+    for _, x in ipairs(self:Expansions()) do
+        for cat, tag in pairs(x.tags) do
+            for _, inst in ipairs(self:Instances(tag)) do
+                local iname = self:InstanceName(inst)
+                if iname:lower():find(q, 1, true) then
+                    out.places[#out.places + 1] = { tag = tag, inst = inst.id, boss = 1, label = iname, cat = cat }
+                end
+                for bi, b in ipairs(self:Bosses(inst)) do
+                    if not b.extra and type(b[1]) == "string" and b[1]:lower():find(q, 1, true) and cat == "dungeons" then
+                        out.places[#out.places + 1] = { tag = tag, inst = inst.id, boss = bi, label = b[1] .. " (" .. iname .. ")", cat = cat }
+                    end
+                end
+            end
+        end
+    end
+    out.unknown = #missing
+    if #missing > 0 and self:LookupsLeft() == 0 then self:LookupNames(missing) end
+    return out
+end
+
+-- The search results as pages: matching items (by kind), then each
+-- matching instance or boss, which opens that page when clicked
+function LB:SearchPages(text)
+    local r = self:Search(text)
+    local all, bySection = {}, {}
+    for _, e in ipairs(r.items) do
+        local entry = e.craft and { craft = e.craft } or { item = e.item }
+        all[#all + 1] = entry
+        bySection[e.cat] = bySection[e.cat] or {}
+        table.insert(bySection[e.cat], entry)
+    end
+    local rows = { { "All (" .. #all .. ")", entries = all } }
+    for _, sec in ipairs(SEARCH_SECTIONS) do
+        local list = bySection[sec[1]]
+        if list then rows[#rows + 1] = { sec[2] .. " (" .. #list .. ")", entries = list } end
+    end
+    local pages = { { id = "results", name = "Items (" .. #all .. ")", kind = "search", bosses = rows } }
+    for _, pl in ipairs(r.places) do
+        pages[#pages + 1] = { id = "goto:" .. pl.tag .. ":" .. pl.inst .. ":" .. pl.boss, name = pl.label, kind = "goto", place = pl, bosses = {} }
+    end
+    return pages, r
+end
+
+-- ============================================
 -- WINDOW
 -- ============================================
 
 local panel
 local ROW_H, ITEM_H, SET_H, PIECE = 18, 30, 30, 26
 local MAX_PIECES = 10
-local state = { exp = nil, cat = nil, inst = nil, boss = 1 }
+local state = { exp = nil, cat = nil, inst = nil, boss = 1, search = nil }
 
 local function CurrentExpansion()
     local list = LB:Expansions()
@@ -806,6 +965,7 @@ end
 local function CurrentTag()
     local x = CurrentExpansion()
     if not x then return nil end
+    if state.search then return "search", x, "search" end
     local cat = state.cat or DB().category or "dungeons"
     if cat == "mine" then
         state.exp, state.cat = x.expansion, cat
@@ -1142,7 +1302,7 @@ function LB:FillItems(entries)
     return used + usedSets
 end
 
-local KIND_COLORS = { raid = "FF9933", extra = "AAAAAA", minor = "AAAAAA", arena = "FF6666", world = "66CC66",
+local KIND_COLORS = { goto = "66CCFF", raid = "FF9933", extra = "AAAAAA", minor = "AAAAAA", arena = "FF6666", world = "66CC66",
     gathering = "AAAAAA", secondary = "AAAAAA", class = "AAAAAA" }
 
 function LB:RefreshDiffButtons(diffs, cur)
@@ -1179,6 +1339,8 @@ function LB:RefreshList()
         if btn then btn:SetShown(x.tags[c.key] ~= nil or c.key == "mine") end
     end
     if panel.catBox.Refresh then panel.catBox:Refresh() end
+    local searchResult
+    if tag == "search" then searchPages, searchResult = self:SearchPages(state.search) end
     local inst = CurrentInstance(tag)
     state.inst = inst and inst.id
     local mine = tag == "mine"
@@ -1198,6 +1360,17 @@ function LB:RefreshList()
         if i == inst then sel = #items end
     end
     panel.instList:Fill(items, sel, function(id)
+        local page = tag == "search" and LB:Instance("search", id)
+        if page and page.place then
+            -- A matching instance or boss: open it
+            LB:ClearSearch()
+            local pl = page.place
+            state.exp, state.cat = Data()[pl.tag].expansion, Data()[pl.tag].category or "dungeons"
+            state.inst, state.boss = pl.inst, pl.boss
+            DB().category, DB().instance[pl.tag] = state.cat, pl.inst
+            LB:RefreshList()
+            return
+        end
         state.inst, state.boss = id, 1
         DB().instance[tag] = id
         LB:RefreshList()
@@ -1226,10 +1399,26 @@ function LB:RefreshList()
     for _, d in ipairs(diffs) do has[d] = true end
     if not has[diff] then diff = diffs[1] or "n" end
     state.diff = diff
-    self:RefreshDiffButtons(mine and {} or diffs, diff)
+    local search = tag == "search"
+    self:RefreshDiffButtons((mine or search) and {} or diffs, diff)
     local entries = self:Entries(boss, diff, DB().myClassSets)
     local title = boss and boss[1] or ""
-    if mine then
+    if search then
+        for _, e in ipairs(entries) do
+            if e.item then e.note = self:SourceShort(e.item) or LB.ItemKind(e.item) end
+        end
+        local left = self:LookupsLeft()
+        local text = "|cFFFFFFFFSearch:|r \"" .. state.search .. "\"  -  " .. #(searchResult and searchResult.items or {}) .. " items"
+        if searchResult and #searchResult.places > 0 then text = text .. ", " .. #searchResult.places .. " places" end
+        if left > 0 or (searchResult and searchResult.unknown > 0) then
+            text = text .. "  |cFF888888(looking up item names: " .. math.max(left, searchResult and searchResult.unknown or 0) .. " to go)|r"
+        end
+        panel.status:SetText(text)
+        panel.waitingForItems = true
+        local n = self:FillItems(entries)
+        panel.waitingForItems = panel.waitingForItems or left > 0 or (searchResult and searchResult.unknown > 0)
+        return n
+    elseif mine then
         local have = 0
         for _, e in ipairs(entries) do
             if e.item then
@@ -1257,7 +1446,7 @@ function LB:CreateUI()
     if panel then return panel end
     panel = WM.UI:CreatePanel({
         name = "WM_LootBrowserFrame", title = "Loot Browser", titleColor = "FFB366",
-        width = 860, height = 540, scroll = false,
+        width = 860, height = 564, scroll = false,
         resizable = { 740, 380, 1600, 1400 },
         onResize = function() LB:RefreshList() end,
         onRefresh = function() LB:RefreshList() end,
@@ -1289,6 +1478,34 @@ function LB:CreateUI()
             LB:RefreshList()
         end,
     }, 262)
+
+    -- Search: live after three letters (or Enter), Escape or Clear to stop
+    local sr = L:Row(24)
+    local box = sr:EditBox({ label = "Search:", width = 200, maxLetters = 40,
+        tooltip = { "Search", "Item names (drops, faction and PvP rewards, set pieces, crafts) and instance or boss"
+            .. " names, for every expansion this client has. Items the game hasn't shown you yet are looked up"
+            .. " as you search, so results can grow for a few seconds." },
+        onEnter = function(t) LB:SetSearch(t) end }, 8)
+    local e = box.editBox
+    local token = 0
+    e:SetScript("OnTextChanged", function(self, userInput)
+        if not userInput then return end
+        token = token + 1
+        local mine = token
+        WM.RunAfter(0.35, function()
+            if mine ~= token then return end
+            local t = strtrim(self:GetText() or "")
+            if #t >= 3 then LB:SetSearch(t) elseif t == "" and state.search then LB:ClearSearch() end
+        end)
+    end)
+    e:SetScript("OnEscapePressed", function(self) LB:ClearSearch(); self:ClearFocus() end)
+    panel.searchBox = box
+    local clear = WM.UI.Button(sr.frame, { text = "Clear", width = 54, onClick = function() LB:ClearSearch() end })
+    clear:SetPoint("LEFT", e, "RIGHT", 6, 0)
+    panel.searchClear = clear
+    local hint = sr.frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", clear, "RIGHT", 10, 0)
+    hint:SetText("Item, recipe, instance or boss name")
 
     local second = L:Row(24)
     local bar = CreateFrame("Frame", nil, second.frame)
@@ -1394,6 +1611,21 @@ function LB:RefreshUI()
     if panel and panel:IsShown() then panel:Refresh() end
 end
 
+function LB:SetSearch(text)
+    text = text and strtrim(text) or ""
+    if #text < 2 then return self:ClearSearch() end
+    state.search, state.inst, state.boss = text, "results", 1
+    if panel and panel.searchBox and panel.searchBox:GetText() ~= text then panel.searchBox:SetText(text) end
+    self:RefreshList()
+end
+
+function LB:ClearSearch()
+    state.search, state.inst, state.boss = nil, nil, 1
+    searchPages = {}
+    if panel and panel.searchBox then panel.searchBox:SetText("") end
+    self:RefreshList()
+end
+
 -- Open on a page of a data set
 function LB:Show(tag, instID)
     local p = self:CreateUI()
@@ -1436,7 +1668,7 @@ local refreshQueued = false
 function LB:OnItemInfo()
     if not (panel and panel:IsShown() and panel.waitingForItems) or refreshQueued then return end
     refreshQueued = true
-    WM.RunAfter(0.3, function()
+    WM.RunAfter(state.search and 1 or 0.3, function()
         refreshQueued = false
         LB:RefreshList()
     end)

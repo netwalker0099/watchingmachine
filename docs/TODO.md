@@ -546,8 +546,8 @@ from which boss), in our own format.
       Wrath's on a Wrath client. Set pages: one line per set, by class.
 - [x] **Favourites and your own BiS marks** (3.39): My Lists, Alt-click /
       right-click, badges, slot groups, owned and source notes.
-- [ ] **Search** by item name (cached names only, or ask the client in
-      batches).
+- [x] **Search** (3.40): items, crafts, instances and bosses; unknown names
+      asked for in throttled batches.
 
 ## 15. GearScore — DONE in 3.37
 

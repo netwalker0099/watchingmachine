@@ -253,6 +253,31 @@ LB:DeleteList("Favourites"); LB:DeleteList("Karazhan")
 check("deleting the last list leaves a fresh Favourites", #LB:Lists() == 1 and LB:Lists()[1] == "Favourites")
 LB:ToggleBiS("Fire", 28477)   -- unmarked again, for the tooltip tests below
 
+-- ---- Search ----
+local requested = {}
+env.C_Item.RequestLoadItemDataByID = function(id) requested[#requested + 1] = id end
+names[22866] = { "Flask of Pure Death", 1 }
+W.timers = {}
+local r = LB:Search("bands")
+check("search: by item name", #r.items >= 1 and r.items[1].item == 28477 and r.items[1].name == "Harbinger Bands")
+check("search: names not known yet are looked up", r.unknown > 1000 and #requested == 25 and LB:LookupsLeft() > 0)
+W.runTimers()
+check("search: in batches", #requested == 50)
+check("search: crafts by what they make", (function()
+    for _, e in ipairs(LB:Search("pure death").items) do if e.craft == 28591 then return true end end
+end)())
+local places = LB:Search("karazhan").places
+check("search: instance names", places[1] and places[1].inst == "Karazhan" and places[1].tag == "tbc")
+local boss = LB:Search("attumen").places[1]
+check("search: boss names", boss and boss.boss == 1 and boss.label:find("Karazhan", 1, true))
+check("search: too short", #LB:Search("b").items == 0)
+check("search: sorted best quality first", (function()
+    names[24023] = { "Bracers of Finesse", 3 }
+    local list = LB:Search("b").items
+    names[24023] = nil
+    return #list == 0
+end)())
+
 -- ---- Window ----
 inInstance, instanceID = true, 543
 LB:Toggle()
@@ -366,6 +391,35 @@ p.catBox.buttons[1]:_fire("OnClick")
 check("back to the dungeons: list bar hidden", not p.listBar:IsShown())
 env.LootBrowserDB.lists.Favourites = {}   -- clean slate for the tooltip tests below
 env.LootBrowserDB.bis = {}
+-- Search in the window
+LB:SetSearch("bands")
+check("search page", p.status:GetText():find("Search:", 1, true) and p.status:GetText():find("bands", 1, true)
+    and p.itemButtons[1].itemID == 28477)
+check("search: where it's from", p.itemButtons[1].kind:GetText():find("Attumen", 1, true) ~= nil)
+check("search: sections", p.bossList.rows[1].text:GetText():find("All (", 1, true) and p.bossList.rows[2].text:GetText():find("Drops", 1, true))
+check("search: looking up names", p.status:GetText():find("looking up item names", 1, true) ~= nil)
+LB:SetSearch("attumen")
+local gotoRow
+for _, row in ipairs(p.instList.rows) do if row:IsShown() and row.value and row.value:find("^goto:") then gotoRow = row end end
+check("search: places listed", gotoRow ~= nil)
+gotoRow:_fire("OnClick")
+check("search: a place opens it", p.status:GetText():find("Karazhan", 1, true) and p.status:GetText():find("Attumen", 1, true)
+    and not p.status:GetText():find("Search:", 1, true) and p.searchBox:GetText() == "")
+-- Typing
+local e = p.searchBox.editBox
+e:SetText("harb")
+W.timers = {}
+e._scripts.OnTextChanged(e, true)
+W.runTimers()
+check("typing searches after a moment", p.status:GetText():find("harb", 1, true) ~= nil)
+e:SetText("ha")
+e._scripts.OnTextChanged(e, false)
+check("not for text set by code", p.status:GetText():find("harb", 1, true) ~= nil)
+e._scripts.OnEscapePressed(e)
+check("Escape clears", not p.status:GetText():find("Search:", 1, true))
+LB:SetSearch("bands")
+W.click(p.searchClear)
+check("Clear", not p.status:GetText():find("Search:", 1, true) and p.searchBox:GetText() == "")
 check("toggle closes", (function() LB:Toggle(); return not p:IsShown() end)())
 check("status", LB:GetQuickStatus():find("instances", 1, true) ~= nil)
 

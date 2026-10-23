@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.39 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.40 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -534,6 +534,13 @@ reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
 
 - **Show:** *Dungeons & Raids*, *Crafting*, *Factions*, *PvP* or *My Lists*,
   for the expansion picked at the top
+- **Search** (3.40): type three letters (or press Enter) to find items by
+  name across every page: drops, faction and PvP rewards, set pieces and
+  crafted items. Results come sorted best quality first, split into Drops /
+  Reputation / PvP / Crafted, each saying where it's from. Matching
+  instances and bosses are listed too; click one to open it. Items the game
+  hasn't shown you yet are looked up as you search (a few seconds; the
+  count shows how many are left). Escape or *Clear* to go back
 - **My Lists** (3.39): your own favourite lists and a best-in-slot list for
   each spec of your class.
   - **Alt-click** any item (or set piece, or recipe) to add it to your list
@@ -817,6 +824,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.40
+- **Loot Browser search**: by item, recipe, instance or boss name, across every expansion and page, with names looked up as you search
 
 ### Version 3.39
 - **Loot Browser My Lists**: favourite lists (Alt-click to add) and best-in-slot lists per spec (right-click), with badges, slot grouping, what you own and where each item is from
