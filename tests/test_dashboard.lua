@@ -34,12 +34,12 @@ for _, g in ipairs(WM.MODULE_GROUPS) do
 end
 for _, name in ipairs({ "AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs",
                         "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ChatFilter",
-                        "ArmorySnap", "AuraRange", "ClassTools", "InstanceTracker", "PvPLog", "AltTracker", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits" }) do
+                        "ArmorySnap", "AuraRange", "ClassTools", "InstanceTracker", "PvPLog", "AltTracker", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila" }) do
     check(name .. " has exactly one card", seen[name] == 1)
     local info = WM.MODULE_INFO[name]
     check(name .. " card explains itself", info and info.about and #info.about > 20 and info.command)
 end
-check("no stray cards", total == 23)
+check("no stray cards", total == 24)
 
 -- ---- build the dashboard ----
 WM:CreateDashboard()
@@ -50,7 +50,7 @@ WM:UpdateDashboard()
 local cards = dash.moduleCards
 
 local switched = { BuffCheck = true, DebuffTracker = true, PvPTracker = true, GuildInvite = true, ChatFilter = true,
-                   AuraRange = true, ArmorySnap = true, KeywordMonitor = true, Hazards = true, Crits = true }
+                   AuraRange = true, ArmorySnap = true, KeywordMonitor = true, Hazards = true, Crits = true, Ogrila = true }
 for name, card in pairs(cards) do
     check(name .. (switched[name] and " has" or " has no") .. " an on/off switch",
         (card.switch ~= nil) == (switched[name] == true))

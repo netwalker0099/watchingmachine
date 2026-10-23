@@ -2,7 +2,33 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.43** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.44** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.44
+
+### New — Ogri'la Helper
+
+Remembers the Apexis Relic sequence in Ogri'la (`/wmachine ogri`, or the
+dashboard card in the Raid group). Game facts compiled with the help of
+Ogri'Lazy's research; the code is our own.
+
+- **Opens by itself** when you start an Apexis Relic or the Apexis Monument.
+- **Record** the colours as the relic lights them: click the green, yellow,
+  blue and red buttons, or press G, Y, B and R while the helper is up.
+- **Follow along:** the next colour is ringed and moves on each time you
+  touch a beam (the Introspection debuff refreshing). A wrong beam (the
+  relic's Reprisal hitting you) puts the step back.
+- **Edit:** left-click a recorded colour to drop it, right-click to drop it
+  and the rest, *Clear* to start again.
+- **Shows** your Apexis Shards and Crystals and your longest sequence per
+  relic.
+- **Hotkeys** are only bound while the helper is showing, can be changed,
+  and are freed in combat (optional). Bindings can't change during combat,
+  so a change then waits for combat to end.
+- **Options:** open at relics (the dashboard switch), help tooltips, keys on
+  the buttons, helper size; drag the helper to move it.
 
 ---
 

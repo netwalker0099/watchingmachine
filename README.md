@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.43 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.44 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -704,7 +704,28 @@ Your biggest hits, crits and heals (Logging group; `/wmachine crits`).
   raid or guild. *Reset* clears a character's records
 - **Your Characters** tooltips show each character's best crit
 
-### 28. Chat Filter
+### 28. Ogri'la Helper
+Remembers the Apexis Relic sequence for you (Raid group; `/wmachine ogri`).
+Game facts compiled with the help of Ogri'Lazy's research; the code is our own.
+
+- **Opens by itself** when you start an Apexis Relic or the Apexis Monument
+  in Ogri'la
+- **Record the sequence:** click the green, yellow, blue and red buttons
+  (or press **G**, **Y**, **B**, **R**) as the relic lights them up. Up to
+  16 colours, in two rows
+- **Then touch the beams:** the next colour is ringed, and each beam you
+  touch moves it on by itself. A wrong beam (the relic's Reprisal hitting
+  you) puts the step back
+- **Fix mistakes:** left-click a colour to remove it, right-click to remove
+  it and everything after; *Clear* starts again. A finished sequence
+  starts over on the next click, ready for the next round
+- **Shows** your Apexis Shards and Crystals and your longest sequence so far
+- **Options** (`/wmachine ogri options`): open at relics (the dashboard
+  switch), help tooltips, hotkeys on or off, your own keys, the keys on
+  the buttons, freeing the keys in combat, and the helper's size. Drag the
+  helper to move it
+
+### 29. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -839,6 +860,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
 - `/wmachine gtfo` - Hazard Alerts (`gtfo test`, `gtfo mute <spell ID>`, `gtfo unmute <spell ID>`)
 - `/wmachine crits` - Crit Tracker
+- `/wmachine ogri` - Ogri'la Helper for the Apexis Relics (`ogri options`, `ogri clear`; also `/wmachine relic`)
 - `/wmachine attune` - Attunements: raids, keys and heroic keys per character
 - `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
@@ -896,6 +918,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AttunementsDB` - Attunement progress per character, guild survey answers
 - `HazardsDB` - Hazard Alerts options, sounds and muted spells
 - `WMCritsDB` - Crit Tracker records per character, and options
+- `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -917,6 +940,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.44
+- New **Ogri'la Helper** (Ogri'Lazy-style): remembers the Apexis Relic and Monument sequence, follows your beam touches, undoes a wrong one, with G/Y/B/R hotkeys and your shard count
 
 ### Version 3.43
 - New **Hazard Alerts** (GTFO-style): a sound when you stand in the bad, by severity, tank- and heroic-aware, with lava, drowning and fatigue
