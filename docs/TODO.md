@@ -540,8 +540,8 @@ from which boss), in our own format.
 - [ ] **Wrath tables:** `Data/LootWrath.lua` is in place and gated on the
       client's expansion. It needs the Wrath dungeon and raid lists (the
       AtlasLoot zip we had has no Wrath dungeon or raid tables).
-- [ ] **Item source tooltips:** "Drops from Attumen the Huntsman (Karazhan)"
-      on item tooltips (`LB:Sources` already builds the index).
+- [x] **Item source tooltips** (3.35): "Drops from: Attumen the Huntsman
+      (Karazhan)", Heroic-only marked, capped at three bosses.
 - [ ] **Crafting, reputation rewards, PvP gear** (Classic, TBC, Wrath gated).
 - [ ] **Favourites and your own BiS marks** per spec. Not AtlasLoot's
       curated BiS lists.

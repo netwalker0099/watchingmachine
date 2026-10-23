@@ -3,7 +3,8 @@
 -- Crusade, with Wrath of the Lich King switching on by itself on a Wrath
 -- client. Pick an instance and a boss to see its loot (normal or heroic),
 -- tier and dungeon sets, keys and trash. Hover an item for its tooltip;
--- shift-click links it, ctrl-click tries it on.
+-- shift-click links it, ctrl-click tries it on. Item tooltips everywhere
+-- say which boss drops the item.
 --
 -- The data (Data/Loot*.lua) is only item IDs per boss; names, icons and
 -- stats come from the client, and each expansion's tables are built the
@@ -14,7 +15,7 @@ local LB = {}
 WM:RegisterModule("LootBrowser", LB)
 WM.LootBrowser = LB
 
-LB.version = "3.34"
+LB.version = "3.35"
 
 local DEFAULTS = {
     expansion = nil,       -- tag of the expansion shown (nil: the client's own)
@@ -22,6 +23,7 @@ local DEFAULTS = {
     diff = "n",            -- n (normal) or h (heroic)
     myClassSets = true,    -- set pages: only your class's sets
     followInstance = true, -- open on the instance you're in
+    tooltips = true,       -- "Drops from" lines on item tooltips
 }
 LB.DEFAULTS = DEFAULTS
 
@@ -231,6 +233,91 @@ function LB:Sources(itemID)
         end
     end
     return sourceIndex[itemID] or {}
+end
+
+-- ============================================
+-- ITEM TOOLTIPS
+-- ============================================
+-- "Drops from:" and up to MAX_SOURCES bosses, one line each, merged per
+-- boss ("Heroic" only when the normal version doesn't drop it).
+
+local MAX_SOURCES = 3
+local SOURCE_COLOR, PLACE_COLOR = "FFB366", "AAAAAA"
+
+function LB:SourceLines(itemID)
+    local list = self:Sources(itemID)
+    if #list == 0 then return nil end
+    local byBoss, order = {}, {}
+    for _, s in ipairs(list) do
+        local g = byBoss[s.boss]
+        if not g then
+            g = { boss = s.boss, instance = s.instance, diffs = {} }
+            byBoss[s.boss] = g
+            order[#order + 1] = g
+        end
+        g.diffs[s.diff] = true
+    end
+    local lines = { "|cFF" .. SOURCE_COLOR .. "Drops from:|r" }
+    for i, g in ipairs(order) do
+        if i > MAX_SOURCES then
+            lines[#lines + 1] = "   |cFF" .. PLACE_COLOR .. "and " .. (#order - MAX_SOURCES) .. " more|r"
+            break
+        end
+        local where = self:InstanceName(g.instance)
+        if g.diffs.h and not g.diffs.n then where = where .. ", Heroic" end
+        lines[#lines + 1] = "   |cFFFFFFFF" .. g.boss[1] .. "|r |cFF" .. PLACE_COLOR .. "(" .. where .. ")|r"
+    end
+    return lines
+end
+
+local function ItemIDFromLink(link)
+    return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
+end
+
+-- Add the lines once per tooltip showing (both hooks below may fire)
+function LB:AddTooltipSource(tooltip, itemID)
+    if not DB().tooltips or not tooltip or not itemID then return false end
+    if tooltip.wmLootSource == itemID then return false end
+    tooltip.wmLootSource = itemID
+    local lines = self:SourceLines(itemID)
+    if not lines then return false end
+    for _, l in ipairs(lines) do tooltip:AddLine(l) end
+    if tooltip.Show then tooltip:Show() end   -- resize to the new lines
+    return true
+end
+
+local hookedTips = {}
+local function HookTooltip(tip)
+    if type(tip) ~= "table" or hookedTips[tip] or not tip.HookScript then return end
+    hookedTips[tip] = true
+    tip:HookScript("OnTooltipCleared", function(t) t.wmLootSource = nil end)
+    if not tip.HasScript or tip:HasScript("OnTooltipSetItem") then
+        tip:HookScript("OnTooltipSetItem", function(t)
+            if not t.GetItem then return end
+            local ok, _, link = pcall(t.GetItem, t)
+            if ok then LB:AddTooltipSource(t, ItemIDFromLink(link)) end
+        end)
+    end
+end
+
+function LB:HookTooltips()
+    if self.tooltipsHooked then return end
+    self.tooltipsHooked = true
+    -- Newer clients route item tooltips through TooltipDataProcessor
+    local proc = rawget(_G, "TooltipDataProcessor")
+    local enum = rawget(_G, "Enum")
+    if type(proc) == "table" and type(proc.AddTooltipPostCall) == "function" and type(enum) == "table"
+        and type(enum.TooltipDataType) == "table" and enum.TooltipDataType.Item then
+        proc.AddTooltipPostCall(enum.TooltipDataType.Item, function(tip, data)
+            if tip and type(data) == "table" then
+                local ok, err = pcall(LB.AddTooltipSource, LB, tip, tonumber(data.id))
+                if not ok then geterrorhandler()(err) end
+            end
+        end)
+    end
+    for _, name in ipairs({ "GameTooltip", "ItemRefTooltip", "ShoppingTooltip1", "ShoppingTooltip2" }) do
+        HookTooltip(rawget(_G, name))
+    end
 end
 
 -- ============================================
@@ -533,6 +620,13 @@ function LB:CreateUI()
         set = function(v) DB().myClassSets = v; LB:RefreshList() end,
         tooltip = { "Set pages", "Show only the tier and dungeon sets your class can wear." },
     }, 430)
+    top:Checkbox({
+        label = "Item tooltips",
+        get = function() return DB().tooltips end,
+        set = function(v) DB().tooltips = v end,
+        tooltip = { "Item tooltips", "Add \"Drops from\" to item tooltips everywhere (bags, chat links, the"
+            .. " auction house): which bosses drop it, in which instance, and Heroic when only Heroic does." },
+    }, 600)
     local st = L:Row(18)
     panel.status = st:Text({ text = "" }, 8)
 
@@ -609,6 +703,7 @@ end
 function LB:Initialize()
     DB()
     WM:RegisterEvents(events, { "GET_ITEM_INFO_RECEIVED" })
+    self:HookTooltips()
 end
 
 events:SetScript("OnEvent", function()

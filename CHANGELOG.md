@@ -2,7 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.34** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.35** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.35
+
+### New — "Drops from" on item tooltips
+
+Every item tooltip (bags, chat links, the auction house, the Loot Browser)
+now says which bosses drop it, from the Loot Browser's data:
+
+```
+Drops from:
+   Attumen the Huntsman (Karazhan)
+```
+
+- **Heroic:** "(Hellfire Ramparts, Heroic)" when only the heroic version
+  drops it; an item from both shows the boss once.
+- **Many bosses:** up to three, then "and N more" (Badge of Justice).
+- **Your faction:** both versions of faction items are known.
+- **Switch:** *Item tooltips* at the top of the Loot Browser (on by default).
+- Works with both ways the client builds item tooltips
+  (`TooltipDataProcessor` and `OnTooltipSetItem`), adding the lines once.
+- The drop index is built the first time an item tooltip shows.
 
 ---
 

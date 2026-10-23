@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.34 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.35 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -541,6 +541,10 @@ What every dungeon and raid boss drops (Raid group; `/wmachine loot`, also
   just your class's
 - **Items:** icon, name in its quality colour, slot and type. Hover for the
   full tooltip; shift-click links it in chat, ctrl-click tries it on
+- **Item tooltips everywhere** (bags, chat links, the auction house, the
+  loot window) get a "Drops from:" list: each boss and its instance, with
+  "Heroic" when only the heroic version drops it. Up to three bosses, then
+  "and N more" (Badge of Justice). *Item tooltips* in the window turns it off
 - **Opens on the instance you're in**, and remembers the last one per
   expansion. The window is resizable; the loot uses two columns when wide
 - **Wrath of the Lich King:** switches on by itself on a Wrath client
@@ -755,6 +759,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.35
+- **Item tooltips** say which boss drops an item, and where (Heroic when only the heroic version drops it)
 
 ### Version 3.34
 - New **Loot Browser**: every Classic and TBC dungeon and raid boss's loot, normal and heroic, with trash, keys and tier sets; opens on the instance you're in. Wrath switches on by itself on a Wrath client

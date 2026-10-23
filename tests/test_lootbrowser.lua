@@ -190,5 +190,57 @@ check("show an instance", p.status:GetText():find("Molten Core", 1, true) ~= nil
 check("toggle closes", (function() LB:Toggle(); return not p:IsShown() end)())
 check("status", LB:GetQuickStatus():find("instances", 1, true) ~= nil)
 
+-- ---- Item tooltips ----
+local kara = LB:SourceLines(28477)
+check("tooltip: header and the boss", kara[1]:find("Drops from:", 1, true)
+    and kara[2]:find("Attumen the Huntsman", 1, true) and kara[2]:find("(Karazhan)", 1, true) and #kara == 2)
+local heroicOnly = LB:SourceLines(27448)   -- Cloak of the Everliving, heroic Gargolmar
+check("tooltip: heroic-only drops say so", heroicOnly[2]:find("Hellfire Ramparts, Heroic", 1, true))
+local both = LB:SourceLines(23881)          -- Gargolmar's Hand, normal and heroic
+check("tooltip: normal and heroic merged", #both == 2 and not both[2]:find("Heroic", 1, true))
+local many = LB:SourceLines(29434)          -- Badge of Justice
+check("tooltip: many bosses capped", #many == 5 and many[5]:find("^   |cFFAAAAAAand %d+ more"))
+check("tooltip: nothing for other items", LB:SourceLines(6948) == nil)
+
+-- A tooltip as the client fills it
+local function Tip()
+    local tip = W.NewFrame("Tip")
+    tip.lines = {}
+    tip.AddLine = function(self, l) self.lines[#self.lines + 1] = l end
+    return tip
+end
+local tip = Tip()
+check("added once", LB:AddTooltipSource(tip, 28477) and #tip.lines == 2)
+check("not twice for the same showing", not LB:AddTooltipSource(tip, 28477) and #tip.lines == 2)
+tip.wmLootSource = nil
+env.LootBrowserDB.tooltips = false
+check("switched off", not LB:AddTooltipSource(tip, 28477))
+env.LootBrowserDB.tooltips = true
+
+-- Hooks: OnTooltipSetItem on the game's tooltips, and TooltipDataProcessor
+local gt = Tip()
+local link = "|cffa335ee|Hitem:28477::::::::70:::::|h[Harbinger Bands]|h|r"
+gt.GetItem = function() return "Harbinger Bands", link end
+gt.HasScript = function(_, name) return name == "OnTooltipSetItem" end
+env.GameTooltip, env.ItemRefTooltip = gt, Tip()
+local post
+env.TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) if kind == 0 then post = fn end end }
+env.Enum = { TooltipDataType = { Item = 0 } }
+LB.tooltipsHooked = nil
+LB:HookTooltips()
+check("hooks the tooltips", gt._hooks.OnTooltipSetItem ~= nil and gt._hooks.OnTooltipCleared ~= nil and post ~= nil)
+gt:_fire("OnTooltipCleared")
+gt:_fire("OnTooltipSetItem")
+check("item tooltip gets the lines", #gt.lines == 2 and gt.lines[2]:find("Attumen", 1, true))
+post(gt, { id = 28477 })
+check("both hooks: still once", #gt.lines == 2)
+gt:_fire("OnTooltipCleared")
+gt.lines = {}
+post(gt, { id = 24024 })
+check("data processor hook", #gt.lines == 2 and gt.lines[2]:find("Watchkeeper Gargolmar", 1, true))
+check("hooked once", (function() LB.tooltipsHooked = nil; local n = 0
+    env.TooltipDataProcessor.AddTooltipPostCall = function() n = n + 1 end
+    LB:HookTooltips(); return n == 1 and #gt._hooks.OnTooltipSetItem == 1 end)())
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end
