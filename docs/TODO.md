@@ -687,3 +687,18 @@ Makes the Ogri'la and Sha'tari Skyguard dailies easier, like Ogri'Lazy.
 - [ ] **Check:** what Blizzard allows on 2.5.6 (item use from addon
       buttons needs secure action buttons, and those can't change in
       combat).
+
+## 22. Crit tracker (CritTracker-style)
+
+Your highest hits, crits and heals, like the CritTracker addon.
+
+- [ ] **Records:** your biggest normal hit, crit, heal and crit heal per
+      spell, from the combat log (your own damage and healing only).
+- [ ] **New record:** a chat line and an optional sound or splash
+      ("New highest crit: Fireball 4,512"), with a minimum so small
+      levelling hits don't spam.
+- [ ] **Where:** the target and zone of each record, and when it happened;
+      PvP and PvE kept apart, and optionally only boss / player targets.
+- [ ] **Window:** records per spell, sortable, per character (Your
+      Characters can show each alt's best), with a reset button.
+- [ ] **Share:** post a record to party / raid / guild.
