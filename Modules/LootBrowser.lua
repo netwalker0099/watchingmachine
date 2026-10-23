@@ -4,7 +4,8 @@
 -- Burning Crusade, with Wrath of the Lich King switching on by itself on a
 -- Wrath client. Hover an item for its tooltip; shift-click links it,
 -- ctrl-click tries it on. Item tooltips everywhere say where the item
--- comes from (boss, faction, PvP, profession).
+-- comes from (boss, faction, PvP, profession). Your own favourite lists
+-- and best-in-slot marks per spec live under My Lists.
 --
 -- The data (Data/Loot*.lua) is only IDs; names, icons and stats come from
 -- the client, and each table is built the first time it's shown.
@@ -14,7 +15,7 @@ local LB = {}
 WM:RegisterModule("LootBrowser", LB)
 WM.LootBrowser = LB
 
-LB.version = "3.36"
+LB.version = "3.39"
 
 local DEFAULTS = {
     expansion = nil,       -- expansion shown (0 / 1 / 2; nil: the client's own)
@@ -34,6 +35,16 @@ local function DB()
     end
     if type(LootBrowserDB.instance) ~= "table" then LootBrowserDB.instance = {} end
     if type(LootBrowserDB.expansion) ~= "number" then LootBrowserDB.expansion = nil end   -- 3.34 kept a tag
+    -- Favourite lists and BiS marks are account-wide; which list Alt-click
+    -- fills is per character
+    if type(LootBrowserDB.lists) ~= "table" then LootBrowserDB.lists = {} end
+    if type(LootBrowserDB.listOrder) ~= "table" then LootBrowserDB.listOrder = {} end
+    if #LootBrowserDB.listOrder == 0 then
+        LootBrowserDB.listOrder[1] = "Favourites"
+        LootBrowserDB.lists.Favourites = LootBrowserDB.lists.Favourites or {}
+    end
+    if type(LootBrowserDB.bis) ~= "table" then LootBrowserDB.bis = {} end
+    if type(LootBrowserDB.chars) ~= "table" then LootBrowserDB.chars = {} end
     return LootBrowserDB
 end
 
@@ -57,6 +68,7 @@ local CATEGORIES = {
     { key = "crafting", label = "Crafting", width = 70 },
     { key = "factions", label = "Factions", width = 70 },
     { key = "pvp", label = "PvP", width = 46 },
+    { key = "mine", label = "My Lists", width = 70 },
 }
 LB.CATEGORIES = CATEGORIES
 
@@ -136,6 +148,7 @@ end
 -- appear (dungeons before raids, ...), extras last; the other side's
 -- faction pages left out
 function LB:Instances(tag)
+    if tag == "mine" then return self:MyPages() end
     local list = Build(tag)
     if not list then return {} end
     if not list.sorted then
@@ -159,7 +172,7 @@ function LB:Instances(tag)
 end
 
 function LB:Instance(tag, id)
-    for _, inst in ipairs(Build(tag) or {}) do
+    for _, inst in ipairs(tag == "mine" and self:MyPages() or Build(tag) or {}) do
         if inst.id == id then return inst end
     end
 end
@@ -349,6 +362,179 @@ function LB.CraftSkill(id)
 end
 
 -- ============================================
+-- YOUR LISTS: favourites and best-in-slot marks
+-- ============================================
+-- Lists hold item IDs; BiS marks are per class and spec ("MAGE:Fire").
+-- Both are account-wide, so an alt's BiS list is there on your main too.
+
+local SPECS = {
+    WARRIOR = { "Arms", "Fury", "Protection" }, PALADIN = { "Holy", "Protection", "Retribution" },
+    HUNTER = { "Beast Mastery", "Marksmanship", "Survival" }, ROGUE = { "Assassination", "Combat", "Subtlety" },
+    PRIEST = { "Discipline", "Holy", "Shadow" }, SHAMAN = { "Elemental", "Enhancement", "Restoration" },
+    MAGE = { "Arcane", "Fire", "Frost" }, WARLOCK = { "Affliction", "Demonology", "Destruction" },
+    DRUID = { "Balance", "Feral (tank)", "Feral (damage)", "Restoration" }, DEATHKNIGHT = { "Blood", "Frost", "Unholy" },
+}
+LB.SPECS = SPECS
+
+local function MyClass() local _, c = UnitClass("player"); return c end
+function LB.MySpecs() return SPECS[MyClass() or ""] or {} end
+
+local function CharKey()
+    return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "")
+end
+local function CharDB()
+    local chars = DB().chars
+    local k = CharKey()
+    chars[k] = chars[k] or {}
+    return chars[k]
+end
+
+function LB:Lists() return DB().listOrder end
+
+-- The list Alt-click adds to (the one you last opened under My Lists)
+function LB:ActiveList()
+    local name = CharDB().list
+    if name and DB().lists[name] then return name end
+    return DB().listOrder[1]
+end
+function LB:SetActiveList(name) if DB().lists[name] then CharDB().list = name end end
+
+function LB:InList(name, id) local l = DB().lists[name]; return l ~= nil and l[id] ~= nil end
+
+-- Add or take out; returns whether it's in the list now
+function LB:ToggleList(name, id)
+    local l = DB().lists[name]
+    if not l or not id then return false end
+    if l[id] then l[id] = nil; return false end
+    l[id] = (GetServerTime and GetServerTime()) or time()
+    return true
+end
+
+function LB:NewList(name)
+    name = name and strtrim and strtrim(name) or name
+    if not name or name == "" then
+        local n = #DB().listOrder + 1
+        name = "List " .. n
+        while DB().lists[name] do n = n + 1; name = "List " .. n end
+    end
+    if DB().lists[name] then return nil, "There's already a list called " .. name .. "." end
+    DB().lists[name] = {}
+    table.insert(DB().listOrder, name)
+    return name
+end
+
+function LB:RenameList(old, new)
+    new = new and strtrim and strtrim(new) or new
+    if not DB().lists[old] or not new or new == "" then return nil end
+    if DB().lists[new] then return nil, "There's already a list called " .. new .. "." end
+    DB().lists[new], DB().lists[old] = DB().lists[old], nil
+    for i, n in ipairs(DB().listOrder) do if n == old then DB().listOrder[i] = new end end
+    for _, c in pairs(DB().chars) do if c.list == old then c.list = new end end
+    return new
+end
+
+function LB:DeleteList(name)
+    if not DB().lists[name] then return false end
+    DB().lists[name] = nil
+    for i, n in ipairs(DB().listOrder) do if n == name then table.remove(DB().listOrder, i); break end end
+    DB()   -- the last list gone: a fresh Favourites
+    return true
+end
+
+local function BisKey(spec, class) return (class or MyClass() or "?") .. ":" .. spec end
+function LB:IsBiS(spec, id, class) local t = DB().bis[BisKey(spec, class)]; return t ~= nil and t[id] ~= nil end
+function LB:ToggleBiS(spec, id, class)
+    local k = BisKey(spec, class)
+    DB().bis[k] = DB().bis[k] or {}
+    local t = DB().bis[k]
+    if t[id] then t[id] = nil; return false end
+    t[id] = (GetServerTime and GetServerTime()) or time()
+    return true
+end
+
+-- Your class's specs this item is marked BiS for, and the lists it's in
+function LB:Marks(id)
+    local specs, lists = {}, {}
+    for _, spec in ipairs(LB.MySpecs()) do if self:IsBiS(spec, id) then specs[#specs + 1] = spec end end
+    for _, name in ipairs(DB().listOrder) do if self:InList(name, id) then lists[#lists + 1] = name end end
+    return specs, lists
+end
+
+-- Slot groups for the My Lists pages, in paper-doll order
+local SLOT_GROUPS = {
+    { "Head", { INVTYPE_HEAD = true } }, { "Neck", { INVTYPE_NECK = true } },
+    { "Shoulder", { INVTYPE_SHOULDER = true } }, { "Back", { INVTYPE_CLOAK = true } },
+    { "Chest", { INVTYPE_CHEST = true, INVTYPE_ROBE = true } }, { "Wrist", { INVTYPE_WRIST = true } },
+    { "Hands", { INVTYPE_HAND = true } }, { "Waist", { INVTYPE_WAIST = true } },
+    { "Legs", { INVTYPE_LEGS = true } }, { "Feet", { INVTYPE_FEET = true } },
+    { "Finger", { INVTYPE_FINGER = true } }, { "Trinket", { INVTYPE_TRINKET = true } },
+    { "Weapons and Off-hands", { INVTYPE_WEAPON = true, INVTYPE_2HWEAPON = true, INVTYPE_WEAPONMAINHAND = true,
+        INVTYPE_WEAPONOFFHAND = true, INVTYPE_SHIELD = true, INVTYPE_HOLDABLE = true } },
+    { "Ranged and Relics", { INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THROWN = true, INVTYPE_RELIC = true } },
+}
+
+local function EquipLoc(id)
+    local f = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if not f then return nil end
+    local ok, _, _, _, loc = pcall(f, id)
+    return ok and loc or nil
+end
+
+local function GroupOf(id)
+    local loc = EquipLoc(id)
+    for i, g in ipairs(SLOT_GROUPS) do if loc and g[2][loc] then return i, g[1] end end
+    return #SLOT_GROUPS + 1, "Other"
+end
+
+-- "All items", then one row per slot group that has something
+local function SlotRows(set)
+    local ids = {}
+    for id in pairs(set or {}) do ids[#ids + 1] = id end
+    table.sort(ids, function(a, b)
+        local ga, gb = GroupOf(a), GroupOf(b)
+        if ga ~= gb then return ga < gb end
+        return a < b
+    end)
+    local rows, byGroup, order = { { "All items", n = ids } }, {}, {}
+    for _, id in ipairs(ids) do
+        local gi, label = GroupOf(id)
+        if not byGroup[gi] then byGroup[gi] = { label, n = {} }; order[#order + 1] = gi end
+        table.insert(byGroup[gi].n, id)
+    end
+    table.sort(order)
+    for _, gi in ipairs(order) do rows[#rows + 1] = byGroup[gi] end
+    return rows, #ids
+end
+
+-- The My Lists pages: your lists, then a BiS page per spec of your class
+function LB:MyPages()
+    local pages = {}
+    for _, name in ipairs(DB().listOrder) do
+        local rows, n = SlotRows(DB().lists[name])
+        pages[#pages + 1] = { id = "list:" .. name, list = name, name = name, kind = "list", bosses = rows, count = n }
+    end
+    for _, spec in ipairs(LB.MySpecs()) do
+        local rows, n = SlotRows(DB().bis[BisKey(spec)])
+        pages[#pages + 1] = { id = "bis:" .. spec, spec = spec, name = "BiS: " .. spec, kind = "bis", bosses = rows, count = n }
+    end
+    return pages
+end
+
+local function Owned(id)
+    local eq = rawget(_G, "IsEquippedItem") or (C_Item and C_Item.IsEquippedItem)
+    if type(eq) == "function" then
+        local ok, v = pcall(eq, id)
+        if ok and v then return "equipped" end
+    end
+    local count = (C_Item and C_Item.GetItemCount) or GetItemCount
+    if count then
+        local ok, n = pcall(count, id, true)
+        if ok and (tonumber(n) or 0) > 0 then return "have" end
+    end
+end
+LB.Owned = Owned
+
+-- ============================================
 -- WHERE ITEMS COME FROM
 -- ============================================
 -- { cat, tag, instance, boss, diff, craft } per source, for tooltips
@@ -426,6 +612,35 @@ local function SourceLine(g)
     return "|cFFFFFFFF" .. LB:InstanceName(s.instance) .. "|r |cFF" .. PLACE_COLOR .. "(" .. s.boss[1] .. ")|r"
 end
 
+-- One line on where an item is from, plain: "Attumen the Huntsman (Karazhan)"
+function LB:SourceShort(itemID)
+    local s = self:Sources(itemID)[1]
+    if not s then return nil end
+    local g = { first = s, diffs = { [s.diff] = true } }
+    return (SourceLine(g):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+
+-- What a My Lists row says under the name: owned, and where it's from
+function LB:ItemNote(id)
+    local o = Owned(id)
+    local src = self:SourceShort(id)
+    local parts = {}
+    if o == "equipped" then parts[#parts + 1] = "|cff00ff00Equipped|r"
+    elseif o == "have" then parts[#parts + 1] = "|cff00ff00Have|r" end
+    if src then parts[#parts + 1] = src end
+    if #parts == 0 then return LB.ItemKind(id) end
+    return table.concat(parts, "  ")
+end
+
+-- "Your BiS: Fire" / "In your lists: Favourites"
+function LB:MarkLines(id)
+    local specs, lists = self:Marks(id)
+    local out = {}
+    if #specs > 0 then out[#out + 1] = "|cFF" .. SOURCE_COLOR .. "Your BiS:|r |cFFFFFFFF" .. table.concat(specs, ", ") .. "|r" end
+    if #lists > 0 then out[#out + 1] = "|cFF" .. SOURCE_COLOR .. "In your lists:|r |cFFFFFFFF" .. table.concat(lists, ", ") .. "|r" end
+    return out
+end
+
 function LB:SourceLines(itemID)
     local list = self:Sources(itemID)
     if #list == 0 then return nil end
@@ -468,8 +683,9 @@ function LB:AddTooltipSource(tooltip, itemID)
     if not DB().tooltips or not tooltip or not itemID then return false end
     if tooltip.wmLootSource == itemID then return false end
     tooltip.wmLootSource = itemID
-    local lines = self:SourceLines(itemID)
-    if not lines then return false end
+    local lines = self:MarkLines(itemID)
+    for _, l in ipairs(self:SourceLines(itemID) or {}) do lines[#lines + 1] = l end
+    if #lines == 0 then return false end
     for _, l in ipairs(lines) do tooltip:AddLine(l) end
     if tooltip.Show then tooltip:Show() end   -- resize to the new lines
     return true
@@ -591,6 +807,10 @@ local function CurrentTag()
     local x = CurrentExpansion()
     if not x then return nil end
     local cat = state.cat or DB().category or "dungeons"
+    if cat == "mine" then
+        state.exp, state.cat = x.expansion, cat
+        return "mine", x, cat
+    end
     if not x.tags[cat] then
         for _, c in ipairs(CATEGORIES) do if x.tags[c.key] then cat = c.key; break end end
     end
@@ -695,6 +915,81 @@ local function ItemClick(b)
     end
 end
 
+-- The item a button stands for (a craft: what it makes)
+local function ButtonItem(b)
+    if b.itemID then return b.itemID end
+    local c = b.craftID and LB.CraftInfo(b.craftID)
+    return c and c[1] and c[1] > 0 and c[1] or nil
+end
+
+-- Right-click: which of your lists it's in, and which specs it's BiS for
+function LB:OpenItemMenu(id)
+    if not id then return end
+    if not self.menu then
+        self.menu = CreateFrame("Frame", "WM_LootItemMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+    local menu = self.menu
+    UIDropDownMenu_Initialize(menu, function(_, level)
+        local title = UIDropDownMenu_CreateInfo()
+        title.text, title.isTitle, title.notCheckable = ItemInfo(id) or ("Item " .. id), true, true
+        UIDropDownMenu_AddButton(title, level)
+        for _, name in ipairs(DB().listOrder) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text, info.isNotRadio, info.keepShownOnClick = name, true, true
+            info.checked = LB:InList(name, id)
+            info.func = function() LB:ToggleList(name, id); LB:RefreshList() end
+            UIDropDownMenu_AddButton(info, level)
+        end
+        for _, spec in ipairs(LB.MySpecs()) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text, info.isNotRadio, info.keepShownOnClick = "BiS: " .. spec, true, true
+            info.checked = LB:IsBiS(spec, id)
+            info.func = function() LB:ToggleBiS(spec, id); LB:RefreshList() end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end, "MENU")
+    if ToggleDropDownMenu then ToggleDropDownMenu(1, nil, menu, "cursor", 0, 0) end
+    return menu
+end
+
+-- Left-click links / tries on; Alt-click adds to (or takes out of) your
+-- list; right-click opens the lists and BiS menu
+local function ItemOnClick(b, button)
+    local id = ButtonItem(b)
+    if button == "RightButton" then
+        LB:OpenItemMenu(id)
+    elseif IsAltKeyDown and IsAltKeyDown() and id then
+        local name = LB:ActiveList()
+        local now = LB:ToggleList(name, id)
+        WM:ModulePrint("LootBrowser", (now and "Added to " or "Taken out of ") .. name .. ": " .. LB.ItemText(id))
+        LB:RefreshList()
+    else
+        ItemClick(b)
+    end
+end
+
+-- A star for "in a list", BiS for "marked BiS" (for your class)
+local function Badges(b)
+    b.star = b:CreateTexture(nil, "OVERLAY")
+    b.star:SetSize(12, 12)
+    b.star:SetPoint("TOPLEFT", b.icon or b, "TOPLEFT", -3, 3)
+    b.star:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
+    b.star:Hide()
+    b.bis = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b.bis:SetPoint("BOTTOMRIGHT", b.icon or b, "BOTTOMRIGHT", 2, -1)
+    b.bis:SetText("|cffff8000BiS|r")
+    b.bis:Hide()
+end
+
+local function ShowBadges(b, id)
+    if not b.star then return end
+    local specs, lists = {}, {}
+    if id then specs, lists = LB:Marks(id) end
+    b.star:SetShown(#lists > 0)
+    b.bis:SetShown(#specs > 0)
+end
+LB.ShowBadges = ShowBadges
+
 local function ItemButton(parent)
     local b = CreateFrame("Button", nil, parent)
     b:SetHeight(ITEM_H)
@@ -712,7 +1007,9 @@ local function ItemButton(parent)
     b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     b:SetScript("OnEnter", ItemEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    b:SetScript("OnClick", ItemClick)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnClick", ItemOnClick)
+    Badges(b)
     return b
 end
 
@@ -732,7 +1029,9 @@ local function SetRow(parent)
         p:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
         p:SetScript("OnEnter", ItemEnter)
         p:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        p:SetScript("OnClick", ItemClick)
+        p:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        p:SetScript("OnClick", ItemOnClick)
+        Badges(p)
         r.pieces[i] = p
     end
     return r
@@ -772,6 +1071,7 @@ function LB:FillItems(entries)
                     local _, _, _, icon = ItemInstant(id)
                     p.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                     p.itemID = id
+                    ShowBadges(p, id)
                     p:Show()
                 else
                     p.itemID = nil
@@ -792,6 +1092,7 @@ function LB:FillItems(entries)
                 b:SetWidth(width)
                 b:SetHeight(e.classHeader and 22 or ITEM_H)
                 b.icon:Hide()
+                ShowBadges(b, nil)
                 b.name:SetText(e.classHeader and ClassLabel(e.classHeader) or ("|cFFFFD100" .. e.header .. "|r"))
                 b.kind:SetText("")
                 y = y + (e.classHeader and 22 or ITEM_H)
@@ -817,9 +1118,10 @@ function LB:FillItems(entries)
                     b.itemID = e.item
                     text, known = LB.ItemText(e.item)
                     icon = select(4, ItemInstant(e.item))
-                    kind = LB.ItemKind(e.item)
+                    kind = e.note or LB.ItemKind(e.item)
                 end
                 if not known then pending = true end
+                ShowBadges(b, ButtonItem(b))
                 b.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                 b.name:SetText(text)
                 b.kind:SetText(kind)
@@ -874,17 +1176,22 @@ function LB:RefreshList()
     end
     for i, c in ipairs(CATEGORIES) do
         local btn = panel.catBox.buttons[i]
-        if btn then btn:SetShown(x.tags[c.key] ~= nil) end
+        if btn then btn:SetShown(x.tags[c.key] ~= nil or c.key == "mine") end
     end
     if panel.catBox.Refresh then panel.catBox:Refresh() end
     local inst = CurrentInstance(tag)
     state.inst = inst and inst.id
+    local mine = tag == "mine"
+    if mine and inst and inst.list then self:SetActiveList(inst.list) end
+    if panel.listBar then panel.listBar:SetShown(mine) end
     -- pages
     local items, sel = {}, nil
     for _, i in ipairs(self:Instances(tag)) do
         local label = self:InstanceName(i)
         if KIND_COLORS[i.kind] then label = "|cFF" .. KIND_COLORS[i.kind] .. label .. "|r" end
         if i.phase then label = label .. " |cFF888888(P" .. i.phase .. ")|r" end
+        if i.count then label = label .. " |cFF888888(" .. i.count .. ")|r" end
+        if i.kind == "bis" then label = "|cFFFF8000" .. label .. "|r" end
         local tip
         if i.levels then tip = { self:InstanceName(i), "Levels " .. (i.levels[2] or i.levels[1]) .. "-" .. (i.levels[3] or i.levels[2] or "") } end
         items[#items + 1] = { text = label, value = i.id, tooltip = tip }
@@ -919,12 +1226,31 @@ function LB:RefreshList()
     for _, d in ipairs(diffs) do has[d] = true end
     if not has[diff] then diff = diffs[1] or "n" end
     state.diff = diff
-    self:RefreshDiffButtons(diffs, diff)
-    local n = self:FillItems(self:Entries(boss, diff, DB().myClassSets))
+    self:RefreshDiffButtons(mine and {} or diffs, diff)
+    local entries = self:Entries(boss, diff, DB().myClassSets)
     local title = boss and boss[1] or ""
-    panel.status:SetText((inst and ("|cFFFFFFFF" .. self:InstanceName(inst) .. "|r") or "")
-        .. (boss and ("  -  " .. title) or "") .. (#diffs > 1 and ("  |cFF66FF66(" .. (DIFF_LABELS[diff] or diff) .. ")|r") or ""))
-    return n
+    if mine then
+        local have = 0
+        for _, e in ipairs(entries) do
+            if e.item then
+                e.note = self:ItemNote(e.item)
+                if Owned(e.item) then have = have + 1 end
+            end
+        end
+        local text = "|cFFFFFFFF" .. (inst and self:InstanceName(inst) or "") .. "|r  -  " .. title
+        if #entries == 0 then
+            text = text .. "  |cFF888888" .. (inst and inst.kind == "bis"
+                and "Right-click any item in the browser to mark it BiS for this spec."
+                or "Alt-click any item in the browser to add it here; right-click for every list.") .. "|r"
+        else
+            text = text .. "  |cFF888888" .. #entries .. " items, " .. have .. " you have|r"
+        end
+        panel.status:SetText(text)
+    else
+        panel.status:SetText((inst and ("|cFFFFFFFF" .. self:InstanceName(inst) .. "|r") or "")
+            .. (boss and ("  -  " .. title) or "") .. (#diffs > 1 and ("  |cFF66FF66(" .. (DIFF_LABELS[diff] or diff) .. ")|r") or ""))
+    end
+    return self:FillItems(entries)
 end
 
 function LB:CreateUI()
@@ -932,7 +1258,7 @@ function LB:CreateUI()
     panel = WM.UI:CreatePanel({
         name = "WM_LootBrowserFrame", title = "Loot Browser", titleColor = "FFB366",
         width = 860, height = 540, scroll = false,
-        resizable = { 680, 380, 1600, 1400 },
+        resizable = { 740, 380, 1600, 1400 },
         onResize = function() LB:RefreshList() end,
         onRefresh = function() LB:RefreshList() end,
     })
@@ -983,6 +1309,48 @@ function LB:CreateUI()
         bar.buttons[i] = btn
     end
     panel.diffBar = bar
+
+    -- My Lists: make, rename and delete lists
+    local lb = CreateFrame("Frame", nil, second.frame)
+    lb:SetPoint("LEFT", 8, 0)
+    lb:SetSize(420, 22)
+    local nameBox = WM.UI.EditBox(lb, { width = 120, maxLetters = 30,
+        tooltip = { "List name", "Type a name, then New list or Rename." } })
+    nameBox:SetPoint("LEFT", 0, 0)
+    local function Selected()
+        local inst = state.inst and LB:Instance("mine", state.inst)
+        return inst and inst.list
+    end
+    local function Say(msg) if msg then WM:ModulePrint("LootBrowser", msg) end end
+    local newBtn = WM.UI.Button(lb, { text = "New list", width = 70, onClick = function()
+        local name, err = LB:NewList(nameBox:GetText())
+        Say(err)
+        if name then
+            nameBox:SetText("")
+            state.inst, state.boss = "list:" .. name, 1
+            LB:RefreshList()
+        end
+    end })
+    newBtn:SetPoint("LEFT", nameBox.editBox, "RIGHT", 6, 0)
+    local renameBtn = WM.UI.Button(lb, { text = "Rename", width = 66, onClick = function()
+        local old = Selected()
+        if not old then Say("Pick one of your lists first (BiS pages can't be renamed)."); return end
+        local name, err = LB:RenameList(old, nameBox:GetText())
+        Say(err)
+        if name then nameBox:SetText(""); state.inst = "list:" .. name; LB:RefreshList() end
+    end })
+    renameBtn:SetPoint("LEFT", newBtn, "RIGHT", 2, 0)
+    local delBtn = WM.UI.Button(lb, { text = "Delete", width = 60, confirm = true, onClick = function()
+        local name = Selected()
+        if not name then Say("Pick one of your lists first (clear a BiS page with right-click)."); return end
+        LB:DeleteList(name)
+        state.inst, state.boss = nil, 1
+        LB:RefreshList()
+    end })
+    delBtn:SetPoint("LEFT", renameBtn, "RIGHT", 2, 0)
+    lb.nameBox, lb.newBtn, lb.renameBtn, lb.delBtn = nameBox, newBtn, renameBtn, delBtn
+    lb:Hide()
+    panel.listBar = lb
     second:Checkbox({
         label = "Sets: my class only",
         get = function() return DB().myClassSets end,
@@ -1016,7 +1384,8 @@ function LB:CreateUI()
     items:SetScrollChild(child)
     panel.itemScroll, panel.itemChild = items, child
 
-    panel:AddFooterText({ text = "|cFF888888Shift-click to link, Ctrl-click to try on.|r" }, "LEFT")
+    panel:AddFooterText({ text = "|cFF888888Shift-click to link, Ctrl-click to try on, Alt-click to add to your list,"
+        .. " right-click for lists and BiS.|r" }, "LEFT")
     panel:Finish()
     return panel
 end

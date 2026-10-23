@@ -529,7 +529,7 @@ needs each NPC's two yell texts.
 - [ ] **Where it lives:** a module of its own, with its own dashboard card.
 
 
-## 14. Loot Browser (AtlasLoot-style) — phases 1–3 DONE in 3.34–3.36
+## 14. Loot Browser (AtlasLoot-style) — phases 1–4 DONE in 3.34–3.39
 
 Our own loot browser, with AtlasLoot as the inspiration. The code is all
 Watching Machine's own. The data keeps only the facts (which item IDs drop
@@ -544,8 +544,8 @@ from which boss), in our own format.
       (Karazhan)", Heroic-only marked, capped at three bosses.
 - [x] **Crafting, reputation rewards, PvP gear** (3.36), Classic + TBC, and
       Wrath's on a Wrath client. Set pages: one line per set, by class.
-- [ ] **Favourites and your own BiS marks** per spec. Not AtlasLoot's
-      curated BiS lists.
+- [x] **Favourites and your own BiS marks** (3.39): My Lists, Alt-click /
+      right-click, badges, slot groups, owned and source notes.
 - [ ] **Search** by item name (cached names only, or ask the client in
       batches).
 

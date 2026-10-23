@@ -2,7 +2,36 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.38** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.39** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.39
+
+### New — favourites and best-in-slot lists in the Loot Browser
+
+A new **My Lists** page in the Loot Browser (*Show: My Lists*).
+
+- **Favourite lists:** start with *Favourites*. Make more (Karazhan gear,
+  alts, crafting mats...) from the bar above the page: type a name, then
+  *New list*, *Rename* or *Delete* (click twice).
+- **BiS lists:** one per spec of your class (*BiS: Arcane*, *BiS: Fire*,
+  *BiS: Frost*). These are your own marks, not a ready-made list.
+- **Adding:**
+  - **Alt-click** an item anywhere in the browser (set pieces and recipes
+    too) to add it to your list, or take it out. It goes to the list you
+    last opened under My Lists.
+  - **Right-click** for a menu that ticks it in or out of any list, and
+    marks it BiS for any of your specs.
+- **Badges:** a star on items in a list, an orange "BiS" on items marked BiS
+  for your class.
+- **The pages:** *All items* plus one section per slot (Head, Neck, ...).
+  Each item says whether you have it (**Equipped**, or **Have** in your bags
+  or bank) and where it's from. The heading counts "16 items, 5 you have".
+- **Tooltips:** item tooltips now start with "Your BiS: Fire" and "In your
+  lists: Favourites" before where it's from.
+- **Shared across characters:** lists and BiS marks are account-wide. Which
+  list Alt-click fills is per character.
 
 ---
 

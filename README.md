@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.38 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.39 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -532,8 +532,19 @@ What every dungeon and raid boss drops, what each profession makes,
 reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
 `/wmachine atlas`).
 
-- **Show:** *Dungeons & Raids*, *Crafting*, *Factions* or *PvP*, for the
-  expansion picked at the top
+- **Show:** *Dungeons & Raids*, *Crafting*, *Factions*, *PvP* or *My Lists*,
+  for the expansion picked at the top
+- **My Lists** (3.39): your own favourite lists and a best-in-slot list for
+  each spec of your class.
+  - **Alt-click** any item (or set piece, or recipe) to add it to your list
+    (the list you last opened under My Lists).
+  - **Right-click** for a menu that ticks it in or out of any list, or
+    marks it BiS for any of your specs.
+  - Items in a list get a star; BiS items get an orange "BiS".
+  - Each page is sorted by slot (Head, Neck, ...), and shows whether you
+    have the item (equipped, in your bags or bank) and where it's from.
+  - Make, rename and delete lists from the bar above. Lists and BiS marks
+    are shared across your characters
 
 - **Classic and The Burning Crusade:** every dungeon and raid, boss by boss,
   plus trash, quest and event pages, keys, and the tier sets. The
@@ -560,7 +571,8 @@ reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
   loot window) say where an item comes from: *Drops from* (each boss and
   its instance, "Heroic" when only the heroic version drops it),
   *Reputation reward* (faction and standing), *PvP reward* and *Made by*
-  (profession and skill). Up to three of each, then "and N more".
+  (profession and skill). Up to three of each, then "and N more". Your
+  BiS marks and lists come first ("Your BiS: Fire").
   *Item tooltips* in the window turns it off
 - **Opens on the instance you're in**, and remembers the last one per
   expansion. The window is resizable; the loot uses two columns when wide
@@ -805,6 +817,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.39
+- **Loot Browser My Lists**: favourite lists (Alt-click to add) and best-in-slot lists per spec (right-click), with badges, slot grouping, what you own and where each item is from
 
 ### Version 3.38
 - **ArmorySnap GearScore**: every snapshot member's score in the member list and paper doll, plus each snapshot's raid average, including snapshots taken before

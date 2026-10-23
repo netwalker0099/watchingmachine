@@ -8,6 +8,10 @@ local env = W.env
 local faction, class = "Horde", "MAGE"
 env.UnitFactionGroup = function() return faction end
 env.UnitClass = function() return "Mage", class end
+local altDown = false
+env.IsAltKeyDown = function() return altDown end
+env.UnitName = function() return "Tanky" end
+env.GetRealmName = function() return "Spineshatter" end
 env.LE_EXPANSION_LEVEL_CURRENT = 1
 local names = { [28477] = { "Harbinger Bands", 4 }, [24024] = { "Pauldrons of Arcane Rage", 3 } }
 local asked = {}
@@ -215,6 +219,40 @@ check("tooltip: made by", Joined(22866):find("Made by:", 1, true) and Joined(228
 check("tooltip: PvP set piece", Joined(24553):find("PvP reward:", 1, true) and Joined(24553):find("Arena Season 1", 1, true))
 check("tooltip: kinds in order", Joined(29434):find("^|cFFFFB366Drops from:") ~= nil)
 
+-- ---- Your lists and BiS marks ----
+local db = env.LootBrowserDB
+check("a Favourites list to start with", #LB:Lists() == 1 and LB:Lists()[1] == "Favourites" and LB:ActiveList() == "Favourites")
+for id in pairs(db.lists.Favourites) do db.lists.Favourites[id] = nil end
+check("add to a list", LB:ToggleList("Favourites", 28477) and LB:InList("Favourites", 28477))
+check("and out again", not LB:ToggleList("Favourites", 28477) and not LB:InList("Favourites", 28477))
+LB:ToggleList("Favourites", 28477)
+check("new list, named", LB:NewList("Kara gear") == "Kara gear" and LB:Lists()[2] == "Kara gear")
+check("new list, no name", LB:NewList("") == "List 3")
+check("no two lists with one name", select(2, LB:NewList("Kara gear")) ~= nil)
+LB:SetActiveList("Kara gear")
+check("rename keeps the active list", LB:RenameList("Kara gear", "Karazhan") == "Karazhan" and LB:ActiveList() == "Karazhan")
+check("delete", LB:DeleteList("List 3") and #LB:Lists() == 2)
+check("BiS specs for your class", #LB.MySpecs() == 3 and LB.MySpecs()[2] == "Fire")
+check("mark BiS", LB:ToggleBiS("Fire", 28477) and LB:IsBiS("Fire", 28477) and not LB:IsBiS("Frost", 28477))
+check("BiS is per class", not LB:IsBiS("Fire", 28477, "WARLOCK"))
+local specs, lists = LB:Marks(28477)
+check("marks", specs[1] == "Fire" and lists[1] == "Favourites" and #lists == 1)
+local ml = LB:MarkLines(28477)
+check("tooltip: your BiS and your lists first", ml[1]:find("Your BiS:", 1, true) and ml[1]:find("Fire", 1, true)
+    and ml[2]:find("In your lists:", 1, true))
+local mtip = Tip and Tip() or nil
+local pages = LB:MyPages()
+check("My Lists pages: lists then BiS per spec", #pages == 5 and pages[1].list == "Favourites" and pages[2].list == "Karazhan"
+    and pages[3].spec == "Arcane" and pages[4].name == "BiS: Fire" and pages[4].count == 1)
+check("rows: all items, then by slot", pages[1].bosses[1][1] == "All items" and pages[1].bosses[1].n[1] == 28477
+    and pages[1].bosses[2][1] == "Wrist")
+env.C_Item.GetItemCount = function(id) return id == 28477 and 1 or 0 end
+check("owned", LB.Owned(28477) == "have" and LB.Owned(1) == nil)
+check("note: owned and where from", LB:ItemNote(28477):find("Have", 1, true) and LB:ItemNote(28477):find("Attumen", 1, true))
+LB:DeleteList("Favourites"); LB:DeleteList("Karazhan")
+check("deleting the last list leaves a fresh Favourites", #LB:Lists() == 1 and LB:Lists()[1] == "Favourites")
+LB:ToggleBiS("Fire", 28477)   -- unmarked again, for the tooltip tests below
+
 -- ---- Window ----
 inInstance, instanceID = true, 543
 LB:Toggle()
@@ -285,6 +323,49 @@ check("craft tooltip: skill and reagents", table.concat(craftTip, "\n"):find("Re
 p.catBox.buttons[3]:_fire("OnClick")
 check("category: factions", env.LootBrowserDB.category == "factions" and p.instList.rows[1]:IsShown())
 p.catBox.buttons[1]:_fire("OnClick")
+-- My Lists in the window
+LB:ToggleList("Favourites", 28477)
+LB:ToggleBiS("Fire", 28477)
+LB:Show("tbc", "Karazhan")
+local first = p.itemButtons[1]
+check("badges: star for a list, BiS for a mark", first.itemID == 28477 and first.star:IsShown() and first.bis:IsShown())
+local second = p.itemButtons[2]
+check("badges: none", not second.star:IsShown() and not second.bis:IsShown())
+altDown = true
+second._scripts.OnClick(second, "LeftButton")
+altDown = false
+check("Alt-click adds to your list", LB:InList("Favourites", second.itemID) and p.itemButtons[2].star:IsShown())
+p.itemButtons[2]._scripts.OnClick(p.itemButtons[2], "RightButton")
+local menuItems = W.openMenu(LB.menu)
+check("right-click menu: title, lists, BiS per spec", #menuItems == 5 and menuItems[1].isTitle and menuItems[2].text == "Favourites"
+    and menuItems[2].checked and menuItems[4].text == "BiS: Fire" and not menuItems[4].checked)
+menuItems[4].func()
+check("menu: marks BiS", LB:IsBiS("Fire", p.itemButtons[2].itemID) and p.itemButtons[2].bis:IsShown())
+p.catBox.buttons[5]:_fire("OnClick")
+check("My Lists page", env.LootBrowserDB.category == "mine" and p.status:GetText():find("Favourites", 1, true)
+    and p.listBar:IsShown() and not p.diffBar:IsShown())
+check("My Lists: items with notes", p.itemButtons[1].itemID ~= nil and p.itemButtons[1].kind:GetText():find("Attumen", 1, true))
+check("My Lists: count and what you have", p.status:GetText():find("2 items, 1 you have", 1, true) ~= nil)
+check("My Lists: pages listed", p.instList.rows[1].text:GetText():find("Favourites", 1, true)
+    and p.instList.rows[2].text:GetText():find("BiS: Arcane", 1, true))
+p.listBar.nameBox:SetText("Alt list")
+W.click(p.listBar.newBtn)
+check("New list button", LB:InList("Alt list", 0) == false and LB:Lists()[2] == "Alt list"
+    and p.status:GetText():find("Alt list", 1, true) and LB:ActiveList() == "Alt list")
+check("empty list: a hint", p.status:GetText():find("Alt-click any item", 1, true) ~= nil)
+p.listBar.nameBox:SetText("Spare")
+W.click(p.listBar.renameBtn)
+check("Rename button", LB:Lists()[2] == "Spare")
+W.click(p.listBar.delBtn)
+check("Delete asks first", LB:Lists()[2] == "Spare")
+W.click(p.listBar.delBtn)
+check("Delete", #LB:Lists() == 1)
+p.instList.rows[3]:_fire("OnClick")
+check("BiS page", p.status:GetText():find("BiS: Fire", 1, true) and p.status:GetText():find("2 items", 1, true))
+p.catBox.buttons[1]:_fire("OnClick")
+check("back to the dungeons: list bar hidden", not p.listBar:IsShown())
+env.LootBrowserDB.lists.Favourites = {}   -- clean slate for the tooltip tests below
+env.LootBrowserDB.bis = {}
 check("toggle closes", (function() LB:Toggle(); return not p:IsShown() end)())
 check("status", LB:GetQuickStatus():find("instances", 1, true) ~= nil)
 
