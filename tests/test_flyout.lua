@@ -23,7 +23,7 @@ local combat = false
 env.InCombatLockdown = function() return combat end
 env.GetCVarBool = function() return true end
 local shards = 7
-env.GetItemCount = function(id) if id == 6265 then return shards end; return 0 end
+env.C_Item = { GetItemCount = function(id) if id == 6265 then return shards end; return 0 end }
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Modules/ClassTools.lua", "Modules/ClassFlyout.lua",
                      "Modules/ClassGeneral.lua", "Modules/ClassWarlock.lua", "Modules/ClassMage.lua" }) do

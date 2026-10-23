@@ -145,37 +145,45 @@ local RUNE_MIN_HEALTH = 0.35
 
 -- Ready = in your bags, usable here, and off cooldown. Returns ready, why.
 local function ItemReady(id)
-    if not GetItemCount or (GetItemCount(id) or 0) < 1 then return false, "none" end
-    if IsUsableItem and not IsUsableItem(id) then return false, "unusable" end
-    if GetItemCooldown then
-        local start, duration = GetItemCooldown(id)
-        -- duration over 1.5s: a real cooldown, not the global cooldown
-        if start and start > 0 and duration and duration > 1.5 then return false, "cooldown" end
-    end
+    if WM.ItemCount(id) < 1 then return false, "none" end
+    if not WM.ItemUsable(id) then return false, "unusable" end
+    local start, duration = WM.ItemCooldown(id)
+    -- duration over 1.5s: a real cooldown, not the global cooldown
+    if start and start > 0 and duration and duration > 1.5 then return false, "cooldown" end
     return true
 end
 
--- First ready item, or nil plus whether one was merely on cooldown
+-- First ready item, or nil plus whether one was merely on cooldown and
+-- the first one carried that can't be used here
 local function FirstReady(list)
-    local onCooldown = false
+    local onCooldown, unusable = false, nil
     for _, id in ipairs(list) do
         local ok, why = ItemReady(id)
         if ok then return id end
         if why == "cooldown" then onCooldown = true end
+        if why == "unusable" and not unusable then unusable = id end
     end
-    return nil, onCooldown
+    return nil, onCooldown, unusable
 end
 General.FirstReady = FirstReady   -- for tests
 
 local function ItemLabel(id, fallback)
-    local name = GetItemInfo and GetItemInfo(id)
-    return (type(name) == "string" and name) or fallback
+    return WM.ItemName(id) or fallback
 end
 
 local function ItemIcon(id, fallback)
-    local tex = GetItemIcon and GetItemIcon(id)
-    return tex or fallback
+    return WM.ItemIcon(id) or fallback
 end
+
+-- A warning that should have shown but couldn't says why in chat, once
+-- per reason per session, so a silent miss can be diagnosed afterwards
+local noted = {}
+local function NoteSkip(reason)
+    if noted[reason] then return end
+    noted[reason] = true
+    if General.Print then General:Print("|cFFFFCC00No mana potion warning:|r " .. reason) end
+end
+General.ResetSkipNotes = function() wipe(noted) end   -- for tests
 
 local latched = { potion = false, rune = false }
 
@@ -205,7 +213,17 @@ local function CheckMana(tools)
     end
 
     local deficit = ManaDeficit()
-    local potion, potionOnCooldown = FirstReady(MANA_POTIONS)
+    local potion, potionOnCooldown, unusable = FirstReady(MANA_POTIONS)
+
+    if potionOn and not potion and deficit >= GeneralChecksDB.potionAt then
+        if potionOnCooldown then
+            NoteSkip("your mana potion is on cooldown (a pre-pull potion shares it). The rune warning covers this if you carry runes.")
+        elseif unusable then
+            NoteSkip(ItemLabel(unusable, "your mana potion") .. " can't be used here, and you carry no other mana potion.")
+        else
+            NoteSkip("no mana potion found in your bags.")
+        end
+    end
 
     latched.potion = potionOn and potion ~= nil
         and Over(deficit, GeneralChecksDB.potionAt, latched.potion) or false
@@ -254,6 +272,14 @@ local function Monitor()
 
     -- Outside a qualifying raid, or dead, stay silent
     if UnitIsDeadOrGhost("player") or not ShouldCheckHere() then
+        -- In a raid the 25-man setting is skipping: say so if it costs a warning
+        local inRaid, maxPlayers = RaidContext()
+        if inRaid and GeneralChecksDB and tools:IsEnabled(CLASS, "manapotion")
+            and UnitAffectingCombat("player") and UnitPowerType("player") == 0
+            and ManaDeficit() >= GeneralChecksDB.potionAt then
+            NoteSkip("\"Only in 25-man raids\" is on and this instance reports "
+                .. tostring(maxPlayers) .. " players.")
+        end
         ClearAll(tools)
         return
     end

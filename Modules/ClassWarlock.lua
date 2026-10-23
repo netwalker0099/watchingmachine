@@ -254,7 +254,7 @@ end
 local SOUL_SHARD = 6265
 
 local function ShardBadge()
-    return tostring(GetItemCount and GetItemCount(SOUL_SHARD) or 0)
+    return tostring(WM.ItemCount(SOUL_SHARD))
 end
 
 local WARLOCK_SPELLS = {

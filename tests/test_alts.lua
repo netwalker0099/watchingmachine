@@ -33,7 +33,7 @@ local skills = {
 env.GetNumSkillLines = function() return #skills end
 env.GetSkillLineInfo = function(i) local s = skills[i]; return s[1], s[2], true, s[3], 0, 0, s[4] end
 local items = {}
-env.GetItemCount = function(id) return items[id] or 0 end
+env.C_Item = { GetItemCount = function(id) return items[id] or 0 end }
 env.GetItemInfo = function() return nil end
 local petOut = false
 env.UnitExists = function(u) return u == "player" or (u == "pet" and petOut) end

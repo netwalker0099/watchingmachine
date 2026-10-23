@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.30"
+WM.version = "3.31"
 WM.modules = {}
 
 -- ============================================
@@ -175,6 +175,44 @@ function WM:IsFlaskBuff(name, spellId)
         if name:find(needle, 1, true) then return true end
     end
     return false
+end
+
+-- ============================================
+-- ITEM API
+-- ============================================
+-- TBC Anniversary 2.5.5 removed the global item functions (GetItemCount,
+-- GetItemInfo, GetItemIcon, GetItemCooldown, IsUsableItem). They only come
+-- back through Blizzard's deprecation fallbacks, which a CVar can turn off,
+-- and the fallback for GetItemCooldown points at C_Item.GetItemCooldown,
+-- which 2.5.6 doesn't have, so it is nil. These use the namespaced
+-- functions first and the old globals only where those are missing.
+
+function WM.ItemCount(id)
+    local f = (C_Item and C_Item.GetItemCount) or GetItemCount
+    return f and tonumber(f(id)) or 0
+end
+
+-- start, duration (nil if the client has neither function)
+function WM.ItemCooldown(id)
+    local f = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+    if f then return f(id) end
+end
+
+function WM.ItemUsable(id)
+    local f = (C_Item and C_Item.IsUsableItem) or IsUsableItem
+    if not f then return true end
+    return f(id) and true or false
+end
+
+function WM.ItemName(id)
+    local f = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    local name = f and f(id)
+    return type(name) == "string" and name or nil
+end
+
+function WM.ItemIcon(id)
+    local f = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
+    return f and f(id) or nil
 end
 
 -- Battle and guardian elixirs. In TBC a flask fills both elixir slots, so

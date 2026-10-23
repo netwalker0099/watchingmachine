@@ -2,7 +2,53 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.30** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.31** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.31
+
+### Changed — raid SR check runs on every robot pull
+
+The raid-wide shadow resist check ran once, 45 seconds after Mother died.
+It now runs each time you pull a trigger mob after her (the Promenade
+Sentinel robots, Shadowmoon Reavers and the Illidari packs), once per
+pull, for the raid leader and assistants. Mother's death only arms it.
+Each scan takes a few seconds per raider who isn't running the addon, so
+it finishes well inside a robot pull.
+
+### Fixed — mana potion cooldowns not seen on 2.5.6
+
+TBC Anniversary 2.5.5 removed the global item functions. Blizzard's
+deprecation fallback sets `GetItemCooldown` to `C_Item.GetItemCooldown`,
+which 2.5.6 doesn't have, so it was nil: a potion on cooldown counted as
+ready, the potion warning stayed up and the rune warning never showed.
+
+- New `WM.ItemCount`, `WM.ItemCooldown`, `WM.ItemUsable`, `WM.ItemName` and
+  `WM.ItemIcon` in `Core.lua` use `C_Item` / `C_Container` first and the old
+  globals only where those are missing.
+- The mana potion and rune warnings, Your Characters' reagent counts and
+  the warlock soul shard count use them.
+
+### New — a missed mana potion warning says why
+
+When you're down by the potion threshold in combat but no potion warning
+can show, chat says why, once per reason per session:
+
+- no mana potion in your bags
+- your potion is on cooldown (a pre-pull potion shares it)
+- the potion you carry can't be used here
+- "Only in 25-man raids" is on and the instance reports another size
+
+### Checked — 2.5.6 build 70006
+
+Build 70006 (October 12) changed nothing in Blizzard's UI code beyond the
+version number; the build before it (69795) only touched the group finder.
+Interface `20506` is still correct. Checked every global function the
+addon calls against the 2.5.6 API list: besides the item functions above,
+`UnitBuff`, `UnitDebuff`, `CombatLogGetCurrentEventInfo`, `SendChatMessage`
+and `GetTalentInfo` also exist only as deprecation fallbacks. They work
+today but Blizzard says they'll be removed.
 
 ---
 

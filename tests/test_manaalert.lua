@@ -17,13 +17,22 @@ env.UnitIsDeadOrGhost = function() return false end
 env.UnitBuff = function() return nil end   -- no buffs; only the mana alerts matter here
 env.IsInInstance = function() return true, "raid" end
 env.GetInstanceInfo = function() return nil, nil, nil, nil, 25 end
-env.GetItemCount = function(id) return bags[id] or 0 end
-env.GetItemCooldown = function(id) local c = cooldowns[id]; if c then return 100, c, 1 end; return 0, 0, 1 end
-env.IsUsableItem = function(id) if usable[id] == false then return false end; return true end
+-- 2.5.6 has only the namespaced item functions; the old globals are gone
+-- (their fallback for GetItemCooldown is nil), so don't provide them
 local NAMES = { [22832] = "Super Mana Potion", [13444] = "Major Mana Potion", [12662] = "Demonic Rune",
     [20520] = "Dark Rune", [32902] = "Bottled Nethergon Energy" }
-env.GetItemInfo = function(id) return NAMES[id] end
-env.GetItemIcon = function(id) return "icon" .. id end
+env.C_Item = {
+    GetItemCount = function(id) return bags[id] or 0 end,
+    IsUsableItem = function(id) if usable[id] == false then return false, false end; return true, false end,
+    GetItemInfo = function(id) return NAMES[id] end,
+    GetItemIconByID = function(id) return "icon" .. id end,
+}
+env.C_Container = {
+    GetItemCooldown = function(id) local c = cooldowns[id]; if c then return 100, c, 1 end; return 0, 0, 1 end,
+}
+for _, n in ipairs({ "GetItemCount", "GetItemCooldown", "IsUsableItem", "GetItemInfo", "GetItemIcon" }) do
+    env[n] = false
+end
 
 W.load("Core.lua")
 W.load("UI.lua")
@@ -123,6 +132,28 @@ CT:SetEnabled("GENERAL", "manapotion", true)
 env.IsInInstance = function() return false, "none" end; Tick()
 check("outside a raid instance: silent, like the other General checks", Potion() == nil)
 env.IsInInstance = function() return true, "raid" end
+
+-- ---- a missed warning says why, once per reason ----
+local said = {}
+local realPrint = Gen.Print
+Gen.Print = function(_, msg) said[#said + 1] = msg end
+Gen.ResetSkipNotes()
+Reset()
+mana = maxMana - 3500; Tick()
+check("no potions: says so", #said == 1 and said[1]:find("no mana potion found", 1, true))
+Tick(); Tick()
+check("only once", #said == 1)
+bags[22832] = 5; cooldowns[22832] = 120; Tick()
+check("pre-pull potion cooldown: says so", #said == 2 and said[2]:find("on cooldown", 1, true))
+cooldowns[22832] = nil
+mana = maxMana - 1000; Tick()
+check("under the threshold: nothing said", #said == 2)
+mana = maxMana - 3500
+env.GeneralChecksDB.only25 = true
+env.GetInstanceInfo = function() return nil, nil, nil, nil, 10 end; Tick()
+check("25-man only in a 10-man: says so", #said == 3 and said[3]:find("reports 10 players", 1, true))
+env.GetInstanceInfo = function() return nil, nil, nil, nil, 25 end
+Gen.Print = realPrint
 
 -- ---- thresholds are options ----
 env.GeneralChecksDB.potionAt = 4500

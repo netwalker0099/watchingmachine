@@ -159,7 +159,7 @@ function Alts:Update()
     c.professions = Professions()
     c.reagents = {}
     for _, id in ipairs(REAGENTS[class] or {}) do
-        c.reagents[id] = (GetItemCount and tonumber(GetItemCount(id))) or 0
+        c.reagents[id] = WM.ItemCount(id)
     end
     if class == "HUNTER" then
         local slot = GetInventorySlotInfo and GetInventorySlotInfo("AmmoSlot")

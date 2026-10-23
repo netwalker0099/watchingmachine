@@ -1340,13 +1340,12 @@ local SR_WARN_COOLDOWN = 20   -- seconds between warnings, so one pull warns onc
 
 local srArmed = false
 local srLastWarn = 0
-local srRaidAutoDone = false  -- the raid-wide scan has run for this arming
+local srRaidPullDone = false  -- the raid-wide scan has run for this pull
 
 -- Raid-wide check: raiders running Watching Machine report their own gear
 -- over SR_PREFIX; everyone who doesn't answer is inspected one at a time.
 local SR_PREFIX = "WMSR"
-local SR_RAID_DELAY = 45       -- seconds after Mother dies, to give time to swap
-local SR_REPLY_WAIT = 3        -- seconds to wait for addon replies before inspecting
+local SR_REPLY_WAIT = 3       -- seconds to wait for addon replies before inspecting
 local SR_INSPECT_GAP = 1.5     -- between inspects (the server throttles them)
 local SR_INSPECT_TIMEOUT = 4   -- give up on one inspect after this
 local srScan = nil             -- the raid scan in progress, if any
@@ -1459,7 +1458,12 @@ end
 function DebuffTracker:ResetShadowResistCheck()
     srArmed = false
     srLastWarn = 0
-    srRaidAutoDone = false
+    srRaidPullDone = false
+end
+
+-- Each pull gets its own raid-wide check
+function DebuffTracker:ResetShadowResistPull()
+    srRaidPullDone = false
 end
 
 function DebuffTracker:ArmShadowResistCheck()
@@ -1525,20 +1529,22 @@ function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destNam
     if subevent == "UNIT_DIED" then
         if destName and destName == MOTHER_NAME then
             srArmed = true
-            -- Give the raid time to swap before checking who hasn't
-            self:AutoRaidShadowResistScan(SR_RAID_DELAY)
         end
         return
     end
 
-    if srArmed then return end  -- already armed; combat entry handles the rest
+    -- Armed and this pull already checked: nothing left to do
+    if srArmed and srRaidPullDone then return end
 
     local a = sourceName and SR_TRIGGER_MOBS[sourceName:lower()]
     local b = destName and SR_TRIGGER_MOBS[destName:lower()]
     if a or b then
-        srArmed = true
-        self:CheckShadowResistGear()
-        self:AutoRaidShadowResistScan(0)
+        if not srArmed then
+            srArmed = true
+            self:CheckShadowResistGear()
+        end
+        -- Every robot / Promenade pull: check who in the raid is still in SR
+        self:AutoRaidShadowResistScan()
     end
 end
 
@@ -1546,8 +1552,9 @@ end
 -- RAID-WIDE SHADOW RESIST CHECK
 -- ============================================
 -- Lets the raid leader see who is still in SR gear after Mother. Runs on
--- its own SR_RAID_DELAY after Mother dies (leader or assist only, so 25
--- people aren't all inspecting), or any time with /wmachine srraid.
+-- its own on each pull of a trigger mob (the Promenade robots and the
+-- Illidari packs), for the leader or an assistant only so 25 people aren't
+-- all inspecting, or any time with /wmachine srraid.
 
 local function ShortName(name)
     if not name then return nil end
@@ -1589,15 +1596,11 @@ local function CanLeadChecks()
     return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
 end
 
-function DebuffTracker:AutoRaidShadowResistScan(delay)
+function DebuffTracker:AutoRaidShadowResistScan()
     if not DebuffTrackerDB or not DebuffTrackerDB.srRaidCheck then return end
-    if srRaidAutoDone or not IsInGroup() or not CanLeadChecks() then return end
-    srRaidAutoDone = true
-    if delay and delay > 0 then
-        WM.RunAfter(delay, function() DebuffTracker:StartRaidShadowResistScan(true) end)
-    else
-        self:StartRaidShadowResistScan(true)
-    end
+    if srRaidPullDone or not IsInGroup() or not CanLeadChecks() then return end
+    srRaidPullDone = true
+    self:StartRaidShadowResistScan(true)
 end
 
 function DebuffTracker:IsRaidShadowResistScanning()
@@ -2412,6 +2415,7 @@ function DebuffTracker:CreateTrackerFrame()
             pullAnnounced = false
             DebuffTracker:ResetDoomWarning()
             DebuffTracker:ResetShearMonitor(false)
+            DebuffTracker:ResetShadowResistPull()
             DebuffTracker:CheckShadowResistGear()
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
@@ -3115,8 +3119,8 @@ function DebuffTracker:CreateUI()
         label = "Check the whole raid after Mother", get = get, set = set,
         tooltip = {
             "Raid Shadow Resist Check",
-            "Lists every raider still in shadow resist gear, 45 seconds after Mother dies."
-                .. " Runs only for the raid leader and assistants.",
+            "Lists every raider still in shadow resist gear each time you pull a Promenade robot"
+                .. " or an Illidari pack after Mother. Runs only for the raid leader and assistants.",
             " ",
             "Raiders running Watching Machine report their own gear. Everyone else is inspected,"
                 .. " which only works within inspect range (about 28 yards); anyone out of range is"

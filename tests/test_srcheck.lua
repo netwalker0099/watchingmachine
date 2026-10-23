@@ -166,10 +166,11 @@ end }
 env.GetItemStats = function() return {} end
 
 DT:ResetShadowResistCheck()
-DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
-check("Mother's death schedules the raid check", #timers == 1 and timers[1].delay == 45)
 DB.srRaidChannel = "RAID"
-table.remove(timers, 1).fn()             -- 45s later: scan starts
+DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
+check("Mother's death only arms it", DT:IsShadowResistArmed() and #sent == 0 and #timers == 0)
+DT:ResetShadowResistPull()               -- next pull
+DT:HandleShadowResistCombatLog("SPELL_DAMAGE", "Me", "Promenade Sentinel")
 check("asks addon users first", sent[1] and sent[1][1] == "WMSR" and sent[1][2] == "Q" and sent[1][3] == "RAID")
 DT:OnShadowResistMessage("R:180:6", "Addonuser-Spineshatter")
 table.remove(timers, 1).fn()             -- reply wait over: inspect starts
@@ -186,20 +187,27 @@ check("leader is clean, not listed", not has("Me ("))
 check("announces to the chosen channel", chat[1] and chat[1][2] == "RAID"
     and chat[1][1] == "Still in SR gear: Addonuser, Inspected - swap out!")
 
--- One automatic check per arming
-DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
-check("only once per arming", #timers == 0)
+-- Once per pull, again on the next robot
+sent = {}
+DT:HandleShadowResistCombatLog("SWING_DAMAGE", "Promenade Sentinel", "Me")
+check("only once per pull", #sent == 0)
+DT:ResetShadowResistPull()
+DT:HandleShadowResistCombatLog("SWING_DAMAGE", "Promenade Sentinel", "Me")
+check("checked again on the next robot", #sent == 1 and DT:IsRaidShadowResistScanning())
+RunTimers()
+check("second scan finishes", not DT:IsRaidShadowResistScanning())
 
 -- Not leader or assist: no automatic check, but the manual one still works
-DT:ResetShadowResistCheck()
+sent = {}
+DT:ResetShadowResistPull()
 env.UnitIsGroupLeader = function() return false end
-DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
-check("raider: no automatic raid check", #timers == 0)
+DT:HandleShadowResistCombatLog("SWING_DAMAGE", "Me", "Promenade Sentinel")
+check("raider: no automatic raid check", #sent == 0)
 DB.srRaidCheck = false
-DT:ResetShadowResistCheck()
+DT:ResetShadowResistPull()
 env.UnitIsGroupLeader = function(u) return u == "player" end
-DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
-check("setting off: no automatic raid check", #timers == 0)
+DT:HandleShadowResistCombatLog("SWING_DAMAGE", "Me", "Promenade Sentinel")
+check("setting off: no automatic raid check", #sent == 0)
 
 -- Answering someone else's check
 sent = {}
