@@ -2,7 +2,28 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.37** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.38** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.38
+
+### New — GearScore in ArmorySnap
+
+Every member of every ArmorySnap snapshot now has a GearScore, worked out
+from the gear saved in the snapshot with the GearScore module's formula
+(same numbers as the tooltips).
+
+- **Member list:** "GS 1650" in the score's colour (where the talent points
+  or item count were; talents are still on the paper doll).
+- **Paper doll:** "GearScore 1650  iLvl 112" ahead of the enchant / gem
+  summary.
+- **Raid average:** next to *Raid Members*, for the snapshot shown.
+- **Old snapshots too:** members captured before 3.38 are scored when you
+  open the snapshot. Items the client hasn't loaded yet show "..." /
+  "(loading)" and fill in as they arrive.
+- **Saved:** once every item is known, the score and average item level
+  are saved on the member, so they're instant next time.
 
 ---
 

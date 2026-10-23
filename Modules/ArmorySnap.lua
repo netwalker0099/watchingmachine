@@ -257,6 +257,47 @@ local function CaptureTalents(isInspect)
 end
 
 ----------------------------------------------------------------------
+-- GearScore of a captured member (from the GearScore module). Saved on the
+-- member once every item is known; older snapshots are scored when shown.
+----------------------------------------------------------------------
+function AS.ScoreMember(member)
+    if not member then return nil end
+    if member.gearScore then return member.gearScore, member.avgIlvl, true end
+    local GS = WM.GearScore
+    if not (GS and GS.GearScoreFor) or type(member.gear) ~= "table" then return nil end
+    local links = {}
+    for slot, gd in pairs(member.gear) do
+        if type(gd) == "table" and gd.link then links[slot] = gd.link end
+    end
+    if not next(links) then return nil end
+    local score, ilvl, complete = GS.GearScoreFor(links, member.class)
+    if complete then
+        member.gearScore, member.avgIlvl = score, math.floor(ilvl * 10 + 0.5) / 10
+        return member.gearScore, member.avgIlvl, true
+    end
+    return score, ilvl, false
+end
+
+-- Average GearScore of a snapshot's scored members: average, how many
+function AS.SnapshotScore(snapshotKey)
+    local snap = AS.db and AS.db.snapshots[snapshotKey]
+    if not snap then return nil, 0 end
+    local sum, n = 0, 0
+    for _, m in pairs(snap.members) do
+        local score, _, complete = AS.ScoreMember(m)
+        if score and complete and score > 0 then sum, n = sum + score, n + 1 end
+    end
+    if n == 0 then return nil, 0 end
+    return math.floor(sum / n + 0.5), n
+end
+
+local function ScoreText(score)
+    local GS = WM.GearScore
+    if not score then return "" end
+    return GS and GS.ColorText and GS.ColorText(score) or tostring(score)
+end
+
+----------------------------------------------------------------------
 -- Capture character metadata
 ----------------------------------------------------------------------
 local function CaptureCharInfo(unit)
@@ -401,6 +442,7 @@ local function OnInspectReady(guid)
     local charInfo    = CaptureCharInfo(unit)
     charInfo.gear     = CaptureGear(unit)
     charInfo.talents  = CaptureTalents(true)
+    AS.ScoreMember(charInfo)
 
     local totalPts = 0
     if charInfo.talents and charInfo.talents.trees then
@@ -620,6 +662,7 @@ function AS.TakeManualSnapshot(label)
             local ci = CaptureCharInfo(unit)
             ci.gear    = CaptureGear(unit)
             ci.talents = CaptureTalents(false)
+            AS.ScoreMember(ci)
             snap.members[ci.name] = ci; captured = captured + 1
             DoNext()
         elseif UnitExists(unit) and CheckInteractDistance(unit, 1) then
@@ -634,6 +677,7 @@ function AS.TakeManualSnapshot(label)
                 local ci = CaptureCharInfo(unit)
                 ci.gear    = CaptureGear(unit)
                 ci.talents = CaptureTalents(true)
+                AS.ScoreMember(ci)
                 snap.members[ci.name] = ci; captured = captured + 1
                 ClearInspectPlayer()
                 C_Timer.After(CHAIN_DELAY, DoNext)
@@ -901,6 +945,7 @@ local LEFT_SLOTS    = { 1, 2, 3, 15, 5, 4, 19, 9 }
 local RIGHT_SLOTS   = { 10, 6, 7, 8, 11, 12, 13, 14 }
 local BOT_SLOTS     = { 16, 17, 18 }
 
+local pendingScores = false   -- a shown GearScore is still waiting on item data
 local LIST_WIDTH    = 180
 local LIST_GAP      = 10
 local DOLL_WIDTH    = 330
@@ -1266,6 +1311,7 @@ local function CreateBrowseFrame()
     local mLabel = leftPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     mLabel:SetPoint("TOPLEFT", snapshotDropdown.dropdown, "BOTTOMLEFT", 16, -6)
     mLabel:SetText("Raid Members:")
+    AS.membersLabel = mLabel
 
     local sf = CreateFrame("ScrollFrame", "WM_ASMemberScroll", leftPanel,
                            "UIPanelScrollFrameTemplate")
@@ -1405,7 +1451,12 @@ end
 
 function AS.RefreshMemberList()
     for _, btn in ipairs(memberButtons) do btn:Hide() end
+    pendingScores = false
 
+    if AS.membersLabel then
+        local avg, n = AS.SnapshotScore(selectedSnapshotKey)
+        AS.membersLabel:SetText("Raid Members:" .. (avg and ("  |cff888888avg GS|r " .. ScoreText(avg)) or ""))
+    end
     if not selectedSnapshotKey then return end
     local names = AS.GetMemberNames(selectedSnapshotKey)
     local snap  = AS.db.snapshots[selectedSnapshotKey]
@@ -1474,6 +1525,14 @@ function AS.RefreshMemberList()
             local gc = 0
             for _ in pairs(member.gear) do gc = gc + 1 end
             rightLabel = gc .. " items"
+        end
+        local score, _, complete = AS.ScoreMember(member)
+        -- The score when there is one (talents are on the paper doll)
+        if score and not complete then
+            pendingScores = true
+            rightLabel = "|cff888888...|r"
+        elseif score and score > 0 then
+            rightLabel = "|cff888888GS|r " .. ScoreText(score)
         end
         btn.rightText:SetText(rightLabel)
 
@@ -1567,6 +1626,14 @@ function AS.RefreshPaperDoll()
     end
 
     local s = items .. " items"
+    local score, ilvl, complete = AS.ScoreMember(member)
+    if score and not complete then
+        pendingScores = true
+        s = "|cffffd100GearScore|r |cff888888(loading)|r  |  " .. s
+    elseif score and score > 0 then
+        s = "|cffffd100GearScore|r " .. ScoreText(score) .. "  |cffffd100iLvl|r |cffffffff"
+            .. math.floor((ilvl or 0) + 0.5) .. "|r  |  " .. s
+    end
     if enchants > 0 or gems > 0 then
         s = s .. "  |  "
         if enchants > 0 then
@@ -1580,6 +1647,23 @@ function AS.RefreshPaperDoll()
         end
     end
     if summaryLabel then summaryLabel:SetText(s) end
+end
+
+-- Scores waiting on item data: redraw when it arrives (at most twice a second)
+local scoreWatch, scoreQueued
+function AS.WatchScores()
+    if scoreWatch then return end
+    scoreWatch = CreateFrame("Frame")
+    scoreWatch:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+    scoreWatch:SetScript("OnEvent", function()
+        if not pendingScores or scoreQueued or not browseFrame or not browseFrame:IsShown() then return end
+        scoreQueued = true
+        C_Timer.After(0.5, function()
+            scoreQueued = false
+            AS.RefreshMemberList()
+            AS.RefreshPaperDoll()
+        end)
+    end)
 end
 
 function AS.RefreshSnapshotList()
@@ -1599,6 +1683,7 @@ function AS.ToggleBrowseFrame()
         return
     end
     CreateBrowseFrame()
+    AS.WatchScores()
     if browseFrame:IsShown() then
         browseFrame:Hide()
     else

@@ -208,35 +208,42 @@ local function UnitClassToken(unit)
     return class
 end
 
--- A unit's total: score, average item level, complete (false while some
--- item data hasn't arrived)
-function GS.UnitScore(unit)
-    local class = UnitClassToken(unit)
+-- The total for a set of gear: { [slot] = item link }. Returns score,
+-- average item level, complete (false while some item data hasn't arrived)
+function GS.GearScoreFor(links, class)
     local total, levels, complete = 0, 0, true
-    local mainLink, mainLevel
     for slot = 1, 18 do
-        if slot ~= 4 then
-            local link = GetInventoryItemLink(unit, slot)
-            if link then
-                local r = GS.ItemScore(link, class)
-                if r then
-                    total = total + r.score
-                    if r.ilvl and r.ilvl > 0 then levels = levels + r.ilvl end
-                    if slot == 16 then mainLink, mainLevel = link, r.ilvl end
-                else
-                    complete = false
-                end
-            elseif GetInventoryItemID and GetInventoryItemID(unit, slot) then
-                complete = false   -- something is there, its link just isn't ready
+        local link = slot ~= 4 and links[slot]
+        if link then
+            local r = GS.ItemScore(link, class)
+            if r then
+                total = total + r.score
+                if r.ilvl and r.ilvl > 0 then levels = levels + r.ilvl end
+            else
+                complete = false
             end
         end
     end
     -- A two-hander counts for both weapon slots in the average
-    if mainLink and not GetInventoryItemLink(unit, 17) and (mainLevel or 0) > 0 then
-        local _, _, _, loc = ItemInfo(mainLink)
-        if loc == "INVTYPE_2HWEAPON" then levels = levels + mainLevel end
+    local main = links[16]
+    if main and not links[17] then
+        local _, _, ilvl, loc = ItemInfo(main)
+        if loc == "INVTYPE_2HWEAPON" and (ilvl or 0) > 0 then levels = levels + ilvl end
     end
     return total, levels / SLOTS, complete
+end
+
+-- A unit's total, from what it has on
+function GS.UnitScore(unit)
+    local links, missing = {}, false
+    for slot = 1, 18 do
+        links[slot] = GetInventoryItemLink(unit, slot)
+        if not links[slot] and slot ~= 4 and GetInventoryItemID and GetInventoryItemID(unit, slot) then
+            missing = true   -- something is there, its link just isn't ready
+        end
+    end
+    local total, avg, complete = GS.GearScoreFor(links, UnitClassToken(unit))
+    return total, avg, complete and not missing
 end
 
 -- ============================================

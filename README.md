@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.37 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.38 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -187,6 +187,7 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - **Paper-doll browser**: pick a snapshot, pick a member, see their gear laid out like the character frame with native tooltips; Shift-click to link items
 - Talent tree capture (full detail for yourself; tree names/icons for inspected players — the Anniversary API doesn't expose inspected point counts to any addon)
 - Enchant/gem count summary per character
+- **GearScore** (3.38): every captured member's score, from the GearScore module's formula. It shows in the member list ("GS 1650"), with average item level on the paper doll, and the snapshot's raid average next to *Raid Members*. Scores are saved with the snapshot once every item is known, and older snapshots are scored when you open them
 - Zone-aware sessions labeled timestamp + zone; snapshots retained 1/7/14/30 days (dropdown)
 - Manual snapshots via `/as snap [label]`; optional scanning in 5-man/world groups
 - **Auto-scan** checkbox (or `/as auto`) turns automatic raid scanning off without disabling the module; manual snapshots still work
@@ -804,6 +805,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.38
+- **ArmorySnap GearScore**: every snapshot member's score in the member list and paper doll, plus each snapshot's raid average, including snapshots taken before
 
 ### Version 3.37
 - New **GearScore**: scores and average item level on player and item tooltips, the character and inspect frames, and a group list; same numbers as GearScoreTBCClassic
