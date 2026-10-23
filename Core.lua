@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.35"
+WM.version = "3.36"
 WM.modules = {}
 
 -- ============================================
@@ -1204,8 +1204,8 @@ local MODULE_INFO = {
         },
     },
     LootBrowser = {
-        title = "Loot Browser", desc = "What every boss drops",
-        about = "Every dungeon and raid boss's loot for Classic and The Burning Crusade (Wrath switches on by itself on a Wrath client): normal and heroic, tier and dungeon sets, keys and trash. Opens on the instance you're in, and item tooltips everywhere say which boss drops the item.",
+        title = "Loot Browser", desc = "Boss loot, crafting, factions, PvP",
+        about = "Every dungeon and raid boss's loot, what each profession makes, reputation rewards and PvP gear, for Classic and The Burning Crusade (Wrath switches on by itself on a Wrath client). Opens on the instance you're in, and item tooltips everywhere say where the item comes from.",
         command = "loot", color = {1, 0.7, 0.4}, icon = "Interface\\Icons\\INV_Box_01",
     },
     PvPLog = {

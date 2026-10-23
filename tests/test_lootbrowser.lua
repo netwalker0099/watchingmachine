@@ -27,7 +27,8 @@ env.IsInInstance = function() return inInstance end
 env.GetInstanceInfo = function() return "x", "raid", 0, "", 10, 0, false, instanceID end
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Data/LootClassic.lua", "Data/LootTBC.lua", "Data/LootWrath.lua",
-    "Data/LootSets.lua", "Modules/LootBrowser.lua" }) do W.load(f) end
+    "Data/LootCrafting.lua", "Data/LootFactions.lua", "Data/LootPvP.lua", "Data/LootSets.lua", "Data/LootCrafts.lua",
+    "Modules/LootBrowser.lua" }) do W.load(f) end
 local WM = W.WM
 local LB = WM.modules.LootBrowser
 env.WatchingMachineDB = { theme = "Default" }
@@ -40,20 +41,30 @@ end
 
 -- ---- The data ----
 local good, why = true, ""
-local ids, items = {}, 0
-for _, tag in ipairs({ "classic", "tbc" }) do
-    for _, inst in ipairs(WM.LootData[tag].build()) do
-        if ids[inst.id] then good, why = false, "duplicate " .. inst.id end
-        ids[inst.id] = true
-        if type(inst.name) ~= "string" or not inst.bosses or #inst.bosses == 0 then good, why = false, "empty " .. inst.id end
-        for _, b in ipairs(inst.bosses) do
-            if type(b[1]) ~= "string" then good, why = false, "boss name in " .. inst.id end
-            for _, k in ipairs({ "n", "h", "horde", "alliance", "sets", "sets_h" }) do
-                for _, e in ipairs(b[k] or {}) do
-                    for _, id in ipairs(type(e) == "table" and e or { e }) do
-                        items = items + 1
-                        if type(id) ~= "number" or id <= 0 or id % 1 ~= 0 then good, why = false, "bad id in " .. inst.id end
-                        if k:find("^sets") and not WM.LootData.sets()[id] then good, why = false, "missing set " .. id end
+local ids, items, perCat = {}, 0, {}
+local setsT, craftsT = WM.LootData.sets(), WM.LootData.crafts()
+local function HasSet(id) return setsT.base[id] or setsT.wrath[id] end
+local function HasCraft(id) return craftsT.base[id] or craftsT.wrath[id] end
+for tag, d in pairs(WM.LootData) do
+    if type(d) == "table" and d.build then
+        if not d.category or type(d.expansion) ~= "number" then good, why = false, "meta " .. tag end
+        for _, inst in ipairs(d.build()) do
+            if ids[inst.id] then good, why = false, "duplicate " .. inst.id end
+            ids[inst.id] = true
+            perCat[d.category] = (perCat[d.category] or 0) + 1
+            if type(inst.name) ~= "string" or not inst.bosses or #inst.bosses == 0 then good, why = false, "empty " .. inst.id end
+            for _, b in ipairs(inst.bosses) do
+                if type(b[1]) ~= "string" then good, why = false, "row name in " .. inst.id end
+                for k, list in pairs(b) do
+                    if type(k) == "string" and type(list) == "table" then
+                        for _, e in ipairs(list) do
+                            for _, id in ipairs(type(e) == "table" and e or { e }) do
+                                items = items + 1
+                                if type(id) ~= "number" or id < 0 or id % 1 ~= 0 then good, why = false, "bad id in " .. inst.id end
+                                if b.set and id > 0 and not HasSet(id) then good, why = false, "missing set " .. id end
+                                if b.craft and id > 0 and not HasCraft(id) then good, why = false, "missing craft " .. id end
+                            end
+                        end
                     end
                 end
             end
@@ -61,17 +72,23 @@ for _, tag in ipairs({ "classic", "tbc" }) do
     end
 end
 check("data: well formed (" .. why .. ")", good)
-check("data: thousands of drops", items > 5000)
+check("data: thousands of entries", items > 10000)
+check("data: every category", (perCat.dungeons or 0) > 60 and (perCat.crafting or 0) > 30
+    and (perCat.factions or 0) > 30 and (perCat.pvp or 0) > 20)
 check("data: no custom-server content", not ids.TheHallOfThanes and not ids.OnyxiasLairNew)
 
 -- ---- Expansions ----
 local ex = LB:Expansions()
-check("TBC client: Classic and TBC", #ex == 2 and ex[1].tag == "classic" and ex[2].tag == "tbc")
-check("Wrath is left out while it has no tables", (function()
+check("TBC client: Classic and TBC", #ex == 2 and ex[1].expansion == 0 and ex[2].expansion == 1
+    and ex[2].label == "Burning Crusade")
+check("every category for TBC", ex[2].tags.dungeons == "tbc" and ex[2].tags.crafting == "tbcCrafting"
+    and ex[2].tags.factions == "tbcFactions" and ex[2].tags.pvp == "tbcPvP" and LB:Tag(1, "pvp") == "tbcPvP")
+check("Wrath client: Wrath crafting, factions and PvP, no dungeons yet", (function()
     env.LE_EXPANSION_LEVEL_CURRENT = 2
-    local n = #LB:Expansions()
+    local list = LB:Expansions()
     env.LE_EXPANSION_LEVEL_CURRENT = 1
-    return n == 2
+    local w = list[3]
+    return #list == 3 and w.expansion == 2 and w.tags.crafting and w.tags.factions and w.tags.pvp and not w.tags.dungeons
 end)())
 env.LE_EXPANSION_LEVEL_CURRENT = 0
 check("Classic client: Classic only", #LB:Expansions() == 1)
@@ -114,16 +131,21 @@ check("Ahune: on Wrath", HasBoss(pens, "Ahune"))
 env.LE_EXPANSION_LEVEL_CURRENT = 1
 
 -- Set pages
-local shared = LB:Instance("tbc", "tbcShared")
+local shared = LB:Instance("tbc", "tbc_dungeonsShared")
+check("shared page name", LB:InstanceName(shared) == "Keys and Tier Sets")
 local t4
 for _, b in ipairs(LB:Bosses(shared)) do if b[1] == "Tier 4 Sets" then t4 = b end end
 local mine = LB:Entries(t4, "n", true)
 local all = LB:Entries(t4, "n", false)
-check("tier sets: your class only", mine[1] and mine[1].header == "Set648" and #mine == 6)
-check("tier sets: every class", #all > 60)
+check("tier sets: your class only", mine[1] and mine[1].classHeader == "MAGE" and mine[2].set == 648
+    and mine[2].name == "Set648" and #mine[2].items == 5 and #mine == 2)
+local heads, setsN = 0, 0
+for _, e in ipairs(all) do if e.classHeader then heads = heads + 1 elseif e.set then setsN = setsN + 1 end end
+check("tier sets: every class, grouped by class", heads == 9 and setsN == 17 and #all == 26
+    and all[1].classHeader == "WARRIOR" and all[#all - 3].classHeader == "DRUID")
 class = "WARRIOR"
 local war = LB:Entries(t4, "n", true)
-check("tier sets: warrior's two", war[1].header == "Set654" and war[7].header == "Set655")
+check("tier sets: warrior's two", war[1].classHeader == "WARRIOR" and war[2].set == 654 and war[3].set == 655 and #war == 3)
 class = "MAGE"
 
 -- Lookups
@@ -137,6 +159,61 @@ check("instance names from the client", LB:InstanceName(LB:Instance("tbc", "Kara
     and LB:InstanceName(ramps) == "Hellfire Ramparts")
 check("item text", LB.ItemText(24024) == "|cFF0070DDPauldrons of Arcane Rage|r" and LB.ItemText(1):find("Item 1", 1, true))
 check("item kind", LB.ItemKind(24024) == "Wrist, Cloth")
+
+-- ---- Crafting ----
+local alch = LB:Instance("tbcCrafting", "AlchemyBC")
+local flasks = LB:Bosses(alch)[1]
+local fe = LB:Entries(flasks, "n")
+check("crafting: craft entries", flasks[1] == "Flasks" and fe[1].craft == 28591 and #fe == 6)
+local c = LB.CraftInfo(28591)
+check("crafting: what it makes and the skill", c[1] == 22866 and c[2] == 4 and c[3] == 375 and LB.CraftSkill(28591) == "Alchemy 375")
+check("crafting: reagents", c.r[1] == 22794 and c.r[2] == 1 and #c.r == 8)
+check("crafting: Wrath changes only on Wrath", LB.CraftInfo(2166).r[4] == 2 and (function()
+    env.LE_EXPANSION_LEVEL_CURRENT = 2
+    local v = LB.CraftInfo(2166).r[4]
+    env.LE_EXPANSION_LEVEL_CURRENT = 1
+    return v == 6
+end)())
+local bsHead
+for _, b in ipairs(LB:Bosses(LB:Instance("classicCrafting", "Blacksmithing"))) do if b[1] == "Armor - Head" then bsHead = b end end
+local bd = LB:Diffs(bsHead)
+check("crafting: plate / mail lists", #bd == 2 and bd[1] == "plate" and bd[2] == "mail")
+check("crafting: a list picked", LB:Entries(bsHead, "mail")[1].craft == 16728 and LB:Entries(bsHead, "plate")[1].craft == 23636)
+check("crafting: unknown list falls back to the first", LB:Entries(bsHead, "n")[1].craft == 23636)
+
+-- ---- Factions ----
+local function Has(tag, id) for _, i in ipairs(LB:Instances(tag)) do if i.id == id then return true end end end
+check("factions: your side's", Has("tbcFactions", "Thrallmar") and not Has("tbcFactions", "HonorHold") and Has("tbcFactions", "TheAldor"))
+faction = "Alliance"
+check("factions: the Alliance's", Has("tbcFactions", "HonorHold") and not Has("tbcFactions", "Thrallmar"))
+faction = "Horde"
+env.GetFactionInfoByID = function(id) if id == 932 then return "The Aldor (client)" end end
+check("factions: the client's name", LB:InstanceName(LB:Instance("tbcFactions", "TheAldor")) == "The Aldor (client)")
+env.GetFactionInfoByID = nil
+local saber = LB:Bosses(LB:Instance("classicFactions", "WintersaberTrainers"))[1]
+check("factions: Alliance-only rewards hidden from the Horde", #LB:Entries(saber, "n") == 0)
+faction = "Alliance"
+check("factions: and shown to the Alliance", LB:Entries(saber, "n")[1].item == 13086)
+faction = "Horde"
+
+-- ---- PvP ----
+local s1 = LB:Bosses(LB:Instance("tbcPvP", "ArenaS1PvP"))[1]
+local s1e = LB:Entries(s1, "n", true)
+check("pvp: arena sets, your class", s1e[1].classHeader == "MAGE" and s1e[2].set == 579 and #s1e == 2)
+local honor = LB:Bosses(LB:Instance("tbcPvP", "HonorSetBCC"))[1]
+check("pvp: your faction's honor sets", LB:Entries(honor, "n", true)[2].set == 600)
+env.LE_EXPANSION_LEVEL_CURRENT = 2
+local wl = LB.SetInfo(3003780)
+check("pvp: Wrath sets named after their base", wl and wl.base == 780 and LB.SetName(3003780) == "Furious Set780")
+env.LE_EXPANSION_LEVEL_CURRENT = 1
+
+-- ---- Where items come from ----
+local function Joined(id) return table.concat(LB:SourceLines(id) or {}, "\n") end
+check("tooltip: reputation reward", Joined(29123):find("Reputation reward:", 1, true) and Joined(29123):find("The Aldor", 1, true)
+    and Joined(29123):find("(Exalted)", 1, true))
+check("tooltip: made by", Joined(22866):find("Made by:", 1, true) and Joined(22866):find("Alchemy|r |cFFAAAAAA(375)", 1, true))
+check("tooltip: PvP set piece", Joined(24553):find("PvP reward:", 1, true) and Joined(24553):find("Arena Season 1", 1, true))
+check("tooltip: kinds in order", Joined(29434):find("^|cFFFFB366Drops from:") ~= nil)
 
 -- ---- Window ----
 inInstance, instanceID = true, 543
@@ -152,7 +229,7 @@ local shown = 0
 for _, b in ipairs(p.itemButtons) do if b:IsShown() then shown = shown + 1 end end
 check("item buttons", shown == 6 and p.itemButtons[1].itemID == 24024)
 check("unknown item names: waits for them", p.waitingForItems == true)
-check("heroic switch shown", p.diffBox:IsShown())
+check("heroic switch shown", p.diffBar:IsShown() and p.diffBar.buttons[2]:IsShown() and p.diffBar.buttons[2].diff == "h")
 p.bossList.rows[2]:_fire("OnClick")
 check("pick a boss", p.status:GetText():find("Omor", 1, true) ~= nil)
 LootBrowserDB = env.LootBrowserDB
@@ -164,7 +241,7 @@ local karaRow
 for i, r in ipairs(p.instList.rows) do if r.value == "Karazhan" then karaRow = r end end
 karaRow:_fire("OnClick")
 check("pick an instance", p.status:GetText():find("Karazhan", 1, true) and p.status:GetText():find("Attumen", 1, true))
-check("no heroic: switch hidden", not p.diffBox:IsShown())
+check("no heroic: switch hidden", not p.diffBar:IsShown())
 check("remembered per expansion", env.LootBrowserDB.instance.tbc == "Karazhan")
 -- Item info arriving refreshes, once
 names[28507] = { "Handwraps of Flowing Thought", 4 }
@@ -187,6 +264,27 @@ check("shift-click / ctrl-click handled", linked and linked:find("Hitem:28477", 
 -- Expansion switch
 LB:Show("classic", "MoltenCore")
 check("show an instance", p.status:GetText():find("Molten Core", 1, true) ~= nil)
+-- Categories and set rows in the window
+LB:Show("tbc", "tbc_dungeonsShared")
+env.LootBrowserDB.myClassSets = false
+p.bossList.rows[2]:_fire("OnClick")   -- Tier 4 Sets
+local setsShown = 0
+for _, r in ipairs(p.setRows or {}) do if r:IsShown() then setsShown = setsShown + 1 end end
+check("set rows: one line per set", setsShown == 17)
+check("set rows: class headers", p.itemButtons[1].name:GetText():find("Warrior", 1, true) ~= nil)
+check("set rows: a piece per icon", p.setRows[1].pieces[1].itemID ~= nil and p.setRows[1].pieces[1]:IsShown()
+    and not p.setRows[1].pieces[10]:IsShown())
+env.LootBrowserDB.myClassSets = true
+p.catBox.buttons[2]:_fire("OnClick")
+check("category: crafting", p.status:GetText():find("Alchemy", 1, true) and env.LootBrowserDB.category == "crafting")
+check("category: craft rows", p.itemButtons[1].craftID ~= nil)
+local craftTip = {}
+env.GameTooltip.AddLine = function(_, l) craftTip[#craftTip + 1] = l end
+p.itemButtons[1]._scripts.OnEnter(p.itemButtons[1])
+check("craft tooltip: skill and reagents", table.concat(craftTip, "\n"):find("Requires Alchemy", 1, true) ~= nil)
+p.catBox.buttons[3]:_fire("OnClick")
+check("category: factions", env.LootBrowserDB.category == "factions" and p.instList.rows[1]:IsShown())
+p.catBox.buttons[1]:_fire("OnClick")
 check("toggle closes", (function() LB:Toggle(); return not p:IsShown() end)())
 check("status", LB:GetQuickStatus():find("instances", 1, true) ~= nil)
 

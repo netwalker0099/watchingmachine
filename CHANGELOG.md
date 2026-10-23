@@ -2,7 +2,37 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.35** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.36** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.36
+
+### New — crafting, factions and PvP in the Loot Browser
+
+A *Show:* switch at the top: **Dungeons & Raids**, **Crafting**,
+**Factions**, **PvP**, for Classic and The Burning Crusade. A Wrath client
+also gets Wrath's crafting (with Inscription), factions and PvP.
+
+| Page | What's in it |
+|---|---|
+| Crafting | Every profession by section (Flasks, Transmutes, Armor - Head...), with Plate / Mail / Leather lists where a section has them. Each recipe shows what it makes and the skill needed; hover for the reagents and the recipe item that teaches it |
+| Factions | What each faction sells at Friendly, Honored, Revered and Exalted. Your side's factions only (Thrallmar or Honor Hold); faction-only rewards (the Wintersaber mount) show only to that faction |
+| PvP | Battleground rewards, Honor and Arena Season 1–4 sets and weapons, world PvP vendors (Halaa, Hellfire, Terokkar, Zangarmarsh), mounts and insignia |
+
+- **Lists:** the *Loot:* buttons now show whatever lists a page has: Normal /
+  Heroic, Plate / Mail / Leather, Major / Minor Glyphs.
+- **Tooltips:** item tooltips now also say *Reputation reward* (faction,
+  standing), *PvP reward* (season or vendor) and *Made by* (profession,
+  skill).
+
+### Changed — shorter set pages
+
+- **One line per set:** each set is now a single line, its name then an
+  icon per piece. Hover a piece for its tooltip; shift-click to link it.
+- **By class:** with *Sets: my class only* off, the sets are grouped under
+  each class's name, in class colour. Tier 4 for every class is now 26
+  lines instead of over 100.
 
 ---
 

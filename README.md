@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.35 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.36 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -527,8 +527,12 @@ Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).
   raid) sends them to that channel
 
 ### 23. Loot Browser
-What every dungeon and raid boss drops (Raid group; `/wmachine loot`, also
+What every dungeon and raid boss drops, what each profession makes,
+reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
 `/wmachine atlas`).
+
+- **Show:** *Dungeons & Raids*, *Crafting*, *Factions* or *PvP*, for the
+  expansion picked at the top
 
 - **Classic and The Burning Crusade:** every dungeon and raid, boss by boss,
   plus trash, quest and event pages, keys, and the tier sets. The
@@ -537,19 +541,32 @@ What every dungeon and raid boss drops (Raid group; `/wmachine loot`, also
 - **Normal / Heroic:** switch between a boss's normal and heroic loot
 - **Your faction's items** where they differ (Onyxia's and Nefarian's heads,
   AQ rewards)
-- **Set pages:** each tier set's pieces; *Sets: my class only* (on) shows
-  just your class's
+- **Set pages:** one line per set, its name and an icon per piece (hover a
+  piece for its tooltip). *Sets: my class only* (on) shows just your
+  class's; off, every class's sets are grouped under the class name
+- **Crafting:** every profession's recipes by section (Flasks, Transmutes,
+  Armor - Head...), with plate / mail / leather lists where a section has
+  them. Each shows what it makes and the skill it needs; hover for the
+  reagents and the recipe that teaches it
+- **Factions:** what each faction sells at each standing (yours, and your
+  side's: Thrallmar or Honor Hold). Faction-only rewards show only to
+  that faction
+- **PvP:** battleground rewards, honor and arena seasons (sets, weapons,
+  off-pieces), world PvP vendors, mounts and insignia
 - **Items:** icon, name in its quality colour, slot and type. Hover for the
   full tooltip; shift-click links it in chat, ctrl-click tries it on
 - **Item tooltips everywhere** (bags, chat links, the auction house, the
-  loot window) get a "Drops from:" list: each boss and its instance, with
-  "Heroic" when only the heroic version drops it. Up to three bosses, then
-  "and N more" (Badge of Justice). *Item tooltips* in the window turns it off
+  loot window) say where an item comes from: *Drops from* (each boss and
+  its instance, "Heroic" when only the heroic version drops it),
+  *Reputation reward* (faction and standing), *PvP reward* and *Made by*
+  (profession and skill). Up to three of each, then "and N more".
+  *Item tooltips* in the window turns it off
 - **Opens on the instance you're in**, and remembers the last one per
   expansion. The window is resizable; the loot uses two columns when wide
-- **Wrath of the Lich King:** switches on by itself on a Wrath client
-  (holiday bosses such as Ahune and the Headless Horseman already do).
-  The Wrath dungeon and raid tables are still to come
+- **Wrath of the Lich King:** switches on by itself on a Wrath client, with
+  Wrath's crafting (Inscription included), factions and PvP, and the
+  Wrath holiday bosses (Ahune, the Headless Horseman). The Wrath dungeon
+  and raid tables are still to come
 - Only item IDs are stored; names, icons and stats come from the game, so
   the first look at a page can show "Item 12345" for a moment while the
   client fetches them
@@ -759,6 +776,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.36
+- **Loot Browser:** new *Crafting*, *Factions* and *PvP* pages (Classic, TBC, and Wrath on a Wrath client); set pages are one line per set, grouped by class; tooltips also say *Reputation reward*, *PvP reward* and *Made by*
 
 ### Version 3.35
 - **Item tooltips** say which boss drops an item, and where (Heroic when only the heroic version drops it)

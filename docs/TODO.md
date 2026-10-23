@@ -542,7 +542,8 @@ from which boss), in our own format.
       AtlasLoot zip we had has no Wrath dungeon or raid tables).
 - [x] **Item source tooltips** (3.35): "Drops from: Attumen the Huntsman
       (Karazhan)", Heroic-only marked, capped at three bosses.
-- [ ] **Crafting, reputation rewards, PvP gear** (Classic, TBC, Wrath gated).
+- [x] **Crafting, reputation rewards, PvP gear** (3.36), Classic + TBC, and
+      Wrath's on a Wrath client. Set pages: one line per set, by class.
 - [ ] **Favourites and your own BiS marks** per spec. Not AtlasLoot's
       curated BiS lists.
 - [ ] **Search** by item name (cached names only, or ask the client in

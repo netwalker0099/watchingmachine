@@ -1,23 +1,25 @@
 -- Watching Machine: Loot Browser data — Burning Crusade dungeons and raids
--- Which items drop where: instance, boss, difficulty and item IDs only.
--- Item names, icons and stats come from the game client at run time.
--- Drop lists were compiled with the help of community loot data
--- (AtlasLoot Classic); only the facts are kept, in Watching Machine's own
--- format. Built on demand, the first time the Loot Browser shows it.
+-- Which items drop where: instance, boss, difficulty and item IDs.
+-- Only IDs are stored; names, icons and stats come from the game client at
+-- run time. Compiled with the help of community loot data (AtlasLoot
+-- Classic); only the facts are kept, in Watching Machine's own format, and
+-- each table is built the first time the Loot Browser shows it.
 --
--- Instance: id, name (English; the client's own name is used when it has
---   one), kind = dungeon / raid / extra, instance (instance map ID), area,
---   levels = { min, recommended from, to }, phase (TBC phase), bosses.
--- Boss: [1] name, npc, special, extra (trash / quest / event pages),
---   expansion (needs that expansion: 2 = Wrath), phase, and loot lists:
---   n (normal), h (heroic), horde / alliance; sets / sets_h for set pages.
---   A list entry is an item ID, or { horde ID, alliance ID }.
+-- Page: id, name (English; the client's own name is used when it has one),
+--   kind, side (Horde / Alliance only), instance / area / faction IDs,
+--   levels, phase (TBC phase), bosses = rows.
+-- Row: [1] name, npc, special, extra (trash / quest / event pages),
+--   expansion (needs that expansion: 2 = Wrath), phase, set (the lists are
+--   item set IDs), craft (the lists are craft spell IDs), and its lists:
+--   n (normal), h (heroic), horde / alliance, or others (plate, mail,
+--   leather, vendor...). A list entry is an ID, or { horde ID, alliance ID }
+--   (0 = not for that faction).
 
 local _, WM = ...
 WM.LootData = WM.LootData or {}
 
 WM.LootData.tbc = {
-    expansion = 1, label = "Burning Crusade", order = 2,
+    expansion = 1, category = "dungeons", label = "Burning Crusade", order = 2,
     build = function() return {
     { id = "HellfireRamparts", name = "Hellfire Ramparts", kind = "dungeon", instance = 543, area = 3562, levels = { 57, 59, 67 }, bosses = {
         { "Watchkeeper Gargolmar", npc = 17306, n = { 24024, 24023, 24022, 24021, 24020, 23881 }, h = { 29434, 30593, 30594, 30592, 27448, 27451, 27450, 27447, 27449, 23881 } },
@@ -221,11 +223,11 @@ WM.LootData.tbc = {
         { "Patterns", extra = true, n = { 35212, 35216, 35213, 35217, 35214, 35218, 35215, 35219, 35204, 35206, 35205, 35207, 35198, 35201, 35199, 35202, 35200, 35203, 35186, 35187, 35189, 35190, 35191, 35192, 35193, 35194, 35195, 35196, 35197 } },
         { "Trash", extra = true, n = { 34351, 34350, 35733, 34183, 34346, 34349, 34348, 34347, 35273, 34664, 32228, 32231, 32229, 32249, 32230, 32227, 35208, 35210, 35209, 35211 } },
     } },
-    { id = "tbcShared", name = "Keys and Sets", kind = "extra", bosses = {
+    { id = "tbc_dungeonsShared", name = "Shared", kind = "extra", bosses = {
         { "Keys", extra = true, n = { 27991, 28395, 31084, {30637,30622}, 30623, 30633, 30635, 30634, 32649, 31704, 24490, 32092, 24140, 32449 } },
-        { "Tier 4 Sets", extra = true, sets = { 645, 663, 664, 621, 651, 654, 655, 648, 638, 639, 640, 631, 632, 633, 624, 625, 626 } },
-        { "Tier 5 Sets", extra = true, sets = { 646, 665, 666, 622, 652, 656, 657, 649, 642, 643, 641, 634, 635, 636, 627, 628, 629 } },
-        { "Tier 6 Sets", extra = true, sets = { 670, 675, 674, 668, 669, 673, 672, 671, 678, 677, 676, 683, 684, 682, 681, 679, 680 } },
+        { "Tier 4 Sets", extra = true, set = true, n = { 645, 663, 664, 621, 651, 654, 655, 648, 638, 639, 640, 631, 632, 633, 624, 625, 626 } },
+        { "Tier 5 Sets", extra = true, set = true, n = { 646, 665, 666, 622, 652, 656, 657, 649, 642, 643, 641, 634, 635, 636, 627, 628, 629 } },
+        { "Tier 6 Sets", extra = true, set = true, n = { 670, 675, 674, 668, 669, 673, 672, 671, 678, 677, 676, 683, 684, 682, 681, 679, 680 } },
     } },
     } end,
 }

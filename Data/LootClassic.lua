@@ -1,23 +1,25 @@
 -- Watching Machine: Loot Browser data — Classic dungeons and raids
--- Which items drop where: instance, boss, difficulty and item IDs only.
--- Item names, icons and stats come from the game client at run time.
--- Drop lists were compiled with the help of community loot data
--- (AtlasLoot Classic); only the facts are kept, in Watching Machine's own
--- format. Built on demand, the first time the Loot Browser shows it.
+-- Which items drop where: instance, boss, difficulty and item IDs.
+-- Only IDs are stored; names, icons and stats come from the game client at
+-- run time. Compiled with the help of community loot data (AtlasLoot
+-- Classic); only the facts are kept, in Watching Machine's own format, and
+-- each table is built the first time the Loot Browser shows it.
 --
--- Instance: id, name (English; the client's own name is used when it has
---   one), kind = dungeon / raid / extra, instance (instance map ID), area,
---   levels = { min, recommended from, to }, phase (TBC phase), bosses.
--- Boss: [1] name, npc, special, extra (trash / quest / event pages),
---   expansion (needs that expansion: 2 = Wrath), phase, and loot lists:
---   n (normal), h (heroic), horde / alliance; sets / sets_h for set pages.
---   A list entry is an item ID, or { horde ID, alliance ID }.
+-- Page: id, name (English; the client's own name is used when it has one),
+--   kind, side (Horde / Alliance only), instance / area / faction IDs,
+--   levels, phase (TBC phase), bosses = rows.
+-- Row: [1] name, npc, special, extra (trash / quest / event pages),
+--   expansion (needs that expansion: 2 = Wrath), phase, set (the lists are
+--   item set IDs), craft (the lists are craft spell IDs), and its lists:
+--   n (normal), h (heroic), horde / alliance, or others (plate, mail,
+--   leather, vendor...). A list entry is an ID, or { horde ID, alliance ID }
+--   (0 = not for that faction).
 
 local _, WM = ...
 WM.LootData = WM.LootData or {}
 
 WM.LootData.classic = {
-    expansion = 0, label = "Classic", order = 1,
+    expansion = 0, category = "dungeons", label = "Classic", order = 1,
     build = function() return {
     { id = "Ragefire", name = "Ragefire Chasm", kind = "dungeon", instance = 389, area = 2437, levels = { 8, 13, 16 }, bosses = {
         { "Taragaman the Hungerer", npc = 11520, n = { 14149, 14148, 14145, 251361, 251362, 251363, 252782 } },
@@ -213,7 +215,7 @@ WM.LootData.classic = {
     } },
     { id = "BlackrockDepths", name = "Blackrock Depths", kind = "dungeon", instance = 230, area = 1584, levels = { 40, 48, 56 }, bosses = {
         { "Lord Roccor", npc = 9025, n = { 22234, 11632, 11631, 22397, 11630, 11813 } },
-        { "High Interrogator Gerstahn ", npc = 9018, n = { 11626, 11624, 22240, 11625, 11140 } },
+        { "High Interrogator Gerstahn", npc = 9018, n = { 11626, 11624, 22240, 11625, 11140 } },
         { "Houndmaster Grebmar", npc = 9319, n = { 11623, 11627, 11628, 11629 } },
         { "Gorosh the Dervish", npc = 9027, n = { 11726, 22271, 22257, 22266 } },
         { "Grizzle", npc = 9028, n = { 11722, 11703, 22270, 11702, 11610 } },
@@ -237,7 +239,7 @@ WM.LootData.classic = {
         { "Panzor the Invincible", npc = 8923, special = "rare", n = { 22245, 11787, 11785, 11786 } },
         { "Chest of The Seven", npc = 9034, n = { 11925, 11926, 11929, 11927, 11920, 11923, 11922, 11921 } },
         { "Magmus", npc = 9938, n = { 11746, 11935, 22395, 22400, 22208 } },
-        { "Princess Moira Bronzebeard ", npc = 8929, n = { 12557, 12554, 12556, 12553 } },
+        { "Princess Moira Bronzebeard", npc = 8929, n = { 12557, 12554, 12556, 12553 } },
         { "Emperor Dagran Thaurissan", npc = 9019, n = { 11684, 11933, 11930, 11924, 22204, 22207, 11934, 11815, 11928, 11931, 11932, 12033 } },
         { "Trash", extra = true, n = { 12549, 12552, 12551, 12542, 12546, 12550, 12547, 12555, 12527, 12531, 12535, 12528, 12532, 15781, 15770, 11611, 11614, 11615, 16048, 16053, 16049, 18654, 18661 } },
         { "Plans", extra = true, n = { 11614, 11615 } },
@@ -268,7 +270,7 @@ WM.LootData.classic = {
         { "Pyroguard Emberseer", npc = 9816, n = { 16672, 12929, 12927, 12905, 12926, 23320 } },
         { "Solakar Flamewreath", npc = 10264, n = { 16695, 12609, 12603, 12589, 12606, 18657 } },
         { "Jed Runewatcher", npc = 10509, special = "rare", n = { 12604, 12930, 12605 } },
-        { "Goraluk Anvilcrack ", npc = 10899, n = { 13502, 13498, 18047, 18048, 12834, 12837, 18779, 12806, 12696 } },
+        { "Goraluk Anvilcrack", npc = 10899, n = { 13502, 13498, 18047, 18048, 12834, 12837, 18779, 12806, 12696 } },
         { "Gyth", npc = 10339, n = { 12871, 16669, 22225, 12960, 12953, 12952, 13522 } },
         { "Warchief Rend Blackhand", npc = 10429, n = { 12590, 16733, 12587, 12588, 12936, 18104, 12935, 18102, 22247, 18103, 12940, 12939, 12583 } },
         { "The Beast", npc = 10430, n = { 12731, 16729, 12967, 12968, 12966, 12965, 12963, 12964, 22311, 12709, 12969, 24101, 19227 } },
@@ -377,7 +379,7 @@ WM.LootData.classic = {
         { "Ragnaros", npc = 11502, n = { 17204, 19017, 16922, 16915, 16930, 16909, 16901, 16938, 16946, 16954, 16962, 17082, 18817, 18814, 17102, 17107, 19137, 17063, 19138, 18815, 17106, 18816, 17104, 17076 } },
         { "All bosses", extra = true, n = { 18264, 18292, 18291, 18290, 18259, 18260, 18252, 18265, 21371, 18257 } },
         { "Trash", extra = true, n = { 16817, 16802, 16806, 16827, 16828, 16851, 16838, 16858, 16864, 17011, 17010, 11382, 17012, 16819, 16799, 16804, 16825, 16830, 16850, 16840, 16857, 16861 } },
-        { "Tier 1 Sets", extra = true, sets_horde = { 207 }, sets_alliance = { 203, 202, 204, 206, 209, 201, 205, 208 } },
+        { "Tier 1 Sets", extra = true, set = true, horde = { 207 }, alliance = { 203, 202, 204, 206, 209, 201, 205, 208 } },
     } },
     { id = "Onyxia", name = "Onyxia's Lair", kind = "raid", instance = 249, area = 2159, bosses = {
         { "Onyxia", npc = 10184, n = { 17969, 17962, 17963, 17964, 17965, 16921, 16914, 16929, 16908, 16900, 16939, 16947, 16955, 16963, {18422,18423}, 15410, 18705, 18205, 17078, 18813, 17064, 17067, 17068, 17075, 17966, 11938 } },
@@ -412,7 +414,7 @@ WM.LootData.classic = {
         { "Chromaggus", npc = 14020, n = { 16924, 16917, 16932, 16832, 16902, 16937, 16945, 16953, 16961, 19389, 19386, 19390, 19388, 19393, 19392, 19385, 19391, 19387, 19361, 19349, 19347, 19352 } },
         { "Nefarian", npc = 11583, n = { 17969, 17962, 17963, 17964, 17965, 16923, 16916, 16931, 16905, 16897, 16942, 16950, 16958, 16966, {19002,19003}, 19360, 19363, 19364, 19356, 19375, 19377, 19378, 19380, 19381, 19376, 19382, 19379, 11938 } },
         { "Trash", extra = true, n = { 19436, 19439, 19437, 19438, 19434, 19435, 19362, 19354, 19358, 18562 } },
-        { "Tier 2 Sets", extra = true, sets_horde = { 216 }, sets_alliance = { 212, 211, 213, 215, 218, 210, 214, 217 } },
+        { "Tier 2 Sets", extra = true, set = true, horde = { 216 }, alliance = { 212, 211, 213, 215, 218, 210, 214, 217 } },
     } },
     { id = "TheRuinsofAhnQiraj", name = "Ruins of Ahn'Qiraj", kind = "raid", instance = 509, area = 3429, bosses = {
         { "Kurinnaxx", npc = 15348, n = { 21499, 21498, 21502, 21501, 21500, 21503, 20885, 20889, 20888, 20884 } },
@@ -453,9 +455,9 @@ WM.LootData.classic = {
         { "Sapphiron", npc = 15989, n = { 23050, 23045, 23040, 23047, 23041, 23046, 23049, 23048, 23043, 23242, 23549, 23548, 23545, 23547, 23072 } },
         { "Kel'Thuzad", npc = 15990, n = { 23057, 23053, 22812, 22821, 22819, 22802, 23056, 23054, 23577, 22798, 22799, 22520, 23061, 23062, 23063, 23060, 23064, 23067, 23065, 23066, 23059, 22733 } },
         { "Trash", extra = true, n = { 23664, 23667, 23069, 23226, 23663, 23666, 23665, 23668, 23237, 23238, 23044, 23221, 22376, 22373, 22374, 22375, 23055, 22682 } },
-        { "Tier 3 Sets", extra = true, sets_horde = { 527 }, sets_alliance = { 529, 525, 524, 530, 523, 526, 521, 528 } },
+        { "Tier 3 Sets", extra = true, set = true, horde = { 527 }, alliance = { 529, 525, 524, 530, 523, 526, 521, 528 } },
     } },
-    { id = "classicShared", name = "Keys and Sets", kind = "extra", bosses = {
+    { id = "classic_dungeonsShared", name = "Shared", kind = "extra", bosses = {
         { "Keys", extra = true, n = { 16309, 12344, 17191, 7146, 12382, 6893, 11000, 11140, 18249, 13704, 11197, 18266, 18268, 13873, 19931, 18250, 9240, 17333, 22754, 13523, 18746, 18663, 19974, 7733, 10818, 22057, 21986 } },
         { "Books", extra = true, n = { 18401, 18362, 18358, 18360, 18356, 18364, 18361, 18363, 18359, 18357, 18333, 18334, 18332, 11733, 11736, 11732, 11734, 11737 } },
         { "Ahn'Qiraj scarabs", extra = true, n = { 20876, 20879, 20875, 20878, 20881, 20877, 20874, 20882, 21762, 21156, 21230, 20864, 20861, 20863, 20862, 20859, 20865, 20860, 20858, 22203, 22202, 21229 } },
