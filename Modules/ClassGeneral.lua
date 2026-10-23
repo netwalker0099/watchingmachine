@@ -211,7 +211,7 @@ local function CheckMana(tools)
         and Over(deficit, GeneralChecksDB.potionAt, latched.potion) or false
     if latched.potion then
         tools:SetAlert("gen_mana_potion", "Use a mana potion (" .. ItemLabel(potion, "potion") .. ")",
-            ItemIcon(potion, ICON_POTION))
+            ItemIcon(potion, ICON_POTION), GeneralChecksDB.potionSound, GeneralChecksDB.soundChannel)
     else
         tools:ClearAlert("gen_mana_potion")
     end
@@ -224,7 +224,7 @@ local function CheckMana(tools)
     if latched.rune then
         local why = potionOnCooldown and "Potion on cooldown" or "No mana potion"
         tools:SetAlert("gen_mana_rune", why .. ": use " .. ItemLabel(rune, "a Dark / Demonic Rune"),
-            ItemIcon(rune, ICON_RUNE))
+            ItemIcon(rune, ICON_RUNE), GeneralChecksDB.runeSound, GeneralChecksDB.soundChannel)
     else
         tools:ClearAlert("gen_mana_rune")
     end
@@ -348,6 +348,24 @@ function General:InitDB()
     if GeneralChecksDB.checkOffHand == nil then GeneralChecksDB.checkOffHand = true end
     if GeneralChecksDB.potionAt == nil then GeneralChecksDB.potionAt = 3000 end
     if GeneralChecksDB.runeAt == nil then GeneralChecksDB.runeAt = 1500 end
+    if GeneralChecksDB.potionSound == nil then GeneralChecksDB.potionSound = "wm:potion" end
+    if GeneralChecksDB.runeSound == nil then GeneralChecksDB.runeSound = "wm:rune" end
+    if GeneralChecksDB.soundChannel == nil then GeneralChecksDB.soundChannel = "Master" end
+end
+
+-- A sound choice for one warning; picking a sound plays it, so the
+-- dropdown is its own test button
+local function SoundFeature(tools, key, name, default, what)
+    tools:RegisterFeature(CLASS, {
+        key = key, kind = "choice", name = name,
+        options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = default,
+        desc = "Plays when " .. what .. " appears. Picking one plays it.",
+        get = function() return GeneralChecksDB[key] end,
+        set = function(v) GeneralChecksDB[key] = v end,
+        onChange = function(v) if WM.Sounds then WM.Sounds.Play(v, GeneralChecksDB.soundChannel) end end,
+        tooltip = { name, "Played once each time " .. what .. " appears.",
+            "None: no sound of its own (the warning frame's sound option still applies)." },
+    })
 end
 
 function General:Initialize()
@@ -380,9 +398,9 @@ function General:Initialize()
         options = POTION_DEFICIT_OPTIONS, default = 3000,
         get = function() return GeneralChecksDB.potionAt end,
         set = function(v) GeneralChecksDB.potionAt = v end,
-        tooltip = { "Potion threshold", "How far below your maximum mana you must be before the potion warning shows.",
-            "Click to cycle." },
+        tooltip = { "Potion threshold", "How far below your maximum mana you must be before the potion warning shows." },
     })
+    SoundFeature(tools, "potionSound", "Potion warning sound", "wm:potion", "the mana potion warning")
     tools:RegisterFeature(CLASS, {
         key = "manarune", name = "Warn to use a Dark / Demonic Rune",
         desc = "In combat, when no mana potion is ready (on cooldown or none left), once your mana is down by the amount below. Not below 35% health, since runes cost health.",
@@ -393,8 +411,16 @@ function General:Initialize()
         options = RUNE_DEFICIT_OPTIONS, default = 1500,
         get = function() return GeneralChecksDB.runeAt end,
         set = function(v) GeneralChecksDB.runeAt = v end,
-        tooltip = { "Rune threshold", "How far below your maximum mana you must be before the rune warning shows.",
-            "Click to cycle." },
+        tooltip = { "Rune threshold", "How far below your maximum mana you must be before the rune warning shows." },
+    })
+    SoundFeature(tools, "runeSound", "Rune warning sound", "wm:rune", "the rune warning")
+    tools:RegisterFeature(CLASS, {
+        key = "soundChannel", kind = "choice", name = "Warning sounds play on",
+        options = WM.Sounds and WM.Sounds.CHANNELS or {}, default = "Master",
+        desc = "Master plays even with game sound effects turned down.",
+        get = function() return GeneralChecksDB.soundChannel end,
+        set = function(v) GeneralChecksDB.soundChannel = v end,
+        onChange = function() if WM.Sounds then WM.Sounds.Play(GeneralChecksDB.potionSound, GeneralChecksDB.soundChannel) end end,
     })
     tools:RegisterFeature(CLASS, {
         key = "only25", name = "Only in 25-man raids",

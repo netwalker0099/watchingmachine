@@ -4,7 +4,7 @@ Planned work that hasn't been started. Each item notes what's decided and
 what still needs settling before it's built.
 
 1. ~~Mana potion / rune alert~~ (done, 3.14)
-2. Audio trigger for alerts
+2. Audio trigger for alerts (mana potion / rune done, 3.26)
 3. ~~Melee swing timer~~ (done, 3.17)
 4. ~~Warlock button: armors and demon summons~~ (done, 3.15)
 5. ~~Shaman totem bar with quick sets~~ (done, 3.16)
@@ -41,6 +41,21 @@ Built in Class Tools > General. The open questions were settled as:
 ---
 
 ## 2. Audio trigger for alerts
+
+**Built in 3.26:**
+- `WM.Sounds` (`Sounds.lua`) and a sound argument on `CT:SetAlert`
+- per-warning sound dropdowns for the mana potion and rune warnings,
+  defaulting to the addon's own `potion.ogg` / `rune.ogg`
+- picking a sound plays it (the test)
+- a channel option (Master / Sound effects / Dialog)
+- each sound plays once per appearance, throttled
+
+**Still open:**
+- [ ] Sound choices for the other Class Tools warnings (flask, food,
+      weapon oil, armor checks, Righteous Fury) and the swing timer's SYNC
+      NOW.
+
+(The original notes follow.)
 
 A sound that plays when an alert fires. It should cover the mana potion /
 rune alerts first, and be built so any Class Tools alert can use it.

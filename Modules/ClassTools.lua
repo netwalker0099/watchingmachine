@@ -232,13 +232,23 @@ function ClassTools:RegisterMonitor(fn)
     monitors[#monitors + 1] = fn
 end
 
-function ClassTools:SetAlert(key, text, icon)
+-- sound (optional): a WM.Sounds choice ("wm:potion", "kit:8959", "none")
+-- played when this warning first appears, in place of the shared warning
+-- sound. "none" leaves it to the shared sound option.
+local lastSoundFor = {}
+function ClassTools:SetAlert(key, text, icon, sound, channel)
     if not key then return end
     if not activeAlerts[key] then
         alertOrder[#alertOrder + 1] = key
         -- Only make noise when a warning first appears
         local now = GetTime()
-        if ClassToolsDB and ClassToolsDB.alertSound
+        local own = sound and sound ~= "none" and WM.Sounds
+        if own then
+            if (now - (lastSoundFor[key] or -100)) > ALERT_SOUND_THROTTLE then
+                lastSoundFor[key] = now
+                WM.Sounds.Play(sound, channel)
+            end
+        elseif ClassToolsDB and ClassToolsDB.alertSound
             and (now - lastAlertSound) > ALERT_SOUND_THROTTLE then
             lastAlertSound = now
             pcall(PlaySound, 8959, "Master")

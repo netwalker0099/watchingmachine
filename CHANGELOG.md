@@ -2,7 +2,37 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.25** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.26** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.26
+
+### New — Alert sounds (mana potion and rune warnings)
+
+- **Their own sounds:** the mana potion and rune warnings in Class Tools >
+  General each play a sound once when they appear. By default these are the
+  two new addon sounds, **Potion** and **Rune** (`Media/Sounds/potion.ogg`,
+  `rune.ogg`).
+- **Choose a sound:** *Potion warning sound* and *Rune warning sound* are
+  dropdowns offering:
+  - the two addon sounds
+  - the game's raid warning, ready check, alarm clock and PvP flag sounds
+  - **None**
+
+  Picking a sound plays it, so the dropdown doubles as a test button.
+- **Channel:** *Warning sounds play on* chooses Master (the default, heard
+  even with game sound effects turned down), Sound effects or Dialog.
+- **Repeats:** a sound plays once per appearance, at most once every few
+  seconds, and never while the warning simply stays up.
+- **The shared sound:** a warning with its own sound plays that instead of
+  the warning frame's shared "sound on a new warning". With *None* it falls
+  back to the shared sound, if that's on.
+- **For other alerts:** `Sounds.lua` (`WM.Sounds`) holds the sound list and
+  plays a choice, and `CT:SetAlert(key, text, icon, sound, channel)` takes
+  one. Other alerts can use it later.
+- **Note:** WoW only finds new sound files after a full restart of the game,
+  not a `/reload`.
 
 ---
 

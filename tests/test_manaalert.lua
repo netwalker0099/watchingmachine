@@ -27,14 +27,16 @@ env.GetItemIcon = function(id) return "icon" .. id end
 
 W.load("Core.lua")
 W.load("UI.lua")
+W.load("Sounds.lua")
 W.load("Modules/ClassTools.lua")
 W.load("Modules/ClassGeneral.lua")
 local WM = W.WM
 env.WatchingMachineDB = { theme = "Default" }
 local CT, Gen = WM.modules.ClassTools, WM.modules.ClassGeneral
 
-local alerts, icons, monitor = {}, {}, nil
-CT.SetAlert = function(_, key, text, icon) alerts[key] = text; icons[key] = icon end
+local alerts, icons, sounds, monitor = {}, {}, {}, nil
+local realSetAlert, realClearAlert = CT.SetAlert, CT.ClearAlert
+CT.SetAlert = function(_, key, text, icon, sound, channel) alerts[key] = text; icons[key] = icon; sounds[key] = { sound, channel } end
 CT.ClearAlert = function(_, key) alerts[key] = nil end
 CT.RegisterMonitor = function(_, fn) monitor = fn end
 CT:InitDB()
@@ -138,6 +140,62 @@ Gen:Explain()
 local out = table.concat(W.printed, "\n")
 check("consumes shows the mana deficit", out:find("mana down by: 4500", 1, true) ~= nil)
 check("consumes names the ready potion", out:find("Super Mana Potion", 1, true) ~= nil)
+
+-- ---- sounds ----
+local played = {}
+env.PlaySoundFile = function(path, channel) played[#played + 1] = { "file", path, channel } end
+env.PlaySound = function(id, channel) played[#played + 1] = { "kit", id, channel } end
+check("default sounds: potion and rune", env.GeneralChecksDB.potionSound == "wm:potion"
+    and env.GeneralChecksDB.runeSound == "wm:rune" and env.GeneralChecksDB.soundChannel == "Master")
+Reset()
+bags[22832] = 5; bags[12662] = 2
+mana = maxMana - 4500; Tick()
+check("potion warning carries its sound", sounds.gen_mana_potion[1] == "wm:potion" and sounds.gen_mana_potion[2] == "Master")
+cooldowns[22832] = 120; Tick()
+mana = maxMana - 2000; Tick()
+check("rune warning carries its sound", sounds.gen_mana_rune and sounds.gen_mana_rune[1] == "wm:rune")
+check("sound options are dropdowns", kinds.potionSound == "choice" and kinds.runeSound == "choice"
+    and kinds.soundChannel == "choice")
+local feature = {}
+for _, f in ipairs(CT:GetFeatures("GENERAL")) do feature[f.key] = f end
+check("sound list offers both sounds and game sounds", (function()
+    local have = {}
+    for _, o in ipairs(feature.potionSound.options) do have[o.value] = true end
+    return have["wm:potion"] and have["wm:rune"] and have["kit:8959"] and have.none
+end)())
+played = {}
+feature.potionSound.set("kit:8959"); feature.potionSound.onChange("kit:8959")
+check("picking a sound plays it (the test button)", played[1] and played[1][1] == "kit" and played[1][2] == 8959)
+check("and saves it", env.GeneralChecksDB.potionSound == "kit:8959")
+feature.potionSound.set("wm:potion")
+-- The real warning frame plays the chosen sound once, when the warning first appears
+CT.SetAlert, CT.ClearAlert = realSetAlert, realClearAlert
+local now = 1000
+env.GetTime = function() return now end
+played = {}
+CT:SetAlert("gen_mana_potion", "Use a mana potion", "icon", "wm:potion", "Master")
+check("plays the addon's file", played[1] and played[1][1] == "file"
+    and played[1][2] == "Interface\\AddOns\\WatchingMachine\\Media\\Sounds\\potion.ogg" and played[1][3] == "Master")
+CT:SetAlert("gen_mana_potion", "Use a mana potion", "icon", "wm:potion", "Master")
+check("not again while the warning stays up", #played == 1)
+CT:ClearAlert("gen_mana_potion")
+now = now + 1
+CT:SetAlert("gen_mana_potion", "Use a mana potion", "icon", "wm:potion", "Master")
+check("not again within a few seconds", #played == 1)
+CT:ClearAlert("gen_mana_potion")
+now = now + 10
+CT:SetAlert("gen_mana_potion", "Use a mana potion", "icon", "wm:potion", "SFX")
+check("again when it comes back later, on the chosen channel", #played == 2 and played[2][3] == "SFX")
+CT:ClearAlert("gen_mana_potion")
+env.ClassToolsDB.alertSound = true
+now = now + 10
+CT:SetAlert("gen_mana_rune", "Use a rune", "icon", "wm:rune", "Master")
+check("its own sound replaces the shared warning sound", #played == 3 and played[3][2]:find("rune.ogg", 1, true))
+CT:ClearAlert("gen_mana_rune")
+now = now + 10
+CT:SetAlert("gen_mana_rune", "Use a rune", "icon", "none", "Master")
+check("None: the shared warning sound instead", #played == 4 and played[4][1] == "kit" and played[4][2] == 8959)
+check("bad choices play nothing", not WM.Sounds.Play("wm:../x") and not WM.Sounds.Play(nil) and not WM.Sounds.Play("none"))
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

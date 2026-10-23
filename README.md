@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.25 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.26 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -266,6 +266,12 @@ always sits first.
     ready, either on cooldown or none left. Not below 35% health.
   - Both thresholds are adjustable. A warning stays up until you're 500 back
     under its threshold, so it doesn't flicker as mana regenerates.
+  - **Sounds:** each warning plays its own sound once when it appears: the
+    addon's **potion** and **rune** sounds by default. Pick another from a
+    dropdown (the other addon sound, raid warning, ready check, alarm clock,
+    PvP flag, or None); picking one plays it, so you can hear it. *Warning
+    sounds play on* Master (default, heard with game sound turned down),
+    Sound effects or Dialog
 - `/wmachine consumes` prints exactly what the checks currently see
 - **Swing timer**: a bar per hand showing the time to your next swing, for
   warriors, rogues, Retribution paladins and Enhancement shamans (spec read
@@ -626,6 +632,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.26
+- **Alert sounds**: the mana potion and rune warnings play their own sounds (new potion and rune sounds by default), each chosen from a dropdown, on the sound channel you pick
 
 ### Version 3.25
 - **Gold trade alerts** in chat (who, how much each way, and where), and the trade log records the instance you were in; Instance Tracker runs show the gold traded during them
