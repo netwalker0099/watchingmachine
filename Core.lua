@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.28"
+WM.version = "3.29"
 WM.modules = {}
 
 -- ============================================
@@ -143,15 +143,34 @@ WM.FOOD_BUFFS = { "Well Fed", "Enlightened" }
 -- the Zul'Aman "Unstable Flask of the Beast" / "...of the Sorcerer" match.
 WM.FLASK_CONTAINS = { "Flask of" }
 
-local FOOD_BUFF_SET = {}
+-- The Shattrath flasks (only work in TK, SSC, Hyjal, BT and Sunwell) put up
+-- an aura without "Flask of" in its name: Shattrath Flask of Blinding Light
+-- gives "Blinding Light". Matched by exact name and by spell ID.
+WM.FLASK_BUFFS = {
+    "Relentless Assault", "Fortification", "Mighty Restoration",
+    "Supreme Power", "Pure Death", "Blinding Light",
+}
+WM.FLASK_IDS = {
+    [41608] = true,  -- Shattrath Flask of Relentless Assault
+    [41609] = true,  -- Shattrath Flask of Fortification
+    [41610] = true,  -- Shattrath Flask of Mighty Restoration
+    [41611] = true,  -- Shattrath Flask of Supreme Power
+    [46837] = true,  -- Shattrath Flask of Pure Death
+    [46839] = true,  -- Shattrath Flask of Blinding Light
+}
+
+local FOOD_BUFF_SET, FLASK_SET = {}, {}
 for _, n in ipairs(WM.FOOD_BUFFS) do FOOD_BUFF_SET[n] = true end
+for _, n in ipairs(WM.FLASK_BUFFS) do FLASK_SET[n] = true end
 
 function WM:IsFoodBuff(name)
     return name ~= nil and FOOD_BUFF_SET[name] == true
 end
 
-function WM:IsFlaskBuff(name)
+function WM:IsFlaskBuff(name, spellId)
+    if spellId and WM.FLASK_IDS[spellId] then return true end
     if not name then return false end
+    if FLASK_SET[name] then return true end
     for _, needle in ipairs(WM.FLASK_CONTAINS) do
         if name:find(needle, 1, true) then return true end
     end
@@ -221,7 +240,7 @@ for _, n in ipairs(WM.GUARDIAN_ELIXIRS) do GUARDIAN_SET[n] = true end
 
 -- "flask", "battle", "guardian" or nil for one aura
 function WM:ConsumableKind(name, spellId)
-    if self:IsFlaskBuff(name) then return "flask" end
+    if self:IsFlaskBuff(name, spellId) then return "flask" end
     if (spellId and WM.BATTLE_ELIXIR_IDS[spellId]) or (name and BATTLE_SET[name]) then return "battle" end
     if (spellId and WM.GUARDIAN_ELIXIR_IDS[spellId]) or (name and GUARDIAN_SET[name]) then return "guardian" end
     return nil

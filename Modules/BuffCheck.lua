@@ -259,6 +259,11 @@ local function BuffMatchesGroup(buffName, group, spellId)
             end
         end
     end
+    -- Shattrath flasks, whose aura names don't say "Flask of"
+    if group.contains == WM.FLASK_CONTAINS
+        and WM:IsFlaskBuff(buffName, type(spellId) == "number" and spellId or nil) then
+        return "Shattrath flask"
+    end
     return nil
 end
 

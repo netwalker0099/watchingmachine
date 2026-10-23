@@ -74,6 +74,9 @@ check("nil is not food", not WM:IsFoodBuff(nil))
 check("Flask of Relentless Assault is a flask", WM:IsFlaskBuff("Flask of Relentless Assault"))
 check("Unstable Flask of the Sorcerer is a flask", WM:IsFlaskBuff("Unstable Flask of the Sorcerer"))
 check("Enlightened is not a flask", not WM:IsFlaskBuff("Enlightened"))
+check("Shattrath Blinding Light is a flask (by name)", WM:IsFlaskBuff("Blinding Light"))
+check("Shattrath Pure Death is a flask (by ID)", WM:IsFlaskBuff("Something Else", 46837))
+check("Shattrath flask is a consumable flask", WM:ConsumableKind("Blinding Light", 46839) == "flask")
 
 -- ---- BuffCheck ready-check scan ----
 local BC = WM.modules.BuffCheck
@@ -141,6 +144,13 @@ DB.checkedGroups.battleelixir = true
 lines, missing = BC:ScanGroup()
 check("battle elixir: flask counts, elixir counts, only raid4 missing", missing == 1 and lines[1]:find("Eater", 1, true))
 DB.checkedGroups.battleelixir = false
+-- Shattrath flasks: aura "Blinding Light", no "Flask of" in the name
+DB.checkedGroups.flask = true
+auras.raid3 = { "Blinding Light" }
+auras.raid4 = { { "Pure Death", 46837 } }
+lines, missing = BC:ScanGroup()
+check("flask: Shattrath flasks count", missing == 0)
+DB.checkedGroups.flask = false
 
 -- Explain labels Enlightened as matched
 DB.checkedGroups.wellfed = true

@@ -2,7 +2,25 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.28** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.29** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.29
+
+### Fixed — Shattrath flasks not detected
+
+The Shattrath flasks, which only work in Tempest Keep, Serpentshrine
+Cavern, Hyjal, Black Temple and Sunwell, put up an aura without "Flask of"
+in its name (Shattrath Flask of Blinding Light gives "Blinding Light"), so
+the flask checks missed them.
+
+- They now count as a flask by aura name and by spell ID: Relentless
+  Assault, Fortification, Mighty Restoration, Supreme Power, Pure Death and
+  Blinding Light.
+- Covers the raid Buff Check (Flask or Elixirs, and the battle and guardian
+  elixir checks) and the Class Tools General flask warning.
+- `/wmachine whybuff` labels them "Shattrath flask".
 
 ---
 

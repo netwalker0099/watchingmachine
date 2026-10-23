@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.28 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.29 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -702,6 +702,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.29
+- Fix: the **Shattrath flasks** (Blinding Light, Pure Death, Relentless Assault, Supreme Power, Fortification, Mighty Restoration) now count as flasks in Buff Check and the personal flask warning
 
 ### Version 3.28
 - New **World Timers**: your layer, Terokkar Forest tower resets per layer, today's dungeon / heroic / PvP dailies, the Darkmoon Faire (where, when, your Sayge cooldown), Classic world buff timers and Songflowers, with Nova World Buffs users' shared timers read in (listen only)
