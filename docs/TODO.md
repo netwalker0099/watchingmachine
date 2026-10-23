@@ -645,3 +645,45 @@ Loot council for raids, with RCLootCouncil as the model.
 - [ ] **TBC Anniversary check:** confirm master loot and trading loot within
       two hours work the same on 2.5.6.
 
+
+## 19. GTFO-style "get out of the bad" warnings
+
+Sounds when you're standing in something that hurts, like the GTFO addon.
+
+- [ ] **Detect:** combat log damage to you from ground effects and void
+      zones (a list of spell IDs per raid and dungeon), and from
+      environmental damage (fire, lava, slime).
+- [ ] **Alerts:** a sound per severity (high, low, fail, "friendly fire"),
+      with the Watching Machine sound choices and channel, throttled.
+- [ ] **Tank / healer aware:** some effects only matter to the target.
+- [ ] **Data:** TBC raid and dungeon spell lists. Write our own, or ask for
+      the GTFO addon to read as a guide (check its licence first).
+
+## 20. ItemRack-style gear sets
+
+Save and swap gear sets, like ItemRack.
+
+- [ ] **Sets:** save what you're wearing as a named set (with an icon),
+      equip it in one click, from a slash command or a key binding.
+- [ ] **Swaps:** out of combat (weapons in combat where the game allows),
+      queued until combat ends otherwise, using bags and the bank's
+      contents from Your Characters.
+- [ ] **Automatic:** swap on events (mounting, entering a battleground,
+      Druid forms, a resistance set for a boss).
+- [ ] **Fits with:** Your Characters (each set's pieces), GearScore (a set's
+      score), the Loot Browser BiS lists (what's missing from a set).
+
+## 21. Ogri'la helper (Ogri'Lazy-style)
+
+Makes the Ogri'la and Sha'tari Skyguard dailies easier, like Ogri'Lazy.
+
+- [ ] **Bombing runs:** the Fel Cannonball Stack / Bomb Them Again!
+      dailies. A button or key that uses the quest item on the target in
+      range, and a counter.
+- [ ] **Banish / Wrangle dailies:** the quest item's button ready when the
+      right target is in range, and the remaining count.
+- [ ] **Apexis shards and crystals:** a count and the cost of what you're
+      saving for (Ogri'la rewards in the Loot Browser).
+- [ ] **Check:** what Blizzard allows on 2.5.6 (item use from addon
+      buttons needs secure action buttons, and those can't change in
+      combat).

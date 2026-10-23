@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.41 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.42 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -468,6 +468,20 @@ Every character you log in, on every realm, in one window (Logging group;
   professions with their skill, your class's **reagents** (candles,
   powder, symbols, Ankhs, Soul Shards, ...), and for hunters **ammo** and
   the **pet** (name, level, family, happiness)
+- **GearScore** column (3.42), from what each character last had on
+- **Click a character** for their gear: a paper doll beside the window,
+  hover a slot for the item, shift-click to link it. GearScore and average
+  item level at the top
+- **Bags, bank, attunements, lockouts** buttons on each row open the same
+  flyout:
+  - **Bags:** everything in their bags and keyring, with stack counts.
+  - **Bank:** as of their last visit (open the bank once on each character).
+  - **Attunements:** their progress on each one, and *Open Attunements*.
+  - **Lockouts:** their raid saves (bosses killed, when it resets), plus
+    the account's instances-per-hour count.
+- **Find an item:** type a name to search every character's gear, bags,
+  keyring and bank. Results show the total held; hover one for who has
+  how many and where. Escape to go back
 - Saved as you play and when you log out
 - **Right-click** a character to remove one you've deleted
 
@@ -854,6 +868,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.42
+- **Your Characters**: a GearScore column; click a character for their gear (paper doll); bags, bank, attunement and lockout views per character; item search across all characters
 
 ### Version 3.41
 - New **Attunements**: every TBC raid attunement, dungeon key and heroic key (Classic optional) with steps done and next, per character, on Your Characters tooltips, and a guild survey

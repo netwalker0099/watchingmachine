@@ -2,7 +2,36 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.41** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.42** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.42
+
+### New — gear, bags, bank, lockouts and item search in Your Characters
+
+- **GearScore column:** each character's score from what they had on last
+  time you played them.
+- **Click a character** for a paper doll flyout beside the window:
+  - their gear, slot by slot, with the GearScore and average item level
+  - hover a slot for the item's tooltip; shift-click to link it
+- **Four buttons on each row** open the same flyout (or the tabs along its
+  top):
+  - **Bags:** everything in their bags and keyring, with stack counts.
+  - **Bank:** what's in their bank and bank bags, as of their last visit.
+    Open the bank once on each character to fill it in.
+  - **Attunements:** that character's progress on every attunement, and a
+    button to open the Attunements window.
+  - **Lockouts:** their raid saves (raid, size, bosses killed, when it
+    resets), read when you log in on them, and the account's
+    instances-per-hour from the Instance Tracker.
+- **Find an item:** a search box at the top looks through every character's
+  gear, bags, keyring and bank.
+  - Each result shows the total held.
+  - Hover it for who has how many, and where (worn, bags, keyring, bank).
+  - Shift-click links it. Escape goes back to the list.
+- **Saved:** gear, bags and keyring as you play; the bank when you open
+  and close it; lockouts when the game sends them.
 
 ---
 
