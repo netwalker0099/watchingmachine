@@ -528,3 +528,22 @@ needs each NPC's two yell texts.
       layer, the first map UI in the addon.
 - [ ] **Where it lives:** a module of its own, with its own dashboard card.
 
+
+## 14. Loot Browser (AtlasLoot-style) — phase 1 DONE in 3.34
+
+Our own loot browser, with AtlasLoot as the inspiration. The code is all
+Watching Machine's own. The data keeps only the facts (which item IDs drop
+from which boss), in our own format.
+
+- [x] **Dungeons and raids** (3.34): Classic + TBC, normal / heroic, faction
+      items, trash / keys / tier sets, opens on your instance.
+- [ ] **Wrath tables:** `Data/LootWrath.lua` is in place and gated on the
+      client's expansion. It needs the Wrath dungeon and raid lists (the
+      AtlasLoot zip we had has no Wrath dungeon or raid tables).
+- [ ] **Item source tooltips:** "Drops from Attumen the Huntsman (Karazhan)"
+      on item tooltips (`LB:Sources` already builds the index).
+- [ ] **Crafting, reputation rewards, PvP gear** (Classic, TBC, Wrath gated).
+- [ ] **Favourites and your own BiS marks** per spec. Not AtlasLoot's
+      curated BiS lists.
+- [ ] **Search** by item name (cached names only, or ask the client in
+      batches).

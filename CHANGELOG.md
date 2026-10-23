@@ -2,7 +2,37 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.33** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.34** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.34
+
+### New — Loot Browser
+
+What every dungeon and raid boss drops (`/wmachine loot`, or the new
+dashboard card in the Raid group).
+
+- **Content:** every Classic and Burning Crusade dungeon and raid, boss by
+  boss. Also trash, quest and event pages, keys, and Tier 1–6 sets.
+- **The window:** instances on the left (dungeons, then raids in orange,
+  with the TBC phase), bosses in the middle, loot on the right.
+  - **Normal / Heroic** switch when a boss has both.
+  - **Your faction's** version of items that differ.
+  - *Sets: my class only* (on by default) on the tier set pages.
+  - **Resizable**; two columns of loot when it's wide.
+- **Items:** icon, name in its quality colour, slot and armour type.
+  - **Hover** for the full tooltip.
+  - **Shift-click** links it, **Ctrl-click** tries it on.
+- **Opens on the instance you're in**, and remembers your last instance per
+  expansion.
+- **Wrath of the Lich King:** the browser checks the client's expansion.
+  - Wrath holiday bosses (Ahune, Headless Horseman, Coren Direbrew,
+    Apothecary Hummel) already show on a Wrath client.
+  - The Wrath dungeon and raid tables slot into `Data/LootWrath.lua` when
+    they're added. Until then Wrath stays out of the list.
+- **Light:** only item IDs are stored (about 80 KB of data), built the
+  first time the window opens. Names, icons and stats come from the game.
 
 ---
 

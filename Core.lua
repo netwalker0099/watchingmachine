@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.33"
+WM.version = "3.34"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -337,6 +337,7 @@ local MODULE_COLORS = {
     AltTracker = "FFCC66",
     PvPLog = "FF6666",
     WorldTimers = "66FFCC",
+    LootBrowser = "FFB366",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1149,7 +1150,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
 }
@@ -1201,6 +1202,11 @@ local MODULE_INFO = {
         tools = {
             { text = "Print the timers", func = function() Call("WorldTimers", "Report") end },
         },
+    },
+    LootBrowser = {
+        title = "Loot Browser", desc = "What every boss drops",
+        about = "Every dungeon and raid boss's loot for Classic and The Burning Crusade (Wrath switches on by itself on a Wrath client): normal and heroic, tier and dungeon sets, keys and trash. Opens on the instance you're in.",
+        command = "loot", color = {1, 0.7, 0.4}, icon = "Interface\\Icons\\INV_Box_01",
     },
     PvPLog = {
         title = "Battlegrounds & Arenas", desc = "Results and stats of every match",
@@ -1847,6 +1853,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine lockouts|r - Print your instance lockouts")
     print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
     print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
+    print("|cFFFFFF00/wmachine loot|r - Loot Browser (what every dungeon and raid boss drops)")
     print("|cFFFFFF00/wmachine wb [guild|party|raid]|r - Print the world timers, or send them to a channel")
     print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
@@ -2046,6 +2053,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "wb" or cmd:match("^wb ") then
         local module = WM.modules.WorldTimers
         if module and module.Report then module:Report(cmd:match("^wb (%a+)")) else WM:Print("WorldTimers module not available") end
+
+    elseif cmd == "loot" or cmd == "atlas" or cmd == "al" then
+        local module = WM.modules.LootBrowser
+        if module and module.Toggle then module:Toggle() else WM:Print("LootBrowser module not available") end
 
     elseif cmd == "bgs" or cmd == "arenas" or cmd == "pvplog" then
         local module = WM.modules.PvPLog

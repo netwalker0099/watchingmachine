@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.33 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.34 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -526,7 +526,31 @@ Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).
 - `/wmachine wb` prints the short timers; `/wmachine wb guild` (or party /
   raid) sends them to that channel
 
-### 23. Chat Filter
+### 23. Loot Browser
+What every dungeon and raid boss drops (Raid group; `/wmachine loot`, also
+`/wmachine atlas`).
+
+- **Classic and The Burning Crusade:** every dungeon and raid, boss by boss,
+  plus trash, quest and event pages, keys, and the tier sets. The
+  instances come in level order, raids after dungeons, with the TBC phase
+  each raid opened in
+- **Normal / Heroic:** switch between a boss's normal and heroic loot
+- **Your faction's items** where they differ (Onyxia's and Nefarian's heads,
+  AQ rewards)
+- **Set pages:** each tier set's pieces; *Sets: my class only* (on) shows
+  just your class's
+- **Items:** icon, name in its quality colour, slot and type. Hover for the
+  full tooltip; shift-click links it in chat, ctrl-click tries it on
+- **Opens on the instance you're in**, and remembers the last one per
+  expansion. The window is resizable; the loot uses two columns when wide
+- **Wrath of the Lich King:** switches on by itself on a Wrath client
+  (holiday bosses such as Ahune and the Headless Horseman already do).
+  The Wrath dungeon and raid tables are still to come
+- Only item IDs are stored; names, icons and stats come from the game, so
+  the first look at a page can show "Item 12345" for a moment while the
+  client fetches them
+
+### 24. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -658,6 +682,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine lockouts` - Print your instance lockouts
 - `/wmachine alts` - Your Characters
 - `/wmachine bgs` - Battleground and arena log
+- `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
 - `/wmachine wb [guild|party|raid]` - Print the world timers, or send them to a channel
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
@@ -708,6 +733,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AltTrackerDB` - Your Characters: every character's saved details
 - `PvPLogDB` - Battleground and arena matches (every character)
 - `WorldTimersDB` - World Timers: layers and timers per realm and faction, Sayge cooldowns
+- `LootBrowserDB` - Loot Browser: last expansion and instance, Normal / Heroic, set filter
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -729,6 +755,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.34
+- New **Loot Browser**: every Classic and TBC dungeon and raid boss's loot, normal and heroic, with trash, keys and tier sets; opens on the instance you're in. Wrath switches on by itself on a Wrath client
 
 ### Version 3.33
 - **World Timers on the world map**: Darkmoon Faire, Terokkar towers, Shattrath dailies and Felwood's Songflowers, with live timers and hover details
