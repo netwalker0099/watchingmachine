@@ -31,7 +31,7 @@ env.UnitClass = function() return "Shaman", "SHAMAN" end
 local cleu
 env.CombatLogGetCurrentEventInfo = function() return unpack(cleu, 1, 24) end
 
-for _, f in ipairs({ "Core.lua", "UI.lua", "Modules/ClassTools.lua", "Modules/ClassFlyout.lua",
+for _, f in ipairs({ "Core.lua", "UI.lua", "Sounds.lua", "Modules/ClassTools.lua", "Modules/ClassFlyout.lua",
                      "Modules/SwingTimer.lua", "Modules/ClassGeneral.lua" }) do
     W.load(f)
 end
@@ -203,6 +203,31 @@ Swing:OnEvent("PLAYER_LEAVE_COMBAT")
 Swing:OnEvent("PLAYER_ENTER_COMBAT")
 state, gap = Swing:SyncState()
 check("pressing the macro at the mark syncs the hands", state == "good" and near(gap, 0.25))
+
+-- ---- SYNC NOW sound ----
+local played = {}
+env.PlaySound = function(id, chan) played[#played + 1] = { id, chan } end
+env.PlaySoundFile = function(path, chan) played[#played + 1] = { path, chan } end
+check("SYNC NOW sound off by default", Swing.DB().syncSound == "none")
+Swing.DB().syncSound = "kit:8959"
+local savedOH = H.oh.expires
+H.oh.expires = now + 0.9
+Swing:Draw(now)
+check("plays as SYNC NOW comes up", #played == 1 and played[1][1] == 8959)
+Swing:Draw(now + 0.02)
+check("once per prompt", #played == 1)
+H.oh.expires = H.mh.expires + 0.15
+Swing:Draw(now)
+H.oh.expires = now + 0.9
+Swing:Draw(now)
+check("again on the next prompt", #played == 2)
+Swing.DB().syncSound = "none"
+H.oh.expires = H.mh.expires + 0.15
+Swing:Draw(now)
+H.oh.expires = now + 0.9
+Swing:Draw(now)
+check("None: silent", #played == 2)
+H.oh.expires = savedOH
 
 -- ---- The bars ----
 Swing:Draw(now)

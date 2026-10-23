@@ -112,6 +112,7 @@ local function DB()
     local db = SwingTimerDB
     if db.locked == nil then db.locked = false end
     if db.syncLag == nil then db.syncLag = 0.15 end
+    if db.syncSound == nil then db.syncSound = "none" end
     if type(db.width) ~= "number" then db.width = DEFAULT_W end
     if type(db.barHeight) ~= "number" then db.barHeight = DEFAULT_H end
     db.width = math.max(MIN_W, math.min(MAX_W, math.floor(db.width + 0.5)))
@@ -732,6 +733,15 @@ function Swing:DrawSync(now)
     local state, gap = self:SyncState()
     local mark = self:SyncMark(now)
     local now_ = self:ShouldSync(now)
+    -- A sound as SYNC NOW comes up (once per prompt)
+    if now_ and not self.syncPrompting then
+        local choice = DB().syncSound
+        if choice and choice ~= "none" and WM.Sounds then
+            local chan = (GeneralChecksDB and GeneralChecksDB.soundChannel) or "Master"
+            WM.Sounds.Play(choice, chan)
+        end
+    end
+    self.syncPrompting = now_ and true or false
     if mark and mark > 0 and mark < mh.speed then
         local x = (1 - mark / mh.speed) * BAR_W
         f.mh.mark:ClearAllPoints()
@@ -815,6 +825,16 @@ function Swing.RegisterOptions(tools)
         key = "swingSync", name = "Shaman weapon sync mark",
         desc = "Enhancement: marks when to press your sync macro (/cleartarget, /targetlasttarget, /startattack) so the off hand lands just after the main hand, and says whether you're in sync.",
         default = true,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
+        options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = "none",
+        desc = "Played as SYNC NOW comes up, so you can press the macro without watching the bar.",
+        get = function() return DB().syncSound end,
+        set = function(v) DB().syncSound = v end,
+        onChange = function(v)
+            if WM.Sounds then WM.Sounds.Play(v, (GeneralChecksDB and GeneralChecksDB.soundChannel) or "Master") end
+        end,
     })
     tools:RegisterFeature("GENERAL", {
         key = "swingSyncLag", kind = "choice", name = "Off hand lands after by",

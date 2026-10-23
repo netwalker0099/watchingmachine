@@ -232,9 +232,39 @@ function ClassTools:RegisterMonitor(fn)
     monitors[#monitors + 1] = fn
 end
 
+-- Warnings that can have a sound of their own, for the Warning sounds
+-- section: { class, key, label } in registration order
+local alertSoundDefs = {}
+
+function ClassTools:RegisterAlertSound(class, key, label)
+    for _, d in ipairs(alertSoundDefs) do if d.key == key then return end end
+    alertSoundDefs[#alertSoundDefs + 1] = { class = class, key = key, label = label }
+end
+
+function ClassTools:GetAlertSoundDefs() return alertSoundDefs end
+
+-- The sound chosen for a warning, or nil for the shared warning sound
+function ClassTools:AlertSound(key)
+    local s = ClassToolsDB and type(ClassToolsDB.alertSounds) == "table" and ClassToolsDB.alertSounds[key]
+    if s == "shared" then return nil end
+    return s
+end
+
+function ClassTools:SetAlertSound(key, choice)
+    if not ClassToolsDB then return end
+    if type(ClassToolsDB.alertSounds) ~= "table" then ClassToolsDB.alertSounds = {} end
+    ClassToolsDB.alertSounds[key] = (choice ~= "shared") and choice or nil
+end
+
+local function SoundChannel()
+    return (GeneralChecksDB and GeneralChecksDB.soundChannel) or "Master"
+end
+ClassTools.SoundChannel = SoundChannel
+
 -- sound (optional): a WM.Sounds choice ("wm:potion", "kit:8959", "none")
--- played when this warning first appears, in place of the shared warning
--- sound. "none" leaves it to the shared sound option.
+-- played when this warning first appears. Without one, the warning's choice
+-- in the Warning sounds section is used, else the shared warning sound.
+-- "none" is silent.
 local lastSoundFor = {}
 function ClassTools:SetAlert(key, text, icon, sound, channel)
     if not key then return end
@@ -242,8 +272,11 @@ function ClassTools:SetAlert(key, text, icon, sound, channel)
         alertOrder[#alertOrder + 1] = key
         -- Only make noise when a warning first appears
         local now = GetTime()
-        local own = sound and sound ~= "none" and WM.Sounds
-        if own then
+        sound = sound or self:AlertSound(key)
+        channel = channel or SoundChannel()
+        if sound == "none" then
+            -- silent
+        elseif sound and WM.Sounds then
             if (now - (lastSoundFor[key] or -100)) > ALERT_SOUND_THROTTLE then
                 lastSoundFor[key] = now
                 WM.Sounds.Play(sound, channel)
@@ -703,6 +736,35 @@ function ClassTools:CreateUI()
             .. " can be found and dragged into place." },
     }, 6)
     L:Note("Tabs appear for each class that has tools built for it. Drag the warning frame to move it.")
+
+    -- One sound choice per warning, for General and your class
+    local mine = ClassTools:GetPlayerClass()
+    local shown = 0
+    for _, d in ipairs(alertSoundDefs) do
+        if d.class == "GENERAL" or d.class == mine then
+            if shown == 0 then L:Section({ key = "sounds", title = "Warning sounds" }) end
+            shown = shown + 1
+            L:Dropdown({
+                label = d.label .. ":", width = 150,
+                options = function()
+                    local opts = { { value = "shared", text = "Shared warning sound" } }
+                    for _, o in ipairs(WM.Sounds and WM.Sounds.OPTIONS or {}) do opts[#opts + 1] = o end
+                    return opts
+                end,
+                get = function() return (ClassToolsDB and ClassToolsDB.alertSounds and ClassToolsDB.alertSounds[d.key]) or "shared" end,
+                set = function(v)
+                    ClassTools:SetAlertSound(d.key, v)
+                    if v ~= "shared" and WM.Sounds then WM.Sounds.Play(v, SoundChannel()) end
+                end,
+                tooltip = { d.label, "Played once when this warning appears. Shared: the sound above, if it's on."
+                    .. " None: silent. Picking a sound plays it." },
+            })
+        end
+    end
+    if shown > 0 then
+        L:Note("The mana potion and rune sounds are in the General tab. Sounds play on the channel set there.")
+        L:EndSection()
+    end
 
     mainFrame = panel
     self.mainFrame = panel

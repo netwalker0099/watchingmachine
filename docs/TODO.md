@@ -4,7 +4,7 @@ Planned work that hasn't been started. Each item notes what's decided and
 what still needs settling before it's built.
 
 1. ~~Mana potion / rune alert~~ (done, 3.14)
-2. Audio trigger for alerts (mana potion / rune done, 3.26)
+2. ~~Audio trigger for alerts~~ (done, 3.26 and 3.32)
 3. ~~Melee swing timer~~ (done, 3.17)
 4. ~~Warlock button: armors and demon summons~~ (done, 3.15)
 5. ~~Shaman totem bar with quick sets~~ (done, 3.16)
@@ -50,10 +50,10 @@ Built in Class Tools > General. The open questions were settled as:
 - a channel option (Master / Sound effects / Dialog)
 - each sound plays once per appearance, throttled
 
-**Still open:**
-- [ ] Sound choices for the other Class Tools warnings (flask, food,
-      weapon oil, armor checks, Righteous Fury) and the swing timer's SYNC
-      NOW.
+**Built in 3.32:** the rest of it.
+- [x] Sound choices for every other Class Tools warning (the Warning sounds
+      section, `CT:RegisterAlertSound`, `CT:SetAlertSound`).
+- [x] The swing timer's SYNC NOW sound.
 
 (The original notes follow.)
 

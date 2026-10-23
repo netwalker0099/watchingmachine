@@ -225,7 +225,33 @@ check("its own sound replaces the shared warning sound", #played == 3 and played
 CT:ClearAlert("gen_mana_rune")
 now = now + 10
 CT:SetAlert("gen_mana_rune", "Use a rune", "icon", "none", "Master")
-check("None: the shared warning sound instead", #played == 4 and played[4][1] == "kit" and played[4][2] == 8959)
+check("None: silent, even with the shared sound on", #played == 3)
+CT:ClearAlert("gen_mana_rune")
+
+-- ---- Per-warning sounds (Warning sounds section) ----
+now = now + 10
+CT:SetAlert("gen_flask", "No flask", "icon")
+check("no choice: the shared warning sound", #played == 4 and played[4][1] == "kit" and played[4][2] == 8959)
+CT:ClearAlert("gen_flask")
+CT:SetAlertSound("gen_flask", "wm:rune")
+now = now + 10
+CT:SetAlert("gen_flask", "No flask", "icon")
+check("a chosen sound for that warning", #played == 5 and played[5][2]:find("rune.ogg", 1, true)
+    and played[5][3] == env.GeneralChecksDB.soundChannel)
+CT:ClearAlert("gen_flask")
+CT:SetAlertSound("gen_flask", "none")
+now = now + 10
+CT:SetAlert("gen_flask", "No flask", "icon")
+check("None for that warning: silent", #played == 5)
+CT:ClearAlert("gen_flask")
+CT:SetAlertSound("gen_flask", "shared")
+check("back to shared clears the choice", CT:AlertSound("gen_flask") == nil and env.ClassToolsDB.alertSounds.gen_flask == nil)
+local keys = {}
+for _, d in ipairs(CT:GetAlertSoundDefs()) do keys[d.key] = d.class end
+check("General warnings offer a sound", keys.gen_flask == "GENERAL" and keys.gen_food == "GENERAL" and keys.gen_oil == "GENERAL")
+-- The Class Tools window lists them
+local panel = CT:CreateUI()
+check("Warning sounds section built", panel.layout.sections and panel.layout.sections.sounds ~= nil)
 check("bad choices play nothing", not WM.Sounds.Play("wm:../x") and not WM.Sounds.Play(nil) and not WM.Sounds.Play("none"))
 
 print(("%d passed, %d failed"):format(pass, fail))

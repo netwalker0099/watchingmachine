@@ -2,7 +2,48 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.31** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.32** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.32
+
+### New — a sound for every warning
+
+The Class Tools window has a new **Warning sounds** section (collapsible,
+below the warning frame options). It has a dropdown for each warning of the
+General tab and your class:
+
+| Tab | Warnings |
+|---|---|
+| General | No flask or elixirs, No food buff, No weapon oil / stone |
+| Mage | Mage armor missing |
+| Warlock | Fel / Demon Armor missing, Demonic Sacrifice missing, Soul Link not cast |
+| Paladin | Righteous Fury missing |
+
+- **The choices:**
+  - *Shared warning sound*, the default: the warning frame's "Play a sound
+    when a new warning appears", if it's on.
+  - Any addon or game sound.
+  - **None** for silent.
+- **Picking a sound plays it.**
+- **Channel:** sounds use the *Warning sounds play on* channel from the
+  General tab.
+- **When:** each plays once when its warning appears, at most every few
+  seconds.
+- The mana potion and rune sounds stay where they were, in the General tab.
+
+### New — SYNC NOW sound
+
+*SYNC NOW sound* (Class Tools > General, off by default) plays a sound when
+the Enhancement weapon sync prompt comes up, once per prompt. That way you
+can press the sync macro without watching the bar.
+
+### Changed — None is silent
+
+For the mana potion and rune warnings, **None** used to fall back to the
+shared warning sound. It's now silent everywhere. Choosing *Shared warning
+sound* in the new section gives the old behaviour.
 
 ---
 

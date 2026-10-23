@@ -390,7 +390,7 @@ local function SoundFeature(tools, key, name, default, what)
         set = function(v) GeneralChecksDB[key] = v end,
         onChange = function(v) if WM.Sounds then WM.Sounds.Play(v, GeneralChecksDB.soundChannel) end end,
         tooltip = { name, "Played once each time " .. what .. " appears.",
-            "None: no sound of its own (the warning frame's sound option still applies)." },
+            "None: silent." },
     })
 end
 
@@ -467,5 +467,8 @@ function General:Initialize()
     -- Swing / Auto Shot timer
     if WM.SwingTimer then WM.SwingTimer.RegisterOptions(tools) end
 
+    tools:RegisterAlertSound(CLASS, "gen_flask", "No flask or elixirs")
+    tools:RegisterAlertSound(CLASS, "gen_food", "No food buff")
+    tools:RegisterAlertSound(CLASS, "gen_oil", "No weapon oil / stone")
     tools:RegisterMonitor(Monitor)
 end

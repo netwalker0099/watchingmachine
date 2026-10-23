@@ -372,6 +372,9 @@ function Warlock:Initialize()
     Dir("armorDir", "Armors expand", "armor")
     Dir("stoneDir", "Stones & rituals expand", "Soulwell, summoning, Healthstone and Soulstone")
 
+    tools:RegisterAlertSound(CLASS, "wl_armor", "Fel / Demon Armor missing")
+    tools:RegisterAlertSound(CLASS, "wl_sac", "Demonic Sacrifice missing")
+    tools:RegisterAlertSound(CLASS, "wl_soullink", "Soul Link not cast")
     tools:RegisterMonitor(Monitor)
 
     local talentWatcher = CreateFrame("Frame")

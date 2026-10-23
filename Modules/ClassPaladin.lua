@@ -128,6 +128,7 @@ function Paladin:Initialize()
         desc = "Protection paladins only (most points in Protection, or Holy Shield / Avenger's Shield).",
         default = true,
     })
+    tools:RegisterAlertSound(CLASS, "pal_fury", "Righteous Fury missing")
     tools:RegisterMonitor(Monitor)
 
     local watcher = CreateFrame("Frame")

@@ -284,6 +284,7 @@ function Mage:Initialize()
     -- Locking, docking and open-on-click are shared by every class's
     -- flyouts: Class Tools > General
 
+    tools:RegisterAlertSound(CLASS, "mage_armor", "Mage armor missing")
     tools:RegisterMonitor(Monitor)
 
     if IsPlayerMage() then

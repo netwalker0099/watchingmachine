@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.31 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.32 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -232,6 +232,17 @@ CT:RegisterFeature("SHAMAN", {
   warning, lock in place, reset position, and **Show example** — which puts
   two dummy lines up for six seconds so you can find and position the frame
   without waiting for a real warning.
+- **Warning sounds** (a section below): a sound for each warning of General
+  and your class:
+  - **General:** no flask or elixirs, no food buff, no weapon oil / stone
+  - **Mage:** armor missing
+  - **Warlock:** Fel / Demon Armor, Demonic Sacrifice, Soul Link
+  - **Paladin:** Righteous Fury
+
+  Each one is *Shared warning sound* (the default: the sound above, if it's
+  on), one of the addon or game sounds, or **None** (silent). Picking a
+  sound plays it. They use the *Warning sounds play on* channel from the
+  General tab.
 
 ### Flyout buttons (all classes)
 The mage, warlock and shaman buttons share one flyout engine (`Modules/ClassFlyout.lua`)
@@ -271,9 +282,9 @@ always sits first.
   - **Sounds:** each warning plays its own sound once when it appears: the
     addon's **potion** and **rune** sounds by default. Pick another from a
     dropdown (the other addon sound, raid warning, ready check, alarm clock,
-    PvP flag, or None); picking one plays it, so you can hear it. *Warning
-    sounds play on* Master (default, heard with game sound turned down),
-    Sound effects or Dialog
+    PvP flag, or None for silent); picking one plays it, so you can hear it.
+    *Warning sounds play on* Master (default, heard with game sound turned
+    down), Sound effects or Dialog
 - `/wmachine consumes` prints exactly what the checks currently see
 - **Swing timer**: a bar per hand showing the time to your next swing, for
   warriors, rogues, Retribution paladins and Enhancement shamans (spec read
@@ -300,7 +311,8 @@ always sits first.
     the main-hand swing, turns green with **SYNC NOW** when it's time, and a
     line under the bars says *In sync*, *Off hand first* or *Out of sync*.
     *Off hand lands after by* sets the lag (0.15s default). Sync only holds
-    with equal weapon speeds; the timer says so when they differ
+    with equal weapon speeds; the timer says so when they differ.
+    *SYNC NOW sound* (off by default) plays a sound as the prompt comes up
   - **Resizable**: drag the grip in its bottom-right corner while it's
     unlocked (right for wider, down for taller bars), or pick *Swing timer
     width* (100–600) and *bar height* (8–40) in Class Tools > General
@@ -704,6 +716,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.32
+- **Warning sounds** for every Class Tools warning (flask, food, weapon oil, mage and warlock armor, Demonic Sacrifice, Soul Link, Righteous Fury), each with its own dropdown; **None** is now silent
+- Optional **SYNC NOW sound** for the Enhancement weapon sync prompt
 
 ### Version 3.31
 - The raid-wide SR check now runs on **every robot pull** after Mother instead of once, 45 seconds after the kill
