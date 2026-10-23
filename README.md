@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.27 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.28 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines seventeen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines eighteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -471,7 +471,35 @@ group; `/wmachine bgs`).
   can be turned off). Hover a match for everything; right-click to delete
 - World PvP kills stay in the PvP Enemy Tracker
 
-### 22. Chat Filter
+### 22. World Timers
+Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).
+
+- **Layers:** which layer you're on, found by targeting or mousing over
+  A'dal, Nutral, Minalei or Innkeeper Haelthol in Shattrath, and numbered the
+  way Nova World Buffs numbers them. Other Outland zones (and the two capitals) are
+  then tied to that layer as you target things there, until you join a group
+  (which can move you) or a zone shows signs of a different layer
+- **Terokkar Forest towers:** when the Spirit Towers reset, per layer and
+  with the controlling faction, read from the zone's timer (corrected for
+  its slow clock). A chat warning 10 minutes before
+- **Dailies:** today's dungeon (Nether-Stalker Mah'duun), heroic (Wind
+  Trader Zhareem) and PvP (Call to Arms) dailies, from accepting them, or
+  from Nova World Buffs users
+- **Darkmoon Faire:** whether it's up, where (Terokkar / Elwynn / Mulgore by
+  month), when it opens or closes and where it goes next; plus **your Sayge
+  fortune cooldown** (4 hours of play) per character
+- **Classic world buffs:** Rend, Onyxia, Nefarian (from the NPC's yell and
+  the buff landing on you), with warnings at 30, 15, 10, 5 and 1 minutes and
+  when one can drop again, and NPC-killed notices. Rare on TBC
+- **Songflowers:** a pick at one of Felwood's ten flowers (yours, or a player
+  you'd already seen) starts its 25-minute respawn timer
+- **Nova World Buffs users:** their shared layers, tower timers, dailies, world
+  buffs and Songflowers (guild, group and nearby yells) are merged in, checked
+  the way Nova checks them. Watching Machine only listens
+- `/wmachine wb` prints the short timers; `/wmachine wb guild` (or party /
+  raid) sends them to that channel
+
+### 23. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -603,6 +631,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine lockouts` - Print your instance lockouts
 - `/wmachine alts` - Your Characters
 - `/wmachine bgs` - Battleground and arena log
+- `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
+- `/wmachine wb [guild|party|raid]` - Print the world timers, or send them to a channel
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
 - `/wmachine swing reset` - Swing timer back to its default place and size
 - `/wmachine consumes` - Show what the general raid consumable checks see
@@ -650,6 +680,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `InstanceTrackerDB` - Instance log (every character) and its options
 - `AltTrackerDB` - Your Characters: every character's saved details
 - `PvPLogDB` - Battleground and arena matches (every character)
+- `WorldTimersDB` - World Timers: layers and timers per realm and faction, Sayge cooldowns
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -669,6 +700,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.28
+- New **World Timers**: your layer, Terokkar Forest tower resets per layer, today's dungeon / heroic / PvP dailies, the Darkmoon Faire (where, when, your Sayge cooldown), Classic world buff timers and Songflowers, with Nova World Buffs users' shared timers read in (listen only)
 
 ### Version 3.27
 - New **Your Characters** window: every alt by realm with gold, rested XP (estimated while offline), bags, durability, professions, reagents, and hunter ammo and pet

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.27"
+WM.version = "3.28"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -279,6 +279,7 @@ local MODULE_COLORS = {
     InstanceTracker = "66CCFF",
     AltTracker = "FFCC66",
     PvPLog = "FF6666",
+    WorldTimers = "66FFCC",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1091,7 +1092,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
 }
@@ -1134,6 +1135,14 @@ local MODULE_INFO = {
         tools = {
             { text = "Print my lockouts", desc = "How many instances this hour and today, and when the next one frees up.",
               func = function() Call("InstanceTracker", "PrintLockouts") end },
+        },
+    },
+    WorldTimers = {
+        title = "World Timers", desc = "Layers, Terokkar towers, dailies, DMF",
+        about = "Which layer you're on, the Terokkar Forest tower reset per layer, today's dungeon, heroic and PvP dailies, the Darkmoon Faire (when, where, your Sayge cooldown), Classic world buff timers and Songflowers. Also reads Nova World Buffs users' shared timers (listen only).",
+        command = "timers", color = {0.4, 1, 0.8}, icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+        tools = {
+            { text = "Print the timers", func = function() Call("WorldTimers", "Report") end },
         },
     },
     PvPLog = {
@@ -1777,6 +1786,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine instances|r - Instance log and lockouts")
     print("|cFFFFFF00/wmachine lockouts|r - Print your instance lockouts")
     print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
+    print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
+    print("|cFFFFFF00/wmachine wb [guild|party|raid]|r - Print the world timers, or send them to a channel")
     print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
     print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
@@ -1967,6 +1978,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "instances" or cmd == "instance" or cmd == "it" then
         local module = WM.modules.InstanceTracker
         if module and module.Toggle then module:Toggle() else WM:Print("InstanceTracker module not available") end
+
+    elseif cmd == "timers" or cmd == "worldtimers" or cmd == "dmf" or cmd == "layer" then
+        local module = WM.modules.WorldTimers
+        if module and module.Toggle then module:Toggle() else WM:Print("WorldTimers module not available") end
+
+    elseif cmd == "wb" or cmd:match("^wb ") then
+        local module = WM.modules.WorldTimers
+        if module and module.Report then module:Report(cmd:match("^wb (%a+)")) else WM:Print("WorldTimers module not available") end
 
     elseif cmd == "bgs" or cmd == "arenas" or cmd == "pvplog" then
         local module = WM.modules.PvPLog

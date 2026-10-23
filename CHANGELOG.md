@@ -2,7 +2,84 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.27** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.28** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.28
+
+### New — World Timers
+
+Open-world timers for TBC Anniversary, per layer (dashboard **Raid** group,
+`/wmachine timers`). It follows how Nova World Buffs works on the TBC
+client, worked out from its code (`docs/NOVA-PROTOCOL.md`, part 3); none of
+its code is used.
+
+- **Layers:**
+  - **Finding yours:** target or mouse over A'dal, Nutral, Minalei or
+    Innkeeper Haelthol in Shattrath and the window shows "Layer N of M",
+    numbered as Nova World Buffs numbers them.
+  - **Other zones:** Outland zones and the two capitals are then tied to your
+    layer as you target things there. This stops once you join a group,
+    since joining can move you, and resets when a zone shows a second
+    instance.
+  - **Old layers:** a layer nobody has seen for 2 hours is dropped, unless a
+    timer is still running on it.
+- **Terokkar Forest towers:**
+  - **The timer:** when the Spirit Towers reset, read from the zone's timer
+    (whose clock runs slow, so it's corrected), per layer, with the
+    controlling faction.
+  - **Warning:** a line 10 minutes before (option).
+  - **Captures:** cleared while the towers are being captured.
+- **Dailies:**
+  - **Which ones:** today's dungeon daily (Nether-Stalker Mah'duun), heroic
+    daily (Wind Trader Zhareem) and PvP daily (Call to Arms).
+  - **How they're found:** from accepting the quest from the NPC (not a
+    shared quest), or from Nova World Buffs users.
+  - **Validity:** each counts for 24 hours.
+- **Darkmoon Faire:**
+  - **When:** whether it's up, when it opens or closes, and where it goes
+    next. It opens the Monday after the first Friday of the month at the
+    region's reset hour, for 7 days.
+  - **Where:** January, April, July and October in Terokkar Forest; March,
+    June, September and December in Elwynn Forest; the other months in
+    Mulgore.
+  - **Your Sayge cooldown:** a fresh fortune buff starts a 4-hour (played
+    time) cooldown per character, with a line when it resets.
+- **Classic world buffs:** Rend, Onyxia and Nefarian timers.
+  - **How a timer is set:** from the NPC's yell and the buff landing on you
+    within 30 seconds, tied to the layer.
+  - **Warnings:** at 30, 15, 10, 5 and 1 minutes, and when a new one can be
+    dropped (option).
+  - **Also:** "about to drop" and buff-NPC-killed notices. These are rare on
+    TBC.
+- **Songflowers:**
+  - **Picks:** a pick at one of Felwood's ten flowers starts that flower's
+    25-minute timer. Your own picks count, and so do picks by a player you'd
+    already seen nearby, so players logging in with the buff aren't counted.
+- **Nova World Buffs users:**
+  - **What's read:** their shared data (guild, group and the yells their
+    addon sends to nearby players): layers, zone mappings, tower timers,
+    dailies, world buffs and Songflowers.
+  - **Checks:** Nova's own receive rules. Layers must have been seen in the
+    last 2 hours, buff timers need a matching yell, tower timers must be in
+    range, and senders must be level 6 or higher on version 3.26 or later.
+  - **Notices:** their "about to drop" and NPC-killed notices are shown
+    (option).
+  - **Listen only:** nothing is ever sent in Nova's format. The decoder
+    gained a full reader for Nova's packed data and the codec for yelled
+    messages, tested against messages made by the real libraries.
+- **Commands:** `/wmachine wb` prints the short timers, and `/wmachine wb
+  guild` (or party / raid) sends them to that channel. The dashboard card's
+  tools menu prints them too.
+- **Saved data:** new SavedVariable `WorldTimersDB` (per realm and faction,
+  plus each character's Sayge cooldown).
+
+**Still to confirm in game:**
+- the Darkmoon Faire hours on OCE realms (Nova uses US times there)
+- whether the Classic world buffs still drop on Anniversary realms
+- whether `QUEST_ACCEPTED` passes one argument or two on 2.5.6 (both are
+  handled)
 
 ---
 

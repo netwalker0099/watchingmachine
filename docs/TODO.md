@@ -15,7 +15,7 @@ what still needs settling before it's built.
 10. ~~Gold trade alerts and trade log by instance~~ (done, 3.25)
 11. ~~Alt tracking: "Your Characters"~~ (done, 3.27)
 12. ~~PvP instance log: battleground and arena stats~~ (done, 3.27)
-13. World buff timers, Songflowers and Darkmoon Faire
+13. ~~World buff timers, Songflowers and Darkmoon Faire~~ (done, 3.28)
 
 ---
 
@@ -435,7 +435,26 @@ it.
 
 ---
 
-## 13. World buff timers, Songflowers and Darkmoon Faire
+## 13. World buff timers, Songflowers and Darkmoon Faire — DONE in 3.28
+
+Built as `Modules/WorldTimers.lua`, covering the TBC-relevant set:
+- layers
+- Terokkar towers
+- dailies
+- Darkmoon Faire with the Sayge cooldown
+- Classic world buffs
+- Songflowers
+
+It listens to Nova World Buffs users. Decided:
+- **Listen only.**
+- **No guild posts from the addon.** Nova on TBC makes none except the
+  Terokkar warning. `/wmachine wb guild` sends only when you ask.
+
+**Not built:**
+- map pins
+- the guild layer roster ("l" messages are read but not shown)
+- NPC-walking detection
+- Whipper Root Tuber / Night Dragon's Breath (local-only on TBC in Nova)
 
 Timers for the Classic world buffs, so nobody misses a drop.
 
