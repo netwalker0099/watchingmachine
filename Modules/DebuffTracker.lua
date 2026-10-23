@@ -235,6 +235,8 @@ local defaults = {
     srCheck = true,              -- Warn if still wearing SR gear after Mother
     srCheckThreshold = 60,       -- Gear-only shadow resist that counts as "still on"
     srCheckChannel = "LOCAL",    -- LOCAL, SAY, PARTY, RAID, RAID_WARNING
+    srRaidCheck = true,          -- Leader/assist: check the whole raid after Mother
+    srRaidChannel = "LOCAL",     -- Where the raid check's list goes
     -- False-positive controls
     bossMinHealth = 150000,   -- Minimum max-HP for a mob to count as a boss (0 = off)
     focusTracking = true,     -- Only alert for the mob taking the most raid damage
@@ -920,7 +922,7 @@ function DebuffTracker:ProcessCombatLog()
 
     -- Shadow resist gear check: arms on Mother's death, fires on engaging the
     -- Grand Promenade pulls. UNIT_DIED has no source, so it runs here too.
-    if DebuffTrackerDB and DebuffTrackerDB.srCheck then
+    if DebuffTrackerDB and (DebuffTrackerDB.srCheck or DebuffTrackerDB.srRaidCheck) then
         pcall(self.HandleShadowResistCombatLog, self, subevent, sourceName, destName)
     end
 
@@ -1338,6 +1340,17 @@ local SR_WARN_COOLDOWN = 20   -- seconds between warnings, so one pull warns onc
 
 local srArmed = false
 local srLastWarn = 0
+local srRaidAutoDone = false  -- the raid-wide scan has run for this arming
+
+-- Raid-wide check: raiders running Watching Machine report their own gear
+-- over SR_PREFIX; everyone who doesn't answer is inspected one at a time.
+local SR_PREFIX = "WMSR"
+local SR_RAID_DELAY = 45       -- seconds after Mother dies, to give time to swap
+local SR_REPLY_WAIT = 3        -- seconds to wait for addon replies before inspecting
+local SR_INSPECT_GAP = 1.5     -- between inspects (the server throttles them)
+local SR_INSPECT_TIMEOUT = 4   -- give up on one inspect after this
+local srScan = nil             -- the raid scan in progress, if any
+local srLastReply = 0
 
 -- Shadow resistance from an item's own stats.
 -- GetItemStats keys differ between clients (ITEM_MOD_SHADOW_RESISTANCE_SHORT
@@ -1381,10 +1394,11 @@ function DebuffTracker.ShadowResistFromLine(text, r, g, b)
 end
 
 local scanTip
--- Calls fn(text, r, g, b) for each left-hand tooltip line of an equipped slot
-local function ForEachSlotTooltipLine(slot, fn)
+-- Calls fn(text, r, g, b) for each left-hand tooltip line of an equipped
+-- slot. Works on an inspected unit too, once INSPECT_READY has fired.
+local function ForEachSlotTooltipLine(unit, slot, fn)
     if C_TooltipInfo and C_TooltipInfo.GetInventoryItem then
-        local data = C_TooltipInfo.GetInventoryItem("player", slot)
+        local data = C_TooltipInfo.GetInventoryItem(unit, slot)
         if type(data) == "table" and type(data.lines) == "table" then
             for _, line in ipairs(data.lines) do
                 local c = line.leftColor
@@ -1398,7 +1412,7 @@ local function ForEachSlotTooltipLine(slot, fn)
     end
     scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
     scanTip:ClearLines()
-    scanTip:SetInventoryItem("player", slot)
+    scanTip:SetInventoryItem(unit, slot)
     for i = 1, scanTip:NumLines() do
         local fs = _G["WM_SRScanTooltipTextLeft" .. i]
         if fs then
@@ -1409,9 +1423,9 @@ local function ForEachSlotTooltipLine(slot, fn)
     scanTip:Hide()
 end
 
-local function TooltipShadowResist(slot)
+local function TooltipShadowResist(unit, slot)
     local sr = 0
-    local ok = pcall(ForEachSlotTooltipLine, slot, function(text, r, g, b)
+    local ok = pcall(ForEachSlotTooltipLine, unit, slot, function(text, r, g, b)
         sr = sr + DebuffTracker.ShadowResistFromLine(text, r, g, b)
     end)
     return ok and sr or 0
@@ -1419,17 +1433,19 @@ end
 
 -- The tooltip counts gems and enchants as well as the item's own stats, so
 -- it's normally the larger; the stats are the fallback if it can't be read.
-local function SlotShadowResist(slot, link)
-    return math.max(StatsShadowResist(link), TooltipShadowResist(slot))
+local function SlotShadowResist(unit, slot, link)
+    return math.max(StatsShadowResist(link), TooltipShadowResist(unit, slot))
 end
 
--- Returns total, pieceCount, detail[] = { slot, link, sr }
-function DebuffTracker:GetGearShadowResist()
+-- Returns total, pieceCount, detail[] = { slot, link, sr }. unit defaults
+-- to the player; another unit must have been inspected first.
+function DebuffTracker:GetGearShadowResist(unit)
+    unit = unit or "player"
     local total, pieces, detail = 0, 0, {}
     for slot = 1, 19 do
-        local link = GetInventoryItemLink("player", slot)
+        local link = GetInventoryItemLink(unit, slot)
         if link then
-            local sr = SlotShadowResist(slot, link)
+            local sr = SlotShadowResist(unit, slot, link)
             if sr > 0 then
                 total = total + sr
                 pieces = pieces + 1
@@ -1443,6 +1459,7 @@ end
 function DebuffTracker:ResetShadowResistCheck()
     srArmed = false
     srLastWarn = 0
+    srRaidAutoDone = false
 end
 
 function DebuffTracker:ArmShadowResistCheck()
@@ -1502,11 +1519,14 @@ end
 -- Combat-log path: arms on Mother's death, and arms+fires on engaging a
 -- Grand Promenade mob (covers reloading after Mother is already dead).
 function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destName)
-    if not DebuffTrackerDB or not DebuffTrackerDB.srCheck then return end
+    if not DebuffTrackerDB then return end
+    if not DebuffTrackerDB.srCheck and not DebuffTrackerDB.srRaidCheck then return end
 
     if subevent == "UNIT_DIED" then
         if destName and destName == MOTHER_NAME then
             srArmed = true
+            -- Give the raid time to swap before checking who hasn't
+            self:AutoRaidShadowResistScan(SR_RAID_DELAY)
         end
         return
     end
@@ -1518,7 +1538,240 @@ function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destNam
     if a or b then
         srArmed = true
         self:CheckShadowResistGear()
+        self:AutoRaidShadowResistScan(0)
     end
+end
+
+-- ============================================
+-- RAID-WIDE SHADOW RESIST CHECK
+-- ============================================
+-- Lets the raid leader see who is still in SR gear after Mother. Runs on
+-- its own SR_RAID_DELAY after Mother dies (leader or assist only, so 25
+-- people aren't all inspecting), or any time with /wmachine srraid.
+
+local function ShortName(name)
+    if not name then return nil end
+    if Ambiguate then return Ambiguate(name, "none") end
+    return (name:gsub("%-.*$", ""))
+end
+
+local function SendSRMessage(msg, channel)
+    local fn = C_ChatInfo and C_ChatInfo.SendAddonMessage or SendAddonMessage
+    if fn then pcall(fn, SR_PREFIX, msg, channel) end
+end
+
+local function GroupChannel()
+    return IsInRaid() and "RAID" or "PARTY"
+end
+
+-- Everyone in the group, player included: { unit, name }
+local function GroupMembers()
+    local list = {}
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local unit = "raid" .. i
+            local name = UnitName(unit)
+            if name then list[#list + 1] = { unit = unit, name = name } end
+        end
+    else
+        list[1] = { unit = "player", name = UnitName("player") }
+        for i = 1, 4 do
+            local unit = "party" .. i
+            local name = UnitExists(unit) and UnitName(unit)
+            if name then list[#list + 1] = { unit = unit, name = name } end
+        end
+    end
+    return list
+end
+
+local function CanLeadChecks()
+    if not IsInRaid() then return true end
+    return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
+end
+
+function DebuffTracker:AutoRaidShadowResistScan(delay)
+    if not DebuffTrackerDB or not DebuffTrackerDB.srRaidCheck then return end
+    if srRaidAutoDone or not IsInGroup() or not CanLeadChecks() then return end
+    srRaidAutoDone = true
+    if delay and delay > 0 then
+        WM.RunAfter(delay, function() DebuffTracker:StartRaidShadowResistScan(true) end)
+    else
+        self:StartRaidShadowResistScan(true)
+    end
+end
+
+function DebuffTracker:IsRaidShadowResistScanning()
+    return srScan ~= nil
+end
+
+function DebuffTracker:StartRaidShadowResistScan(auto)
+    if srScan then
+        if not auto then self:Print("Raid SR check already running.") end
+        return
+    end
+    if not IsInGroup() then
+        self:Print("Not in a group - use /wmachine srcheck for your own gear.")
+        return
+    end
+    local members = GroupMembers()
+    srScan = { results = {}, skipped = {}, queue = {}, members = members, token = {} }
+
+    local total, pieces = self:GetGearShadowResist("player")
+    srScan.results[UnitName("player")] = { sr = total, pieces = pieces, via = "self" }
+
+    SendSRMessage("Q", GroupChannel())
+    self:Print(string.format("Checking %d raiders for shadow resist gear...", #members))
+
+    local token = srScan.token
+    WM.RunAfter(SR_REPLY_WAIT, function()
+        if not srScan or srScan.token ~= token then return end
+        for _, m in ipairs(srScan.members) do
+            if not srScan.results[m.name] then srScan.queue[#srScan.queue + 1] = m end
+        end
+        DebuffTracker:InspectNextForSR()
+    end)
+end
+
+-- A reply from a raider running the addon: "R:<total>:<pieces>"
+function DebuffTracker:OnShadowResistMessage(msg, sender)
+    local name = ShortName(sender)
+    if not name or name == UnitName("player") then return end
+    if msg == "Q" then
+        -- Answer once even if two leaders ask at the same time
+        local now = GetTime()
+        if now - srLastReply < 5 then return end
+        srLastReply = now
+        local total, pieces = self:GetGearShadowResist("player")
+        SendSRMessage("R:" .. total .. ":" .. pieces, GroupChannel())
+        return
+    end
+    local total, pieces = msg:match("^R:(%d+):(%d+)$")
+    if total and srScan and not srScan.results[name] then
+        srScan.results[name] = { sr = tonumber(total), pieces = tonumber(pieces), via = "addon" }
+    end
+end
+
+local function InspectBusy()
+    -- Don't take the inspect slot from Armory Snap or an open inspect window
+    local AS = WM.modules.ArmorySnap
+    if AS and AS.session and AS.session.inspecting then return true end
+    return InspectFrame and InspectFrame.IsShown and InspectFrame:IsShown() or false
+end
+
+function DebuffTracker:InspectNextForSR()
+    local scan = srScan
+    if not scan then return end
+    local m = table.remove(scan.queue, 1)
+    if not m then
+        self:FinishRaidShadowResistScan()
+        return
+    end
+    local unit = m.unit
+    if UnitName(unit) ~= m.name or not UnitIsConnected(unit) then
+        scan.skipped[#scan.skipped + 1] = m.name .. " (offline)"
+        return self:InspectNextForSR()
+    end
+    if not CheckInteractDistance(unit, 1) or (CanInspect and not CanInspect(unit)) then
+        scan.skipped[#scan.skipped + 1] = m.name
+        return self:InspectNextForSR()
+    end
+    if InspectBusy() then
+        m.waits = (m.waits or 0) + 1
+        if m.waits > 3 then
+            scan.skipped[#scan.skipped + 1] = m.name .. " (inspect busy)"
+            return self:InspectNextForSR()
+        end
+        table.insert(scan.queue, 1, m)
+        WM.RunAfter(SR_INSPECT_GAP, function() DebuffTracker:InspectNextForSR() end)
+        return
+    end
+
+    scan.current = { unit = unit, name = m.name, guid = UnitGUID(unit) }
+    local current = scan.current
+    NotifyInspect(unit)
+    WM.RunAfter(SR_INSPECT_TIMEOUT, function()
+        if srScan == scan and scan.current == current then
+            scan.current = nil
+            scan.skipped[#scan.skipped + 1] = m.name .. " (no inspect reply)"
+            if ClearInspectPlayer then ClearInspectPlayer() end
+            DebuffTracker:InspectNextForSR()
+        end
+    end)
+end
+
+function DebuffTracker:OnShadowResistInspectReady(guid)
+    local scan = srScan
+    local current = scan and scan.current
+    if not current or (guid and current.guid and guid ~= current.guid) then return end
+    scan.current = nil
+    local total, pieces = self:GetGearShadowResist(current.unit)
+    scan.results[current.name] = { sr = total, pieces = pieces, via = "inspect" }
+    if ClearInspectPlayer then ClearInspectPlayer() end
+    WM.RunAfter(SR_INSPECT_GAP, function() DebuffTracker:InspectNextForSR() end)
+end
+
+function DebuffTracker:FinishRaidShadowResistScan()
+    local scan = srScan
+    srScan = nil
+    if not scan then return end
+    local threshold = DebuffTrackerDB.srCheckThreshold or 60
+
+    local still, checked = {}, 0
+    for name, r in pairs(scan.results) do
+        checked = checked + 1
+        if r.sr >= threshold then still[#still + 1] = { name = name, sr = r.sr } end
+    end
+    table.sort(still, function(a, b) return a.sr > b.sr end)
+    self.lastRaidSR = { still = still, checked = checked, skipped = scan.skipped, time = GetTime() }
+
+    self:Print("=== Raid shadow resist gear ===")
+    if #still == 0 then
+        print(string.format("  |cFF00FF00Nobody is in SR gear|r (%d checked)", checked))
+    else
+        local parts = {}
+        for _, s in ipairs(still) do parts[#parts + 1] = s.name .. " (" .. s.sr .. ")" end
+        print(string.format("  |cFFFF4444Still in SR gear (%d):|r %s", #still, table.concat(parts, ", ")))
+        print(string.format("  %d checked, threshold %d SR", checked, threshold))
+    end
+    if #scan.skipped > 0 then
+        print("  |cFF888888Couldn't check (out of inspect range or no reply): "
+            .. table.concat(scan.skipped, ", ") .. "|r")
+    end
+    if #still == 0 then return end
+
+    local names = {}
+    for _, s in ipairs(still) do names[#names + 1] = s.name end
+    local msg = "Still in SR gear: " .. table.concat(names, ", ") .. " - swap out!"
+    if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
+        pcall(RaidNotice_AddMessage, RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
+    end
+
+    local channel = DebuffTrackerDB.srRaidChannel or "LOCAL"
+    if channel == "LOCAL" or not IsInGroup() then return end
+    if channel == "RAID_WARNING" and not CanLeadChecks() then channel = "RAID" end
+    if (channel == "RAID" or channel == "RAID_WARNING") and not IsInRaid() then channel = "PARTY" end
+    if #msg > 255 then msg = msg:sub(1, 252) .. "..." end
+    pcall(SendChatMessage, msg, channel)
+end
+
+function DebuffTracker:RegisterRaidShadowResist()
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, SR_PREFIX)
+    elseif RegisterAddonMessagePrefix then
+        pcall(RegisterAddonMessagePrefix, SR_PREFIX)
+    end
+    local f = CreateFrame("Frame")
+    WM:RegisterEvents(f, { "CHAT_MSG_ADDON", "INSPECT_READY" })
+    f:SetScript("OnEvent", function(_, event, a1, a2, _, a4)
+        if event == "CHAT_MSG_ADDON" then
+            if a1 == SR_PREFIX and type(a2) == "string" then
+                DebuffTracker:OnShadowResistMessage(a2, a4)
+            end
+        elseif event == "INSPECT_READY" then
+            DebuffTracker:OnShadowResistInspectReady(a1)
+        end
+    end)
+    self.srEventFrame = f
 end
 
 -- /wmachine srcheck
@@ -1755,6 +2008,7 @@ function DebuffTracker:Initialize()
     self:CreateTrackerFrame()
     self:RegisterPullDetection()
     self:RegisterDoomWarning()
+    self:RegisterRaidShadowResist()
     -- Resolve Shear's localized name so non-English clients match by name too
     if GetSpellInfo then
         local n = GetSpellInfo(41032)
@@ -2855,6 +3109,32 @@ function DebuffTracker:CreateUI()
                 .. " themselves - it is not limited to the raid leader.",
         },
     }, 268)
+    row = L:Row(24)
+    get, set = DBGetSet("srRaidCheck")
+    row:Checkbox({
+        label = "Check the whole raid after Mother", get = get, set = set,
+        tooltip = {
+            "Raid Shadow Resist Check",
+            "Lists every raider still in shadow resist gear, 45 seconds after Mother dies."
+                .. " Runs only for the raid leader and assistants.",
+            " ",
+            "Raiders running Watching Machine report their own gear. Everyone else is inspected,"
+                .. " which only works within inspect range (about 28 yards); anyone out of range is"
+                .. " listed as not checked.",
+            " ",
+            { "/wmachine srraid - run it now" },
+        },
+    }, 8)
+    row:Cycle({
+        label = "To:", options = CHANNEL_OPTIONS, default = "LOCAL",
+        get = function() return DebuffTrackerDB.srRaidChannel end,
+        set = function(v) DebuffTrackerDB.srRaidChannel = v end,
+        tooltip = {
+            "Raid SR List Channel",
+            "Cycles: Me only > Say > Party > Raid > /rw",
+            "Where the list of names still in SR gear goes. It always shows on your screen too.",
+        },
+    }, 268)
     row = L:Row(44)
     row:Slider({
         name = "WM_DebuffSRThresholdSlider", label = "Warn at gear SR of", width = 165,
@@ -2876,6 +3156,16 @@ function DebuffTracker:CreateUI()
             "Check My Gear",
             "Lists every equipped piece carrying shadow resistance, the gear total against the"
                 .. " threshold, and whether the check is currently armed.",
+        },
+    }, 8)
+    row = L:Row(26)
+    row:RightButton({
+        text = "Check Raid", width = 110,
+        onClick = function() DebuffTracker:StartRaidShadowResistScan() end,
+        tooltip = {
+            "Check Raid",
+            "Lists every raider still in shadow resist gear now, against the threshold above."
+                .. " Takes a few seconds per raider who isn't running Watching Machine.",
         },
     }, 8)
     L:Note("Trigger mobs: Shadowmoon Reaver, Promenade Sentinel and the Illidari packs on the"

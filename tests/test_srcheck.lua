@@ -92,6 +92,14 @@ total = DT:GetGearShadowResist()
 check("scanning tooltip: gem counted, grey bonus not", total == 44)
 
 -- ---- arming and warning ----
+local inGroup = false
+env.IsInGroup = function() return inGroup end
+env.IsInRaid = function() return inGroup end
+local timers = {}
+WM.RunAfter = function(delay, fn) timers[#timers + 1] = { delay = delay, fn = fn } end
+local function RunTimers()
+    while #timers > 0 do table.remove(timers, 1).fn() end
+end
 local warned
 DT.WarnShadowResist = function(_, t, p) warned = { t, p } end
 env.C_TooltipInfo = {
@@ -114,6 +122,92 @@ warned = nil
 gear[5], gear[11], gear[12] = nil, nil, nil
 DT:CheckShadowResistGear()
 check("SR gear off: no warning", warned == nil)
+check("solo: no raid scan scheduled", #timers == 0)
+
+-- ---- raid-wide check ----
+-- Me (leader, clean), Addonuser (replies 180), Inspected (SR gems, in
+-- range), Faraway (out of range), Gone (offline)
+inGroup = true
+local roster = { "Me", "Addonuser", "Inspected", "Faraway", "Gone" }
+env.GetNumGroupMembers = function() return #roster end
+env.UnitName = function(u)
+    if u == "player" then return "Me" end
+    local i = tonumber(tostring(u):match("^raid(%d+)$"))
+    return i and roster[i]
+end
+env.UnitGUID = function(u) return "GUID-" .. tostring(env.UnitName(u)) end
+env.UnitIsConnected = function(u) return env.UnitName(u) ~= "Gone" end
+env.CheckInteractDistance = function(u) return env.UnitName(u) ~= "Faraway" end
+env.CanInspect = function() return true end
+env.UnitIsGroupLeader = function(u) return u == "player" end
+env.UnitIsGroupAssistant = function() return false end
+env.Ambiguate = function(n) return (n:gsub("%-.*$", "")) end
+env.GetTime = function() return 1000 end
+local inspected, sent, chat = {}, {}, {}
+env.NotifyInspect = function(u) inspected[#inspected + 1] = env.UnitName(u) end
+env.ClearInspectPlayer = function() end
+env.InspectFrame = false                 -- no inspect window open
+env.C_ChatInfo = { SendAddonMessage = function(p, m, c) sent[#sent + 1] = { p, m, c } end }
+env.SendChatMessage = function(m, c) chat[#chat + 1] = { m, c } end
+printed = {}
+env.print = function(...) local t = {} for i = 1, select("#", ...) do t[#t + 1] = tostring(select(i, ...)) end printed[#printed + 1] = table.concat(t, " ") end
+local function has(s) for _, l in ipairs(printed) do if l:find(s, 1, true) then return true end end end
+
+-- raid3's gear (read once it's inspected)
+local inspectGear = { [5] = { link = "[Robe]", stats = {}, lines = Lines("Robe", "+60 Shadow Resistance", "+4 Resist All") } }
+env.GetInventoryItemLink = function(u, slot)
+    local g = (u == "player") and gear or (u == "raid3" and inspectGear or {})
+    return g[slot] and g[slot].link
+end
+env.C_TooltipInfo = { GetInventoryItem = function(u, slot)
+    local g = (u == "player") and gear or (u == "raid3" and inspectGear or {})
+    return g[slot] and { lines = g[slot].lines }
+end }
+env.GetItemStats = function() return {} end
+
+DT:ResetShadowResistCheck()
+DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
+check("Mother's death schedules the raid check", #timers == 1 and timers[1].delay == 45)
+DB.srRaidChannel = "RAID"
+table.remove(timers, 1).fn()             -- 45s later: scan starts
+check("asks addon users first", sent[1] and sent[1][1] == "WMSR" and sent[1][2] == "Q" and sent[1][3] == "RAID")
+DT:OnShadowResistMessage("R:180:6", "Addonuser-Spineshatter")
+table.remove(timers, 1).fn()             -- reply wait over: inspect starts
+check("waits for INSPECT_READY", inspected[1] == "Inspected" and DT:IsRaidShadowResistScanning())
+DT:OnShadowResistInspectReady("GUID-Someone-else")
+check("ignores another addon's inspect", DT:IsRaidShadowResistScanning() and #timers == 1)
+DT:OnShadowResistInspectReady("GUID-Inspected")
+RunTimers()
+check("addon users aren't inspected", #inspected == 1)
+check("scan finished", not DT:IsRaidShadowResistScanning())
+check("lists who is still in SR gear, highest first", has("Still in SR gear (2):|r Addonuser (180), Inspected (64)"))
+check("lists who couldn't be checked", has("Faraway") and has("Gone (offline)"))
+check("leader is clean, not listed", not has("Me ("))
+check("announces to the chosen channel", chat[1] and chat[1][2] == "RAID"
+    and chat[1][1] == "Still in SR gear: Addonuser, Inspected - swap out!")
+
+-- One automatic check per arming
+DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
+check("only once per arming", #timers == 0)
+
+-- Not leader or assist: no automatic check, but the manual one still works
+DT:ResetShadowResistCheck()
+env.UnitIsGroupLeader = function() return false end
+DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
+check("raider: no automatic raid check", #timers == 0)
+DB.srRaidCheck = false
+DT:ResetShadowResistCheck()
+env.UnitIsGroupLeader = function(u) return u == "player" end
+DT:HandleShadowResistCombatLog("UNIT_DIED", nil, "Mother Shahraz")
+check("setting off: no automatic raid check", #timers == 0)
+
+-- Answering someone else's check
+sent = {}
+gear[5] = { link = "[Chest]", stats = { RESISTANCE5_NAME = 40 }, lines = Lines("Chest", "+40 Shadow Resistance") }
+DT:OnShadowResistMessage("Q", "Leader-Spineshatter")
+check("replies with own gear", sent[1] and sent[1][2] == "R:40:1" and sent[1][3] == "RAID")
+DT:OnShadowResistMessage("Q", "Other-Spineshatter")
+check("one reply per few seconds", #sent == 1)
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

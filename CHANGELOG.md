@@ -2,7 +2,34 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.29.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.30** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.30
+
+### New — raid-wide shadow resist gear check
+
+The SR gear check only ever looked at your own gear, so a raid leader had
+no way to see who was still in SR gear after Mother Shahraz. Now they can.
+
+- **When:** 45 seconds after Mother dies, to give people time to swap.
+  If you `/reload` after Mother, it runs instead the moment you engage a
+  Grand Promenade pull. It runs automatically only for the raid leader and
+  assistants, once per kill. `/wmachine srraid`, the **Check Raid** button
+  (Debuff Tracker settings, Black Temple section) or the dashboard tools
+  menu runs it any time, for anyone.
+- **How:** raiders running Watching Machine 3.30 report their own gear
+  total over a `WMSR` addon message (the same reading as
+  `/wmachine srcheck`). Everyone who doesn't answer within 3 seconds is
+  inspected, one every 1.5 seconds. Inspecting needs them within about
+  28 yards. It waits for Armory Snap's inspects and leaves an open inspect
+  window alone.
+- **Result:** "Still in SR gear (N): Name (SR), ...", highest first, against
+  the same threshold as the personal check, plus who couldn't be checked
+  (out of range, offline, no inspect reply). It shows on screen, and can
+  go to Say / Party / Raid / `/rw` (new **To:** setting, default Me only).
+- New settings: **Check the whole raid after Mother** (on) and its channel.
 
 ---
 

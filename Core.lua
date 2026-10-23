@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.29.1"
+WM.version = "3.30"
 WM.modules = {}
 
 -- ============================================
@@ -1203,6 +1203,8 @@ local MODULE_INFO = {
             { text = "Shear tallies", desc = "Illidan Shear monitor status and counts.",
               func = function() Call("DebuffTracker", "ShowShearStatus") end },
             { text = "Check my shadow resist gear", func = function() Call("DebuffTracker", "ExplainShadowResist") end },
+            { text = "Check the raid's shadow resist gear", desc = "Who is still in SR gear (addon replies, then inspects).",
+              func = function() Call("DebuffTracker", "StartRaidShadowResistScan") end },
         },
     },
     PvPTracker = {
@@ -1797,6 +1799,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
     print("|cFFFFFF00/wmachine encounters|r - Debuff Tracker settings, opened at Encounter Callouts")
     print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
+    print("|cFFFFFF00/wmachine srraid|r - List raiders still in shadow resist gear")
     print("|cFFFFFF00/wmachine class|r - Open Class Tools for your class")
     print("|cFFFFFF00/wmachine soulstone|r - Soulstone timers in your group (warlock)")
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")
@@ -2061,6 +2064,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         local module = WM.modules.DebuffTracker
         if module and module.ExplainShadowResist then
             module:ExplainShadowResist()
+        else
+            WM:Print("DebuffTracker module not available")
+        end
+
+    elseif cmd == "srraid" or cmd == "srcheck raid" or cmd == "sr raid" then
+        local module = WM.modules.DebuffTracker
+        if module and module.StartRaidShadowResistScan then
+            module:StartRaidShadowResistScan()
         else
             WM:Print("DebuffTracker module not available")
         end

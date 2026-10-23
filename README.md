@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.29.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.30 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -116,6 +116,8 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - Configurable threshold (default 60 gear SR) so an odd piece with incidental resistance is ignored
   - Warns you locally with a screen flash and sound by default; optional Say/Party/Raid/`/rw` announce. Unlike the other callouts this is **not** limited to the raid leader, since it's about your own gear
   - One warning per pull (20s cooldown), `/wmachine srcheck` to see exactly what it detects per slot
+  - Counts the item's own resistance plus socketed gems (Void Sphere's +4 Resist All), enchants and active socket bonuses
+  - **Raid-wide check** for the raid leader and assistants: 45 seconds after Mother dies it lists every raider still in SR gear, on screen and optionally to Say/Party/Raid/`/rw`. Raiders running Watching Machine report their own gear; everyone else is inspected, which needs them within inspect range (anyone out of range is listed as not checked). `/wmachine srraid` or the **Check Raid** button runs it any time
 - **Encounter callouts** (Doom warning, Shear monitor, SR check) are the *Encounter Callouts* section of Debuff Tracker settings; `/wmachine encounters` opens the panel scrolled to it
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
@@ -702,6 +704,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.30
+- New **raid-wide shadow resist check**: the raid leader sees who is still in SR gear after Mother Shahraz (`/wmachine srraid`, or automatically 45 seconds after the kill)
 
 ### Version 3.29.1
 - Fix: the Black Temple **shadow resist gear check** now counts socketed gems (Void Sphere's +4 Resist All), enchants and socket bonuses, and pieces whose resistance the item stats don't report
