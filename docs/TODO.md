@@ -529,7 +529,7 @@ needs each NPC's two yell texts.
 - [ ] **Where it lives:** a module of its own, with its own dashboard card.
 
 
-## 14. Loot Browser (AtlasLoot-style) — phase 1 DONE in 3.34
+## 14. Loot Browser (AtlasLoot-style) — phases 1–3 DONE in 3.34–3.36
 
 Our own loot browser, with AtlasLoot as the inspiration. The code is all
 Watching Machine's own. The data keeps only the facts (which item IDs drop
@@ -548,3 +548,88 @@ from which boss), in our own format.
       curated BiS lists.
 - [ ] **Search** by item name (cached names only, or ask the client in
       batches).
+
+## 15. GearScore
+
+A gear score for every player, in the style of the GearScore / TacoTip
+addons, worked out locally from equipped items.
+
+- [ ] **The score:** from each slot's item level and quality, with slot
+      weights (two-handers count double, off-hand / ranged less). Hunters
+      weight ranged higher.
+- [ ] **Where it shows:** the unit tooltip on mouseover (score and average
+      item level, coloured by tier), and your own on the character frame.
+- [ ] **Inspect:** read other players' gear through `NotifyInspect` /
+      `INSPECT_READY`, throttled and cached per GUID. Don't inspect in
+      combat.
+- [ ] **Raid view:** the group's scores in one list, e.g. a Buff Check or
+      ArmorySnap tab, for sizing up pugs.
+- [ ] **To settle:** our own formula, or match the GearScore numbers people
+      already quote (TBC values differ from Wrath's)? Check that it
+      reads TacoTip's comm data if that's common on Anniversary realms.
+
+## 16. Attunement tracking
+
+Which attunements and keys each of your characters has, and what's left.
+
+- [ ] **TBC chains:** Karazhan (The Master's Key), Serpentshrine Cavern
+      (Cudgel of Kar'desh), Tempest Keep (The Tempest Key), Mount Hyjal (The
+      Vials of Eternity), Black Temple (Medallion of Karabor).
+- [ ] **Heroic keys:** the five reputation keys at Revered (Flamewrought /
+      Reservoir / Auchenai / Key of Time / Warpforged), from reputation
+      standing.
+- [ ] **Classic:** Molten Core, Onyxia, Blackwing Lair, Naxxramas. Only
+      while Classic raids still matter.
+- [ ] **Progress:** each chain step from quest completion
+      (`C_QuestLog.IsQuestFlaggedCompleted`), shown as "4 / 9" with the next
+      step and where to go.
+- [ ] **Alts:** saved per character, shown in Your Characters (item 11), with
+      an attunement column.
+- [ ] **Guild view:** which guild members are attuned for the next raid. This
+      needs our own addon message, so only Watching Machine users would show.
+- [ ] **Data:** quest IDs per step, kept in a data file like the Loot
+      Browser's.
+
+## 17. Guild roster manager
+
+Tools for officers on top of the guild roster.
+
+- [ ] **Roster view:** sortable by rank, level, class, last online,
+      officer / public note, with filters (inactive for N days, alts, no
+      note).
+- [ ] **Inactivity:** a list of members offline more than N days, with a
+      one-click demote / remove (confirmations, officer permissions
+      checked).
+- [ ] **Alts and mains:** linked from a note format (e.g. "alt: Mainname"),
+      grouped in the view.
+- [ ] **Change log:** joins, leaves, promotions, demotions and note changes
+      noted as they happen (roster events and guild system messages), kept
+      per guild.
+- [ ] **Ranks:** promotion rules (e.g. after N days at a rank), shown as
+      suggestions, not done automatically.
+- [ ] **Fits with:** Guild Invite and the Recruiting Tool (who invited whom),
+      and the attunement guild view (item 16).
+
+## 18. RCLootCouncil
+
+Loot council for raids, with RCLootCouncil as the model.
+
+- [ ] **First decide:** our own council, or work alongside RCLootCouncil
+      (read its comms, as we do with Nova)? Most raids that use a council
+      already run RCLootCouncil, so a separate system only helps raids
+      that have it installed everywhere. Read RCLootCouncil's protocol
+      before deciding (ask for the addon files, as with Nova).
+- [ ] **Master looter flow:** on loot, the master looter's addon offers each
+      item to the raid. Members answer (Need / Minor upgrade / Off-spec /
+      Pass, with a note) and the council sees the answers with each
+      player's current item in that slot.
+- [ ] **Council view:** votes, a item-for-item comparison, GearScore (item
+      15), attendance and past awards. Award on a click; it hands the item
+      out through master loot.
+- [ ] **History:** every award saved (who, what, when, response), searchable,
+      exportable for spreadsheets or a website.
+- [ ] **Fits with:** the Loot Browser (the item's source and set), the
+      Instance Tracker run log (awards per run), ArmorySnap (gear).
+- [ ] **TBC Anniversary check:** confirm master loot and trading loot within
+      two hours work the same on 2.5.6.
+
