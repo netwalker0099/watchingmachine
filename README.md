@@ -2,11 +2,11 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.26.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.27 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines fifteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine combines seventeen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
 
 ## Modules
 
@@ -438,7 +438,40 @@ instance limits (Logging group on the dashboard; `/wmachine instances`).
   the "you can enter again" message, the "Entered" message, and where run
   stats go
 
-### 20. Chat Filter
+### 20. Your Characters
+Every character you log in, on every realm, in one window (Logging group;
+`/wmachine alts`, or **Your Characters** in the Instance Tracker window).
+
+- Grouped by realm, with each realm's **total gold** (hover the realm) and
+  your gold on all characters at the bottom
+- Each character: level, **rested XP** (as a % of a level), gold and when you
+  last played it. Rested XP keeps building while you're logged out (5% of a
+  level per 8 hours resting, a quarter of that elsewhere, up to 1.5 levels),
+  and the window shows the estimate for now
+- **Hover a character** for: XP through the level, rested XP, gold, free bag
+  slots (ordinary bags), armor durability (average and lowest piece),
+  professions with their skill, your class's **reagents** (candles,
+  powder, symbols, Ankhs, Soul Shards, ...), and for hunters **ammo** and
+  the **pet** (name, level, family, happiness)
+- Saved as you play and when you log out
+- **Right-click** a character to remove one you've deleted
+
+### 21. Battlegrounds & Arenas
+A log of every battleground and arena match, on every character (Logging
+group; `/wmachine bgs`).
+
+- **Each match:** the result (win, loss, draw or left early), its length, and
+  your scoreboard line: killing blows, honorable kills, deaths, honor,
+  damage and healing
+- **Arenas:** the bracket (2v2 / 3v3 / 5v5, rated or skirmish), who you were
+  with and against, both team names, and your **rating change**
+- **Totals:** games played, won and win rate per battleground and per arena
+  bracket, for one character or all
+- A **result line in chat** after each match (click it to open the log;
+  can be turned off). Hover a match for everything; right-click to delete
+- World PvP kills stay in the PvP Enemy Tracker
+
+### 22. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -568,6 +601,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine totems` - Edit your totem sets (shaman)
 - `/wmachine instances` - Instance log and lockouts
 - `/wmachine lockouts` - Print your instance lockouts
+- `/wmachine alts` - Your Characters
+- `/wmachine bgs` - Battleground and arena log
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
 - `/wmachine swing reset` - Swing timer back to its default place and size
 - `/wmachine consumes` - Show what the general raid consumable checks see
@@ -613,6 +648,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WarlockToolsDB` - Warlock button position and expansion directions
 - `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
 - `InstanceTrackerDB` - Instance log (every character) and its options
+- `AltTrackerDB` - Your Characters: every character's saved details
+- `PvPLogDB` - Battleground and arena matches (every character)
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -632,6 +669,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.27
+- New **Your Characters** window: every alt by realm with gold, rested XP (estimated while offline), bags, durability, professions, reagents, and hunter ammo and pet
+- New **Battlegrounds & Arenas** log: results, scoreboard stats, arena brackets, teams and rating changes, with win rates
 
 ### Version 3.26.1
 - New **Potion** warning sound

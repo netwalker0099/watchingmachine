@@ -2,7 +2,63 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.26.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.27** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.27
+
+### New — Your Characters
+
+A window listing every character you log in, on every realm (dashboard
+**Logging** group, `/wmachine alts`, or the **Your Characters** button in the
+Instance Tracker window).
+
+- **Grouped by realm,** with each realm's total gold (hover the realm row) and
+  the gold across all characters in the footer.
+- **Each row:** name (class colour), level, rested XP as a % of a level,
+  gold, and when you last played it.
+- **Rested XP while offline:** it's estimated from the last saved value: 5%
+  of a level per 8 hours resting (a quarter of that elsewhere), up to 1.5
+  levels.
+- **Hover a character** for its details:
+  - XP through the level, and rested XP
+  - gold, and free bag slots (ordinary bags only: quivers, soul and herb
+    bags are left out)
+  - armor durability, average and lowest piece
+  - professions with skill
+  - the reagents your class carries: Sacred / Holy Candles, Arcane Powder
+    and the teleport / portal runes, Druid seeds and Quillvine, Symbols,
+    Ankhs, Soul Shards / Infernal Stones / Demonic Figurines, Flash /
+    Blinding Powder
+  - for hunters, ammo and the pet (name, level, family, happiness)
+- **When it saves:** as you play (bag, money, XP and durability changes,
+  grouped) and when you log out.
+- **Right-click** removes a character you've deleted. It comes back if you
+  log in on it again.
+- **Saved data:** new SavedVariable `AltTrackerDB`.
+
+### New — Battlegrounds & Arenas
+
+A log of every battleground and arena match, on every character (dashboard
+**Logging** group, `/wmachine bgs`).
+
+- **The result:** win, loss, draw, or left early. It's read when the game
+  declares a winner.
+- **Your scoreboard line:** killing blows, honorable kills, deaths, honor,
+  damage and healing.
+- **Arenas also record:**
+  - the bracket (2v2 / 3v3 / 5v5, rated or skirmish)
+  - your partners and opponents, with classes
+  - both team names
+  - your new rating and its change
+- **Totals:** played, won and win rate per battleground and per arena
+  bracket, for all characters or just the one you're on.
+- **A result line in chat** after each match, for example "Warsong Gulch: Win
+  (24m 10s) — 4 KB, 31 HK, 2 deaths, +412 honor". Click it to open the log,
+  or turn it off.
+- **In the log:** hover a match for everything; right-click to delete one.
+- **Saved data:** new SavedVariable `PvPLogDB`.
 
 ---
 

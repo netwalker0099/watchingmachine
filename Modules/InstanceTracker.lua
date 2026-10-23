@@ -717,6 +717,8 @@ function IT:CreateUI()
     panel.showAll = true
 
     panel:AddFooterButton({ text = "Print lockouts", width = 110, onClick = function() IT:PrintLockouts() end }, "LEFT")
+    panel:AddFooterButton({ text = "Your Characters", width = 120,
+        onClick = function() if WM.modules.AltTracker then WM.modules.AltTracker:Toggle() end end }, "RIGHT")
     panel:Finish()
     -- Lockout countdowns tick while open
     local since = 0

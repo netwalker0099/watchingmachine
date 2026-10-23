@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.26.1"
+WM.version = "3.27"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -277,6 +277,8 @@ local MODULE_COLORS = {
     SwingTimer = "FFAA33",
     ClassPaladin = "F58CBA",
     InstanceTracker = "66CCFF",
+    AltTracker = "FFCC66",
+    PvPLog = "FF6666",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1091,7 +1093,7 @@ end
 local MODULE_GROUPS = {
     { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
-    { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker" } },
+    { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
 }
 
 local MODULE_INFO = {
@@ -1133,6 +1135,16 @@ local MODULE_INFO = {
             { text = "Print my lockouts", desc = "How many instances this hour and today, and when the next one frees up.",
               func = function() Call("InstanceTracker", "PrintLockouts") end },
         },
+    },
+    PvPLog = {
+        title = "Battlegrounds & Arenas", desc = "Results and stats of every match",
+        about = "Logs every battleground and arena on all your characters: result, length, killing blows, honorable kills, deaths, honor, damage and healing, and for arenas the bracket, both teams and your rating change, with win rates per battleground and bracket.",
+        command = "bgs", color = {1, 0.4, 0.4}, icon = "Interface\\Icons\\INV_Jewelry_Necklace_21",
+    },
+    AltTracker = {
+        title = "Your Characters", desc = "Every alt's gold, rested XP and more",
+        about = "Every character you log in, on every realm: level, XP and rested XP (estimated while logged out), gold per realm, bag space, durability, professions, class reagents, and a hunter's ammo and pet.",
+        command = "alts", color = {1, 0.8, 0.4}, icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
     },
     WhisperLogs = {
         title = "WarcraftLogs Lookup", desc = "WCL links for whispers & group",
@@ -1764,6 +1776,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine totems|r - Edit your totem sets (shaman)")
     print("|cFFFFFF00/wmachine instances|r - Instance log and lockouts")
     print("|cFFFFFF00/wmachine lockouts|r - Print your instance lockouts")
+    print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
+    print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
     print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
@@ -1953,6 +1967,14 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "instances" or cmd == "instance" or cmd == "it" then
         local module = WM.modules.InstanceTracker
         if module and module.Toggle then module:Toggle() else WM:Print("InstanceTracker module not available") end
+
+    elseif cmd == "bgs" or cmd == "arenas" or cmd == "pvplog" then
+        local module = WM.modules.PvPLog
+        if module and module.Toggle then module:Toggle() else WM:Print("PvPLog module not available") end
+
+    elseif cmd == "alts" or cmd == "characters" or cmd == "chars" then
+        local module = WM.modules.AltTracker
+        if module and module.Toggle then module:Toggle() else WM:Print("AltTracker module not available") end
 
     elseif cmd == "lockouts" or cmd == "lockout" then
         local module = WM.modules.InstanceTracker

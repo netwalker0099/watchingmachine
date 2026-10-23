@@ -13,8 +13,8 @@ what still needs settling before it's built.
 8. ~~Dock flyout buttons together~~ (done, 3.15)
 9. Instance tracker: lockouts, instance log and run stats (core done, 3.22)
 10. ~~Gold trade alerts and trade log by instance~~ (done, 3.25)
-11. Alt tracking: "Your Characters"
-12. PvP instance log: battleground and arena stats
+11. ~~Alt tracking: "Your Characters"~~ (done, 3.27)
+12. ~~PvP instance log: battleground and arena stats~~ (done, 3.27)
 13. World buff timers, Songflowers and Darkmoon Faire
 
 ---
@@ -289,7 +289,8 @@ What all five should share instead of building their own:
       instance is marked reset. Decided: we don't send in Nova's format.
 - [x] **Clickable chat (3.24):** chat lines open the log, and the "Entered"
       line has a red **X** to delete that run.
-- [ ] **Minimap button:** right-click to open the alts window (with TODO 11).
+- [x] **Alts window:** opened from the Instance Tracker window's footer and its
+      own card (the minimap right-click stays Settings).
 
 Tracks every instance you enter, on every character and realm, and the
 limits on entering them.
@@ -374,7 +375,14 @@ logs trades per character.
 
 ---
 
-## 11. Alt tracking: "Your Characters"
+## 11. Alt tracking: "Your Characters" — DONE in 3.27
+
+Built as `Modules/AltTracker.lua`. Settled:
+- **Reagents:** per class, as listed in the module.
+- **Durability:** read from worn gear (average and lowest piece).
+- **Deleted characters:** right-click removes them.
+- **Opened from:** its own dashboard card and the Instance Tracker window,
+  not the minimap button's right-click, which stays Settings.
 
 A **Your Characters** window listing every character, grouped by realm.
 
@@ -402,7 +410,12 @@ of starting another.
 
 ---
 
-## 12. PvP instance log: battleground and arena stats
+## 12. PvP instance log: battleground and arena stats — DONE in 3.27
+
+Built as `Modules/PvPLog.lua`, with its own dashboard card. The 2.5.6
+scoreboard APIs (`GetBattlefieldScore`, `GetBattlefieldWinner`,
+`GetBattlefieldTeamInfo`, `GetBattlefieldArenaFaction`) were checked against
+Blizzard's TBC scoreboard code.
 
 Logs every battleground and arena you enter, like item 9's log but for PvP.
 
