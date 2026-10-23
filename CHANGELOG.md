@@ -2,7 +2,42 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.44** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.45** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.45
+
+### New — Gear Sets
+
+Save and swap gear sets, like ItemRack (`/wmachine gear`, or the dashboard
+card in the Raid group). Written from the ground up: the idea is
+ItemRack's, the code is our own and built to be reliable.
+
+- **Sets** from what you're wearing, with the slots you tick. Equip from the
+  window, a macro (`/wmachine gear equip <name>`), or undo the last swap.
+- **Spec swaps:** assign a set to Spec 1 or Spec 2 and tick *Equip it when I
+  switch to that spec*. Switching spec puts it on. Automatic swaps can be
+  turned off on the dashboard; each set's spec swap has its own tick box.
+- **Mounted / battlegrounds:** a set can go on while mounted or in
+  battlegrounds and arenas; your previous gear goes back on after.
+- **Reliability:**
+  - Exact item matching (enchant, gems, random suffix, which copy), so
+    identical trinkets and re-enchanted pieces are found.
+  - Each step re-reads your bags and slots and skips items the server is
+    still moving; a refused equip is retried, and the off hand waits for
+    the main hand.
+  - Swaps in place (no free bag space needed for most sets); two-handers
+    take the off hand off first; quivers and soul bags are never used.
+  - In combat the weapons change at once and the rest waits for combat to
+    end; casts and death are waited out; a stuck item times out.
+  - The result is checked at the end and anything that didn't go on is
+    named with the reason.
+- **Missing items:** a chat alert after a swap names any set item you don't
+  have on you (and says if it's in your bank). The character sheet shows a
+  warning listing them and marks the current set's missing slots in red.
+- **Quick swap:** Alt over a character sheet slot shows what in your bags
+  fits it; click to equip.
 
 ---
 

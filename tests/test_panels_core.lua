@@ -71,7 +71,7 @@ local dash = WM.dashboard
 dash:Show()
 check("dashboard built by the builder", dash.layout ~= nil and dash:GetName() == "WatchingMachineDashboard")
 check("dashboard is a fill panel", dash.opts.scroll == false and dash.layout.fill ~= nil)
--- 24 cards don't fit one column on a 768-high screen: two columns,
+-- 25 cards don't fit one column on a 768-high screen: two columns,
 -- and the window stops 16px short of the screen (the cards scroll)
 check("dashboard opens at a size that shows every card", dash:GetWidth() == 50 + 2 * 370 + 6
     and dash:GetHeight() == math.min(3 * 20 + 13 * 49 + 12 + 104, 768 - 16))
@@ -93,7 +93,7 @@ for _, card in pairs(dash.moduleCards) do
     n = n + 1
     if card:GetParent() ~= dash.cardsContainer then inside = false end
 end
-check("every module card created", n == 24)
+check("every module card created", n == 25)
 check("cards live in cardsContainer", inside)
 check("container sized to the cards", dash.cardsContainer:GetHeight() == 3 * 20 + 13 * 49 + 12)
 check("two columns of cards", dash.cardColumns == 2)
@@ -107,7 +107,7 @@ check("card width split between columns", dash.moduleCards.BuffCheck:GetWidth() 
 dash:SetWidth(400)
 WM:LayoutCards()
 check("narrow: one column", dash.cardColumns == 1 and select(4, dash.moduleCards.DebuffTracker:GetPoint(1)) == 0
-    and dash.cardsContainer:GetHeight() == 3 * 20 + 24 * 49 + 12)
+    and dash.cardsContainer:GetHeight() == 3 * 20 + 25 * 49 + 12)
 check("card text narrows with the card", dash.moduleCards.BuffCheck.titleText:GetWidth()
     == 350 - dash.moduleCards.BuffCheck.textReserve)
 -- Wide: three columns

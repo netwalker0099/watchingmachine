@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.44 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.45 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -725,7 +725,42 @@ Game facts compiled with the help of Ogri'Lazy's research; the code is our own.
   the buttons, freeing the keys in combat, and the helper's size. Drag the
   helper to move it
 
-### 29. Chat Filter
+### 29. Gear Sets
+Save and swap gear sets, ItemRack-style (Raid group; `/wmachine gear`). Our
+own code, written from the ground up for reliability.
+
+- **Sets:** *New set* takes what you're wearing; tick the slots the set
+  changes (the rest are left alone, and a ticked empty slot means "take it
+  off"). Equip from the window, the macro `/wmachine gear equip <name>`, or
+  *Undo last swap* to put back what you wore before
+- **Talent spec swaps:** give a set a spec (Spec 1 or Spec 2, shown with
+  its talent tree) and tick *Equip it when I switch to that spec*. Switching
+  spec then puts it on by itself. The dashboard switch turns all automatic
+  swaps on or off
+- **Mounted and battlegrounds:** a set can go on while you're mounted or in
+  battlegrounds and arenas, and what you wore before goes back on after
+- **Reliable swaps:**
+  - items are matched exactly (enchant, gems, random suffix, and which
+    copy), so two identical trinkets or a re-enchanted piece are still found
+  - every step re-reads your bags and slots, skips anything the server is
+    still moving, and retries what the game refuses
+  - swaps happen in place, so most sets need no free bag space; a
+    two-hander takes the off hand off first (and says so if your bags are
+    full); quivers and soul bags are never used for gear
+  - in combat the weapons change at once and the rest goes on when combat
+    ends; it also waits out casts and death
+  - at the end it checks the result and says what didn't go on, and why
+- **Missing items:** a chat alert names any set item that isn't on you, and
+  says when it's in your bank (from Your Characters). Opening the character
+  sheet shows a warning with the list, and the slots of your current set
+  that are missing an item are marked red
+- **Quick swap:** hold Alt and point at a character sheet slot to see what
+  in your bags fits it; click one to put it on
+- **The window:** every set with its icon, *wearing* / *N to change* /
+  *N missing*, its spec, mounted and PvP badges; hover for the items, and
+  *Equip*, *Edit* and *Delete*
+
+### 30. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -860,6 +895,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
 - `/wmachine gtfo` - Hazard Alerts (`gtfo test`, `gtfo mute <spell ID>`, `gtfo unmute <spell ID>`)
 - `/wmachine crits` - Crit Tracker
+- `/wmachine gear` - Gear Sets (`gear equip <name>`, `gear undo`, `gear list`; also `/wmachine sets`)
 - `/wmachine ogri` - Ogri'la Helper for the Apexis Relics (`ogri options`, `ogri clear`; also `/wmachine relic`)
 - `/wmachine attune` - Attunements: raids, keys and heroic keys per character
 - `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
@@ -918,6 +954,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AttunementsDB` - Attunement progress per character, guild survey answers
 - `HazardsDB` - Hazard Alerts options, sounds and muted spells
 - `WMCritsDB` - Crit Tracker records per character, and options
+- `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
@@ -940,6 +977,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.45
+- New **Gear Sets** (ItemRack-style, rewritten for reliability): sets you swap in one click or by macro, automatic swaps on talent spec change (per set), mounted and in battlegrounds, missing-item chat alerts and a character sheet warning, Alt quick swap
 
 ### Version 3.44
 - New **Ogri'la Helper** (Ogri'Lazy-style): remembers the Apexis Relic and Monument sequence, follows your beam touches, undoes a wrong one, with G/Y/B/R hotkeys and your shard count

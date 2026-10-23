@@ -662,19 +662,20 @@ Sounds when you're standing in something that hurts, like the GTFO addon.
 - [ ] **Data:** TBC raid and dungeon spell lists. Write our own, or ask for
       the GTFO addon to read as a guide (check its licence first).
 
-## 20. ItemRack-style gear sets
+## 20. ItemRack-style gear sets — DONE in 3.45
 
-Save and swap gear sets, like ItemRack.
+Built as `Modules/GearSets.lua` (our own code, written from the ground up;
+ItemRack used only for the idea).
 
-- [ ] **Sets:** save what you're wearing as a named set (with an icon),
-      equip it in one click, from a slash command or a key binding.
-- [ ] **Swaps:** out of combat (weapons in combat where the game allows),
-      queued until combat ends otherwise, using bags and the bank's
-      contents from Your Characters.
-- [ ] **Automatic:** swap on events (mounting, entering a battleground,
-      Druid forms, a resistance set for a boss).
-- [ ] **Fits with:** Your Characters (each set's pieces), GearScore (a set's
-      score), the Loot Browser BiS lists (what's missing from a set).
+- [x] **Sets:** save what you're wearing (ticked slots), equip in one click
+      or with `/wmachine gear equip <name>`, undo the last swap.
+- [x] **Swaps:** exact matching, a re-check before every step, retries,
+      weapons in combat and the rest after, a final check and report.
+- [x] **Automatic:** talent spec (per set, can be switched off), mounted,
+      battlegrounds and arenas, each putting your old gear back after.
+- [x] **Missing items:** chat alert after a swap, character sheet warning.
+- [ ] **Later:** key bindings per set, Druid form and stance swaps, and
+      showing a set's GearScore and its missing BiS pieces.
 
 ## 21. Ogri'la helper (Ogri'Lazy-style) — DONE in 3.44
 

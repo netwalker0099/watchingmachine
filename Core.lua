@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.44"
+WM.version = "3.45"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -343,6 +343,7 @@ local MODULE_COLORS = {
     Hazards = "FF6633",
     Crits = "FF8800",
     Ogrila = "99E666",
+    GearSets = "CCB366",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1155,7 +1156,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
 }
@@ -1241,6 +1242,14 @@ local MODULE_INFO = {
         title = "Crit Tracker", desc = "Your biggest hits, crits and heals",
         about = "Your best normal hit and best crit for every spell, ability, melee and ranged attack and heal, with the crit rate, who it was on and where. A new best crit says so in chat (with a sound, if you like). Per character, PvP kept apart, and on spell tooltips.",
         command = "crits", color = {1, 0.53, 0}, icon = "Interface\\Icons\\Ability_CriticalStrike",
+    },
+    GearSets = {
+        title = "Gear Sets", desc = "Save and swap gear sets (ItemRack-style)",
+        about = "Save what you're wearing as a set and put it back on in one click, from a macro, or automatically when you switch talent spec, mount up or enter a battleground. Swaps check every step and tell you what's missing or in your bank; the character sheet warns you when a set's item isn't on you.",
+        command = "gear", color = {0.8, 0.7, 0.4}, icon = "Interface\\Icons\\INV_Chest_Plate06",
+        tools = {
+            { text = "Undo the last swap", func = function() Call("GearSets", "Undo") end },
+        },
     },
     Ogrila = {
         title = "Ogri'la Helper", desc = "Remembers the Apexis Relic sequence",
@@ -1897,6 +1906,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
     print("|cFFFFFF00/wmachine loot|r - Loot Browser (what every dungeon and raid boss drops)")
     print("|cFFFFFF00/wmachine gtfo|r - Hazard Alerts (gtfo test / mute <spell ID> / unmute <spell ID>)")
+    print("|cFFFFFF00/wmachine gear|r - Gear Sets (gear equip <name> / undo / list)")
     print("|cFFFFFF00/wmachine ogri|r - Ogri'la Helper: remembers the Apexis Relic sequence (ogri options / clear)")
     print("|cFFFFFF00/wmachine crits|r - Crit Tracker: your best hits, crits and heals")
     print("|cFFFFFF00/wmachine attune|r - Attunements: raid attunements and keys for each character")
@@ -2112,6 +2122,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "gtfo" or cmd == "hazards" or cmd:match("^gtfo ") then
         local module = WM.modules.Hazards
         if module and module.Command then module:Command(cmd:match("^gtfo (.+)$")) else WM:Print("Hazards module not available") end
+
+    elseif cmd == "gear" or cmd == "sets" or cmd == "itemrack" or cmd:match("^gear ") then
+        local module = WM.modules.GearSets
+        if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) else WM:Print("GearSets module not available") end
 
     elseif cmd == "ogri" or cmd == "relic" or cmd == "ogrila" or cmd:match("^ogri ") then
         local module = WM.modules.Ogrila
