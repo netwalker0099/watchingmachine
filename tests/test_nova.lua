@@ -62,6 +62,32 @@ check("garbage doesn't inflate", Nova.Inflate("\255\255\255") == nil)
 check("truncated data doesn't inflate", Nova.Inflate(F.reset.body:sub(1, 5)) == nil)
 check("inflate size cap", Nova.Inflate(Nova.Unescape(F.long.body), 100) == nil)
 
+-- ---- The full LibSerialize reader and both codecs (Nova World Buffs data) ----
+local NWB = dofile(REPO .. "/tests/nwb_fixtures.lua")
+local okv, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13 = Nova.Deserialize(NWB.values)
+check("numbers of every size", okv and a1 == 1 and a2 == -1 and a3 == 300 and a4 == -300 and a5 == 70000
+    and a6 == 2 ^ 31 + 5 and a7 == 3.5 and a8 == -0.125)
+check("strings, booleans, nil", a9 == "hello world, a longer string" and a10 == true and a11 == false
+    and a12 == nil and a13 == 7)
+local okr, refs = Nova.Deserialize(NWB.refs)
+check("string back-references", okr and refs[1] == "abcd" and refs[2] == "abcd" and refs[3] == "abcd")
+for _, which in ipairs({ "addon", "chat" }) do
+    local ok, text = Nova.DecodeBody(NWB[which], which == "chat" and "YELL" or "GUILD")
+    check(which .. " codec: whole message decodes", ok and type(text) == "string" and text:find("^data 3%.42 70%-1 12ept ") ~= nil)
+    if ok and type(text) == "string" then
+        local inner = text:sub(#"data 3.42 70-1 12ept " + 1)
+        local okt, t = Nova.Deserialize(inner)
+        check(which .. ": table payload", okt and t.layers[11872].E == 1800000000 and t.layers[11872].L == 1800001234
+            and t.layers[11873].E == 1799996400 and t.O == 1800003600 and t.name == "Watcher")
+        check(which .. ": arrays, mixed tables, big / negative / float numbers", okt and t.list[4] == "three"
+            and t.list[5] == true and t.list[6] == false and t.mixed[2] == 20 and t.mixed.x == "y" and t.mixed.z == -5
+            and t.big == 4294967296 + 123 and t.neg == -70000 and t.float == 3.25 and t.tiny == -2047)
+        check(which .. ": nested tables and table references", okt and t.nested.a.b.c == "deep" and t.again == t.nested)
+    end
+end
+check("the wrong codec fails cleanly", Nova.DecodeBody(NWB.chat, "GUILD") == nil or select(1, Nova.DecodeBody(NWB.chat, "GUILD")) == false)
+check("bad LibSerialize data fails cleanly", Nova.Deserialize("\001\250") == false and Nova.Deserialize("x") == false)
+
 -- AceComm framing
 check("single part passes through", Nova.Reassemble("NIT", "abc", "PARTY", "Lead") == "abc")
 check("escaped control byte", Nova.Reassemble("NIT", "\004\001xyz", "PARTY", "Lead") == "\001xyz")

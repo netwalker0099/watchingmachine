@@ -242,6 +242,219 @@ function Nova.ReadSerializedString(s)
     return s:sub(start, start + len - 1)
 end
 
+-- ============================================
+-- LIBSERIALIZE (format 1): any value
+-- ============================================
+-- The full value format: numbers (embedded, 16 / 24 / 32 / 56-bit, double,
+-- decimal string), booleans, nil, strings, tables, arrays, mixed tables,
+-- and back-references to strings (over 2 bytes) and tables seen earlier.
+
+local MAX_OBJECTS, MAX_DEPTH = 20000, 32
+
+local function ReadDouble(b1, b2, b3, b4, b5, b6, b7, b8)
+    local sign = b1 > 127 and -1 or 1
+    local expo = (b1 % 128) * 16 + math.floor(b2 / 16)
+    local mant = ((((((b2 % 16) * 256 + b3) * 256 + b4) * 256 + b5) * 256 + b6) * 256 + b7) * 256 + b8
+    if expo == 0 and mant == 0 then return sign * 0.0 end
+    if expo == 2047 then return mant == 0 and sign * math.huge or 0 / 0 end
+    return sign * (1 + mant / 4503599627370496) * 2 ^ (expo - 1023)
+end
+
+-- Returns ok, value1, value2, ... (ok false, reason on bad data)
+function Nova.Deserialize(s)
+    if type(s) ~= "string" or s:byte(1) ~= 1 then return false, "not LibSerialize format 1" end
+    local pos, objects = 2, 0
+    local strings, tables = {}, {}
+
+    local function Bytes(n)
+        local chunk = s:sub(pos, pos + n - 1)
+        if #chunk < n then error("truncated", 0) end
+        pos = pos + n
+        return chunk
+    end
+    local function Int(n)
+        local v = 0
+        for i = 1, n do
+            local b = s:byte(pos)
+            if not b then error("truncated", 0) end
+            v = v * 256 + b
+            pos = pos + 1
+        end
+        return v
+    end
+    local function Str(len)
+        local v = Bytes(len)
+        if len > 2 then strings[#strings + 1] = v end
+        return v
+    end
+
+    local Read
+    local function Table(count, t, depth)
+        if not t then t = {}; tables[#tables + 1] = t end
+        for _ = 1, count do
+            local k = Read(depth)
+            local v = Read(depth)
+            if k == nil then error("nil key", 0) end
+            t[k] = v
+        end
+        return t
+    end
+    local function Array(count, t, depth)
+        if not t then t = {}; tables[#tables + 1] = t end
+        for i = 1, count do t[i] = Read(depth) end
+        return t
+    end
+    local function Mixed(arrayCount, mapCount, depth)
+        local t = {}
+        tables[#tables + 1] = t
+        Array(arrayCount, t, depth)
+        Table(mapCount, t, depth)
+        return t
+    end
+
+    local TYPED = {
+        [0] = function() return nil end,
+        [1] = function() return Int(2) end, [2] = function() return -Int(2) end,
+        [3] = function() return Int(3) end, [4] = function() return -Int(3) end,
+        [5] = function() return Int(4) end, [6] = function() return -Int(4) end,
+        [7] = function() return Int(7) end, [8] = function() return -Int(7) end,
+        [9] = function() return ReadDouble(Bytes(8):byte(1, 8)) end,
+        [10] = function() return tonumber(Bytes(Int(1))) end,
+        [11] = function() return -(tonumber(Bytes(Int(1))) or 0) end,
+        [12] = function() return true end, [13] = function() return false end,
+        [14] = function() return Str(Int(1)) end, [15] = function() return Str(Int(2)) end,
+        [16] = function() return Str(Int(3)) end,
+        [17] = function(d) return Table(Int(1), nil, d) end, [18] = function(d) return Table(Int(2), nil, d) end,
+        [19] = function(d) return Table(Int(3), nil, d) end,
+        [20] = function(d) return Array(Int(1), nil, d) end, [21] = function(d) return Array(Int(2), nil, d) end,
+        [22] = function(d) return Array(Int(3), nil, d) end,
+        [23] = function(d) local a, m = Int(1), Int(1); return Mixed(a, m, d) end,
+        [24] = function(d) local a, m = Int(2), Int(2); return Mixed(a, m, d) end,
+        [25] = function(d) local a, m = Int(3), Int(3); return Mixed(a, m, d) end,
+        [26] = function() return strings[Int(1)] end, [27] = function() return strings[Int(2)] end,
+        [28] = function() return strings[Int(3)] end,
+        [29] = function() return tables[Int(1)] end, [30] = function() return tables[Int(2)] end,
+        [31] = function() return tables[Int(3)] end,
+    }
+
+    function Read(depth)
+        depth = (depth or 0) + 1
+        if depth > MAX_DEPTH then error("too deep", 0) end
+        objects = objects + 1
+        if objects > MAX_OBJECTS then error("too big", 0) end
+        local b = Int(1)
+        if b % 2 == 1 then return (b - 1) / 2 end                   -- 7-bit number
+        if b % 4 == 2 then                                          -- type with its count
+            local typ = (b - 2) / 4
+            local count = math.floor(typ / 4)
+            typ = typ % 4
+            if typ == 0 then return Str(count) end
+            if typ == 1 then return Table(count, nil, depth) end
+            if typ == 2 then return Array(count, nil, depth) end
+            return Mixed(count % 4 + 1, math.floor(count / 4) + 1, depth)
+        end
+        if b % 8 == 4 then                                          -- 12-bit number
+            local packed = Int(1) * 256 + b
+            if b % 16 == 12 then return -(packed - 12) / 16 end
+            return (packed - 4) / 16
+        end
+        local reader = TYPED[b / 8]
+        if not reader then error("unknown type " .. b, 0) end
+        return reader(depth)
+    end
+
+    local results, n = {}, 0
+    local ok, err = pcall(function()
+        while pos <= #s do
+            n = n + 1
+            results[n] = Read(0)
+        end
+    end)
+    if not ok then return false, err end
+    return true, unpack(results, 1, n)
+end
+
+-- ============================================
+-- LIBDEFLATE CODECS
+-- ============================================
+-- LibDeflate's codecs replace "reserved" bytes with an escape byte plus a
+-- substitute (or, for the first few, with a single "map" byte). The table
+-- of substitutes is rebuilt here from the same three lists it's made from.
+
+local function Codec(reserved, escapes, map)
+    local taken, decode = {}, {}
+    local all = reserved .. escapes .. map
+    for i = 1, #all do taken[all:byte(i)] = true end
+    local mapped = {}
+    for i = 1, #map do
+        mapped[map:byte(i)] = reserved:sub(i, i)
+    end
+    local alreadyMapped = {}
+    for i = 1, #map do alreadyMapped[reserved:sub(i, i)] = true end
+    local escIndex, r = 1, 0
+    local esc = escapes:byte(1)
+    decode[esc] = {}
+    for i = 1, #all do
+        local c = all:sub(i, i)
+        if not alreadyMapped[c] then
+            while r >= 256 or taken[r] do
+                r = r + 1
+                if r > 255 then
+                    escIndex = escIndex + 1
+                    esc = escapes:byte(escIndex)
+                    if not esc then return nil end
+                    decode[esc] = {}
+                    r = 0
+                end
+            end
+            decode[esc][r] = c
+            r = r + 1
+        end
+    end
+    local reservedSet = {}
+    for i = 1, #reserved do reservedSet[reserved:byte(i)] = true end
+    return function(str)
+        if type(str) ~= "string" then return nil end
+        local out, i, n = {}, 1, #str
+        while i <= n do
+            local b = str:byte(i)
+            if decode[b] then
+                local nb = str:byte(i + 1)
+                local c = nb and decode[b][nb]
+                if not c then return nil end
+                out[#out + 1] = c
+                i = i + 2
+            elseif mapped[b] then
+                out[#out + 1] = mapped[b]
+                i = i + 1
+            elseif reservedSet[b] then
+                return nil                     -- a reserved byte can't appear encoded
+            else
+                out[#out + 1] = string.char(b)
+                i = i + 1
+            end
+        end
+        return table.concat(out)
+    end
+end
+Nova.Codec = Codec
+
+local chatHigh = {}
+for i = 128, 255 do chatHigh[#chatHigh + 1] = string.char(i) end
+Nova.DecodeChat = Codec("sS\000\010\013\124%" .. table.concat(chatHigh), "\029\031", "\015\020")
+Nova.DecodeAddon = Codec("\000", "\001", "")
+
+-- Body of a Nova message -> the values it carries. distribution picks the
+-- codec: YELL / SAY use the chat-channel one.
+function Nova.DecodeBody(body, distribution)
+    local decode = (distribution == "YELL" or distribution == "SAY") and Nova.DecodeChat or Nova.DecodeAddon
+    local raw = decode(body)
+    if not raw then return nil end
+    local inflated = Nova.Inflate(raw)
+    if not inflated then return nil end
+    return Nova.Deserialize(inflated)
+end
+
 -- Whole pipeline: one complete message body -> "<cmd> <version> <data>"
 function Nova.DecodeNIT(body)
     local raw = Nova.Unescape(body)
