@@ -8,9 +8,11 @@
 ## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB, InstanceTrackerDB, AltTrackerDB, PvPLogDB, WorldTimersDB, LootBrowserDB, WMGearScoreDB, AttunementsDB, HazardsDB, WMCritsDB, OgrilaDB, WMGearSetsDB
 
 Core.lua
+Profiles.lua
 UI.lua
 Sounds.lua
 GameMenu.lua
+Setup.lua
 Modules/AutoLogger.lua
 Modules/KeywordMonitor.lua
 Modules/ChatFilter.lua

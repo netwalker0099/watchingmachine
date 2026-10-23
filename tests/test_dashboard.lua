@@ -49,11 +49,9 @@ dash:Show()
 WM:UpdateDashboard()
 local cards = dash.moduleCards
 
-local switched = { BuffCheck = true, DebuffTracker = true, PvPTracker = true, GuildInvite = true, ChatFilter = true,
-                   AuraRange = true, ArmorySnap = true, KeywordMonitor = true, Hazards = true, Crits = true, Ogrila = true, GearSets = true }
+-- Every module has a per-character switch now
 for name, card in pairs(cards) do
-    check(name .. (switched[name] and " has" or " has no") .. " an on/off switch",
-        (card.switch ~= nil) == (switched[name] == true))
+    check(name .. " has an on/off switch", card.switch ~= nil)
     check(name .. " status text stops before the buttons",
         card.statusText:GetWidth() > 100 and card.statusText:GetWidth() <= 370 - 50 - 63)
     check(name .. " card has a hover tooltip", card:GetScript("OnEnter") ~= nil)

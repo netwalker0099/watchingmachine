@@ -229,9 +229,18 @@ return function(REPO)
     W.WM = WM
 
     function W.load(rel)
+        if rel == "Profiles.lua" and W._profilesLoaded then return end
+        if rel == "Profiles.lua" then W._profilesLoaded = true end
         local f = assert(loadfile(REPO .. "/" .. rel))
         setfenv(f, G)
         f("WatchingMachine", WM)
+        -- Profiles.lua always comes with Core (the addon loads it next)
+        if rel == "Core.lua" and not W._profilesLoaded then
+            W._profilesLoaded = true
+            local pf = assert(loadfile(REPO .. "/Profiles.lua"))
+            setfenv(pf, G)
+            pf("WatchingMachine", WM)
+        end
         -- Timers: collect, run on demand with W.runTimers()
         if WM.RunAfter and not W._timersHooked then
             W._timersHooked = true

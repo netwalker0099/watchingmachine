@@ -168,7 +168,7 @@ end
 
 -- A gossip option was picked: starting a relic?
 function OG:OnGossipSelect()
-    if not DB().autoOpen then return end
+    if not WM:IsModuleOn("Ogrila") or not DB().autoOpen then return end
     local relic = OG.RelicFor(UnitGUID("npc"))
     if not relic then return end
     local db = DB()
@@ -459,8 +459,32 @@ function OG:Toggle()
 end
 OG.ToggleUI = OG.Toggle
 
-function OG:IsModuleEnabled() return DB().autoOpen end
-function OG:SetModuleEnabled(v) DB().autoOpen = v and true or false end
+-- Turned off on this character: close everything and free the keys (the
+-- gossip hook stays, but does nothing while the module is off)
+function OG:OnModuleOff()
+    if helper then helper:Hide() end
+    if panel then panel:Hide() end
+end
+
+-- The module's page in the guided setup
+function OG:SetupPage(L)
+    L:Note("In Ogri'la (Blade's Edge Mountains) the Apexis Relics and the Apexis Monument play a memory game: they"
+        .. " light a sequence of coloured beams and you touch the beams in the same order. Each round is longer.")
+    L:Note("|cFFFFFFFFHow it works:|r when you start a relic the helper opens. As the relic lights each colour, click"
+        .. " that colour in the helper (or press G, Y, B or R). Then touch the beams: the next one is ringed and moves"
+        .. " on by itself each time you touch one, and steps back if the relic punishes a wrong one. It also shows"
+        .. " your Apexis Shards and Crystals.")
+    L:Checkbox({ label = "Open the helper when you start a relic", get = function() return DB().autoOpen end,
+        set = function(v) DB().autoOpen = v end })
+    L:Checkbox({ label = "Hotkeys (G, Y, B, R) while the helper is up", get = function() return DB().hotkeys end,
+        set = function(v) DB().hotkeys = v end,
+        tooltip = { "Hotkeys", "Only while the helper is showing; your keys go back to normal when it closes." } })
+    L:Checkbox({ label = "Give the keys back in combat", get = function() return DB().unbindCombat end,
+        set = function(v) DB().unbindCombat = v end })
+    L:Checkbox({ label = "Help tooltips on the helper's buttons", get = function() return DB().tooltips end,
+        set = function(v) DB().tooltips = v end })
+    L:Note("Different keys and the helper's size are in its options: |cFFFFFF00/wmachine ogri options|r.")
+end
 
 function OG:GetQuickStatus()
     local db = DB()
@@ -502,6 +526,7 @@ function OG:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event)
+    if not WM:IsModuleOn("Ogrila") then return end
     local ok, err = true
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         if not (helper and helper:IsShown() and CombatLogGetCurrentEventInfo) then return end

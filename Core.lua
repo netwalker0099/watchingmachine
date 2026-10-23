@@ -750,14 +750,28 @@ function WM:OnSecurityCheckPassed()
     
     -- Initialize modules, each one protected: a module that errors is
     -- reported but can't stop the others from starting
-    for name, module in pairs(self.modules) do
-        if module.Initialize then
-            local ok, err = pcall(module.Initialize, module)
-            if not ok then
-                geterrorhandler()(name .. ":Initialize failed: " .. tostring(err))
+    -- (only the ones on for this character)
+    local c = self:CharState()
+    if c.setup == "offer" and not c.synced then
+        -- A character from before per-character switches: a module whose
+        -- own switch was off stays off
+        c.synced = true
+        for name, module in pairs(self.modules) do
+            if module.IsModuleEnabled and c.modules[name] == nil then
+                local ok, on = pcall(module.IsModuleEnabled, module)
+                if ok and not on then c.modules[name] = false end
             end
         end
     end
+    local names = {}
+    for name in pairs(self.modules) do names[#names + 1] = name end
+    table.sort(names)
+    for _, name in ipairs(names) do
+        if self:IsModuleOn(name) then self:StartModule(name) end
+    end
+
+    -- First time on this character: offer the setup
+    if self.Setup then RunAfter(3, function() self.Setup:OnLogin() end) end
     
     -- Watching Machine button in the Escape menu
     pcall(self.SetupGameMenuButton, self)
@@ -942,8 +956,10 @@ local function CreateMinimapButton()
         for _, group in ipairs(WM.MODULE_GROUPS or {}) do
             for _, name in ipairs(group.modules) do
                 local module = WM.modules[name]
-                if module and module.GetQuickStatus then
-                    local info = WM.MODULE_INFO[name]
+                local info = WM.MODULE_INFO[name]
+                if module and not WM:IsModuleOn(name) then
+                    GameTooltip:AddDoubleLine(info and info.title or name, "|cFF666666off|r", 0.5, 0.5, 0.5, 1, 1, 1)
+                elseif module and module.GetQuickStatus then
                     GameTooltip:AddDoubleLine(info and info.title or name, module:GetQuickStatus(),
                         0.8, 0.8, 0.8, 1, 1, 1)
                 end
@@ -1127,9 +1143,8 @@ end
 local function Mod(name) return WM.modules[name] end
 
 local function Call(name, method, ...)
-    local m = Mod(name)
+    local m = WM:UsableModule(name)
     if m and m[method] then return m[method](m, ...) end
-    WM:Print(name .. " not available")
 end
 
 local function PlayerClass()
@@ -1379,9 +1394,19 @@ local MODULE_INFO = {
 WM.MODULE_INFO = MODULE_INFO
 WM.MODULE_GROUPS = MODULE_GROUPS
 
+-- Every module has an on/off switch, per character
 local function HasSwitch(module)
-    return module and module.IsModuleEnabled and module.SetModuleEnabled and true or false
+    return module ~= nil
 end
+
+-- On for this character, and (for modules with a switch of their own) on there too
+local function ModuleOn(name)
+    local module = WM.modules[name]
+    if not WM:IsModuleOn(name) then return false end
+    if module and module.IsModuleEnabled then return module:IsModuleEnabled() and true or false end
+    return true
+end
+WM.ModuleOn = ModuleOn
 
 local function VisibleTools(info)
     local out = {}
@@ -1438,8 +1463,8 @@ local function ShowCardTooltip(card)
         GameTooltip:AddLine("Status: " .. module:GetQuickStatus(), 0.8, 0.8, 0.8, true)
     end
     if HasSwitch(module) then
-        GameTooltip:AddLine("Switch: " .. (module:IsModuleEnabled() and "|cFF00FF00on|r" or "|cFFFF4444off|r"),
-            0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Switch: " .. (ModuleOn(card.moduleName) and "|cFF00FF00on|r" or "|cFFFF4444off|r")
+            .. " |cFF888888(this character)|r", 0.8, 0.8, 0.8)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Open: settings and details", 0.6, 0.8, 1)
@@ -1592,6 +1617,14 @@ function WM:CreateModuleCards()
             openBtn:SetPoint("RIGHT", -8, 0)
             openBtn:SetText("Open")
             openBtn:SetScript("OnClick", function()
+                if not WM:IsModuleOn(moduleName) then
+                    WM:Confirm(info.title .. " is off on this character. Turn it on?", function()
+                        WM:SetModuleOn(moduleName, true)
+                        local m = WM.modules[moduleName]
+                        if m and (m.ToggleUI or m.Toggle) then (m.ToggleUI or m.Toggle)(m) end
+                    end)
+                    return
+                end
                 if module and module.ToggleUI then
                     module:ToggleUI()
                 elseif module and module.Toggle then
@@ -1626,13 +1659,13 @@ function WM:CreateModuleCards()
                 sw:SetSize(24, 24)
                 sw:SetPoint("RIGHT", leftmost, "LEFT", -2, 0)
                 sw:SetScript("OnClick", function(self)
-                    module:SetModuleEnabled(self:GetChecked() and true or false)
+                    WM:SetModuleOn(moduleName, self:GetChecked() and true or false)
                     WM:UpdateDashboard()
                 end)
                 sw:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:AddLine(info.title .. ": " .. (module:IsModuleEnabled() and "on" or "off"), 1, 0.8, 0)
-                    GameTooltip:AddLine("Click to turn it " .. (module:IsModuleEnabled() and "off." or "on."), 0.8, 0.8, 0.8)
+                    GameTooltip:AddLine(info.title .. ": " .. (ModuleOn(moduleName) and "on" or "off") .. " on this character", 1, 0.8, 0)
+                    GameTooltip:AddLine("Click to turn it " .. (ModuleOn(moduleName) and "off." or "on."), 0.8, 0.8, 0.8)
                     if info.toggleNote then GameTooltip:AddLine(info.toggleNote, 0.8, 0.8, 0.8, true) end
                     GameTooltip:Show()
                 end)
@@ -1691,13 +1724,16 @@ function WM:UpdateDashboard()
 
     for moduleName, card in pairs(dashboard.moduleCards) do
         local module = self.modules[moduleName]
-        if module and module.GetQuickStatus then
-            card.statusText:SetText(module:GetQuickStatus())
+        if module and not WM:IsModuleOn(moduleName) then
+            card.statusText:SetText("|cFF888888Off on this character|r")
+        elseif module and module.GetQuickStatus then
+            local ok, status = pcall(module.GetQuickStatus, module)
+            card.statusText:SetText(ok and status or "|cFFFF6666Status unavailable|r")
         else
             card.statusText:SetText("|cFF888888Module not loaded|r")
         end
         if card.switch then
-            local on = module:IsModuleEnabled()
+            local on = ModuleOn(moduleName)
             card.switch:SetChecked(on)
             card.icon:SetDesaturated(not on)
         end
@@ -1871,6 +1907,7 @@ end
 function WM:ShowHelp()
     self:Print("=== Watching Machine Commands ===")
     print("|cFFFFFF00/wmachine|r - Toggle dashboard")
+    print("|cFFFFFF00/wmachine setup|r - Choose which modules are on for this character (setup quick / setup guided)")
     print("|cFFFFFF00/wmachine logger|r - Open Auto Logger")
     print("|cFFFFFF00/wmachine keyword|r - Open Keyword Monitor")
     print("|cFFFFFF00/wmachine filter|r - Open Chat Filter (hide spam phrases; applied before Keyword Monitor)")
@@ -1980,239 +2017,194 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         WM:ToggleDashboard()
         
     elseif cmd == "logger" or cmd == "autolog" or cmd == "log" then
-        local module = WM.modules.AutoLogger
+        local module = WM:UsableModule("AutoLogger")
         if module and module.OpenSettings then
             module:OpenSettings()
-        else
-            WM:Print("AutoLogger module not available")
         end
         
     elseif cmd == "keyword" or cmd == "km" or cmd == "keywords" then
-        local module = WM.modules.KeywordMonitor
+        local module = WM:UsableModule("KeywordMonitor")
         if module and module.ToggleUI then
             module:ToggleUI()
-        else
-            WM:Print("KeywordMonitor module not available")
         end
         
     elseif cmd == "filter" or cmd == "chatfilter" or cmd == "cf" then
-        local module = WM.modules.ChatFilter
+        local module = WM:UsableModule("ChatFilter")
         if module and module.ToggleUI then
             module:ToggleUI()
-        else
-            WM:Print("ChatFilter module not available")
         end
 
     elseif cmd == "mail" or cmd == "ml" or cmd == "trade" then
-        local module = WM.modules.MailLogger
+        local module = WM:UsableModule("MailLogger")
         if module and module.ToggleUI then
             module:ToggleUI()
-        else
-            WM:Print("MailLogger module not available")
         end
         
     elseif cmd == "services" or cmd == "sp" or cmd == "boost" or cmd == "boosts" then
-        local module = WM.modules.ServicesParser
+        local module = WM:UsableModule("ServicesParser")
         if module and module.ToggleUI then
             module:ToggleUI()
-        else
-            WM:Print("ServicesParser module not available")
         end
         
     elseif cmd == "recruit" or cmd == "recruiter" or cmd == "guild" then
-        local module = WM.modules.Recruiter
+        local module = WM:UsableModule("Recruiter")
         if module and module.ToggleUI then
             module:ToggleUI()
-        else
-            WM:Print("Recruiter module not available")
         end
         
     elseif cmd == "whisper" or cmd == "whispers" or cmd == "wcl" or cmd == "logs" then
-        local module = WM.modules.WhisperLogs
+        local module = WM:UsableModule("WhisperLogs")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("WhisperLogs module not available")
         end
         
     elseif cmd == "ginvite" or cmd == "guildinvite" or cmd == "autoinv" then
-        local module = WM.modules.GuildInvite
+        local module = WM:UsableModule("GuildInvite")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("GuildInvite module not available")
         end
         
     elseif cmd == "debuff" or cmd == "debuffs" or cmd == "debufftracker" then
-        local module = WM.modules.DebuffTracker
+        local module = WM:UsableModule("DebuffTracker")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("DebuffTracker module not available")
         end
         
     elseif cmd == "pvp" or cmd == "enemies" or cmd == "pvptracker" or cmd == "kos" then
-        local module = WM.modules.PvPTracker
+        local module = WM:UsableModule("PvPTracker")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("PvPTracker module not available")
         end
 
     elseif cmd == "buffcheck" or cmd == "buffs" or cmd == "bc" then
-        local module = WM.modules.BuffCheck
+        local module = WM:UsableModule("BuffCheck")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("BuffCheck module not available")
         end
 
     elseif cmd == "armory" or cmd == "armorysnap" or cmd == "gear" or cmd == "snap" then
-        local module = WM.modules.ArmorySnap
+        local module = WM:UsableModule("ArmorySnap")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("ArmorySnap module not available")
         end
 
     elseif cmd == "soulstone" or cmd == "soulstones" or cmd == "ss" then
-        local module = WM.modules.ClassWarlock
+        local module = WM:UsableModule("ClassWarlock")
         if module and module.ReportSoulstones then
             module:ReportSoulstones()
-        else
-            WM:Print("ClassWarlock module not available")
         end
 
     elseif cmd == "consumes" or cmd == "consumables" then
-        local module = WM.modules.ClassGeneral
+        local module = WM:UsableModule("ClassGeneral")
         if module and module.Explain then
             module:Explain()
-        else
-            WM:Print("ClassGeneral module not available")
         end
 
     elseif cmd == "portals" or cmd == "teleports" then
-        local module = WM.modules.ClassMage
+        local module = WM:UsableModule("ClassMage")
         if module and module.ReportSpells then
             module:ReportSpells()
-        else
-            WM:Print("ClassMage module not available")
         end
 
     elseif cmd == "instances" or cmd == "instance" or cmd == "it" then
-        local module = WM.modules.InstanceTracker
-        if module and module.Toggle then module:Toggle() else WM:Print("InstanceTracker module not available") end
+        local module = WM:UsableModule("InstanceTracker")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "timers" or cmd == "worldtimers" or cmd == "dmf" or cmd == "layer" then
-        local module = WM.modules.WorldTimers
-        if module and module.Toggle then module:Toggle() else WM:Print("WorldTimers module not available") end
+        local module = WM:UsableModule("WorldTimers")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "wb" or cmd:match("^wb ") then
-        local module = WM.modules.WorldTimers
-        if module and module.Report then module:Report(cmd:match("^wb (%a+)")) else WM:Print("WorldTimers module not available") end
+        local module = WM:UsableModule("WorldTimers")
+        if module and module.Report then module:Report(cmd:match("^wb (%a+)")) end
 
     elseif cmd == "gs" or cmd == "gearscore" or cmd:match("^gs ") then
-        local module = WM.modules.GearScore
-        if module and module.Command then module:Command(cmd:match("^gs (.+)$")) else WM:Print("GearScore module not available") end
+        local module = WM:UsableModule("GearScore")
+        if module and module.Command then module:Command(cmd:match("^gs (.+)$")) end
 
     elseif cmd == "attune" or cmd == "attunements" or cmd == "att" then
-        local module = WM.modules.Attunements
-        if module and module.Toggle then module:Toggle() else WM:Print("Attunements module not available") end
+        local module = WM:UsableModule("Attunements")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "gtfo" or cmd == "hazards" or cmd:match("^gtfo ") then
-        local module = WM.modules.Hazards
-        if module and module.Command then module:Command(cmd:match("^gtfo (.+)$")) else WM:Print("Hazards module not available") end
+        local module = WM:UsableModule("Hazards")
+        if module and module.Command then module:Command(cmd:match("^gtfo (.+)$")) end
 
     elseif cmd == "gear" or cmd == "sets" or cmd == "itemrack" or cmd:match("^gear ") then
-        local module = WM.modules.GearSets
-        if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) else WM:Print("GearSets module not available") end
+        local module = WM:UsableModule("GearSets")
+        if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) end
 
     elseif cmd == "ogri" or cmd == "relic" or cmd == "ogrila" or cmd:match("^ogri ") then
-        local module = WM.modules.Ogrila
-        if module and module.Command then module:Command(cmd:match("^ogri (.+)$")) else WM:Print("Ogrila module not available") end
+        local module = WM:UsableModule("Ogrila")
+        if module and module.Command then module:Command(cmd:match("^ogri (.+)$")) end
 
     elseif cmd == "crits" or cmd == "crit" or cmd == "ct" then
-        local module = WM.modules.Crits
-        if module and module.Toggle then module:Toggle() else WM:Print("Crits module not available") end
+        local module = WM:UsableModule("Crits")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "loot" or cmd == "atlas" or cmd == "al" then
-        local module = WM.modules.LootBrowser
-        if module and module.Toggle then module:Toggle() else WM:Print("LootBrowser module not available") end
+        local module = WM:UsableModule("LootBrowser")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "bgs" or cmd == "arenas" or cmd == "pvplog" then
-        local module = WM.modules.PvPLog
-        if module and module.Toggle then module:Toggle() else WM:Print("PvPLog module not available") end
+        local module = WM:UsableModule("PvPLog")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "alts" or cmd == "characters" or cmd == "chars" then
-        local module = WM.modules.AltTracker
-        if module and module.Toggle then module:Toggle() else WM:Print("AltTracker module not available") end
+        local module = WM:UsableModule("AltTracker")
+        if module and module.Toggle then module:Toggle() end
 
     elseif cmd == "lockouts" or cmd == "lockout" then
-        local module = WM.modules.InstanceTracker
-        if module and module.PrintLockouts then module:PrintLockouts() else WM:Print("InstanceTracker module not available") end
+        local module = WM:UsableModule("InstanceTracker")
+        if module and module.PrintLockouts then module:PrintLockouts() end
 
     elseif cmd == "swing reset" then
-        local module = WM.modules.SwingTimer
+        local module = WM:UsableModule("SwingTimer")
         if module and module.ResetPosition then
             module:ResetPosition()
             WM:Print("Swing timer moved back to the centre at its default size.")
         end
 
     elseif cmd == "swing" or cmd == "swingtimer" then
-        local module = WM.modules.SwingTimer
+        local module = WM:UsableModule("SwingTimer")
         if module and module.Test then
             module:Test()
-        else
-            WM:Print("SwingTimer module not available")
         end
 
     elseif cmd == "totems" or cmd == "totem" then
-        local module = WM.modules.ClassShaman
+        local module = WM:UsableModule("ClassShaman")
         if module and module.ToggleEditor then
             module:ToggleEditor()
-        else
-            WM:Print("ClassShaman module not available")
         end
 
     elseif cmd == "class" or cmd == "classes" or cmd == "classtools" then
-        local module = WM.modules.ClassTools
+        local module = WM:UsableModule("ClassTools")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("ClassTools module not available")
         end
 
     elseif cmd == "encounters" or cmd == "callouts" then
-        local module = WM.modules.DebuffTracker
+        local module = WM:UsableModule("DebuffTracker")
         if module and module.ToggleEncounterUI then
             module:ToggleEncounterUI()
-        else
-            WM:Print("DebuffTracker module not available")
         end
 
     elseif cmd == "srcheck" or cmd == "sr" or cmd == "resist" then
-        local module = WM.modules.DebuffTracker
+        local module = WM:UsableModule("DebuffTracker")
         if module and module.ExplainShadowResist then
             module:ExplainShadowResist()
-        else
-            WM:Print("DebuffTracker module not available")
         end
 
     elseif cmd == "srraid" or cmd == "srcheck raid" or cmd == "sr raid" then
-        local module = WM.modules.DebuffTracker
+        local module = WM:UsableModule("DebuffTracker")
         if module and module.StartRaidShadowResistScan then
             module:StartRaidShadowResistScan()
-        else
-            WM:Print("DebuffTracker module not available")
         end
 
     elseif cmd == "shear" or cmd == "shear on" or cmd == "shear off"
         or cmd == "shearstats" then
-        local module = WM.modules.DebuffTracker
-        if not module then
-            WM:Print("DebuffTracker module not available")
-            return
-        end
+        local module = WM:UsableModule("DebuffTracker")
+        if not module then return end
         if cmd == "shear on" or cmd == "shear off" then
             local want = (cmd == "shear on")
             if DebuffTrackerDB and DebuffTrackerDB.shearMonitor ~= want then
@@ -2225,21 +2217,16 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
 
     elseif cmd == "whybuff" or cmd == "buffdebug" then
-        local module = WM.modules.BuffCheck
+        local module = WM:UsableModule("BuffCheck")
         if module and module.ExplainUnit then
             -- Inspect your target if you have one, otherwise yourself
             module:ExplainUnit(UnitExists("target") and "target" or "player")
-        else
-            WM:Print("BuffCheck module not available")
         end
 
     elseif cmd == "exclude" or cmd == "unexclude" or cmd == "exclusions"
         or cmd == "excludelist" or cmd == "clearexclusions" or cmd == "whyboss" then
-        local module = WM.modules.DebuffTracker
-        if not module then
-            WM:Print("DebuffTracker module not available")
-            return
-        end
+        local module = WM:UsableModule("DebuffTracker")
+        if not module then return end
         if cmd == "exclude" then
             module:ExcludeTarget()
         elseif cmd == "unexclude" then
@@ -2253,11 +2240,9 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
 
     elseif cmd == "range" or cmd == "aurarange" or cmd == "totem" or cmd == "aura" then
-        local module = WM.modules.AuraRange
+        local module = WM:UsableModule("AuraRange")
         if module and module.Toggle then
             module:Toggle()
-        else
-            WM:Print("AuraRange module not available")
         end
 
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then
@@ -2279,12 +2264,21 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
         WM:Print("Minimap button position reset. Drag to reposition.")
         
+    elseif cmd == "setup" or cmd == "setup quick" or cmd == "setup guided" or cmd == "wizard" then
+        if WM.Setup then
+            if cmd == "setup quick" then WM.Setup:OpenQuick()
+            elseif cmd == "setup guided" then WM.Setup:OpenGuided()
+            else WM.Setup:ShowWelcome() end
+        end
+
     elseif cmd == "help" then
         WM:ShowHelp()
     elseif cmd == "status" then
         WM:Print("=== Module Status ===")
         for name, module in pairs(WM.modules) do
-            if module.GetQuickStatus then
+            if not WM:IsModuleOn(name) then
+                print("  " .. name .. ": |cFF888888off on this character|r")
+            elseif module.GetQuickStatus then
                 print("  " .. name .. ": " .. module:GetQuickStatus())
             else
                 print("  " .. name .. ": |cFF888888Loaded|r")
@@ -2330,6 +2324,9 @@ local maxRetries = 5
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == AddonName then
         InitCoreDB()
+        -- Per-character settings, then this character's module switches
+        if WM.Profiles then WM.Profiles:Load() end
+        if WM.InitCharacter then WM:InitCharacter() end
         
     elseif event == "PLAYER_LOGIN" then
         -- Hide dashboard if it exists from previous session

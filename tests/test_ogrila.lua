@@ -163,8 +163,15 @@ env.OgrilaDB.hotkeys = true
 env.OgrilaDB.autoOpen = false
 h:Hide()
 hooks.SelectOption()
-check("auto-open off", not h:IsShown() and not OG:IsModuleEnabled())
-OG:SetModuleEnabled(true)
+check("auto-open off", not h:IsShown())
+env.OgrilaDB.autoOpen = true
+-- Turned off on this character: closes, and relics don't open it
+OG:ShowHelper()
+WM:SetModuleOn("Ogrila", false)
+check("off: the helper closes", not h:IsShown() and next(bindings) == nil)
+hooks.SelectOption()
+check("off: relics don't open it", not h:IsShown())
+WM:SetModuleOn("Ogrila", true)
 OG:Command("")
 check("command toggles the helper", h:IsShown())
 OG:Command("clear")

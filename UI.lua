@@ -826,6 +826,29 @@ function Panel:AddFooterText(spec, side)
     return fs
 end
 
+-- Pages: more than one set of content in one scrolling panel (a wizard).
+-- Each page has its own layout; ShowPage swaps it in.
+function Panel:NewPage()
+    assert(self.opts.scroll, "pages need a scrolling panel")
+    local content = CreateFrame("Frame", nil, self.body)
+    content:SetWidth(self.layout.width)
+    content:SetHeight(1)
+    content:Hide()
+    return { content = content, layout = NewLayout(self, content, self.layout.width) }
+end
+
+function Panel:ShowPage(page)
+    if self.page and self.page ~= page then self.page.content:Hide() end
+    if not self.firstPage then self.firstPage = { content = self.content, layout = self.layout } end
+    if self.content ~= page.content then self.content:Hide() end
+    self.page = page
+    self.content, self.layout = page.content, page.layout
+    self.body:SetScrollChild(page.content)
+    page.content:Show()
+    self.body:SetVerticalScroll(0)
+    self:Refresh()
+end
+
 -- Call once all rows are added
 function Panel:Finish()
     self:Reflow()
