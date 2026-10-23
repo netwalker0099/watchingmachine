@@ -676,28 +676,14 @@ Save and swap gear sets, like ItemRack.
 - [ ] **Fits with:** Your Characters (each set's pieces), GearScore (a set's
       score), the Loot Browser BiS lists (what's missing from a set).
 
-## 21. Ogri'la helper (Ogri'Lazy-style) — Apexis Relic part DONE in 3.44
+## 21. Ogri'la helper (Ogri'Lazy-style) — DONE in 3.44
 
 Built as `Modules/Ogrila.lua` (our own code; object, debuff and spell IDs
-compiled with Ogri'Lazy's research). Ogri'Lazy itself only does the Apexis
-Relic memory game, so the rest below is still open.
+compiled with Ogri'Lazy's research).
 
 - [x] **Apexis Relic / Monument:** record the colour sequence, follow beam
       touches, undo on Reprisal, hotkeys, auto-open at the relic.
 - [x] **Apexis shards and crystals:** the count, in the helper.
-
-Still to do (the Ogri'la and Sha'tari Skyguard dailies):
-
-- [ ] **Bombing runs:** the Fel Cannonball Stack / Bomb Them Again!
-      dailies. A button or key that uses the quest item on the target in
-      range, and a counter.
-- [ ] **Banish / Wrangle dailies:** the quest item's button ready when the
-      right target is in range, and the remaining count.
-- [ ] **Apexis costs:** what you're saving for (Ogri'la rewards in the
-      Loot Browser) next to the shard count.
-- [ ] **Check:** what Blizzard allows on 2.5.6 (item use from addon
-      buttons needs secure action buttons, and those can't change in
-      combat).
 
 ## 22. Crit tracker (CritTracker-style) — DONE in 3.43
 
