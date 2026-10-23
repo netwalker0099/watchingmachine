@@ -303,6 +303,11 @@ function Alts:ShowTooltip(owner, c)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Last seen " .. Ago(c.seen) .. (c.zone and (" in " .. c.zone) or ""), 0.6, 0.6, 0.6)
+    local att = WM.Attunements and WM.Attunements.TooltipLines and WM.Attunements:TooltipLines(c.key)
+    if att then
+        GameTooltip:AddLine(" ")
+        for _, l in ipairs(att) do GameTooltip:AddLine(l, 1, 1, 1, true) end
+    end
     if c.key ~= CharKey() then GameTooltip:AddLine("Right-click to remove (a deleted character).", 0.6, 0.6, 0.6) end
     GameTooltip:Show()
 end

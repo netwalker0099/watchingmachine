@@ -574,7 +574,13 @@ addons, worked out locally from equipped items.
       already quote (TBC values differ from Wrath's)? Check that it
       reads TacoTip's comm data if that's common on Anniversary realms.
 
-## 16. Attunement tracking
+## 16. Attunement tracking — DONE in 3.41
+
+Built as `Modules/Attunements.lua` + `Data/Attunements.lua` (our own code;
+the chain facts compiled with the Attune addon's research): TBC and
+Classic chains, the heroic keys by patch, per-character progress, Your
+Characters lines, a guild survey over our own addon message. Not done:
+reading Attune users' own comms.
 
 Which attunements and keys each of your characters has, and what's left.
 

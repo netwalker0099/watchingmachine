@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.40"
+WM.version = "3.41"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -339,6 +339,7 @@ local MODULE_COLORS = {
     WorldTimers = "66FFCC",
     LootBrowser = "FFB366",
     GearScore = "A335EE",
+    Attunements = "66CCFF",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1151,7 +1152,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
 }
@@ -1215,6 +1216,14 @@ local MODULE_INFO = {
         command = "gs", color = {0.64, 0.21, 0.93}, icon = "Interface\\Icons\\INV_Jewelry_Talisman_08",
         tools = {
             { text = "Print the group's scores", func = function() Call("GearScore", "Report") end },
+        },
+    },
+    Attunements = {
+        title = "Attunements", desc = "Raid attunements and keys, per character",
+        about = "How far each of your characters is through every TBC raid attunement, dungeon key and heroic key (Classic ones too if you like): the steps done, what to do next and where, your alts side by side, and a guild survey of members running Watching Machine.",
+        command = "attune", color = {0.4, 0.8, 1}, icon = "Interface\\Icons\\INV_Misc_Key_07",
+        tools = {
+            { text = "Survey the guild", func = function() Call("Attunements", "Survey") end },
         },
     },
     PvPLog = {
@@ -1863,6 +1872,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
     print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
     print("|cFFFFFF00/wmachine loot|r - Loot Browser (what every dungeon and raid boss drops)")
+    print("|cFFFFFF00/wmachine attune|r - Attunements: raid attunements and keys for each character")
     print("|cFFFFFF00/wmachine gs|r - GearScore for your group (gs unlock / lock / reset / report)")
     print("|cFFFFFF00/wmachine wb [guild|party|raid]|r - Print the world timers, or send them to a channel")
     print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
@@ -2067,6 +2077,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "gs" or cmd == "gearscore" or cmd:match("^gs ") then
         local module = WM.modules.GearScore
         if module and module.Command then module:Command(cmd:match("^gs (.+)$")) else WM:Print("GearScore module not available") end
+
+    elseif cmd == "attune" or cmd == "attunements" or cmd == "att" then
+        local module = WM.modules.Attunements
+        if module and module.Toggle then module:Toggle() else WM:Print("Attunements module not available") end
 
     elseif cmd == "loot" or cmd == "atlas" or cmd == "al" then
         local module = WM.modules.LootBrowser

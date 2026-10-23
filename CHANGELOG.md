@@ -2,7 +2,53 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.40** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.41** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.41
+
+### New — Attunements
+
+Where each of your characters is on every attunement (`/wmachine attune`,
+or the dashboard card in the Raid group).
+
+| Group | Attunements |
+|---|---|
+| Raids | Karazhan, Nightbane, Serpentshrine Cavern, The Eye, Mount Hyjal, Black Temple |
+| Dungeon keys | Shattered Halls, Shadow Labyrinth, The Arcatraz, The Black Morass |
+| Heroic keys | Thrallmar / Honor Hold, Cenarion Expedition, Lower City, Sha'tar, Keepers of Time |
+| Other | Ogri'la, Ally of the Netherwing |
+| Classic (*Classic too*) | Molten Core, Onyxia, Blackwing Lair, Naxxramas, Aqual Quintessence, the Scepter, BRD and Scholomance keys |
+
+- **Progress is read from the game:**
+  - finished quests, quests in your log
+  - items in your bags and bank
+  - your level and reputation
+  - attunements a chain needs (Karazhan needs the Shadow Labyrinth,
+    Arcatraz and Black Morass keys)
+  - Steps the game can't report, like a kill or a conversation, count as
+    done once anything after them is.
+- **Each step:**
+  - **green** done, **yellow** what to do next, **grey** later, with its
+    zone
+  - hover for the quest's level and group size, the creature, the item, or
+    your reputation so far
+  - the heading says "12 / 26 steps (46%)", with a short summary
+- **Patch-aware:** the heroic keys follow the client's patch (Revered on
+  2.5.6; Honored and the new keys from 2.5.7).
+- **Your characters:**
+  - *My characters* shows every alt's progress for the selected attunement.
+  - Your Characters tooltips now say *Attuned:* and *In progress:* for raids.
+- **Guild:** *Survey guild* asks guild members running Watching Machine for
+  their progress, and the *Guild* view lists them.
+  - It uses its own addon message.
+  - Each member answers at most every 30 seconds, a moment apart.
+- **"Attuned: Karazhan!"** in chat when you finish one (*Say when done*).
+- **Written for Watching Machine:** the code is new. The attunement chains
+  were compiled with the help of the Attune addon's research. Only the
+  facts are kept (which quests, items, creatures, levels and reputation),
+  in our own format.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.40 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.41 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -617,7 +617,35 @@ A gear score and average item level for you and every player you mouse over
   TacoTip) loaded, its tooltips and character frame score are left to it;
   the group list still works
 
-### 25. Chat Filter
+### 25. Attunements
+Every raid attunement and key, for each of your characters (Raid group;
+`/wmachine attune`).
+
+- **What's tracked (TBC):**
+  - **Raids:** Karazhan, Nightbane, Serpentshrine Cavern, The Eye, Mount
+    Hyjal, Black Temple.
+  - **Dungeon keys:** Shattered Halls, Shadow Labyrinth, Arcatraz, Black
+    Morass.
+  - **Heroic keys:** the five faction keys.
+  - **Other:** Ogri'la, Netherwing.
+  - **Classic:** MC, Onyxia, BWL, Naxxramas and the Classic keys (*Classic
+    too*).
+- **Read from the game:** finished quests, quests in your log, items in
+  your bags and bank, your level and reputation, and other attunements a
+  chain needs. Kills and conversations the game can't report count as done
+  once anything after them is
+- **The steps:** green done, yellow what to do next, grey later, each with
+  its zone; hover for the quest's level and group size, the creature, the
+  item, or your reputation so far
+- **Patch-aware:** the heroic keys follow the client: Revered on 2.5.6,
+  Honored and the new keys from 2.5.7
+- **My characters:** every alt's progress for the selected attunement, and
+  *Attuned:* / *In progress:* lines on Your Characters tooltips
+- **Guild:** *Survey guild* asks guild members running Watching Machine for
+  their progress (its own addon message; one answer per 30 seconds each)
+- **Chat:** "Attuned: Karazhan!" when you finish one (*Say when done*)
+
+### 26. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -750,6 +778,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine alts` - Your Characters
 - `/wmachine bgs` - Battleground and arena log
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
+- `/wmachine attune` - Attunements: raids, keys and heroic keys per character
 - `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
 - `/wmachine wb [guild|party|raid]` - Print the world timers, or send them to a channel
@@ -803,6 +832,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WorldTimersDB` - World Timers: layers and timers per realm and faction, Sayge cooldowns
 - `LootBrowserDB` - Loot Browser: last expansion and instance, Normal / Heroic, set filter
 - `WMGearScoreDB` - GearScore options, frame positions, others' scores (kept a week)
+- `AttunementsDB` - Attunement progress per character, guild survey answers
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -824,6 +854,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.41
+- New **Attunements**: every TBC raid attunement, dungeon key and heroic key (Classic optional) with steps done and next, per character, on Your Characters tooltips, and a guild survey
 
 ### Version 3.40
 - **Loot Browser search**: by item, recipe, instance or boss name, across every expansion and page, with names looked up as you search
