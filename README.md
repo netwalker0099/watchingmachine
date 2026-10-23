@@ -693,8 +693,10 @@ Ideas that are planned but not started, with open questions, are in
 Full detail for 2.8 onward lives in [`CHANGELOG.md`](CHANGELOG.md).
 Copy-paste release announcements for Discord and CurseForge are in
 [`docs/`](docs/) — the latest is
-[`docs/RELEASE-NOTES-v3.16-v3.21.md`](docs/RELEASE-NOTES-v3.16-v3.21.md)
-(3.16 to 3.21). Earlier: 3.11.3 to 3.13 in
+[`docs/RELEASE-NOTES-v3.21-v3.28.md`](docs/RELEASE-NOTES-v3.21-v3.28.md)
+(3.21 to 3.28). Earlier: 3.16 to 3.21 in
+[`docs/RELEASE-NOTES-v3.16-v3.21.md`](docs/RELEASE-NOTES-v3.16-v3.21.md),
+3.11.3 to 3.13 in
 [`docs/RELEASE-NOTES-v3.11.3-v3.13.md`](docs/RELEASE-NOTES-v3.11.3-v3.13.md),
 3.11 to 3.11.2 in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
