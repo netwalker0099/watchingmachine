@@ -549,7 +549,13 @@ from which boss), in our own format.
 - [ ] **Search** by item name (cached names only, or ask the client in
       batches).
 
-## 15. GearScore
+## 15. GearScore — DONE in 3.37
+
+Built as `Modules/GearScore.lua`, using GearScoreTBCClassic (MIT) as the
+guide: its formula, so the numbers match. Player and item tooltips, the
+character and inspect frames, a throttled inspect queue, a group list. Not
+done: reading TacoTip's comm data, and a GearScore column in Buff Check /
+ArmorySnap.
 
 A gear score for every player, in the style of the GearScore / TacoTip
 addons, worked out locally from equipped items.

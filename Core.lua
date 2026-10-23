@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.36"
+WM.version = "3.37"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -338,6 +338,7 @@ local MODULE_COLORS = {
     PvPLog = "FF6666",
     WorldTimers = "66FFCC",
     LootBrowser = "FFB366",
+    GearScore = "A335EE",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1150,7 +1151,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker" } },
 }
@@ -1207,6 +1208,14 @@ local MODULE_INFO = {
         title = "Loot Browser", desc = "Boss loot, crafting, factions, PvP",
         about = "Every dungeon and raid boss's loot, what each profession makes, reputation rewards and PvP gear, for Classic and The Burning Crusade (Wrath switches on by itself on a Wrath client). Opens on the instance you're in, and item tooltips everywhere say where the item comes from.",
         command = "loot", color = {1, 0.7, 0.4}, icon = "Interface\\Icons\\INV_Box_01",
+    },
+    GearScore = {
+        title = "GearScore", desc = "Gear scores for you and your group",
+        about = "A gear score and average item level for every player you mouse over, on item tooltips (with what an item would change for you), on the character and inspect frames, and for your whole group in one list. Same numbers as GearScoreTBCClassic.",
+        command = "gs", color = {0.64, 0.21, 0.93}, icon = "Interface\\Icons\\INV_Jewelry_Talisman_08",
+        tools = {
+            { text = "Print the group's scores", func = function() Call("GearScore", "Report") end },
+        },
     },
     PvPLog = {
         title = "Battlegrounds & Arenas", desc = "Results and stats of every match",
@@ -1854,6 +1863,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine bgs|r - Battleground and arena log")
     print("|cFFFFFF00/wmachine timers|r - World Timers (layers, Terokkar, dailies, DMF)")
     print("|cFFFFFF00/wmachine loot|r - Loot Browser (what every dungeon and raid boss drops)")
+    print("|cFFFFFF00/wmachine gs|r - GearScore for your group (gs unlock / lock / reset / report)")
     print("|cFFFFFF00/wmachine wb [guild|party|raid]|r - Print the world timers, or send them to a channel")
     print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
@@ -2053,6 +2063,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "wb" or cmd:match("^wb ") then
         local module = WM.modules.WorldTimers
         if module and module.Report then module:Report(cmd:match("^wb (%a+)")) else WM:Print("WorldTimers module not available") end
+
+    elseif cmd == "gs" or cmd == "gearscore" or cmd:match("^gs ") then
+        local module = WM.modules.GearScore
+        if module and module.Command then module:Command(cmd:match("^gs (.+)$")) else WM:Print("GearScore module not available") end
 
     elseif cmd == "loot" or cmd == "atlas" or cmd == "al" then
         local module = WM.modules.LootBrowser

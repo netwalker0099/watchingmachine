@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.36 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.37 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -571,7 +571,33 @@ reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
   the first look at a page can show "Item 12345" for a moment while the
   client fetches them
 
-### 24. Chat Filter
+### 24. GearScore
+A gear score and average item level for you and every player you mouse over
+(Raid group; `/wmachine gs`, or `/gs` when no other GearScore addon has it).
+
+- **Same numbers as GearScoreTBCClassic:** the GearScoreLite formula tuned
+  for TBC. It uses each item's level, quality and slot weight; enchants add
+  5% and gems 5 each; hunters' ranged weapons count more and melee less.
+  Colours run grey, white, green, blue, purple, orange
+- **Player tooltips:** "GearScore: 1650  iLvl: 112". Players you mouse over
+  are inspected automatically: out of combat, within inspect range, one at
+  a time, never while your own inspect window is open. Scores are kept by
+  name for a week
+- **Item tooltips:** the item's score. *Item tooltip details* adds its base
+  score, enchant and gem bonuses (or what's missing), and what equipping it
+  would change for you (against the weaker ring or trinket, both hands for
+  a two-hander)
+- **Character and inspect frames:** your score and average item level, and
+  the inspected player's. `/wmachine gs unlock` to drag it, `lock` to save,
+  `reset` to put it back
+- **Group list:** everyone in your party or raid, highest first, with when
+  they were last seen. *Scan group* inspects whoever's missing; *Send to
+  group* posts the list. `/wmachine gs report` prints it
+- **With another GearScore addon** (GearScoreTBCClassic, GearScoreLite,
+  TacoTip) loaded, its tooltips and character frame score are left to it;
+  the group list still works
+
+### 25. Chat Filter
 Hides chat spam by phrase — e.g. **Guild Loot Run** — before you, or Keyword Monitor, ever see it.
 
 - **Premade filters**, one tick each (off until you turn them on):
@@ -704,6 +730,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine alts` - Your Characters
 - `/wmachine bgs` - Battleground and arena log
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
+- `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
 - `/wmachine wb [guild|party|raid]` - Print the world timers, or send them to a channel
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
@@ -755,6 +782,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `PvPLogDB` - Battleground and arena matches (every character)
 - `WorldTimersDB` - World Timers: layers and timers per realm and faction, Sayge cooldowns
 - `LootBrowserDB` - Loot Browser: last expansion and instance, Normal / Heroic, set filter
+- `WMGearScoreDB` - GearScore options, frame positions, others' scores (kept a week)
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
 ## Planned work
@@ -776,6 +804,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.37
+- New **GearScore**: scores and average item level on player and item tooltips, the character and inspect frames, and a group list; same numbers as GearScoreTBCClassic
 
 ### Version 3.36
 - **Loot Browser:** new *Crafting*, *Factions* and *PvP* pages (Classic, TBC, and Wrath on a Wrath client); set pages are one line per set, grouped by class; tooltips also say *Reputation reward*, *PvP reward* and *Made by*

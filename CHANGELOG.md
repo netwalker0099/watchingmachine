@@ -2,7 +2,49 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.36** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.37** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.37
+
+### New — GearScore
+
+A gear score and average item level for you and every player you mouse over
+(`/wmachine gs`, `/gs`, or the dashboard card in the Raid group).
+
+- **The numbers:** the same as GearScoreTBCClassic's. It uses the
+  GearScoreLite formula tuned for TBC:
+  - each item's level, quality and slot weight (a two-hander counts double,
+    trinkets and rings about half)
+  - **enchants +5%**, **gems +5** each
+  - hunters' ranged weapons count more and their melee weapons less
+  - colours by tier, grey through orange
+- **Player tooltips:** "GearScore: 1650  iLvl: 112".
+  - **Auto-inspect:** players you mouse over are inspected one at a time,
+    out of combat and within inspect range (about 28 yards), never while
+    your own inspect window is open.
+  - **Late tooltips:** the line appears as soon as the inspect comes back,
+    even with the tooltip already open.
+  - **Kept:** scores are saved by name for a week.
+- **Item tooltips:** the item's score. *Item tooltip details* (off by
+  default) adds:
+  - its base score, enchant and gem bonuses, or a missing enchant or empty
+    sockets
+  - what equipping it would change: against your weaker ring or trinket,
+    and both hands for a two-hander
+- **Character and inspect frames:** "GearScore: 1650  iLvl: 112".
+  `/wmachine gs unlock` to move it, `lock` to save, `reset` to put it back.
+- **Group list:** your party or raid, highest score first, with when each
+  was last inspected.
+  - *Scan group* inspects whoever's missing.
+  - *Send to group* posts the scores.
+  - `/wmachine gs report` prints them.
+- **Another GearScore addon?** With GearScoreTBCClassic, GearScoreLite or
+  TacoTip loaded, Watching Machine leaves the tooltips and character frame
+  to it (no double lines). The group list still works.
+- **Credit:** formula and colour brackets from GearScoreTBCClassic (gk646,
+  MIT licence, notice in `Modules/GearScore.lua`).
 
 ---
 

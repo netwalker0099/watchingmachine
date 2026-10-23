@@ -34,12 +34,12 @@ for _, g in ipairs(WM.MODULE_GROUPS) do
 end
 for _, name in ipairs({ "AutoLogger", "KeywordMonitor", "MailLogger", "ServicesParser", "WhisperLogs",
                         "GuildInvite", "DebuffTracker", "PvPTracker", "Recruiter", "BuffCheck", "ChatFilter",
-                        "ArmorySnap", "AuraRange", "ClassTools", "InstanceTracker", "PvPLog", "AltTracker", "WorldTimers", "LootBrowser" }) do
+                        "ArmorySnap", "AuraRange", "ClassTools", "InstanceTracker", "PvPLog", "AltTracker", "WorldTimers", "LootBrowser", "GearScore" }) do
     check(name .. " has exactly one card", seen[name] == 1)
     local info = WM.MODULE_INFO[name]
     check(name .. " card explains itself", info and info.about and #info.about > 20 and info.command)
 end
-check("no stray cards", total == 19)
+check("no stray cards", total == 20)
 
 -- ---- build the dashboard ----
 WM:CreateDashboard()
