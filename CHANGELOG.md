@@ -2,7 +2,26 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.29** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.29.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.29.1
+
+### Fixed — shadow resist gear not detected after Mother Shahraz
+
+The check read gear shadow resistance from `GetItemStats`, which gives only
+an item's own stats: socketed gems and enchants never showed, and "Resist
+All" wasn't counted. A set gemmed with Void Spheres could stay under the
+threshold and never warn.
+
+- Each equipped item's tooltip is now read as well (`C_TooltipInfo` where
+  the client has it, otherwise a hidden scanning tooltip). It counts "+N
+  Shadow Resistance", "+N Resist All", "+N All Resistances" and active
+  socket and set bonuses; grey (inactive) bonuses are skipped.
+- Each slot takes the larger of the item stats and the tooltip, so a client
+  where one of them comes back empty still works.
+- New test file `tests/test_srcheck.lua`.
 
 ---
 

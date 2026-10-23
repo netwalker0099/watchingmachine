@@ -1339,10 +1339,11 @@ local SR_WARN_COOLDOWN = 20   -- seconds between warnings, so one pull warns onc
 local srArmed = false
 local srLastWarn = 0
 
--- Total shadow resistance contributed by equipped items.
+-- Shadow resistance from an item's own stats.
 -- GetItemStats keys differ between clients (ITEM_MOD_SHADOW_RESISTANCE_SHORT
 -- vs RESISTANCE5_NAME), so match either shape rather than one literal key.
-local function SlotShadowResist(link)
+-- It leaves out socketed gems and enchants, so the tooltip is read too.
+local function StatsShadowResist(link)
     if not link or not GetItemStats then return 0 end
     local ok, stats = pcall(GetItemStats, link)
     if not ok or type(stats) ~= "table" then return 0 end
@@ -1350,12 +1351,76 @@ local function SlotShadowResist(link)
     for k, v in pairs(stats) do
         if type(v) == "number" and v > 0 then
             local K = tostring(k):upper()
-            if K:find("SHADOW_RESISTANCE", 1, true) or K == "RESISTANCE5_NAME" then
+            if K:find("SHADOW_RESISTANCE", 1, true) or K == "RESISTANCE5_NAME"
+                or K:find("RESIST_ALL", 1, true) or K:find("ALL_RESIST", 1, true) then
                 sr = sr + v
             end
         end
     end
     return sr
+end
+
+-- Tooltip lines that add shadow resistance: the item's own "+40 Shadow
+-- Resistance", gems ("+4 Resist All" from Void Sphere), enchants ("+5 All
+-- Resistances") and socket or set bonuses. Grey lines are inactive bonuses.
+local SR_LINE_PATTERNS = {
+    "%+(%d+) [Ss]hadow [Rr]esistance",
+    "%+(%d+) [Rr]esist [Aa]ll",
+    "%+(%d+) [Tt]o [Aa]ll [Rr]esistances",
+    "%+(%d+) [Aa]ll [Rr]esistances",
+}
+
+function DebuffTracker.ShadowResistFromLine(text, r, g, b)
+    if type(text) ~= "string" then return 0 end
+    if r and g and b and r < 0.6 and g < 0.6 and b < 0.6 then return 0 end
+    for _, pat in ipairs(SR_LINE_PATTERNS) do
+        local n = text:match(pat)
+        if n then return tonumber(n) or 0 end
+    end
+    return 0
+end
+
+local scanTip
+-- Calls fn(text, r, g, b) for each left-hand tooltip line of an equipped slot
+local function ForEachSlotTooltipLine(slot, fn)
+    if C_TooltipInfo and C_TooltipInfo.GetInventoryItem then
+        local data = C_TooltipInfo.GetInventoryItem("player", slot)
+        if type(data) == "table" and type(data.lines) == "table" then
+            for _, line in ipairs(data.lines) do
+                local c = line.leftColor
+                fn(line.leftText, c and c.r, c and c.g, c and c.b)
+            end
+            return
+        end
+    end
+    if not scanTip then
+        scanTip = CreateFrame("GameTooltip", "WM_SRScanTooltip", nil, "GameTooltipTemplate")
+    end
+    scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scanTip:ClearLines()
+    scanTip:SetInventoryItem("player", slot)
+    for i = 1, scanTip:NumLines() do
+        local fs = _G["WM_SRScanTooltipTextLeft" .. i]
+        if fs then
+            local r, g, b = fs:GetTextColor()
+            fn(fs:GetText(), r, g, b)
+        end
+    end
+    scanTip:Hide()
+end
+
+local function TooltipShadowResist(slot)
+    local sr = 0
+    local ok = pcall(ForEachSlotTooltipLine, slot, function(text, r, g, b)
+        sr = sr + DebuffTracker.ShadowResistFromLine(text, r, g, b)
+    end)
+    return ok and sr or 0
+end
+
+-- The tooltip counts gems and enchants as well as the item's own stats, so
+-- it's normally the larger; the stats are the fallback if it can't be read.
+local function SlotShadowResist(slot, link)
+    return math.max(StatsShadowResist(link), TooltipShadowResist(slot))
 end
 
 -- Returns total, pieceCount, detail[] = { slot, link, sr }
@@ -1364,7 +1429,7 @@ function DebuffTracker:GetGearShadowResist()
     for slot = 1, 19 do
         local link = GetInventoryItemLink("player", slot)
         if link then
-            local sr = SlotShadowResist(link)
+            local sr = SlotShadowResist(slot, link)
             if sr > 0 then
                 total = total + sr
                 pieces = pieces + 1

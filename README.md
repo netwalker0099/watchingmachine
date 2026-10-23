@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.29 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.29.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -702,6 +702,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.29.1
+- Fix: the Black Temple **shadow resist gear check** now counts socketed gems (Void Sphere's +4 Resist All), enchants and socket bonuses, and pieces whose resistance the item stats don't report
 
 ### Version 3.29
 - Fix: the **Shattrath flasks** (Blinding Light, Pure Death, Relentless Assault, Supreme Power, Fortification, Mighty Restoration) now count as flasks in Buff Check and the personal flask warning
