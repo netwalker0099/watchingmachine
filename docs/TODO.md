@@ -623,7 +623,7 @@ Loot council for raids, with RCLootCouncil as the model.
       item to the raid. Members answer (Need / Minor upgrade / Off-spec /
       Pass, with a note) and the council sees the answers with each
       player's current item in that slot.
-- [ ] **Council view:** votes, a item-for-item comparison, GearScore (item
+- [ ] **Council view:** votes, an item-for-item comparison, GearScore (item
       15), attendance and past awards. Award on a click; it hands the item
       out through master loot.
 - [ ] **History:** every award saved (who, what, when, response), searchable,
