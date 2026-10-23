@@ -2,7 +2,57 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.32** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.33** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.33
+
+### New — World Timers on the world map
+
+Pins with live timers on the map they belong to (World Timers options:
+*Show the timers on the world map*, on by default).
+
+| Map | Pins |
+|---|---|
+| The Faire's zone and continent | Darkmoon Faire: "opens in" or "ends in" |
+| Terokkar Forest, Shattrath | Terokkar towers: your layer's reset (or the soonest) |
+| Shattrath | Today's dungeon and heroic dailies |
+| Felwood | All ten Songflowers: time until each is back, or "ready?" |
+
+- **Hover a pin** for details: every layer's tower reset and who holds the
+  towers, when a Songflower was picked and on which layer.
+- **Ticks** once a second while the map is open; pins keep their size when
+  you zoom.
+- **Safe:** pins are drawn on the map's canvas and only post-hook it
+  (`OnMapChanged`, `OnCanvasScaleChanged`, `OnShow`). Nothing of Blizzard's
+  is replaced. It also works when the map loads after Watching Machine.
+
+### New — guild layer list
+
+Nova World Buffs users tell their guild which layer they're on. World
+Timers now lists them under the timers ("Layer 1: Anna, Bob"), in Nova's
+numbering, for 30 minutes after each last said. Only guild messages count.
+
+### New — NPC walking alert (Horde)
+
+After the Onyxia or Nefarian head is handed in, Runthak or Saurfang walks
+to the gate and the buff drops when they get there. Stand by the throne
+with their window open: when they walk off, it closes by itself, and you
+get "Onyxia buff NPC has started walking!" and a sound.
+
+- **What doesn't count** (checked half a second after the close, as Nova
+  World Buffs does):
+  - closing it yourself: the X, Goodbye, Escape, or a trade window opening
+  - moving, or having stopped in the last second
+  - targeting the NPC while they stand still
+  - being away from the throne
+- **Repeats:** once a minute per buff.
+- **Options:** *Say when the Onyxia / Nefarian NPC starts walking (Horde)*
+  (on), and *Walking alert sound* (raid warning by default; any addon or game
+  sound, or None).
+- **Guild members' Nova walking notices** show too ("... started walking
+  (seen by Anna)"), with the same sound. Like Nova, only from the guild.
 
 ---
 

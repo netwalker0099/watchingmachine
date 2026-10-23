@@ -259,5 +259,185 @@ WT:Toggle()
 check("window opens", env.WM_WorldTimersFrame:IsShown() and (env.WM_WorldTimersFrame.text:GetText() or ""):find("Layer", 1, true))
 check("status", WT:GetQuickStatus():find("DMF", 1, true) ~= nil)
 
+-- ---- Guild layers (Nova World Buffs users) ----
+NWB(F.layerL, "GUILD", "Alpha-Spineshatter")
+NWB(F.dailiesGuild, "GUILD", "Bravo-Spineshatter")
+NWB(F.layerL, "YELL", "Charlie-Spineshatter")
+NWB(F.terokYell, "YELL", "Delta-Spineshatter")
+local gl = WT:GuildLayerLines(now)
+local glText = table.concat(gl, "\n")
+check("guild layer list", gl[1] and gl[1]:find("^Guild") and glText:find("Layer 1: Bravo", 1, true)
+    and glText:find("Layer 2: Alpha", 1, true))
+check("only guild messages count", not glText:find("Charlie", 1, true) and not glText:find("Delta", 1, true))
+check("layer 1 is listed before layer 2", glText:find("Layer 1", 1, true) < glText:find("Layer 2", 1, true))
+check("guild layers in the window", WT:AllText(now):find("Layer 2: Alpha", 1, true) ~= nil)
+WT:NoteGuildLayer("Alpha-Spineshatter", "70-3")
+glText = table.concat(WT:GuildLayerLines(now), "\n")
+check("a newer message moves them", glText:find("Layer 3: Alpha", 1, true) and not glText:find("Layer 2: Alpha", 1, true))
+WT:NoteGuildLayer("Echo", "70")
+check("no layer in the level: not listed", not table.concat(WT:GuildLayerLines(now), "\n"):find("Echo", 1, true))
+check("old entries drop off after 30 minutes", #WT:GuildLayerLines(now + 1801) == 0)
+
+-- ---- NPC walking (Horde, Orgrimmar) ----
+local played = {}
+local savedSounds = WM.Sounds
+WM.Sounds = { Play = function(c) played[#played + 1] = c end }
+env.C_Timer = false
+env.UnitAffectingCombat = function() return false end
+local speeds = {}
+env.GetUnitSpeed = function(u) return speeds[u] or 0 end
+mapID, px, py = 1454, 0.513, 0.75
+guids.target = nil
+local RUNTHAK, SAURFANG = 14392, 14720
+local function Gossip(npc, atClose)
+    guids.npc = Creature(5000, npc)
+    WT:OnEvent("GOSSIP_SHOW")
+    clock = clock + 5
+    if atClose then atClose() end
+    guids.npc = nil
+    return WT:OnGossipClosed()
+end
+check("walking: Runthak's window closing by itself", Gossip(RUNTHAK) == "ony"
+    and Last():find("Onyxia buff NPC has started walking", 1, true) and played[#played] == "kit:8959")
+check("walking: once a minute per buff", Gossip(RUNTHAK) == nil)
+check("walking: Saurfang is Nefarian", Gossip(SAURFANG) == "nef")
+now = now + 61
+check("walking: other NPCs don't count", Gossip(3296) == nil)
+check("walking: a close you made doesn't count", Gossip(RUNTHAK, function() WT:NoteSelfClose() end) == nil)
+clock = clock + 5
+speeds.player = 7
+check("walking: you moving doesn't count", Gossip(RUNTHAK) == nil)
+speeds.player = 0
+WT:OnEvent("PLAYER_STARTED_MOVING")
+check("walking: still moving", Gossip(RUNTHAK) == nil)
+WT:OnEvent("PLAYER_STOPPED_MOVING")
+check("walking: just stopped", WT:CheckWalking("ony") == nil)
+clock = clock + 2
+guids.target = Creature(5000, RUNTHAK)
+check("walking: your target is them and they're standing", WT:CheckWalking("ony") == nil)
+speeds.target = 2.5
+check("walking: your target is them and they're moving", WT:CheckWalking("ony") == "ony")
+guids.target, speeds.target = nil, nil
+now = now + 61
+px = 0.60
+check("walking: away from the throne doesn't count", Gossip(RUNTHAK) == nil)
+px = 0.513
+env.UnitFactionGroup = function() return "Alliance" end
+check("walking: Alliance doesn't count", Gossip(RUNTHAK) == nil)
+env.UnitFactionGroup = function() return "Horde" end
+env.WorldTimersDB.walkAlert = false
+check("walking: switched off", Gossip(RUNTHAK) == nil)
+env.WorldTimersDB.walkAlert = true
+check("walking: a trade window opening doesn't count",
+    Gossip(RUNTHAK, function() WT:OnEvent("TRADE_SHOW") end) == nil)
+clock = clock + 5
+local delayed
+env.C_Timer = { After = function(_, fn) delayed = fn end }
+Gossip(RUNTHAK)
+check("walking: checked half a second later", delayed ~= nil)
+delayed()
+check("walking: and then alerts", Last():find("Onyxia buff NPC has started walking", 1, true) ~= nil)
+env.C_Timer = false
+played = {}
+NWB(F.npcWalking, "GUILD", "Foxtrot-Spineshatter")
+check("guild walking notice", Last():find("Onyxia buff NPC has started walking (seen by Foxtrot)", 1, true)
+    and played[1] == "kit:8959")
+local before = #W.printed
+NWB(F.npcWalking, "YELL", "Golf-Spineshatter")
+check("walking notices only from the guild", #W.printed == before)
+WM.Sounds = savedSounds
+
+-- ---- World map pins ----
+env.WorldTimersDB.realms = {}
+mapID = 1955
+NWB(F.terokYell, "YELL")
+NWB(F.dailiesGuild, "GUILD")
+NWB(F.buffsGuild, "GUILD")
+local function PinsBy(list)
+    local by = {}
+    for _, p in ipairs(list) do by[p.icon:match("([^\\]+)$")] = p end
+    return by
+end
+local d = WT:Dmf(now)
+local dmfZone = ({ ["Mulgore"] = 1412, ["Elwynn Forest"] = 1429, ["Terokkar Forest (Outland)"] = 1952 })[d.place]
+local dmfCont = ({ [1412] = 1414, [1429] = 1415, [1952] = 1945 })[dmfZone]
+local zp = PinsBy(WT:MapPinsFor(dmfZone, now))
+check("pins: the Faire on its zone", zp.INV_Misc_Ticket_Darkmoon_01
+    and zp.INV_Misc_Ticket_Darkmoon_01.text:find(d.up and "^ends in" or "^opens in"))
+check("pins: and on its continent", PinsBy(WT:MapPinsFor(dmfCont, now)).INV_Misc_Ticket_Darkmoon_01 ~= nil)
+check("pins: not elsewhere", #WT:MapPinsFor(1415 + 1429 - dmfCont == 1415 and 1414 or 1415, now) == 0
+    or not PinsBy(WT:MapPinsFor(1415 + 1414 - dmfCont, now)).INV_Misc_Ticket_Darkmoon_01)
+local tp = PinsBy(WT:MapPinsFor(1952, now))
+check("pins: Terokkar towers", tp.Spell_Nature_TimeStop and tp.Spell_Nature_TimeStop.lines[2]:find("^Layer 1")
+    and tp.Spell_Nature_TimeStop.lines[2]:find("reset in", 1, true))
+local sh = WT:MapPinsFor(1955, now)
+local daily = {}
+for _, p in ipairs(sh) do if p.icon:find("Note_01") then daily[#daily + 1] = p end end
+check("pins: Shattrath dailies and towers", #daily == 2 and PinsBy(sh).Spell_Nature_TimeStop ~= nil
+    and (daily[1].text == "Hellfire Ramparts" or daily[2].text == "Hellfire Ramparts"))
+local fw = WT:MapPinsFor(1448, now)
+local f3
+for _, p in ipairs(fw) do if p.lines[1]:find("North of Irontree Woods", 1, true) then f3 = p end end
+check("pins: ten Songflowers", #fw == 10)
+local picked = 1792003500   -- f3 in buffsGuild
+check("pins: a picked Songflower's timer", f3 and f3.text == WT.Short(picked + 1500 - now)
+    and f3.lines[2]:find("Picked " .. WT.Short(now - picked) .. " ago", 1, true))
+check("pins: an unpicked one", fw[1].text == "ready?")
+check("pins: no map, no pins", #WT:MapPinsFor(nil, now) == 0 and #WT:MapPinsFor(1453, now) == 0)
+
+-- Drawn on a stand-in world map
+local canvas = W.NewFrame("Canvas")
+canvas:SetSize(1000, 800)
+local map = W.NewFrame("WorldMapFrame")
+local shownMap, zoom = 1955, 2
+map.GetCanvas = function() return canvas end
+map.GetMapID = function() return shownMap end
+map.GetCanvasScale = function() return zoom end
+map.OnMapChanged = function() end
+map.OnCanvasScaleChanged = function() end
+local hooked = {}
+env.hooksecurefunc = function(t, name, fn)
+    if type(t) == "table" then hooked[name] = fn else hooked[t] = fn end
+end
+check("pins: nothing without a world map", WT:SetupMapPins() == false and WT:RefreshMapPins() == 0)
+env.WorldMapFrame = map
+WT:OnEvent("ADDON_LOADED", "Blizzard_WorldMap")
+check("pins: hooks the map when it loads", hooked.OnMapChanged and hooked.OnCanvasScaleChanged
+    and map._hooks.OnShow ~= nil and WT.mapTicker ~= nil)
+local made = {}
+local realCreate = env.CreateFrame
+env.CreateFrame = function(...) local f = realCreate(...); made[#made + 1] = f; return f end
+check("pins: drawn", WT:RefreshMapPins() == #sh)
+env.CreateFrame = realCreate
+local towerFrame
+for _, f in ipairs(made) do if f.pin and f.pin.icon:find("TimeStop") then towerFrame = f end end
+local pt = towerFrame and towerFrame._points[1]
+-- 93%, 79% of a 1000 x 800 canvas, at half scale on a map zoomed 2x
+check("pins: placed on the canvas", pt and pt[1] == "CENTER" and pt[2] == canvas and pt[3] == "TOPLEFT"
+    and math.abs(pt[4] - 1860) < 0.01 and math.abs(pt[5] + 1264) < 0.01)
+check("pins: tooltip", (function()
+    local lines = {}
+    env.GameTooltip.SetText = function(_, t) lines[#lines + 1] = t end
+    env.GameTooltip.AddLine = function(_, t) lines[#lines + 1] = t end
+    towerFrame._scripts.OnEnter(towerFrame)
+    return lines[1] == "Terokkar Forest towers" and #lines >= 2
+end)())
+local ticks = 0
+local real = WT.RefreshMapPins
+WT.RefreshMapPins = function(...) ticks = ticks + 1; return real(...) end
+WT.mapTicker:_fire("OnUpdate", 0.5)
+WT.mapTicker:_fire("OnUpdate", 0.6)
+check("pins: timers tick once a second", ticks == 1)
+WT.RefreshMapPins = real
+shownMap = 1448
+hooked.OnMapChanged()
+check("pins: map change redraws", WT:RefreshMapPins() == 10)
+env.WorldTimersDB.mapPins = false
+check("pins: switched off", WT:RefreshMapPins() == 0)
+env.WorldTimersDB.mapPins = true
+map:Hide()
+check("pins: map closed", WT:RefreshMapPins() == 0)
+map:Show()
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

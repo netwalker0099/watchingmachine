@@ -16,7 +16,7 @@ local WT = {}
 WM:RegisterModule("WorldTimers", WT)
 WM.WorldTimers = WT
 
-WT.version = "3.28"
+WT.version = "3.33"
 
 -- ============================================
 -- CONSTANTS
@@ -139,6 +139,9 @@ local DEFAULTS = {
     buffWarn = true,         -- world buff warnings (30/15/10/5/1 min)
     listenNWB = true,        -- read Nova World Buffs users' timers
     showNWBNotices = true,   -- their yell / NPC-killed notices
+    mapPins = true,          -- timers on the world map
+    walkAlert = true,        -- the Onyxia / Nefarian NPC starting the walk (Horde)
+    walkSound = "kit:8959",  -- raid warning
 }
 WT.DEFAULTS = DEFAULTS
 
@@ -426,10 +429,13 @@ end
 -- ============================================
 
 local gossipNPC, gossipClosed, gossipShown = nil, -100, -100
+local WALK_NPCS = { [14392] = "ony", [14720] = "nef" }   -- Runthak, Saurfang (see NPC WALKING)
+local walkNPC
 
 function WT:OnGossipShow()
     local _, npcID = ParseGUID(UnitGUID("npc"))
     gossipNPC, gossipShown = npcID, GetTime()
+    if npcID and WALK_NPCS[npcID] then walkNPC = npcID; self:HookGossipCloses() end
 end
 
 function WT:OnQuestFinished()
@@ -873,16 +879,24 @@ function WT:OnNWBMessage(body, distribution, sender)
     if not ver or ver < NWB_MIN_VERSION then return nil end
     local level = tonumber((lvl or ""):match("^(%d+)"))
     if not level or level <= 5 then return nil end
+    if distribution == "GUILD" then self:NoteGuildLayer(sender, lvl) end
     if cmd == "data" then
         local okT, t = WM.Nova.Deserialize(rest)
         if not okT then return nil end
         return self:MergeNWB(t), "data"
-    elseif cmd == "yell" or cmd == "npcKilled" then
+    elseif cmd == "yell" or cmd == "npcKilled" or cmd == "npcWalking" then
         local b = rest:match("^(%a+)")
+        -- Nova only takes walking notices from the guild
+        if cmd == "npcWalking" and distribution ~= "GUILD" then b = nil end
         if b and BUFFS[b] and DB().showNWBNotices then
             local who = (WM.Nova and sender and (sender:match("^([^-]+)"))) or "someone"
             if cmd == "yell" then
                 self:Print(BUFFS[b].name .. " is about to drop (seen by " .. who .. ").")
+            elseif cmd == "npcWalking" then
+                self:Print(BUFFS[b].name .. " buff NPC has started walking (seen by " .. who .. ").")
+                if DB().walkAlert and WM.Sounds then
+                    WM.Sounds.Play(DB().walkSound, GeneralChecksDB and GeneralChecksDB.soundChannel)
+                end
             else
                 self:Print(BUFFS[b].name .. " buff NPC has just been killed (seen by " .. who .. ").")
             end
@@ -890,6 +904,119 @@ function WT:OnNWBMessage(body, distribution, sender)
         return 0, cmd
     end
     return 0, cmd
+end
+
+-- ============================================
+-- NPC WALKING (Horde, Orgrimmar)
+-- ============================================
+-- Turning in the head starts Runthak or Saurfang walking to the gate, and
+-- the buff drops when they get there. When they walk off, their gossip
+-- window closes by itself: a close you didn't make, standing still by the
+-- throne, is how Nova World Buffs spots it. Closes you make (the X,
+-- Goodbye, Escape, a trade opening) are noted and don't count.
+
+local WALK_BOX = { 50.13, 52.50, 73.89, 76.62 }   -- x from / to, y from / to (Orgrimmar map %)
+local lastWalk = {}
+local selfClosed, lastMoved, moving = -100, -100, false
+
+function WT:NoteSelfClose() selfClosed = GetTime() end
+function WT:NoteMoving(started)
+    moving = started and true or false
+    if not started then lastMoved = GetTime() end
+end
+
+function WT:OnGossipClosed()
+    local b = WALK_NPCS[walkNPC or 0]
+    walkNPC = nil
+    if not b or not DB().walkAlert then return end
+    -- A moment for the close button and the NPC's movement to show
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0.5, function() WT:CheckWalking(b) end)
+    else
+        return self:CheckWalking(b)
+    end
+end
+
+function WT:CheckWalking(b)
+    if (UnitFactionGroup and UnitFactionGroup("player")) ~= "Horde" or MapID() ~= ORGRIMMAR then return end
+    local t = GetTime()
+    if t - selfClosed < 1 then return end
+    if moving or t - lastMoved < 1 then return end
+    if GetUnitSpeed and (tonumber(GetUnitSpeed("player")) or 0) > 0 then return end
+    -- Still targeting them and they haven't moved: not walking
+    local _, targetID = ParseGUID(UnitGUID("target"))
+    if WALK_NPCS[targetID or 0] == b and GetUnitSpeed and (tonumber(GetUnitSpeed("target")) or 0) < 1
+        and not (UnitAffectingCombat and UnitAffectingCombat("target")) then
+        return
+    end
+    local x, y
+    if C_Map and C_Map.GetPlayerMapPosition then
+        local ok, pos = pcall(C_Map.GetPlayerMapPosition, ORGRIMMAR, "player")
+        if ok and pos then x, y = pos:GetXY() end
+    end
+    if not x then return end
+    x, y = x * 100, y * 100
+    if x < WALK_BOX[1] or x > WALK_BOX[2] or y < WALK_BOX[3] or y > WALK_BOX[4] then return end
+    local now = Now()
+    if now - (lastWalk[b] or 0) < 60 then return end
+    lastWalk[b] = now
+    self:Print("|cFFFFCC33" .. BUFFS[b].name .. " buff NPC has started walking!|r The buff drops when they reach the gate.")
+    if WM.Sounds then WM.Sounds.Play(DB().walkSound, GeneralChecksDB and GeneralChecksDB.soundChannel) end
+    return b
+end
+
+-- Closes the player makes (post-hooks only: nothing of Blizzard's is replaced)
+function WT:HookGossipCloses()
+    if self.gossipHooked or type(hooksecurefunc) ~= "function" then return end
+    self.gossipHooked = true
+    local note = function() WT:NoteSelfClose() end
+    local buttons = { rawget(_G, "GossipFrameCloseButton"), rawget(_G, "GossipFrameGreetingGoodbyeButton") }
+    local gf = rawget(_G, "GossipFrame")
+    if type(gf) == "table" and type(gf.GreetingPanel) == "table" then buttons[#buttons + 1] = gf.GreetingPanel.GoodbyeButton end
+    for _, btn in pairs(buttons) do
+        if type(btn) == "table" and btn.HookScript then btn:HookScript("OnClick", note) end
+    end
+    for _, fn in ipairs({ "CloseAllWindows", "CloseWindows", "CloseGossip" }) do
+        if type(rawget(_G, fn)) == "function" then hooksecurefunc(fn, note) end
+    end
+    if C_GossipInfo and type(C_GossipInfo.CloseGossip) == "function" then hooksecurefunc(C_GossipInfo, "CloseGossip", note) end
+end
+
+-- ============================================
+-- GUILD LAYERS (Nova World Buffs users)
+-- ============================================
+-- Nova clients tell their guild which layer they're on (their own
+-- numbering, from the layers they know). Kept for this session.
+
+local guildLayers = {}   -- name -> { layer = n (0 = unknown), at = time }
+local GUILD_LAYER_FRESH = 1800
+
+function WT:NoteGuildLayer(sender, levelField, now)
+    local n = tonumber(type(levelField) == "string" and levelField:match("^%d+%-(%d+)$"))
+    if not n or not sender then return end
+    guildLayers[(sender:match("^([^-]+)"))] = { layer = n, at = now or Now() }
+end
+
+function WT:GuildLayerLines(now)
+    now = now or Now()
+    local by, any = {}, false
+    for name, g in pairs(guildLayers) do
+        if now - g.at < GUILD_LAYER_FRESH then
+            by[g.layer] = by[g.layer] or {}
+            table.insert(by[g.layer], name)
+            any = true
+        end
+    end
+    if not any then return {} end
+    local lines = { "Guild (Nova World Buffs users, their numbering):" }
+    local keys = {}
+    for k in pairs(by) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do
+        table.sort(by[k])
+        lines[#lines + 1] = "   " .. (k == 0 and "Unknown" or ("Layer " .. k)) .. ": " .. table.concat(by[k], ", ")
+    end
+    return lines
 end
 
 -- ============================================
@@ -975,6 +1102,11 @@ function WT:AllText(now)
         if t and t + BUFFS[b].cooldown > now then loose[#loose + 1] = BUFFS[b].name .. " " .. Short(t + BUFFS[b].cooldown - now) end
     end
     if #loose > 0 then parts[#parts + 1] = "World buffs (layer unknown): " .. table.concat(loose, ", ") end
+    local guild = self:GuildLayerLines(now)
+    if #guild > 0 then
+        parts[#parts + 1] = " "
+        for _, l in ipairs(guild) do parts[#parts + 1] = l end
+    end
     return table.concat(parts, "\n")
 end
 
@@ -1015,6 +1147,196 @@ function WT:Report(channel)
 end
 
 -- ============================================
+-- WORLD MAP PINS
+-- ============================================
+-- An icon and a timer on the zone each one belongs to, drawn on the world
+-- map's canvas. Placed again when the map, its zoom or its size changes;
+-- the timers tick once a second while the map is open.
+
+local ICON_DMF = "Interface\\Icons\\INV_Misc_Ticket_Darkmoon_01"
+local ICON_TOWERS = "Interface\\Icons\\Spell_Nature_TimeStop"
+local ICON_DAILY = "Interface\\Icons\\INV_Misc_Note_01"
+local ICON_FLOWER = "Interface\\Icons\\Spell_Holy_MindVision"
+
+-- The Faire's spot on its zone map and on that zone's continent
+local DMF_PINS = {
+    ["Terokkar Forest (Outland)"] = { [TEROKKAR] = { 34.8, 34.6 }, [1945] = { 44.6, 69.5 } },
+    ["Mulgore"] = { [1412] = { 36.8, 37.6 }, [1414] = { 45.95, 59.6 } },
+    ["Elwynn Forest"] = { [ELWYNN] = { 42, 70 }, [1415] = { 45.2, 73.55 } },
+}
+local TOWER_PINS = { [TEROKKAR] = { 94, 82 }, [SHATTRATH] = { 93, 79 } }
+local DAILY_PINS = { dungeon = { 65, 92 }, heroic = { 65, 95 } }   -- Shattrath, by the Lower City inn
+
+local function PlainText(s) return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+
+local function Pin(list, x, y, icon, text, lines)
+    list[#list + 1] = { x = x, y = y, icon = icon, text = text, lines = lines }
+end
+
+-- Tower resets: your layer's on the pin, every layer's in the tooltip
+local function TowerPin(self, list, at, now)
+    local keys = SortedLayerKeys(self:Data().layers)
+    local lines, text, soonest = { "Terokkar Forest towers" }, nil, nil
+    for i, key in ipairs(keys) do
+        local layer = self:Data().layers[key]
+        if layer.terokTowers then
+            local left = WT.TerokEnd(layer.terokTowers, layer.terokTowersTime) - now
+            local when = left > 0 and ("reset in " .. Short(left)) or ("reset " .. Short(-left) .. " ago")
+            lines[#lines + 1] = "Layer " .. i .. (key == currentLayer and " (you)" or "") .. ": " .. when
+                .. " - " .. PlainText(FACTION_TEXT[layer.terokFaction] or "?")
+            if key == currentLayer and left > 0 then text = Short(left) end
+            if left > 0 and (not soonest or left < soonest) then soonest = left end
+        end
+    end
+    if #lines == 1 then return end
+    if not text and soonest then text = Short(soonest) .. " (soonest)" end
+    Pin(list, at[1], at[2], ICON_TOWERS, text or "towers reset", lines)
+end
+
+-- A Songflower's pick time: your layer's, else one kept without a layer,
+-- else the freshest on any layer (named in the tooltip)
+local function FlowerTime(self, n, now)
+    local layers = self:Data().layers
+    local mine = currentLayer and layers[currentLayer]
+    local t = mine and mine.flowers and mine.flowers[n]
+    if t and now - t < SONGFLOWER_RESPAWN then return t end
+    t = self:Data().flowers[n]
+    if t and now - t < SONGFLOWER_RESPAWN then return t end
+    local best, bestLayer
+    for i, key in ipairs(SortedLayerKeys(layers)) do
+        local lt = layers[key].flowers and layers[key].flowers[n]
+        if lt and now - lt < SONGFLOWER_RESPAWN and (not best or lt > best) then best, bestLayer = lt, i end
+    end
+    return best, bestLayer
+end
+
+-- The pins for one map: { x, y, icon, text, lines } (map %, tooltip lines)
+function WT:MapPinsFor(mapID, now)
+    now = now or Now()
+    local list = {}
+    if not mapID then return list end
+    local d = self:Dmf(now)
+    if d then
+        local at = DMF_PINS[d.place] and DMF_PINS[d.place][mapID]
+        if at then
+            local text = d.up and ("ends in " .. Short(d.ends - now)) or ("opens in " .. Short(d.start - now))
+            local lines = { "Darkmoon Faire", PlainText(self:DmfLine(now)) }
+            Pin(list, at[1], at[2], ICON_DMF, text, lines)
+        end
+    end
+    if TOWER_PINS[mapID] then TowerPin(self, list, TOWER_PINS[mapID], now) end
+    if mapID == SHATTRATH then
+        for kind, at in pairs(DAILY_PINS) do
+            local name = self:Daily(kind, now)
+            if name then
+                Pin(list, at[1], at[2], ICON_DAILY, name,
+                    { DAILY_KINDS[kind].label .. " daily", name })
+            end
+        end
+    elseif mapID == FELWOOD then
+        for n, f in ipairs(SONGFLOWERS) do
+            local t, layerN = FlowerTime(self, n, now)
+            local text = t and Short(t + SONGFLOWER_RESPAWN - now) or "ready?"
+            local lines = { "Songflower: " .. f[3],
+                t and ("Picked " .. Short(now - t) .. " ago, back in " .. Short(t + SONGFLOWER_RESPAWN - now)
+                    .. (layerN and (" (layer " .. layerN .. ")") or "")) or "No pick seen in the last 25 minutes" }
+            Pin(list, f[1], f[2], ICON_FLOWER, text, lines)
+        end
+    end
+    table.sort(list, function(a, b) return a.y < b.y end)
+    return list
+end
+
+local pinFrames = {}
+
+local function MapCanvas()
+    local map = rawget(_G, "WorldMapFrame")
+    if type(map) ~= "table" or type(map.GetCanvas) ~= "function" then return nil end
+    local ok, canvas = pcall(map.GetCanvas, map)
+    if ok and type(canvas) == "table" then return canvas, map end
+end
+
+local function PinEnter(f)
+    if not f.lines then return end
+    GameTooltip:SetOwner(f, "ANCHOR_RIGHT")
+    GameTooltip:SetText(f.lines[1], 0.4, 1, 0.8)
+    for i = 2, #f.lines do GameTooltip:AddLine(f.lines[i], 1, 1, 1, true) end
+    GameTooltip:Show()
+end
+
+local function PinFrame(i, canvas)
+    local f = pinFrames[i]
+    if f then
+        if f:GetParent() ~= canvas then f:SetParent(canvas) end
+        return f
+    end
+    f = CreateFrame("Frame", nil, canvas)
+    f:SetSize(16, 16)
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetAllPoints()
+    f.label = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.label:SetPoint("TOP", f, "BOTTOM", 0, -1)
+    f:EnableMouse(true)
+    f:SetScript("OnEnter", PinEnter)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pinFrames[i] = f
+    return f
+end
+
+-- Draw this map's pins. Returns how many are shown.
+function WT:RefreshMapPins()
+    for _, f in ipairs(pinFrames) do f:Hide() end
+    local canvas, map = MapCanvas()
+    if not canvas or not DB().mapPins or not (map.IsShown and map:IsShown()) then return 0 end
+    local okM, mapID = pcall(map.GetMapID, map)
+    local pins = self:MapPinsFor(okM and tonumber(mapID) or nil, Now())
+    local w, h = tonumber(canvas:GetWidth()) or 0, tonumber(canvas:GetHeight()) or 0
+    if w <= 0 or h <= 0 then return 0 end
+    -- Keep the pins the same size on screen however far the map is zoomed
+    local okS, zoom = pcall(map.GetCanvasScale, map)
+    zoom = okS and tonumber(zoom) or 1
+    local s = zoom > 0 and 1 / zoom or 1
+    local level = (tonumber(canvas:GetFrameLevel()) or 0) + 2000
+    for i, p in ipairs(pins) do
+        local f = PinFrame(i, canvas)
+        f:SetScale(s)
+        f:SetFrameLevel(level)
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", canvas, "TOPLEFT", p.x / 100 * w / s, -p.y / 100 * h / s)
+        f.icon:SetTexture(p.icon)
+        f.label:SetText(p.text)
+        f.lines, f.pin = p.lines, p
+        f:Show()
+    end
+    return #pins
+end
+
+local function SafeRefreshPins()
+    local ok, err = pcall(WT.RefreshMapPins, WT)
+    if not ok then geterrorhandler()(err) end
+end
+
+-- Hook the world map (it can load after us: Blizzard_WorldMap)
+function WT:SetupMapPins()
+    if self.mapHooked then return true end
+    local canvas, map = MapCanvas()
+    if not canvas or type(hooksecurefunc) ~= "function" then return false end
+    self.mapHooked = true
+    for _, method in ipairs({ "OnMapChanged", "OnCanvasScaleChanged" }) do
+        if type(map[method]) == "function" then hooksecurefunc(map, method, SafeRefreshPins) end
+    end
+    if map.HookScript then map:HookScript("OnShow", SafeRefreshPins) end
+    if canvas.HookScript then canvas:HookScript("OnSizeChanged", SafeRefreshPins) end
+    local ticker, since = CreateFrame("Frame", nil, map), 0
+    ticker:SetScript("OnUpdate", function(_, elapsed)
+        since = since + (elapsed or 0)
+        if since >= 1 then since = 0; SafeRefreshPins() end
+    end)
+    self.mapTicker = ticker
+    return true
+end
+
+-- ============================================
 -- WINDOW
 -- ============================================
 
@@ -1046,6 +1368,24 @@ function WT:CreateUI()
             .. " checked the way Nova checks them. It never sends in Nova's format." } })
     L:Checkbox({ label = "Show their \"buff about to drop\" / NPC killed notices",
         get = function() return DB().showNWBNotices end, set = function(v) DB().showNWBNotices = v end })
+    L:Checkbox({ label = "Show the timers on the world map",
+        get = function() return DB().mapPins end,
+        set = function(v) DB().mapPins = v; WT:RefreshMapPins() end,
+        tooltip = { "Map pins", "Darkmoon Faire (its zone and continent), Terokkar towers, Shattrath dailies"
+            .. " and Felwood's Songflowers, with their timers. Hover a pin for details." } })
+    L:Checkbox({ label = "Say when the Onyxia / Nefarian NPC starts walking (Horde)",
+        get = function() return DB().walkAlert end, set = function(v) DB().walkAlert = v end,
+        tooltip = { "NPC walking", "When Runthak or Saurfang walks off to the gate after the head is handed in."
+            .. " Stand by the throne with their window open: it closes when they start walking." } })
+    L:Dropdown({
+        label = "Walking alert sound:", width = 150,
+        options = function() return WM.Sounds and WM.Sounds.OPTIONS or {} end,
+        get = function() return DB().walkSound end,
+        set = function(v)
+            DB().walkSound = v
+            if WM.Sounds then WM.Sounds.Play(v, GeneralChecksDB and GeneralChecksDB.soundChannel) end
+        end,
+    })
     L:EndSection()
     panel:AddFooterButton({ text = "Print timers", width = 100, onClick = function() WT:Report() end }, "LEFT")
     panel:Finish()
@@ -1096,6 +1436,7 @@ function WT:OnEvent(event, ...)
         self:OnGossipShow()
     elseif event == "QUEST_FINISHED" or event == "GOSSIP_CLOSED" then
         self:OnQuestFinished()
+        if event == "GOSSIP_CLOSED" then self:OnGossipClosed() end
     elseif event == "QUEST_ACCEPTED" then
         self:OnQuestAccepted(...)
     elseif event == "GROUP_JOINED" then
@@ -1103,6 +1444,12 @@ function WT:OnEvent(event, ...)
     elseif event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
         if MapID() == TEROKKAR then self.terokTargetSeen = false end
         if MapID() ~= FELWOOD then wipe(seenInFelwood) end
+    elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_STOPPED_MOVING" then
+        self:NoteMoving(event == "PLAYER_STARTED_MOVING")
+    elseif event == "TRADE_SHOW" then
+        self:NoteSelfClose()
+    elseif event == "ADDON_LOADED" then
+        if (...) == "Blizzard_WorldMap" then self:SetupMapPins() end
     elseif event == "CHAT_MSG_ADDON" then
         local prefix, message, distribution, sender = ...
         if prefix ~= "NWB" or type(message) ~= "string" then return end
@@ -1122,8 +1469,10 @@ function WT:Initialize()
         "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "COMBAT_LOG_EVENT_UNFILTERED",
         "CHAT_MSG_MONSTER_YELL", "CHAT_MSG_MONSTER_SAY", "UPDATE_UI_WIDGET",
         "GOSSIP_SHOW", "QUEST_DETAIL", "QUEST_FINISHED", "GOSSIP_CLOSED", "QUEST_ACCEPTED",
-        "GROUP_JOINED", "ZONE_CHANGED_NEW_AREA", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON",
+        "GROUP_JOINED", "ZONE_CHANGED_NEW_AREA", "PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON", "ADDON_LOADED",
+        "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING", "TRADE_SHOW",
     })
+    self:SetupMapPins()
     if WM.RegisterChatLink then
         WM:RegisterChatLink("wtimers", function()
             local p = WT:CreateUI()

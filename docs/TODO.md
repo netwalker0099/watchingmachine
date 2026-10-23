@@ -450,10 +450,12 @@ It listens to Nova World Buffs users. Decided:
 - **No guild posts from the addon.** Nova on TBC makes none except the
   Terokkar warning. `/wmachine wb guild` sends only when you ask.
 
+**Added in 3.33:**
+- map pins (Faire, Terokkar towers, Shattrath dailies, Songflowers)
+- the guild layer list (from Nova users' guild messages)
+- NPC-walking detection (Horde), and guild members' Nova walking notices
+
 **Not built:**
-- map pins
-- the guild layer roster ("l" messages are read but not shown)
-- NPC-walking detection
 - Whipper Root Tuber / Night Dragon's Breath (local-only on TBC in Nova)
 
 Timers for the Classic world buffs, so nobody misses a drop.

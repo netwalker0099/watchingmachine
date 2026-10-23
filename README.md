@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.32 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.33 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -510,6 +510,19 @@ Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).
 - **Nova World Buffs users:** their shared layers, tower timers, dailies, world
   buffs and Songflowers (guild, group and nearby yells) are merged in, checked
   the way Nova checks them. Watching Machine only listens
+- **World map pins:** the Faire on its zone and continent maps, the
+  Terokkar towers (Terokkar and Shattrath), today's dungeon and heroic
+  dailies in Shattrath, and all ten Songflowers in Felwood, each with its
+  timer. Hover a pin for details (every layer's tower reset, which layer a
+  Songflower pick was on). The timers tick while the map is open
+- **Guild layers:** which layer each guild member running Nova World Buffs
+  is on (in their numbering), shown under the timers for 30 minutes after
+  they last said
+- **NPC walking (Horde):** stand by the throne in Orgrimmar with Runthak's
+  or Saurfang's window open after the head is handed in. When they walk off
+  to the gate, the window closes by itself and you get a chat line and a
+  sound (pick it, or None). Closes you make (the X, Goodbye, Escape, a trade)
+  and moving don't count. Guild members' Nova walking notices show too
 - `/wmachine wb` prints the short timers; `/wmachine wb guild` (or party /
   raid) sends them to that channel
 
@@ -716,6 +729,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.33
+- **World Timers on the world map**: Darkmoon Faire, Terokkar towers, Shattrath dailies and Felwood's Songflowers, with live timers and hover details
+- **Guild layer list** from Nova World Buffs users in your guild
+- **NPC walking alert** (Horde): a chat line and sound when Runthak or Saurfang starts the walk to the gate, and guild members' Nova walking notices
 
 ### Version 3.32
 - **Warning sounds** for every Class Tools warning (flask, food, weapon oil, mage and warlock armor, Demonic Sacrifice, Soul Link, Righteous Fury), each with its own dropdown; **None** is now silent
