@@ -2,7 +2,28 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48.1
+
+### Logout diagnostics
+
+For "I can't log out with the addon loaded":
+
+- Watching Machine now records, across sessions: actions the game blocked
+  and the addon it blamed (`ADDON_ACTION_BLOCKED` / `_FORBIDDEN`), logout
+  and quit countdowns starting and being cancelled (and whether you were in
+  combat), and clicks on its Escape-menu button. If the game blocks logging
+  out or quitting, or blames Watching Machine for anything, it says so in
+  chat straight away.
+- `/wmachine logoutcheck` prints that record, checks whether the Watching
+  Machine menu button is covering Log Out (with the Escape menu open), and
+  lists what to try: `/logout`, the menu button off, and the game's taint
+  log (`/console taintLog 1`, then `Logs\taint.log`).
+- `/wmachine menubutton off|on`. Off (after `/reload`) the addon doesn't
+  hook the Escape menu at all, so it can be ruled out.
 
 ---
 

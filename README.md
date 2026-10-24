@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -859,6 +859,17 @@ Built-in error capture system for debugging.
 - `/wmachine errors` - show last 20 errors in chat
 - `/wmachine clearerrors` - clear the error log
 
+### Can't log out?
+- `/wmachine logoutcheck` shows what Watching Machine recorded: actions the
+  game blocked and the addon it blamed (logging out blocked is also said in
+  chat the moment it happens), logout countdowns started and cancelled,
+  clicks on the Escape-menu button, and whether that button is covering
+  Log Out (run it with the Escape menu open). It ends with what to try:
+  `/logout`, turning the menu button off, and the game's taint log
+- `/wmachine menubutton off` (then `/reload`) removes the Watching Machine
+  button from the Escape menu and stops the addon touching the menu at all;
+  `/wmachine menubutton on` puts it back
+
 ## Installation
 
 1. Extract the `WatchingMachine` folder to your WoW addons directory:
@@ -1016,6 +1027,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine status` - Show status of all modules
 - `/wmachine errors` - Show captured error log
 - `/wmachine clearerrors` - Clear error log
+- `/wmachine logoutcheck` - Can't log out? What the game blocked, logout attempts, and what to try
+- `/wmachine menubutton on|off` - The Watching Machine button in the Escape menu (off also stops it touching the menu)
 - `/wmachine help` - Show command help
 
 ### Game Menu Button
@@ -1084,6 +1097,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.48.1
+- **Logout diagnostics:** `/wmachine logoutcheck` (blocked actions and the addon blamed, logout attempts, menu-button overlap) and `/wmachine menubutton off`
 
 ### Version 3.48
 - **Gear Sets:** a dressing room in the set editor (your character wearing the set, click a slot to choose its item), and an ItemRack-style slot menu on the character sheet (hover a slot for everything that fits it; click to swap)

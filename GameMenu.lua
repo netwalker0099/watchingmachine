@@ -27,6 +27,7 @@ local function Wanted()
 end
 
 local function OpenFromMenu()
+    if WM.Diagnostics then WM.Diagnostics:Note("menuclick", "Watching Machine menu button clicked") end
     if PlaySound and SOUNDKIT then pcall(PlaySound, SOUNDKIT.IG_MAINMENU_OPTION) end
     if HideUIPanel then HideUIPanel(GameMenuFrame) else GameMenuFrame:Hide() end
     WM:ToggleDashboard()
@@ -166,6 +167,9 @@ end
 
 function WM:SetupGameMenuButton()
     if self.gameMenuHooked or not GameMenuFrame or not hooksecurefunc then return end
+    -- Off: don't touch the menu at all (so it can be ruled out when logging
+    -- out misbehaves); turning it back on takes a /reload
+    if not Wanted() then return end
     self.gameMenuHooked = true
     if type(GameMenuFrame.InitButtons) == "function" then
         hooksecurefunc(GameMenuFrame, "InitButtons", function(menu) WM:AddGameMenuButton(menu) end)

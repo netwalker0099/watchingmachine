@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.48"
+WM.version = "3.48.1"
 WM.modules = {}
 
 -- ============================================
@@ -2037,6 +2037,8 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine debug|r - Show debug info")
     print("|cFFFFFF00/wmachine errors|r - Show captured error log")
     print("|cFFFFFF00/wmachine clearerrors|r - Clear error log")
+    print("|cFFFFFF00/wmachine logoutcheck|r - Can't log out? Shows what the game blocked and what to try")
+    print("|cFFFFFF00/wmachine menubutton on|off|r - The Watching Machine button in the Escape menu")
     print("|cFFFFFF00/wmachine help|r - Show this help")
 end
 
@@ -2348,6 +2350,12 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             elseif cmd == "setup guided" then WM.Setup:OpenGuided()
             else WM.Setup:ShowWelcome() end
         end
+
+    elseif cmd == "logoutcheck" or cmd == "logout check" or cmd == "diag" then
+        if WM.Diagnostics then WM.Diagnostics:Report() end
+
+    elseif cmd == "menubutton on" or cmd == "menubutton off" then
+        if WM.Diagnostics then WM.Diagnostics:SetMenuButton(cmd == "menubutton on") end
 
     elseif cmd == "help" then
         WM:ShowHelp()
