@@ -4,6 +4,16 @@ A WoW TBC Classic Anniversary addon (client 2.5.6, Interface 20506, Lua 5.1).
 Tests: `tests/run.sh` (a stub client in `tests/wowstub.lua`); syntax:
 `luac5.1 -p <file>` (then `rm -f luac.out`).
 
+## Never assign a game global
+
+Writing any of the game's globals from addon code (even
+`X = X or {}`, a leaked `_`, or replacing an API function) "taints" it and
+can get protected actions blocked: 3.48.3 fixed Log Out in the Escape menu
+being blocked by `StaticPopupDialogs = StaticPopupDialogs or {}`. Add keys
+to game tables (`StaticPopupDialogs["WM_..."] = ...`), use `hooksecurefunc`
+instead of replacing functions, and keep everything else `local`.
+`tests/test_globals.lua` fails on any other global write.
+
 ## Every new module or feature goes into the setup and the panels
 
 Every module can be switched on and off per character, and has its own
