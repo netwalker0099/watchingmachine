@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1032,11 +1032,15 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine help` - Show command help
 
 ### Game Menu Button
-- A **Watching Machine** button in the menu Escape opens, just above
-  **Log Out** (like ElvUI's). Click it to open the dashboard
-- With **ElvUI** it sits under ElvUI's button instead of on top of it, and
-  takes ElvUI's button skin (unless ElvUI's Blizzard skins are off)
-- Turn it off in Settings: *Watching Machine button in the game menu (Esc)*
+- A **Watching Machine** button just below the menu Escape opens, shown
+  with it. Click it to open the dashboard
+- It sits outside the menu and changes nothing in it (3.48.2): no buttons
+  added or moved, so the menu's **Log Out** works as normal
+- With **ElvUI** it takes ElvUI's button skin (unless ElvUI's Blizzard skins
+  are off)
+- Turn it off in Settings (*Watching Machine button in the game menu (Esc)*)
+  or with `/wmachine menubutton off`; off, the addon doesn't touch the menu
+  at all
 
 ### Minimap Button
 - **Left-click**: Toggle dashboard
@@ -1097,6 +1101,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.48.2
+- **Fixed: Log Out in the Escape menu not working.** The Watching Machine button now sits just below the menu, outside it, and changes nothing in it
 
 ### Version 3.48.1
 - **Logout diagnostics:** `/wmachine logoutcheck` (blocked actions and the addon blamed, logout attempts, menu-button overlap) and `/wmachine menubutton off`

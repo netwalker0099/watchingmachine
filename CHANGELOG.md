@@ -2,7 +2,22 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48.2
+
+- **Fixed: Log Out in the Escape menu did nothing** (`/camp` and `/logout`
+  still worked). The Watching Machine button was fitted into the menu:
+  added as one of its buttons each time it was built, with Log Out, Exit
+  Game and Return to Game pushed down to make room. The game blocks
+  protected actions such as logging out when an addon has taken part in
+  building the menu, and the button could also end up over Log Out. The
+  button is now a separate one just below the menu, shown and hidden with
+  it, and nothing in the menu is touched: no button added, none moved, no
+  resizing, no code run while it lays itself out. With the button turned
+  off the addon doesn't watch the menu at all.
 
 ---
 

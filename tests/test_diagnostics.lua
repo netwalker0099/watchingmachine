@@ -79,7 +79,8 @@ check("menu closed: can't tell", D.MenuOverlap() == nil)
 
 -- ---- The menu button: clicks, and turning it off ----
 local n = #log
-WM:AddGameMenuButton(menu)
+WM.gameMenuButton = nil
+WM:CreateGameMenuButton()
 WM.gameMenuButton._scripts.OnClick(WM.gameMenuButton)
 check("menu button clicks recorded", log[#log].kind == "menuclick")
 W.printed = {}
@@ -89,12 +90,11 @@ check("menu button off", env.WatchingMachineDB.gameMenuButton == false and not W
     and Said("/reload"))
 WM.gameMenuHooked = nil
 hooks = 0
-env.GameMenuFrame.InitButtons = function() end
 WM:SetupGameMenuButton()
-check("off: the menu isn't hooked at all", hooks == 0)
+check("off: the menu isn't watched at all", not WM.gameMenuHooked)
 D:SetMenuButton(true)
 WM:SetupGameMenuButton()
-check("on: hooked", hooks > 0)
+check("on: watched", WM.gameMenuHooked == true and hooks == 0)
 
 for _ = 1, 80 do D:Note("x", "filler") end
 check("the record is kept short", #log == 60)

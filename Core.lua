@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.48.1"
+WM.version = "3.48.2"
 WM.modules = {}
 
 -- ============================================
@@ -1939,10 +1939,11 @@ function WM:CreateSettingsPanel()
         get = function() return not (WatchingMachineDB and WatchingMachineDB.gameMenuButton == false) end,
         set = function(v)
             if WatchingMachineDB then WatchingMachineDB.gameMenuButton = v and true or false end
+            if WM.UpdateGameMenuButton and WM.gameMenuHooked then WM:UpdateGameMenuButton() end
         end,
-        tooltip = { "Game Menu Button", "Adds a Watching Machine button above Log Out in the menu"
-            .. " Escape opens, like ElvUI's. Click it to open the dashboard. Takes effect the next"
-            .. " time the menu opens." },
+        tooltip = { "Game Menu Button", "A Watching Machine button just below the menu Escape opens."
+            .. " Click it to open the dashboard. It sits outside the menu and changes nothing in it."
+            .. " Turned off, the addon doesn't touch the menu at all (after a /reload)." },
     })
     L:Row(20):Text({
         font = "GameFontNormalSmall",
