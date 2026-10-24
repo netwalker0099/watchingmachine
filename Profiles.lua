@@ -49,7 +49,7 @@ P.SCOPE = {
     AltTrackerDB = { shared = { "chars" } },
     PvPLogDB = { shared = { "matches", "nextId" } },
     WorldTimersDB = { shared = { "realms", "chars" } },
-    LootBrowserDB = { shared = { "lists", "bis", "listOrder", "chars" } },
+    LootBrowserDB = { shared = { "lists", "bis", "listOrder", "chars", "names" } },
     WMGearScoreDB = { shared = { "players" } },
     AttunementsDB = { shared = { "chars", "guild" } },
     HazardsDB = {},

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.46.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.47 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -543,18 +543,25 @@ Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).
 
 ### 23. Loot Browser
 What every dungeon and raid boss drops, what each profession makes,
-reputation rewards and PvP gear (Raid group; `/wmachine loot`, also
+reputation rewards, PvP gear and collections (Raid group; `/wmachine loot`, also
 `/wmachine atlas`).
 
-- **Show:** *Dungeons & Raids*, *Crafting*, *Factions*, *PvP* or *My Lists*,
-  for the expansion picked at the top
+- **Show:** *Dungeons & Raids*, *Crafting*, *Factions*, *PvP*, *Collections*
+  or *My Lists*, for the expansion picked at the top
+- **Collections** (3.47): the Badge of Justice vendor (and its Phase 4 and 5
+  stock), the Sunmote vendor, world epics, mounts, companions, tabards,
+  legendaries, the Classic item sets (tier, dungeon, Zul'Gurub, Ahn'Qiraj
+  and others) and the world events (Darkmoon Faire, the holidays, Brewfest,
+  invasions). Item tooltips say "Also in:" for these
 - **Search** (3.40): type three letters (or press Enter) to find items by
   name across every page: drops, faction and PvP rewards, set pieces and
   crafted items. Results come sorted best quality first, split into Drops /
-  Reputation / PvP / Crafted, each saying where it's from. Matching
-  instances and bosses are listed too; click one to open it. Items the game
-  hasn't shown you yet are looked up as you search (a few seconds; the
-  count shows how many are left). Escape or *Clear* to go back
+  Reputation / PvP / Crafted / Collections, each saying where it's from.
+  Matching instances and bosses are listed too; click one to open it.
+  Escape or *Clear* to go back. Fast (3.47): item names are remembered
+  between sessions for all your characters, so a search never waits on the
+  server; names the game hasn't shown you yet are learnt in the background
+  a small batch at a time, and the results grow as matching ones arrive
 - **My Lists** (3.39): your own favourite lists and a best-in-slot list for
   each spec of your class.
   - **Alt-click** any item (or set piece, or recipe) to add it to your list
@@ -1023,6 +1030,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.47
+- **Loot Browser:** a Collections category (badge and Sunmote vendors, world epics, mounts, companions, tabards, legendaries, Classic sets, world events), and a much faster search that no longer stalls the game
 
 ### Version 3.46.2
 - **Hide inactive** button on the dashboard: only the modules that are on for this character (Show all brings the rest back)

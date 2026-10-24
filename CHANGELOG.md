@@ -2,7 +2,34 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.46.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.47** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.47
+
+### Loot Browser
+
+- **Collections**, a new category: the Badge of Justice vendor (with its
+  Phase 4 and 5 stock), the Sunmote vendor on the Isle of Quel'Danas,
+  world epics, mounts, companions, tabards, legendaries, the Classic item
+  sets (tier, dungeon, Zul'Gurub, Ahn'Qiraj and others) and world events
+  (Darkmoon Faire, the holidays, Brewfest, Gurubashi Arena, invasions),
+  for Classic and The Burning Crusade. Compiled with the help of AtlasLoot
+  Classic's research; only the item IDs are kept. Tooltips say "Also in:"
+  for collection items, and the search covers them.
+- **Search no longer stalls the game.** It used to ask the game for every
+  item in the browser (about ten thousand) on each search, which made the
+  client request every item it hadn't seen from the server, and it redid
+  that every second while names came in. Now:
+  - item names are remembered between sessions, for all your characters,
+    so a search reads only that list (milliseconds, no calls into the
+    game);
+  - names the game hasn't shown you yet are learnt in the background, 20
+    every quarter of a second, and never asked for again once known (or
+    once the game says the item doesn't exist);
+  - the results refresh only when a newly learnt name matches your search,
+    at most once a second.
 
 ---
 

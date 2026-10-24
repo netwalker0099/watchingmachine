@@ -19,7 +19,7 @@ LB.version = "3.40"
 
 local DEFAULTS = {
     expansion = nil,       -- expansion shown (0 / 1 / 2; nil: the client's own)
-    category = "dungeons", -- dungeons, crafting, factions, pvp
+    category = "dungeons", -- dungeons, crafting, factions, pvp, collections
     instance = nil,        -- page shown per data set: { [tag] = id }
     diff = "n",            -- the list shown: n (normal), h (heroic), plate...
     myClassSets = true,    -- set pages: only your class's sets
@@ -71,6 +71,7 @@ local CATEGORIES = {
     { key = "crafting", label = "Crafting", width = 70 },
     { key = "factions", label = "Factions", width = 70 },
     { key = "pvp", label = "PvP", width = 46 },
+    { key = "collections", label = "Collections", width = 84 },
     { key = "mine", label = "My Lists", width = 70 },
 }
 LB.CATEGORIES = CATEGORIES
@@ -605,8 +606,9 @@ end
 
 local MAX_SOURCES = 3
 local SOURCE_COLOR, PLACE_COLOR = "FFB366", "AAAAAA"
-local SOURCE_HEADS = { dungeons = "Drops from:", factions = "Reputation reward:", pvp = "PvP reward:", crafting = "Made by:" }
-local SOURCE_ORDER = { "dungeons", "factions", "pvp", "crafting" }
+local SOURCE_HEADS = { dungeons = "Drops from:", factions = "Reputation reward:", pvp = "PvP reward:", crafting = "Made by:",
+    collections = "Also in:" }
+local SOURCE_ORDER = { "dungeons", "factions", "pvp", "crafting", "collections" }
 
 local function SourceLine(g)
     local s = g.first
@@ -802,10 +804,53 @@ LB.ClassLabel = ClassLabel
 -- small batches (throttled) and the results grow as the names arrive.
 
 local MAX_RESULTS = 300
-local LOOKUP_BATCH, LOOKUP_EVERY = 25, 0.2
+local LEARN_BATCH, LEARN_EVERY = 20, 0.25
 local searchIndex          -- { items = { id = cat }, crafts = { spell = cat } }
-local lookupQueue, lookupAt, lookupTicker = nil, 1, nil
-local SEARCH_SECTIONS = { { "dungeons", "Drops" }, { "factions", "Reputation" }, { "pvp", "PvP" }, { "crafting", "Crafted" } }
+local SEARCH_SECTIONS = { { "dungeons", "Drops" }, { "factions", "Reputation" }, { "pvp", "PvP" }, { "crafting", "Crafted" },
+    { "collections", "Collections" } }
+
+local function Lower(s) return type(s) == "string" and s:lower() or nil end
+
+-- Item names, kept between sessions (shared by your characters) so a search
+-- never waits on the server once it's seen a name: [id] = quality digit ..
+-- name, or "" for an ID the game doesn't have. Cleared if the client's
+-- language changes.
+local names, lower         -- the saved names; lower-case copies, made as needed
+local unknown = 0          -- index items with no name yet
+local learnQueue, learnAt, learning = nil, 1, false
+
+local function Names()
+    if names then return names end
+    local db = DB()
+    local locale = GetLocale and GetLocale() or "enUS"
+    if type(db.names) ~= "table" or db.names.locale ~= locale then db.names = { locale = locale, items = {} } end
+    if type(db.names.items) ~= "table" then db.names.items = {} end
+    names, lower = db.names.items, {}
+    return names
+end
+
+local function LowerName(id)
+    local l = lower[id]
+    if l == nil then
+        local v = names[id]
+        l = (v and #v > 1) and v:sub(2):lower() or false
+        lower[id] = l
+    end
+    return l
+end
+
+-- Note an item's name if the client has it now. Returns true when known.
+local function Learn(id)
+    local cache = Names()
+    if cache[id] then return true end
+    local name, _, quality = ItemInfo(id)
+    if not name then return false end
+    cache[id] = tostring(math.max(0, math.min(9, quality or 1))) .. name
+    lower[id] = nil
+    if searchIndex and searchIndex.items[id] then unknown = math.max(0, unknown - 1) end
+    return true
+end
+LB.LearnName = Learn
 
 function LB:SearchIndex()
     if searchIndex then return searchIndex end
@@ -821,6 +866,8 @@ function LB:SearchIndex()
                                     if id > 0 then
                                         if b.craft then
                                             crafts[id] = crafts[id] or cat
+                                            local c = LB.CraftInfo(id)
+                                            if c and c[1] and c[1] > 0 then items[c[1]] = items[c[1]] or false end
                                         elseif b.set then
                                             for _, piece in ipairs(LB.SetInfo(id) or {}) do items[piece] = items[piece] or cat end
                                         else
@@ -836,49 +883,86 @@ function LB:SearchIndex()
         end
     end
     searchIndex = { items = items, crafts = crafts }
+    -- What we don't have a name for yet. Names the client already holds are
+    -- taken now, without asking the server for anything
+    local cache = Names()
+    local cached = C_Item and C_Item.IsItemDataCachedByID
+    unknown = 0
+    for id in pairs(items) do
+        if not cache[id] then
+            local ok, has = false, false
+            if cached then ok, has = pcall(cached, id) end
+            if not (ok and has and Learn(id)) then unknown = unknown + 1 end
+        end
+    end
     return searchIndex
 end
 
-local function Lower(s) return type(s) == "string" and s:lower() or nil end
-
--- Ask the client for names it doesn't have, a batch at a time
-function LB:LookupNames(ids)
-    lookupQueue, lookupAt = ids, 1
-    if lookupTicker or #ids == 0 then return end
-    local request = (C_Item and C_Item.RequestLoadItemDataByID) or function(id) ItemInfo(id) end
+-- Learn the names we don't have, a small batch at a time, so the server is
+-- never asked for thousands at once
+function LB:LearnNames()
+    if learning or unknown == 0 then return end
+    local idx = self:SearchIndex()
+    local cache = Names()
+    learnQueue, learnAt = {}, 1
+    for id in pairs(idx.items) do if not cache[id] then learnQueue[#learnQueue + 1] = id end end
+    table.sort(learnQueue)
+    if #learnQueue == 0 then unknown = 0; return end
+    learning = true
+    local request = C_Item and C_Item.RequestLoadItemDataByID
     local function Step()
-        if not lookupQueue or not On() then lookupQueue, lookupTicker = nil, nil; return end
-        local stop = math.min(#lookupQueue, lookupAt + LOOKUP_BATCH - 1)
-        for i = lookupAt, stop do pcall(request, lookupQueue[i]) end
-        lookupAt = stop + 1
-        if lookupAt > #lookupQueue then
-            lookupQueue, lookupTicker = nil, nil
+        if not learnQueue or not On() then learnQueue, learning = nil, false; return end
+        local stop = math.min(#learnQueue, learnAt + LEARN_BATCH - 1)
+        for i = learnAt, stop do
+            local id = learnQueue[i]
+            if not Learn(id) and request then pcall(request, id) end
+        end
+        learnAt = stop + 1
+        if learnAt > #learnQueue then
+            learnQueue, learning = nil, false
             return
         end
-        lookupTicker = WM.RunAfter(LOOKUP_EVERY, Step) or true
+        WM.RunAfter(LEARN_EVERY, Step)
     end
-    lookupTicker = true
     Step()
 end
 
 function LB:LookupsLeft()
-    return lookupQueue and (#lookupQueue - lookupAt + 1) or 0
+    if not learnQueue then return 0 end
+    return #learnQueue - learnAt + 1
+end
+function LB:UnknownNames() return unknown end
+
+-- The game has an item's data: learn its name. True if it's one a search
+-- would show (so the results may need a refresh)
+function LB:OnItemData(id, success)
+    id = tonumber(id)
+    if not id or not searchIndex or searchIndex.items[id] == nil or Names()[id] then return false end
+    if Learn(id) then return true end
+    if success == false then
+        -- The game has no such item: don't ask again
+        names[id] = ""
+        unknown = math.max(0, unknown - 1)
+    end
+    return false
 end
 
 -- Items and crafts whose name has the text in it, and pages / bosses
--- named after it. Returns { items = { entry }, places = { place }, unknown }
+-- named after it. Returns { items = { entry }, places = { place }, unknown }.
+-- Only reads the saved names (plain Lua, no calls into the game per item).
 function LB:Search(text)
     local q = Lower(text and strtrim and strtrim(text) or text)
     local out = { items = {}, places = {}, unknown = 0 }
     if not q or #q < 2 then return out end
     local idx = self:SearchIndex()
-    local missing = {}
+    local cache = Names()
     for id, cat in pairs(idx.items) do
-        local name, _, quality = ItemInfo(id)
-        if not name then
-            missing[#missing + 1] = id
-        elseif name:lower():find(q, 1, true) then
-            out.items[#out.items + 1] = { item = id, cat = cat, name = name, quality = quality or 1 }
+        if cat then
+            local n = LowerName(id)
+            if n and n:find(q, 1, true) then
+                local v = cache[id]
+                out.items[#out.items + 1] = { item = id, cat = cat, name = v:sub(2), quality = tonumber(v:sub(1, 1)) or 1 }
+            end
         end
     end
     for spell, cat in pairs(idx.crafts) do
@@ -886,9 +970,8 @@ function LB:Search(text)
         local made = c and c[1] and c[1] > 0 and c[1]
         local name, quality
         if made then
-            local n, _, qq = ItemInfo(made)
-            name, quality = n, qq
-            if not n then missing[#missing + 1] = made end
+            local v = cache[made]
+            if v and #v > 1 then name, quality = v:sub(2), tonumber(v:sub(1, 1)) end
         else
             name = SpellInfo(spell)
         end
@@ -917,8 +1000,8 @@ function LB:Search(text)
             end
         end
     end
-    out.unknown = #missing
-    if #missing > 0 and self:LookupsLeft() == 0 then self:LookupNames(missing) end
+    out.unknown = unknown
+    if unknown > 0 then self:LearnNames() end
     return out
 end
 
@@ -1306,7 +1389,8 @@ function LB:FillItems(entries)
 end
 
 local KIND_COLORS = { goto = "66CCFF", raid = "FF9933", extra = "AAAAAA", minor = "AAAAAA", arena = "FF6666", world = "66CC66",
-    gathering = "AAAAAA", secondary = "AAAAAA", class = "AAAAAA" }
+    gathering = "AAAAAA", secondary = "AAAAAA", class = "AAAAAA",
+    vendor = "66CCFF", event = "FF99CC", sets = "A335EE" }
 
 function LB:RefreshDiffButtons(diffs, cur)
     local bar = panel.diffBar
@@ -1410,17 +1494,15 @@ function LB:RefreshList()
         for _, e in ipairs(entries) do
             if e.item then e.note = self:SourceShort(e.item) or LB.ItemKind(e.item) end
         end
-        local left = self:LookupsLeft()
         local text = "|cFFFFFFFFSearch:|r \"" .. state.search .. "\"  -  " .. #(searchResult and searchResult.items or {}) .. " items"
         if searchResult and #searchResult.places > 0 then text = text .. ", " .. #searchResult.places .. " places" end
-        if left > 0 or (searchResult and searchResult.unknown > 0) then
-            text = text .. "  |cFF888888(looking up item names: " .. math.max(left, searchResult and searchResult.unknown or 0) .. " to go)|r"
+        if unknown > 0 then
+            text = text .. "  |cFF888888(learning item names the game hasn't shown you yet: " .. unknown
+                .. " to go; results grow as they arrive)|r"
         end
         panel.status:SetText(text)
-        panel.waitingForItems = true
-        local n = self:FillItems(entries)
-        panel.waitingForItems = panel.waitingForItems or left > 0 or (searchResult and searchResult.unknown > 0)
-        return n
+        panel.searchUnknown = unknown
+        return self:FillItems(entries)
     elseif mine then
         local have = 0
         for _, e in ipairs(entries) do
@@ -1450,7 +1532,7 @@ function LB:CreateUI()
     panel = WM.UI:CreatePanel({
         name = "WM_LootBrowserFrame", title = "Loot Browser", titleColor = "FFB366",
         width = 860, height = 564, scroll = false,
-        resizable = { 740, 380, 1600, 1400 },
+        resizable = { 820, 380, 1600, 1400 },
         onResize = function() LB:RefreshList() end,
         onRefresh = function() LB:RefreshList() end,
     })
@@ -1669,14 +1751,15 @@ end
 -- The tooltip hooks stay but add nothing while it's off.
 function LB:OnModuleOff()
     if panel then panel:Hide() end
-    lookupQueue = nil
+    learnQueue, learning = nil, false
 end
 
 function LB:SetupPage(L)
     DB()
     L:Note("The Loot Browser is a loot table you can open anywhere. Pick an expansion and a category"
-        .. " (dungeons and raids, crafting, factions or PvP), then a page down the side: each boss, profession,"
-        .. " reputation or PvP vendor shows its items. Inside a dungeon it can open straight on that instance.")
+        .. " (dungeons and raids, crafting, factions, PvP or collections), then a page down the side: each boss,"
+        .. " profession, reputation, PvP vendor or collection shows its items. Collections has the Badge of Justice"
+        .. " and Sunmote vendors, world epics, mounts, companions, tabards, legendaries, Classic sets and world events. Inside a dungeon it can open straight on that instance.")
     L:Note("|cFFFFFFFFUsing it:|r hover an item for its tooltip, Shift-click to link it in chat, Ctrl-click to"
         .. " try it on. Alt-click puts it on your list (Favourites to start with); right-click for your other"
         .. " lists and to mark it best-in-slot for a spec. The search box finds items and bosses by name.")
@@ -1717,13 +1800,30 @@ end
 local events = CreateFrame("Frame")
 local refreshQueued = false
 
-function LB:OnItemInfo()
-    if not (panel and panel:IsShown() and panel.waitingForItems) or refreshQueued then return end
+local function QueueRefresh(delay)
+    if refreshQueued then return end
     refreshQueued = true
-    WM.RunAfter(state.search and 1 or 0.3, function()
+    WM.RunAfter(delay, function()
         refreshQueued = false
         LB:RefreshList()
     end)
+end
+
+-- An item's data arrived. While searching, the results only refresh when
+-- the new name matches what you typed (or the last name came in), at most
+-- once a second; otherwise a page waiting for item data refreshes.
+function LB:OnItemInfo(id, success)
+    local learned = self:OnItemData(id, success)
+    if not (panel and panel:IsShown()) then return end
+    if state.search then
+        local q = Lower(state.search)
+        local n = learned and LowerName(tonumber(id))
+        if (n and q and n:find(q, 1, true)) or (panel.searchUnknown and panel.searchUnknown > 0 and unknown == 0) then
+            QueueRefresh(1)
+        end
+    elseif panel.waitingForItems then
+        QueueRefresh(0.3)
+    end
 end
 
 function LB:Initialize()
@@ -1732,8 +1832,8 @@ function LB:Initialize()
     self:HookTooltips()
 end
 
-events:SetScript("OnEvent", function()
+events:SetScript("OnEvent", function(_, _, id, success)
     if not On() then return end
-    local ok, err = pcall(LB.OnItemInfo, LB)
+    local ok, err = pcall(LB.OnItemInfo, LB, id, success)
     if not ok then geterrorhandler()(err) end
 end)

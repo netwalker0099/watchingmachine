@@ -23,6 +23,8 @@ env.C_Item = {
     end,
     GetItemInfoInstant = function(id) return id, "Armor", "Cloth", "INVTYPE_WRIST", "Interface\\Icons\\INV_Bracer_07" end,
     GetItemSetInfo = function(id) return "Set" .. id end,
+    -- The client says which items it already holds, without fetching any
+    IsItemDataCachedByID = function(id) return names[id] ~= nil end,
 }
 env.INVTYPE_WRIST = "Wrist"
 env.C_Map = { GetAreaInfo = function(id) if id == 3457 then return "Karazhan" end end }
@@ -260,9 +262,28 @@ names[22866] = { "Flask of Pure Death", 1 }
 W.timers = {}
 local r = LB:Search("bands")
 check("search: by item name", #r.items >= 1 and r.items[1].item == 28477 and r.items[1].name == "Harbinger Bands")
-check("search: names not known yet are looked up", r.unknown > 1000 and #requested == 25 and LB:LookupsLeft() > 0)
+check("search: names not known yet are learnt", r.unknown > 1000 and #requested == 20 and LB:LookupsLeft() > 0)
 W.runTimers()
-check("search: in batches", #requested == 50)
+check("search: a small batch at a time", #requested == 40)
+check("search: names are saved for next time", env.LootBrowserDB.names.items[28477] == "4Harbinger Bands"
+    and env.LootBrowserDB.names.locale ~= nil)
+-- Searching again asks the game about nothing
+for k in pairs(asked) do asked[k] = nil end
+LB:Search("harbinger")
+check("search: no calls into the game per item", next(asked) == nil)
+-- Items in the loot data with no name yet
+local spare = {}
+for id, cat in pairs(LB:SearchIndex().items) do
+    if cat and not env.LootBrowserDB.names.items[id] and not names[id] then spare[#spare + 1] = id end
+    if #spare == 4 then break end
+end
+-- A name arriving is learnt; one the game doesn't have isn't asked again
+names[spare[1]] = { "Brute Cloak", 3 }
+check("search: a new name is learnt", LB:OnItemData(spare[1], true) == true
+    and env.LootBrowserDB.names.items[spare[1]] == "3Brute Cloak")
+local before = LB:UnknownNames()
+LB:OnItemData(spare[2], false)
+check("search: an item the game doesn't have", env.LootBrowserDB.names.items[spare[2]] == "" and LB:UnknownNames() == before - 1)
 check("search: crafts by what they make", (function()
     for _, e in ipairs(LB:Search("pure death").items) do if e.craft == 28591 then return true end end
 end)())
@@ -366,7 +387,7 @@ check("right-click menu: title, lists, BiS per spec", #menuItems == 5 and menuIt
     and menuItems[2].checked and menuItems[4].text == "BiS: Fire" and not menuItems[4].checked)
 menuItems[4].func()
 check("menu: marks BiS", LB:IsBiS("Fire", p.itemButtons[2].itemID) and p.itemButtons[2].bis:IsShown())
-p.catBox.buttons[5]:_fire("OnClick")
+p.catBox.buttons[6]:_fire("OnClick")
 check("My Lists page", env.LootBrowserDB.category == "mine" and p.status:GetText():find("Favourites", 1, true)
     and p.listBar:IsShown() and not p.diffBar:IsShown())
 check("My Lists: items with notes", p.itemButtons[1].itemID ~= nil and p.itemButtons[1].kind:GetText():find("Attumen", 1, true))
@@ -397,7 +418,16 @@ check("search page", p.status:GetText():find("Search:", 1, true) and p.status:Ge
     and p.itemButtons[1].itemID == 28477)
 check("search: where it's from", p.itemButtons[1].kind:GetText():find("Attumen", 1, true) ~= nil)
 check("search: sections", p.bossList.rows[1].text:GetText():find("All (", 1, true) and p.bossList.rows[2].text:GetText():find("Drops", 1, true))
-check("search: looking up names", p.status:GetText():find("looking up item names", 1, true) ~= nil)
+check("search: learning names", p.status:GetText():find("learning item names", 1, true) ~= nil)
+-- Results refresh only for a matching name, at most once a second
+W.timers = {}
+names[spare[3]] = { "Bloodlust Bands", 4 }
+LB:OnItemInfo(spare[3], true)
+check("search: a matching name refreshes the results", #W.timers == 1)
+W.runTimers()
+names[spare[4]] = { "Cloak of Woe", 3 }
+LB:OnItemInfo(spare[4], true)
+check("search: other names don't", #W.timers == 0)
 LB:SetSearch("attumen")
 local gotoRow
 for _, row in ipairs(p.instList.rows) do if row:IsShown() and row.value and row.value:find("^goto:") then gotoRow = row end end
