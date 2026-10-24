@@ -6,7 +6,46 @@ Version 3.48 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine combines eighteen monitoring and automation tools into a single unified addon with a central dashboard. Updated for The Burning Crusade Classic Anniversary Edition patch 2.5.6.
+Watching Machine is one addon made of 25 modules for raiding, guilds and
+logging, built for The Burning Crusade Classic Anniversary Edition (patch
+2.5.6). Everything is reached from one dashboard (`/wmachine`). Each module
+switches on and off **per character**, keeps its own settings for each
+character, and is explained in a **guided setup** the first time you log
+in.
+
+**Raid**
+- **Buff Check** and **Debuff Tracker**: ready-check buff audits, boss
+  debuff tracking with alerts and encounter callouts.
+- **Class Tools**: per-class warnings and buttons (consumables, mana
+  potions and runes, warlock stones and demons, mage portals, shaman
+  totem sets, paladin auras) and a **swing timer**.
+- **Aura Range**: an alert when you leave a raid aura or totem's range.
+- **ArmorySnap** and **GearScore**: raid gear and talent snapshots, and
+  gear scores on tooltips, the character sheet and for your group.
+- **Loot Browser**: every boss's loot, crafting, reputation and PvP
+  rewards, and **collections** (badge vendors, mounts, companions, world
+  epics, events), with your own lists and best-in-slot, fast search and
+  "drops from" tooltips (Classic and TBC; Wrath ready).
+- **Attunements**: every raid attunement and key, per character, with a
+  guild survey.
+- **World Timers**: layers, Terokkar towers, dailies, world buffs and the
+  Darkmoon Faire, with map pins.
+- **Hazard Alerts** (GTFO-style): a sound when you stand in the bad.
+- **Gear Sets** (ItemRack-style): save and swap sets, a **dressing room**,
+  a slot menu on the character sheet, automatic swaps on **spec change**,
+  mount or battleground, and missing-item alerts.
+- **Ogri'la Helper**: remembers the Apexis Relic sequence.
+
+**Guild & Social**
+- **Guild Invite**, **Recruiting Tool**, **PvP Enemy Tracker** (with guild
+  sync), **Chat Filter**, **Keyword Monitor**, **Services Parser** and
+  **WarcraftLogs Lookup**.
+
+**Logging**
+- **Auto Logger** (chat and combat logs), **Mail & Trade Logger**,
+  **Instance Tracker** (lockouts and a log of every run), **Battlegrounds
+  & Arenas**, **Your Characters** (every alt's gold, gear, bags, bank and
+  lockouts, with a search across them) and **Crit Tracker**.
 
 ## Modules
 
