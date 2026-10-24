@@ -75,7 +75,7 @@ local combat, dead = false, false
 env.InCombatLockdown = function() return combat end
 env.UnitAffectingCombat = function() return combat end
 env.UnitIsDeadOrGhost = function() return dead end
-env.GetItemInfoInstant = function(link) local id = IDOf(link); return id, "Armor", "Misc", LOC[id] end
+env.GetItemInfoInstant = function(link) local id = IDOf(link) or tonumber(link); return id, "Armor", "Misc", LOC[id] end
 -- The client knows items it has cached: name and a link
 env.GetItemInfo = function(l)
     local id = IDOf(l) or tonumber(l)
@@ -545,6 +545,150 @@ check("unknown set", Said("No set called") ~= nil)
 GS:Command("list")
 check("list", Said("Your sets: Fury, Riding, Tank") ~= nil)
 check("status", GS:GetQuickStatus():find("3 sets", 1, true) and GS:GetQuickStatus():find("Tank", 1, true))
+
+-- Save a set again with extra options, keeping the rest
+local function Resave(name, extra)
+    local s = GS.Char().sets[name]
+    local opts = { spec = s.spec, specAuto = s.specAuto, mount = s.mount, pvp = s.pvp, form = s.form, key = s.key, bis = s.bis }
+    for k, v in pairs(extra) do opts[k] = v end
+    if extra.form == false then opts.form = nil end
+    return GS:SaveSet(name, s.items, opts)
+end
+
+-- ---- Key bindings ----
+local xml = io.open(REPO .. "/Bindings.xml"):read("*a")
+local allNamed = true
+for name in xml:gmatch('<Binding name="([^"]+)"') do
+    if name:find("^WM_GEARSET") and not env["BINDING_NAME_" .. name] then allNamed = false end
+end
+check("Bindings.xml: ten set keys, undo and the totem button", xml:find('"WM_GEARSET_10"', 1, true)
+    and xml:find('"WM_GEARSET_UNDO"', 1, true) and xml:find('"CLICK WM_TotemAnchor:LeftButton"', 1, true)
+    and xml:find('header="WATCHINGMACHINE"', 1, true))
+check("key binding heading named", env.BINDING_HEADER_WATCHINGMACHINE == "Watching Machine")
+check("every set key has a name", allNamed and env.BINDING_NAME_WM_GEARSET_UNDO ~= nil)
+check("unused key named by number", env.BINDING_NAME_WM_GEARSET_1 == "Gear set 1")
+Resave("Tank", { key = 1 })
+check("set takes a key number; key named after it", GS.Char().sets.Tank.key == 1
+    and env.BINDING_NAME_WM_GEARSET_1 == "Gear set 1: Tank" and GS:SetForKey(1).name == "Tank")
+Resave("Fury", { key = 1 })
+check("a key number belongs to one set", GS.Char().sets.Tank.key == nil and GS:SetForKey(1).name == "Fury"
+    and env.BINDING_NAME_WM_GEARSET_1 == "Gear set 1: Fury")
+Resave("Tank", { key = 2 })
+env.GetBindingKey = function(b) if b == "WM_GEARSET_2" then return "F5" end end
+check("badge shows the bound key", GS.Badges(GS.Char().sets.Tank):find("key F5", 1, true) ~= nil)
+check("badge shows the number when no key is bound", GS.Badges(GS.Char().sets.Fury):find("key 1", 1, true) ~= nil)
+GS.job = nil
+GS.Char().undo = nil
+env.WM_GearSetKey(2)
+check("pressing the key equips its set", GS.Char().undo and GS.Char().undo.name == "what you wore before Tank")
+Run()
+W.printed = {}
+env.WM_GearSetKey(7)
+check("an unused key says so", Said("No set uses Gear set 7") ~= nil)
+env.WM_GearSetKey("undo")
+check("the undo key undoes", GS.Char().undo == nil)
+Run()
+local dd = GS:OpenEditor(GS.Char().sets.Tank)
+check("editor keeps the key", dd.draft.key == 2)
+dd:Hide()
+GS:DeleteSet("Fury")
+check("deleting a set frees its key name", env.BINDING_NAME_WM_GEARSET_1 == "Gear set 1")
+
+-- ---- Forms and stances ----
+local formIndex = 0
+local FORM_SPELLS = { 9634, 768, 783 }
+local FORM_NAMES = { [9634] = "Dire Bear Form", [768] = "Cat Form", [783] = "Travel Form" }
+env.GetNumShapeshiftForms = function() return 3 end
+env.GetShapeshiftFormInfo = function(i) return "icon", i == formIndex, true, FORM_SPELLS[i] end
+env.GetSpellInfo = function(id) return FORM_NAMES[id] end
+env.GetShapeshiftForm = function() return formIndex end
+check("forms read from the stance bar", table.concat(GS.Forms(), ",") == "Dire Bear Form,Cat Form,Travel Form")
+check("caster form is no form", GS.CurrentForm() == nil)
+-- Older clients give the name second
+env.GetShapeshiftFormInfo = function(i) return "icon", FORM_NAMES[FORM_SPELLS[i]], i == formIndex, true end
+check("forms on older clients too", GS.Forms()[2] == "Cat Form")
+GS:EquipSet("Tank"); Run()
+local casterHelm = inv[1]
+GS:SaveSet("Bear", { [1] = GS.ItemString(HELM_D) }, { form = "Dire Bear Form" })
+check("form saved on the set; badge", GS.Char().sets.Bear.form == "Dire Bear Form"
+    and GS.Badges(GS.Char().sets.Bear):find("Dire Bear Form", 1, true) ~= nil)
+GS.ready = true
+GS.state.form = nil
+formIndex = 1
+GS.job = nil
+Event("UPDATE_SHAPESHIFT_FORM")
+check("bear form: its set goes on", GS.job and GS.job.setName == "Bear")
+Run()
+check("... and is on", GS.ItemString(inv[1]) == GS.ItemString(HELM_D))
+GS.job = nil
+Event("UPDATE_SHAPESHIFT_FORM")
+check("the same form again: nothing", GS.job == nil)
+formIndex = 2
+Event("UPDATE_SHAPESHIFT_FORM")
+check("a form with no set: what you wore before goes back", GS.job ~= nil)
+Run()
+check("... your caster helm", inv[1] == casterHelm and GS.Char().revert.form == nil)
+formIndex = 0
+GS.job = nil
+Event("UPDATE_SHAPESHIFT_FORM")
+check("back to caster with nothing to put back: nothing", GS.job == nil)
+GS.DB().auto = false
+formIndex = 1
+Event("UPDATE_SHAPESHIFT_FORM")
+check("automatic swaps off: no form swap", GS.job == nil)
+GS.DB().auto = true
+formIndex = 0
+Event("UPDATE_SHAPESHIFT_FORM")
+GS.ready = false
+formIndex = 1
+Event("UPDATE_SHAPESHIFT_FORM")
+check("at login (not ready): the form is noted, no swap", GS.job == nil and GS.state.form == "Dire Bear Form")
+GS.ready = true
+formIndex = 0
+Event("UPDATE_SHAPESHIFT_FORM")
+GS.job = nil
+local fe = GS:OpenEditor(GS.Char().sets.Bear)
+check("editor keeps the form", fe.draft.form == "Dire Bear Form")
+fe:Hide()
+
+-- ---- A set's GearScore and missing BiS ----
+check("no GearScore without the module", GS:SetScore(GS.Char().sets.Tank) == nil and GS.Extras(GS.Char().sets.Tank) == "")
+local scored
+WM.modules.GearScore = {
+    GearScoreFor = function(links) scored = links; local n = 0; for _ in pairs(links) do n = n + 1 end; return n * 100, 115.5, true end,
+    ColorText = function(_, t) return "<" .. t .. ">" end,
+}
+local tank = GS.Char().sets.Tank
+local score = GS:SetScore(tank)
+check("set's GearScore from its items", score ~= nil and scored[1] and scored[1]:find("29011", 1, true)
+    and scored[16] ~= nil)
+check("GearScore text coloured by the module", GS:ScoreText(tank) == "<GS " .. score .. ">")
+check("no BiS compare without a BiS spec", GS:MissingBiS(tank) == nil)
+local BIS = { Protection = { [29011] = 1, [29021] = 1, [29279] = 1, [28757] = 1, [28825] = 1 } }
+WM.modules.LootBrowser = {
+    MySpecs = function() return { "Arms", "Fury", "Protection" } end,
+    BiSItems = function(_, spec) return BIS[spec] or {} end,
+}
+check("BiS specs from the Loot Browser", table.concat(GS.BiSSpecs(), ",") == "Arms,Fury,Protection")
+Resave("Tank", { bis = "Protection" })
+tank = GS.Char().sets.Tank
+local missing, short = GS:MissingBiS(tank)
+local missIds = {}
+for _, m in ipairs(missing or {}) do missIds[m.id] = m.slot end
+-- Tank has the BiS helm (another BiS helm doesn't count), one BiS ring of two, the BiS shield
+check("missing BiS: the second ring only", short == 1 and missIds[28757] == 11 and missIds[29021] == nil
+    and missIds[29279] == nil and missIds[28825] == nil)
+check("list shows score and BiS", GS.Extras(tank):find("<GS", 1, true) and GS.Extras(tank):find("1 BiS missing", 1, true))
+BIS.Protection[28757] = nil
+check("all BiS: nothing missing", select(2, GS:MissingBiS(tank)) == 0 and not GS.Extras(tank):find("BiS", 1, true))
+BIS.Protection[99999] = 1
+LOC[99999] = "INVTYPE_BODY"   -- a shirt: the set leaves that slot alone
+check("BiS for a slot the set doesn't cover: not counted", select(2, GS:MissingBiS(tank)) == 0)
+local be = GS:OpenEditor(tank)
+check("editor keeps the BiS spec", be.draft.bis == "Protection")
+be:Hide()
+WM.modules.GearScore, WM.modules.LootBrowser = nil, nil
+check("modules gone: nothing shown", GS.Extras(tank) == "" and GS:MissingBiS(tank) == nil)
 
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

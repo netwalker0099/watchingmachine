@@ -165,7 +165,7 @@ check("Attunements page: Classic", RoundTrip(WM.modules.Attunements, "Show Class
     function() return env.AttunementsDB.showClassic end))
 env.AttunementsDB.showClassic = false
 local GE = WM.modules.GearSets
-check("Gear Sets page: automatic swaps", RoundTrip(GE, "Automatic swaps (spec, mounted, battlegrounds)", false,
+check("Gear Sets page: automatic swaps", RoundTrip(GE, "Automatic swaps (spec, form, mounted, battlegrounds)", false,
     function() return env.WMGearSetsDB.auto end))
 GE.DB().auto = false
 check("Gear Sets: auto is an ordinary setting now", GE.IsModuleEnabled == nil and GE.SetModuleEnabled == nil

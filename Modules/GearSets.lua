@@ -523,7 +523,12 @@ function GS:SaveSet(name, items, opts)
         if Char().current == opts.oldName then Char().current = name end
     end
     local set = { name = name, items = {}, spec = opts.spec, specAuto = opts.specAuto and true or false,
-        mount = opts.mount and true or false, pvp = opts.pvp and true or false }
+        mount = opts.mount and true or false, pvp = opts.pvp and true or false, form = opts.form,
+        key = tonumber(opts.key), bis = opts.bis }
+    -- A key number belongs to one set
+    if set.key then
+        for other, s in pairs(sets) do if other ~= name and s.key == set.key then s.key = nil end end
+    end
     set.links = {}
     for slot, v in pairs(items) do
         set.items[slot] = v
@@ -531,6 +536,7 @@ function GS:SaveSet(name, items, opts)
     end
     set.icon = opts.icon or GS.IconFor(set)
     sets[name] = set
+    self:UpdateBindingNames()
     self:RefreshUI()
     return set
 end
@@ -539,6 +545,7 @@ function GS:DeleteSet(name)
     local c = Char()
     c.sets[name] = nil
     if c.current == name then c.current = nil end
+    self:UpdateBindingNames()
     self:RefreshUI()
     self:UpdateDoll()
 end
@@ -666,6 +673,192 @@ function GS:CheckTrigger(key)
         return job
     end
 end
+
+-- ============================================
+-- FORMS AND STANCES
+-- ============================================
+-- A set can go on in a druid form or a warrior stance (or any other entry
+-- on your stance bar: stealth, shadowform, ...). Moving to a form with no
+-- set of its own puts back what you wore before the first form's set.
+
+-- The forms on your stance bar: { "Bear Form", "Cat Form", ... }
+function GS.Forms()
+    local out = {}
+    local n = GetNumShapeshiftForms and tonumber(GetNumShapeshiftForms()) or 0
+    for i = 1, n do
+        local a, b, _, d = GetShapeshiftFormInfo(i)
+        -- Older clients: icon, name, active, castable; newer: icon, active, castable, spell ID
+        local name = type(b) == "string" and b or nil
+        if not name and d and GetSpellInfo then name = GetSpellInfo(d) end
+        if type(name) == "string" then out[#out + 1] = name end
+    end
+    return out
+end
+
+-- The form you're in (nil: none, or caster form)
+function GS.CurrentForm()
+    local i = GetShapeshiftForm and tonumber(GetShapeshiftForm()) or 0
+    if i <= 0 then return nil end
+    return GS.Forms()[i]
+end
+
+function GS:SetForForm(form)
+    if not form then return nil end
+    for _, name in ipairs(self:SetNames()) do
+        local set = Char().sets[name]
+        if set.form == form then return set end
+    end
+end
+
+function GS:OnFormChanged()
+    local form = GS.CurrentForm()
+    self.state = self.state or {}
+    if self.state.form == form then return end
+    self.state.form = form
+    -- At login the form shows up late: note it, don't swap
+    if not self.ready or not DB().auto then return end
+    local c = Char()
+    local set = self:SetForForm(form)
+    if set then
+        -- Keep what you wore before the first form's set (bear to cat keeps your caster gear)
+        if not c.revert.form then c.revert.form = { items = Snapshot(set.items), name = set.name } end
+        self:EquipSet(set.name, "form", true)
+    elseif c.revert.form then
+        local r = c.revert.form
+        c.revert.form = nil
+        return self:Equip(r.items, "your gear from before " .. r.name, true)
+    end
+end
+
+-- ============================================
+-- KEY BINDINGS
+-- ============================================
+-- Bindings.xml has ten "Gear set N" keys and an undo key, under Watching
+-- Machine in the game's Key Bindings. A set takes one of the ten numbers
+-- in its editor; the key names show the set's name.
+
+local MAX_KEYS = 10
+GS.MAX_KEYS = MAX_KEYS
+
+function GS:SetForKey(n)
+    for _, name in ipairs(self:SetNames()) do
+        local set = Char().sets[name]
+        if set.key == n then return set end
+    end
+end
+
+-- The key bound to "Gear set N" (nil: none)
+function GS.BoundKey(n)
+    if not GetBindingKey then return nil end
+    local key = GetBindingKey("WM_GEARSET_" .. n)
+    return type(key) == "string" and key or nil
+end
+
+-- Name the binding slots after this character's sets
+function GS:UpdateBindingNames()
+    for n = 1, MAX_KEYS do
+        local set = self:SetForKey(n)
+        _G["BINDING_NAME_WM_GEARSET_" .. n] = "Gear set " .. n .. (set and (": " .. set.name) or "")
+    end
+    _G.BINDING_NAME_WM_GEARSET_UNDO = "Gear sets: undo the last swap"
+end
+
+-- Called by the key bindings (Bindings.xml)
+function WM_GearSetKey(n)
+    if not WM:IsModuleOn("GearSets") then
+        Say("Gear Sets is off on this character. Turn it on from the dashboard.")
+        return
+    end
+    if n == "undo" then return GS:Undo() end
+    local set = GS:SetForKey(tonumber(n))
+    if not set then Say("No set uses Gear set " .. tostring(n) .. ". Pick it in a set's editor."); return end
+    GS:EquipSet(set.name)
+end
+
+-- ============================================
+-- A SET'S GEARSCORE AND MISSING BEST-IN-SLOT
+-- ============================================
+
+local function ClassToken() local _, c = UnitClass("player"); return c end
+
+-- The set's GearScore, as you'd wear it (slots it leaves alone count what
+-- you have on). nil while GearScore is off.
+function GS:SetScore(set)
+    local GSC = WM:IsModuleOn("GearScore") and WM.modules.GearScore
+    if not GSC or not GSC.GearScoreFor then return nil end
+    local links = {}
+    for slot = 1, 18 do
+        local v = set.items[slot]
+        local saved = set.links and set.links[slot]
+        if v then links[slot] = (saved and ItemString(saved) == v and saved) or ("item:" .. v)
+        elseif v == nil then links[slot] = GetInventoryItemLink("player", slot) end
+    end
+    local score, ilvl, complete = GSC.GearScoreFor(links, ClassToken())
+    return score, ilvl, complete
+end
+
+function GS:ScoreText(set)
+    local score = self:SetScore(set)
+    if not score then return nil end
+    local GSC = WM.modules.GearScore
+    local text = "GS " .. score
+    return GSC.ColorText and GSC.ColorText(score, text) or text
+end
+
+-- The specs whose BiS list a set can be compared with (nil: Loot Browser off)
+function GS.BiSSpecs()
+    local LB = WM:IsModuleOn("LootBrowser") and WM.modules.LootBrowser
+    if not LB or not LB.MySpecs then return nil end
+    return LB.MySpecs()
+end
+
+-- Items marked BiS (in the Loot Browser) for the set's spec that it
+-- doesn't have, for the slots the set covers: { { id =, slot = }, ... }
+-- and how many slots that leaves short. nil when there's nothing to compare.
+function GS:MissingBiS(set)
+    local LB = WM:IsModuleOn("LootBrowser") and WM.modules.LootBrowser
+    if not set.bis or not LB or not LB.BiSItems then return nil end
+    local bis = LB:BiSItems(set.bis)
+    local inSet = {}
+    for _, v in pairs(set.items) do if v then inSet[ItemID(v)] = true end end
+    -- BiS items by the slots they fit (both rings, both trinkets together)
+    local groups, order = {}, {}
+    for id in pairs(bis) do
+        local fits = FITS[EquipLoc(id) or ""]
+        if fits then
+            local key = table.concat(fits, ",")
+            if not groups[key] then groups[key] = { fits = fits, ids = {} }; order[#order + 1] = key end
+            table.insert(groups[key].ids, id)
+        end
+    end
+    table.sort(order)
+    local out, short = {}, 0
+    for _, key in ipairs(order) do
+        local g = groups[key]
+        table.sort(g.ids)
+        local covered, has = false, 0
+        for _, slot in ipairs(g.fits) do
+            local v = set.items[slot]
+            if v ~= nil then covered = true end
+            if v and bis[ItemID(v)] then has = has + 1 end
+        end
+        local need = math.min(#g.ids, #g.fits) - has
+        if covered and need > 0 then
+            short = short + need
+            for _, id in ipairs(g.ids) do
+                if not inSet[id] then out[#out + 1] = { id = id, slot = g.fits[1] } end
+            end
+        end
+    end
+    return out, short
+end
+
+local function ItemName(id)
+    local name, link
+    if GetItemInfo then name, link = GetItemInfo(id) end
+    return (type(link) == "string" and link) or (type(name) == "string" and ("[" .. name .. "]")) or ("item " .. id)
+end
+GS.ItemName = ItemName
 
 -- ============================================
 -- CHARACTER SHEET: missing items, quick swap
@@ -929,8 +1122,22 @@ local function Badges(set)
     if set.spec then b[#b + 1] = (set.specAuto and "|cFF66CCFF" or "|cFF888888") .. "spec " .. set.spec .. "|r" end
     if set.mount then b[#b + 1] = "|cFF99E666mounted|r" end
     if set.pvp then b[#b + 1] = "|cFFFF6666PvP|r" end
+    if set.form then b[#b + 1] = "|cFFFFCC66" .. set.form .. "|r" end
+    if set.key then b[#b + 1] = "|cFFCCCCCCkey " .. (GS.BoundKey(set.key) or set.key) .. "|r" end
     return table.concat(b, " ")
 end
+GS.Badges = Badges
+
+-- GearScore and missing BiS, for the set list
+local function Extras(set)
+    local parts = {}
+    local score = GS:ScoreText(set)
+    if score then parts[#parts + 1] = score end
+    local _, short = GS:MissingBiS(set)
+    if short and short > 0 then parts[#parts + 1] = "|cFFFF8000" .. short .. " BiS missing|r" end
+    return table.concat(parts, " ")
+end
+GS.Extras = Extras
 
 function GS:SetStatus(set, scan)
     local plan = GS.Plan(set.items, scan)
@@ -976,6 +1183,24 @@ local function NewSetRow(row)
                 GameTooltip:AddDoubleLine(SLOT_NAMES[slot], right, 0.7, 0.7, 0.7, 1, 1, 1)
             end
         end
+        local score, ilvl = GS:SetScore(self.set)
+        if score then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine("GearScore", string.format("%s  (item level %.1f)", GS:ScoreText(self.set), ilvl or 0),
+                0.7, 0.7, 0.7, 1, 1, 1)
+        end
+        local missing, short = GS:MissingBiS(self.set)
+        if missing then
+            GameTooltip:AddLine(" ")
+            if short > 0 then
+                GameTooltip:AddLine("Not yet best in slot (" .. self.set.bis .. "):", 1, 0.5, 0)
+                for _, m in ipairs(missing) do
+                    GameTooltip:AddDoubleLine(SLOT_NAMES[m.slot], ItemName(m.id), 0.7, 0.7, 0.7, 1, 1, 1)
+                end
+            else
+                GameTooltip:AddLine("Best in slot for " .. self.set.bis .. " in every slot it covers.", 0.2, 1, 0.2)
+            end
+        end
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -988,8 +1213,8 @@ function GS:CreateUI()
         onRefresh = function(p) GS:FillRows(p) end })
     local L = panel.layout
     L:Note("Save what you're wearing as a set and put it back on in one click, from a macro (/wmachine gear equip <name>),"
-        .. " or automatically when you switch spec, mount up or enter a battleground.")
-    L:Checkbox({ label = "Automatic swaps (spec, mounted, battlegrounds)", get = function() return DB().auto end,
+        .. " or a key, or automatically when you switch spec or form, mount up or enter a battleground.")
+    L:Checkbox({ label = "Automatic swaps (spec, form, mounted, battlegrounds)", get = function() return DB().auto end,
         set = function(v) DB().auto = v end,
         tooltip = { "Automatic swaps", "Off: sets only go on when you equip them yourself." } })
     L:Note(function() return "You're in " .. GS.SpecName(GS.ActiveSpec()) .. "." end)
@@ -1039,7 +1264,8 @@ function GS:FillRows(p)
             local status, plan = self:SetStatus(set, scan)
             f.plan = plan
             local badges = Badges(set)
-            f.status:SetText(status .. (badges ~= "" and ("  " .. badges) or ""))
+            local extras = Extras(set)
+            f.status:SetText(status .. (extras ~= "" and ("  " .. extras) or "") .. (badges ~= "" and ("  " .. badges) or ""))
         end
     end
     p.emptyRow.hidden = #names > 0
@@ -1258,6 +1484,61 @@ function GS:CreateEditor()
         set = function(v) D().mount = v end })
     L:Checkbox({ label = "Equip it in battlegrounds and arenas (back after)", get = function() return D() and D().pvp end,
         set = function(v) D().pvp = v end })
+    L:Dropdown({ label = "Form or stance:", width = 180,
+        options = function()
+            local o = { { value = "", text = "None" } }
+            for _, f in ipairs(GS.Forms()) do o[#o + 1] = { value = f, text = f } end
+            return o
+        end,
+        get = function() return D() and D().form or "" end,
+        set = function(v) D().form = (v ~= "") and v or nil end,
+        tooltip = { "Form or stance", "Equip the set when you take this form or stance (bear, cat, a warrior stance,"
+            .. " stealth, ...). Taking a form with no set of its own puts back what you wore before." } })
+    L:Dropdown({ label = "Key binding:", width = 180,
+        options = function()
+            local o = { { value = 0, text = "None" } }
+            for n = 1, MAX_KEYS do
+                local key = GS.BoundKey(n)
+                local other = GS:SetForKey(n)
+                local text = "Gear set " .. n .. (key and (" (" .. key .. ")") or " (no key yet)")
+                if other and other.name ~= (D() and D().oldName) then text = text .. " - now " .. other.name end
+                o[#o + 1] = { value = n, text = text }
+            end
+            return o
+        end,
+        get = function() return D() and D().key or 0 end,
+        set = function(v) D().key = (v ~= 0) and v or nil end,
+        tooltip = { "Key binding", "Pick a number here, then give \"Gear set N\" a key in the game's Key Bindings"
+            .. " (under Watching Machine). Pressing it equips this set." } })
+    L:Dropdown({ label = "Compare with BiS:", width = 180,
+        options = function()
+            local o = { { value = "", text = "None" } }
+            for _, spec in ipairs(GS.BiSSpecs() or {}) do o[#o + 1] = { value = spec, text = spec } end
+            return o
+        end,
+        get = function() return D() and D().bis or "" end,
+        set = function(v) D().bis = (v ~= "") and v or nil; editor:Refresh() end,
+        disabled = function() return GS.BiSSpecs() == nil end,
+        tooltip = { "Best in slot", "Lists the items you've marked BiS for this spec in the Loot Browser that the"
+            .. " set doesn't have yet (needs the Loot Browser on)." } })
+    L:Note(function()
+        local d = D()
+        if not d then return "" end
+        local parts = {}
+        local score = GS:ScoreText(d)
+        if score then parts[#parts + 1] = "This set: " .. score end
+        local missing, short = GS:MissingBiS(d)
+        if missing then
+            if short > 0 then
+                local names = {}
+                for _, m in ipairs(missing) do names[#names + 1] = ItemName(m.id) end
+                parts[#parts + 1] = "|cFFFF8000Not yet BiS:|r " .. table.concat(names, ", ")
+            else
+                parts[#parts + 1] = "|cFF33FF33BiS in every slot it covers.|r"
+            end
+        end
+        return table.concat(parts, "\n")
+    end)
     editor:AddFooterButton({ text = "Save", width = 90, onClick = function() GS:SaveDraft() end }, "RIGHT")
     editor:AddFooterButton({ text = "Cancel", width = 90, onClick = function() editor:Hide() end }, "RIGHT")
     editor:Finish()
@@ -1270,6 +1551,7 @@ function GS:OpenEditor(set)
     local d = { items = {} }
     if set then
         d.name, d.oldName, d.spec, d.specAuto, d.mount, d.pvp = set.name, set.name, set.spec, set.specAuto, set.mount, set.pvp
+        d.form, d.key, d.bis, d.links = set.form, set.key, set.bis, set.links
         for slot, v in pairs(set.items) do d.items[slot] = v end
     else
         d.name = ""
@@ -1287,7 +1569,7 @@ function GS:SaveDraft()
     local d = editor and editor.draft
     if not d then return end
     local set, err = self:SaveSet(d.name, d.items, { oldName = d.oldName, spec = d.spec, specAuto = d.specAuto,
-        mount = d.mount, pvp = d.pvp })
+        mount = d.mount, pvp = d.pvp, form = d.form, key = d.key, bis = d.bis })
     if not set then Say(err); return end
     editor:Hide()
     Say("Saved " .. set.name .. (set.spec and set.specAuto and (", equipped when you switch to " .. GS.SpecName(set.spec)) or "") .. ".")
@@ -1312,7 +1594,7 @@ end
 -- while it was off (spec, mount, zone) sets off a swap
 function GS:OnModuleOn()
     if not self._wmStarted and not self.state then return end
-    self.state = { mount = Mounted(), pvp = InPvP() }
+    self.state = { mount = Mounted(), pvp = InPvP(), form = GS.CurrentForm() }
     self:Arm()
     self:UpdateDoll()
 end
@@ -1332,10 +1614,19 @@ function GS:SetupPage(L)
         .. " Untick the box on one set to stop just that set swapping, or turn off Automatic swaps below to stop"
         .. " them all. A set can also go on while you're mounted or in battlegrounds, and what you wore before comes"
         .. " back after.")
+    L:Header("Forms, stances and keys")
+    L:Note("|cFFFFFFFFForms and stances:|r in a set's editor, pick a form or stance under |cFFFFFFFFForm or"
+        .. " stance|r (Bear Form, Cat Form, Defensive Stance, Stealth, ...). Taking that form puts the set on; taking a"
+        .. " form with no set of its own puts back what you wore before.")
+    L:Note("|cFFFFFFFFKeys:|r pick a number under |cFFFFFFFFKey binding|r in a set's editor, then give \"Gear set N\" a"
+        .. " key in the game's Key Bindings, under Watching Machine. There's an undo key there too.")
+    L:Note("|cFFFFFFFFGearScore and best in slot:|r with GearScore on, each set shows its score. Pick a spec under"
+        .. " |cFFFFFFFFCompare with BiS|r and, with the Loot Browser on, the set lists the items you've marked BiS"
+        .. " for that spec that it doesn't have yet.")
     L:Note("|cFFFFFFFFIf something's missing:|r when a swap ends it says in chat what it couldn't find, and whether"
         .. " it's in your bank (that needs Your Characters on, which remembers your bank). Opening your character"
         .. " sheet shows a warning when a set's item isn't on you, and marks the slots of your last set in red.")
-    L:Checkbox({ label = "Automatic swaps (spec, mounted, battlegrounds)", get = function() return DB().auto end,
+    L:Checkbox({ label = "Automatic swaps (spec, form, mounted, battlegrounds)", get = function() return DB().auto end,
         set = function(v) DB().auto = v end,
         tooltip = { "Automatic swaps", "On: a set goes on when you switch to its spec, mount up or enter a"
             .. " battleground (whichever its editor has ticked). Off: sets only go on when you equip them yourself." } })
@@ -1419,7 +1710,8 @@ end
 
 function GS:Initialize()
     DB()
-    self.state = { mount = Mounted(), pvp = InPvP() }
+    self.state = { mount = Mounted(), pvp = InPvP(), form = GS.CurrentForm() }
+    self:UpdateBindingNames()
     self:HookDoll()
     -- Started after you were already in the world (at login the start-up
     -- comes after the first loading screen, or turned on later): get ready
@@ -1430,7 +1722,7 @@ function GS:Initialize()
     WM:RegisterEvents(events, { "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_TALENT_UPDATE", "PLAYER_REGEN_ENABLED",
         "PLAYER_ALIVE", "PLAYER_UNGHOST", "UNIT_AURA", "PLAYER_MOUNT_DISPLAY_CHANGED", "ZONE_CHANGED_NEW_AREA",
         "PLAYER_ENTERING_WORLD", "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYER_EQUIPMENT_CHANGED",
-        "ADDON_LOADED" })
+        "ADDON_LOADED", "UPDATE_SHAPESHIFT_FORM", "UPDATE_BINDINGS" })
 end
 
 events:SetScript("OnEvent", function(_, event, arg1)
@@ -1454,6 +1746,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
         if panel and panel:IsShown() and not GS.job then GS:RefreshUI() end
     elseif event == "ADDON_LOADED" then
         GS:HookDoll()
+    elseif event == "UPDATE_SHAPESHIFT_FORM" then
+        ok, err = pcall(GS.OnFormChanged, GS)
+    elseif event == "UPDATE_BINDINGS" then
+        if panel and panel:IsShown() then GS:RefreshUI() end
     end
     if not ok then geterrorhandler()(err) end
 end)

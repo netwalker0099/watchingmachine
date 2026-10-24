@@ -1,0 +1,16 @@
+<Bindings>
+	<!-- Gear Sets: a set picks one of these numbers in its editor -->
+	<Binding name="WM_GEARSET_1" header="WATCHINGMACHINE">WM_GearSetKey(1)</Binding>
+	<Binding name="WM_GEARSET_2">WM_GearSetKey(2)</Binding>
+	<Binding name="WM_GEARSET_3">WM_GearSetKey(3)</Binding>
+	<Binding name="WM_GEARSET_4">WM_GearSetKey(4)</Binding>
+	<Binding name="WM_GEARSET_5">WM_GearSetKey(5)</Binding>
+	<Binding name="WM_GEARSET_6">WM_GearSetKey(6)</Binding>
+	<Binding name="WM_GEARSET_7">WM_GearSetKey(7)</Binding>
+	<Binding name="WM_GEARSET_8">WM_GearSetKey(8)</Binding>
+	<Binding name="WM_GEARSET_9">WM_GearSetKey(9)</Binding>
+	<Binding name="WM_GEARSET_10">WM_GearSetKey(10)</Binding>
+	<Binding name="WM_GEARSET_UNDO">WM_GearSetKey("undo")</Binding>
+	<!-- Class Tools: the shaman totem button (a secure button, so it works in combat) -->
+	<Binding name="CLICK WM_TotemAnchor:LeftButton"/>
+</Bindings>

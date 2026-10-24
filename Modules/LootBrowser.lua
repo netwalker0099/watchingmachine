@@ -454,6 +454,8 @@ end
 
 local function BisKey(spec, class) return (class or MyClass() or "?") .. ":" .. spec end
 function LB:IsBiS(spec, id, class) local t = DB().bis[BisKey(spec, class)]; return t ~= nil and t[id] ~= nil end
+-- The items marked BiS for a spec: { [item ID] = when marked }
+function LB:BiSItems(spec, class) return DB().bis[BisKey(spec, class)] or {} end
 function LB:ToggleBiS(spec, id, class)
     local k = BisKey(spec, class)
     DB().bis[k] = DB().bis[k] or {}

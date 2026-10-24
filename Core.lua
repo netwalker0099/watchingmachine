@@ -8,6 +8,9 @@ _G.WatchingMachine = WM
 WM.version = "3.49"
 WM.modules = {}
 
+-- The heading for our keys in the game's Key Bindings (Bindings.xml)
+BINDING_HEADER_WATCHINGMACHINE = "Watching Machine"
+
 -- ============================================
 -- ERROR LOGGING (loads before everything else)
 -- ============================================
