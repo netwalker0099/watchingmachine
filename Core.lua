@@ -1964,6 +1964,7 @@ function WM:CreateSettingsPanel()
         font = "GameFontNormalSmall",
         text = function() return "Active: |cFF00FF00" .. WM:GetThemeName() .. "|r" end,
     }, 12)
+    if self.Setup and self.Setup.ForgetControls then self.Setup:ForgetControls(L, panel) end
 
     settingsFrame = panel:Finish()
     return settingsFrame
@@ -2000,7 +2001,7 @@ end
 function WM:ShowHelp()
     self:Print("=== Watching Machine Commands ===")
     print("|cFFFFFF00/wmachine|r - Toggle dashboard")
-    print("|cFFFFFF00/wmachine setup|r - Run the setup (again) for this character, keeping what's on (setup quick / setup guided; also /wmachine resetup)")
+    print("|cFFFFFF00/wmachine setup|r - Run the setup (again) for this character, keeping what's on (setup quick / setup guided / setup new for what's new; also /wmachine resetup)")
     print("|cFFFFFF00/wmachine logger|r - Open Auto Logger")
     print("|cFFFFFF00/wmachine keyword|r - Open Keyword Monitor")
     print("|cFFFFFF00/wmachine filter|r - Open Chat Filter (hide spam phrases; applied before Keyword Monitor)")
@@ -2365,9 +2366,12 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         WM:Print("Minimap button position reset. Drag to reposition.")
         
     elseif cmd == "setup" or cmd == "setup quick" or cmd == "setup guided" or cmd == "wizard"
-        or cmd == "resetup" or cmd == "rerun" or cmd == "setup again" then
+        or cmd == "resetup" or cmd == "rerun" or cmd == "setup again" or cmd == "setup new" or cmd == "whatsnew" then
         if WM.Setup then
-            if cmd == "setup quick" then WM.Setup:OpenQuick()
+            if cmd == "setup new" or cmd == "whatsnew" then
+                local new = WM.Setup:NewModules()
+                WM.Setup:ShowWhatsNew(#new > 0 and new or WM:CharState().lastNew)
+            elseif cmd == "setup quick" then WM.Setup:OpenQuick()
             elseif cmd == "setup guided" then WM.Setup:OpenGuided()
             else WM.Setup:ShowWelcome() end
         end

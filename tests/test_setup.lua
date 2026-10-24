@@ -313,5 +313,67 @@ for i = WM.Setup.guided and 1 or g.index, #g.pages - 1 do WM.Setup:Go(1) end
 WM.Setup:Go(1)
 check("re-run guided: paging through changes nothing", not g:IsShown() and Same(before, Snapshot()) and env.HazardsDB.drowning == true)
 
+-- ---- What's new: a module added since this character last looked ----
+local c = WM:CharState()
+check("finishing the setup marks every module as seen", type(c.known) == "table" and c.known.FrameMover
+    and #WM.Setup:NewModules() == 0)
+c.known.FrameMover = nil            -- as if this version had just added it
+check("a module it hasn't seen is new", table.concat(WM.Setup:NewModules(), ",") == "FrameMover")
+WM.Setup:OnLogin()
+local wn = env.WM_SetupWhatsNew
+check("login shows what's new", wn ~= nil and wn:IsShown())
+local fmSwitch
+for _, w in ipairs(wn.layout.widgets) do
+    local t = rawget(w, "Text") and w.Text:GetText()
+    if t and t:find("Turn on Frame Mover", 1, true) then fmSwitch = w end
+end
+check("what's new: the module's page, with its switch", fmSwitch ~= nil and fmSwitch:GetChecked() == WM:IsModuleOn("FrameMover"))
+W.click(fmSwitch)
+check("what's new: the switch works", WM:IsModuleOn("FrameMover") == fmSwitch:GetChecked())
+W.click(wn.doneBtn)
+check("Done: seen, closed", not wn:IsShown() and #WM.Setup:NewModules() == 0)
+wn:Hide()
+WM.Setup:OnLogin()
+check("not shown again once seen", not wn:IsShown())
+c.known = nil
+WM.Setup:OnLogin()
+check("a character from before: everything it has counts as seen", not wn:IsShown() and c.known and c.known.Hazards)
+W.printed = {}
+env.SlashCmdList.WATCHINGMACHINE("setup new")
+check("setup new: the last new modules again", wn:IsShown())
+wn:Hide()
+c.lastNew = nil
+env.SlashCmdList.WATCHINGMACHINE("whatsnew")
+check("whatsnew with nothing new says so", Said("Nothing new") and not wn:IsShown())
+
+-- ---- Forget a character ----
+local me = P.key
+local hz = rawget(env.HazardsDB, "__wm")
+check("another character has settings", hz.profiles["Veteran-Spineshatter"] ~= nil
+    and env.WatchingMachineDB.chars["Veteran-Spineshatter"] ~= nil)
+check("can't forget the character you're on", P:DeleteCharacter(me) == false and hz.profiles[me] ~= nil)
+local welcomeP = WM.Setup:ShowWelcome()
+welcomeP.forget = "Veteran-Spineshatter"
+local forgetBtn
+for _, w in ipairs(welcomeP.layout.widgets) do
+    if w.GetText and w:GetText() == "Forget its settings" then forgetBtn = w end
+end
+check("welcome window: forget a character", forgetBtn ~= nil)
+W.click(forgetBtn)
+check("forgotten: its settings and switches", hz.profiles["Veteran-Spineshatter"] == nil
+    and env.WatchingMachineDB.chars["Veteran-Spineshatter"] == nil and Said("Forgot Veteran-Spineshatter"))
+check("records about all characters kept", env.AltTrackerDB.chars["Veteran-Spineshatter"] ~= nil)
+local listed = false
+for _, k in ipairs(P:Characters()) do if k == "Veteran-Spineshatter" then listed = true end end
+check("no longer listed", not listed)
+check("forgetting again finds nothing", WM.Setup:Forget("Veteran-Spineshatter") == false)
+welcomeP:Hide()
+local sp = WM:CreateSettingsPanel()
+local inSettings = false
+for _, w in ipairs(sp.layout.widgets) do
+    if w.GetText and w:GetText() == "Forget its settings" then inSettings = true end
+end
+check("settings window: forget a character too", inSettings)
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

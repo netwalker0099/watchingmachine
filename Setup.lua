@@ -50,11 +50,34 @@ local PRESETS = {
 }
 S.PRESETS = PRESETS
 
+-- ---- Modules this character has been shown ----
+-- c.known lists them, so a module a later version adds is shown once on
+-- the "what's new" page. A character from before this keeps everything it
+-- has as known.
+
+function S:MarkKnown()
+    local c = WM:CharState()
+    c.known = {}
+    for _, m in ipairs(self:Modules()) do c.known[m.name] = true end
+end
+
+-- Modules this character hasn't been shown yet, in dashboard order
+function S:NewModules()
+    local c = WM:CharState()
+    if type(c.known) ~= "table" then return {} end
+    local out = {}
+    for _, m in ipairs(self:Modules()) do
+        if not c.known[m.name] then out[#out + 1] = m.name end
+    end
+    return out
+end
+
 local function Done(how)
     local c = WM:CharState()
     c.setup = "done"
     c.setupHow = how
     c.defaultOn = c.defaultOn and true or false
+    S:MarkKnown()
 end
 
 function S:OnCount()
@@ -71,7 +94,9 @@ local welcome
 
 function S:OnLogin()
     local c = WM:CharState()
-    if c.setup == "new" or c.setup == "offer" then self:ShowWelcome() end
+    if type(c.known) ~= "table" then self:MarkKnown() end
+    if c.setup == "new" or c.setup == "offer" then self:ShowWelcome()
+    elseif c.setup == "done" and #self:NewModules() > 0 then self:ShowWhatsNew() end
 end
 
 function S:ShowWelcome()
@@ -115,6 +140,7 @@ function S:ShowWelcome()
             S:CopyFrom(welcome.copyFrom)
             welcome:Hide()
         end } })
+        S:ForgetControls(L, welcome)
         welcome:AddFooterButton({ text = "Later", width = 90, onClick = function() S:Later() end }, "RIGHT")
         welcome:Finish()
     end
@@ -157,6 +183,40 @@ function S:CopyFrom(other)
     end
     WM:Print("Copied " .. other .. "'s modules and settings.")
     return true
+end
+
+-- Forget a character you deleted: its settings and module switches
+function S:Forget(other)
+    if not WM.Profiles:DeleteCharacter(other) then return false end
+    WM:Print("Forgot " .. other .. "'s Watching Machine settings.")
+    return true
+end
+
+-- "Forget a character" controls on a panel (the welcome window, Settings)
+function S:ForgetControls(L, panel)
+    L:Header("Forget a character")
+    L:Note("For a character you've deleted or renamed: removes its Watching Machine settings and which modules it had"
+        .. " on. Lists about all your characters (Your Characters, the instance log) keep their own delete.")
+    L:Dropdown({ label = "Character:", width = 200,
+        options = function()
+            local o = {}
+            for _, k in ipairs(WM.Profiles:Characters()) do o[#o + 1] = { value = k, text = k } end
+            if #o == 0 then o[1] = { value = "", text = "(no other characters)" } end
+            return o
+        end,
+        get = function() return panel.forget end,
+        set = function(v) panel.forget = v ~= "" and v or nil end,
+        tooltip = { "Forget a character", "Only other characters are listed: the one you're on can't be forgotten." } })
+    L:Buttons({ { text = "Forget its settings", width = 160, onClick = function()
+        local who = panel.forget
+        if not who then WM:Print("Pick a character to forget first."); return end
+        WM:Confirm("Forget " .. who .. "'s Watching Machine settings and module switches? This can't be undone.",
+            function()
+                S:Forget(who)
+                panel.forget = nil
+                panel:Refresh()
+            end)
+    end } })
 end
 
 -- ============================================
@@ -292,6 +352,9 @@ local function BuildIntro(L)
     L:Note("Which modules are on, and every module's settings, belong to this character. Your other characters"
         .. " keep their own (you can copy one character's setup to another from the welcome window). Things that are"
         .. " about all your characters, like Your Characters' gold totals or the instance log, are shared.")
+    L:Note("When a new version adds a module, your next login shows it on a |cFFFFFFFFNew in Watching Machine|r"
+        .. " page (|cFFFFFF00/wmachine setup new|r brings it back). The settings of a character you've deleted can be"
+        .. " forgotten from the welcome window or |cFFFFFF00/wmachine settings|r.")
     L:Header("The dashboard")
     L:Note("|cFFFFFFFF/wmachine|r (or left-click the minimap button) opens the dashboard: a card per module, in"
         .. " three groups. Each card has an on/off switch (for this character), an Open button for the module's"
@@ -419,4 +482,47 @@ end
 function S:OpenModulePage(name)
     local pages = self:Pages()
     for i, p in ipairs(pages) do if p.name == name then return self:OpenGuided(i) end end
+end
+
+-- ============================================
+-- WHAT'S NEW: modules added since this character last looked
+-- ============================================
+
+local whatsNew
+
+-- Show the modules this character hasn't seen, each with its setup page
+-- (names: which ones; default: every new one)
+function S:ShowWhatsNew(names)
+    names = names or self:NewModules()
+    if #names == 0 then
+        WM:Print("Nothing new: this character has seen every module. |cFFFFFF00/wmachine setup|r goes through them all.")
+        return nil
+    end
+    if not whatsNew then
+        whatsNew = WM.UI:CreatePanel({ name = "WM_SetupWhatsNew", title = "New in Watching Machine", width = 560,
+            height = 560, strata = "DIALOG" })
+        whatsNew.doneBtn = whatsNew:AddFooterButton({ text = "Done", width = 90, onClick = function()
+            S:MarkKnown()
+            whatsNew:Hide()
+        end }, "RIGHT")
+        whatsNew:AddFooterButton({ text = "Ask me next time", width = 140, onClick = function() whatsNew:Hide() end }, "LEFT")
+        whatsNew:Finish()
+    end
+    WM:CharState().lastNew = names
+    local page = whatsNew:NewPage()
+    local L = page.layout
+    local titles = {}
+    for _, name in ipairs(names) do titles[#titles + 1] = Title(name) end
+    L:Note("|cFFFFFFFFThis version of Watching Machine adds " .. table.concat(titles, ", ") .. ".|r Here's what"
+        .. (#names == 1 and " it does" or " each one does") .. ". The switch shows whether it's on for this"
+        .. " character now; set it the way you want, then click Done.")
+    for _, name in ipairs(names) do
+        S.FillDefaults(name)
+        BuildModule(L, name)
+    end
+    L:Reflow()
+    whatsNew.names = names
+    whatsNew:Show()
+    whatsNew:ShowPage(page)
+    return whatsNew
 end

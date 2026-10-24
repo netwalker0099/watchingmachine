@@ -150,6 +150,20 @@ function P:Characters()
     return out
 end
 
+-- Forget another character's settings and module switches (a character
+-- you deleted or renamed). Records modules keep about all your characters
+-- (Your Characters' list, the instance log, ...) are left to those modules.
+function P:DeleteCharacter(other)
+    if not other or other == self.key then return false end
+    local found = false
+    for _, store in pairs(self.stores) do
+        if store.profiles[other] ~= nil then store.profiles[other] = nil; found = true end
+    end
+    local chars = WatchingMachineDB and WatchingMachineDB.chars
+    if type(chars) == "table" and chars[other] then chars[other] = nil; found = true end
+    return found
+end
+
 -- Copy another character's settings and module switches onto this one.
 -- Modules already running pick up some changes only after /reload.
 function P:CopyFrom(other)
