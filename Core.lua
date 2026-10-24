@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.48.5"
+WM.version = "3.49"
 WM.modules = {}
 
 -- ============================================
@@ -19,7 +19,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -344,6 +344,7 @@ local MODULE_COLORS = {
     Crits = "FF8800",
     Ogrila = "99E666",
     GearSets = "CCB366",
+    FrameMover = "99CCFF",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1205,6 +1206,7 @@ local MODULE_GROUPS = {
     { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
     { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
+    { title = "Interface", modules = { "FrameMover" } },
 }
 
 local MODULE_INFO = {
@@ -1294,6 +1296,14 @@ local MODULE_INFO = {
         command = "gear", color = {0.8, 0.7, 0.4}, icon = "Interface\\Icons\\INV_Chest_Plate06",
         tools = {
             { text = "Undo the last swap", func = function() Call("GearSets", "Undo") end },
+        },
+    },
+    FrameMover = {
+        title = "Frame Mover", desc = "Move and resize the game's windows (BlizzMove-style)",
+        about = "Drag the game's own windows wherever you like: character, spellbook, talents, bank, mailbox, world map, auction house, professions and the rest. Ctrl + mouse wheel resizes one; Shift + right-click puts it back. Each character remembers its own layout, and a window returns to your spot whenever the game opens it.",
+        command = "move", color = {0.6, 0.8, 1}, icon = "Interface\\Icons\\INV_Misc_Map_01",
+        tools = {
+            { text = "Reset every window", func = function() Call("FrameMover", "Command", "reset") end },
         },
     },
     Ogrila = {
@@ -2025,6 +2035,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine gtfo|r - Hazard Alerts (gtfo test / mute <spell ID> / unmute <spell ID>)")
     print("|cFFFFFF00/wmachine gear|r - Gear Sets (gear equip <name> / undo / list)")
     print("|cFFFFFF00/wmachine ogri|r - Ogri'la Helper: remembers the Apexis Relic sequence (ogri options / clear)")
+    print("|cFFFFFF00/wmachine move|r - Frame Mover: move and resize the game's windows (move reset puts them all back)")
     print("|cFFFFFF00/wmachine crits|r - Crit Tracker: your best hits, crits and heals")
     print("|cFFFFFF00/wmachine attune|r - Attunements: raid attunements and keys for each character")
     print("|cFFFFFF00/wmachine gs|r - GearScore for your group (gs unlock / lock / reset / report)")
@@ -2219,6 +2230,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "ogri" or cmd == "relic" or cmd == "ogrila" or cmd:match("^ogri ") then
         local module = WM:UsableModule("Ogrila")
         if module and module.Command then module:Command(cmd:match("^ogri (.+)$")) end
+
+    elseif cmd == "move" or cmd == "mover" or cmd == "frames" or cmd:match("^move ") then
+        local module = WM:UsableModule("FrameMover")
+        if module and module.Command then module:Command(cmd:match("^move (.+)$")) end
 
     elseif cmd == "crits" or cmd == "crit" or cmd == "ct" then
         local module = WM:UsableModule("Crits")

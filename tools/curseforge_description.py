@@ -1,5 +1,5 @@
 import re
-src = open('README.md').read().split('\n')
+src = open('README.md', encoding='utf-8').read().split('\n')
 # Split into level-2 sections and numbered module sections
 def section(title_re, level='## '):
     start = None
@@ -26,6 +26,7 @@ GROUPS = [
     ('Raid', [10, 7, (13, [14, 15, 16, 17, 18]), 12, 11, 22, 23, 24, 25, 26, 28, 29]),
     ('Guild & Social', [6, 9, 8, 30, 2, 4, 5]),
     ('Logging', [1, 3, 19, 21, 20, 27]),
+    ('Interface', [31]),
 ]
 out = []
 out.append('Post Issues here - https://github.com/netwalker0099/watchingmachine/issues\nPlease include your full LUA error output.\n')
@@ -47,5 +48,5 @@ for name in ('Usage', 'Global Theme System', 'Error Logging', 'Installation', 'S
     out.append('\n'.join(sec).rstrip() + '\n')
 text = '\n'.join(out)
 text = re.sub(r'\n{3,}', '\n\n', text)
-open('docs/CURSEFORGE-DESCRIPTION.md', 'w').write(text)
+open('docs/CURSEFORGE-DESCRIPTION.md', 'w', encoding='utf-8').write(text)
 print(len(text.split('\n')), 'lines')

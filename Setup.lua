@@ -41,10 +41,10 @@ end
 local PRESETS = {
     { key = "raid", text = "Raiding", tip = "Raid and dungeon tools, class tools, logging and your characters.",
         modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser",
-            "GearScore", "Attunements", "Hazards", "GearSets", "AutoLogger", "InstanceTracker", "AltTracker", "Crits" } },
+            "GearScore", "Attunements", "Hazards", "GearSets", "AutoLogger", "InstanceTracker", "AltTracker", "Crits", "FrameMover" } },
     { key = "guild", text = "Guild officer", tip = "Recruiting, invites, chat tools and logs.",
         modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser",
-            "WhisperLogs", "MailLogger", "AltTracker", "ArmorySnap" } },
+            "WhisperLogs", "MailLogger", "AltTracker", "ArmorySnap", "FrameMover" } },
     { key = "all", text = "Everything", tip = "Every module on." },
     { key = "none", text = "Nothing", tip = "Every module off." },
 }

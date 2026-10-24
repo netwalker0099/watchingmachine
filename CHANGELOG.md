@@ -2,7 +2,45 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48.5** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.49** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.49
+
+### New module: Frame Mover
+
+Move and resize the game's own windows, like BlizzMove. It's in a new
+**Interface** group on the dashboard, with its own page in the guided setup,
+and `/wmachine move` opens its window. The list of windows was compiled with
+the help of BlizzMove's research; the code is Watching Machine's own.
+
+- **Drag** any of about 55 game windows (character, spellbook, talents,
+  bank, guild bank, mailbox, vendor, quest log, world map, auction house,
+  professions, trainer, inspect, macros, the social window, ...). A drag on
+  a tab or inner panel moves the whole window.
+- **Ctrl + mouse wheel** resizes a window (50% to 200%). **Shift +
+  right-click** puts it back where the game had it, **Ctrl + right-click**
+  puts its size back.
+- **Per character**, kept across logouts until reset. When the game opens a
+  window or moves it to make room, it goes back to your spot.
+- **Options:** only move while Shift is held, resizing on or off, keep
+  windows on the screen, leave a chosen window alone, reset one window or
+  all of them (`/wmachine move reset`), and a list of what you've moved.
+- **Safe with the game's code:** nothing is written into the game's
+  windows or tables (secure hooks only), protected windows wait for combat
+  to end, the Escape menu is never moved, and the game's layout cache isn't
+  touched. With BlizzMove (or MoveAnything) loaded, Frame Mover stands
+  aside.
+- Turned off, every window goes back to the game's place, size and mouse
+  settings; the layout stays saved.
+
+### Tests
+
+- `tests/test_globals.lua` now runs on Windows: it takes `$LUAC`, then
+  `luac5.1`, then `luac`, and quotes paths so `cmd.exe` accepts them.
+- `tools/curseforge_description.py` reads and writes UTF-8 (on Windows it
+  read the README's dashes wrongly) and has the new Interface group.
 
 ---
 

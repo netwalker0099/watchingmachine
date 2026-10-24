@@ -716,3 +716,22 @@ Built as `Profiles.lua` (per-character settings and module switches) and
 - [x] **Turning off works at once:** events, hooks and frames stop.
 - [ ] **Later:** a "what's new" page in the setup when a version adds a
       module, and deleting an old character's settings.
+
+## 24. Frame Mover (BlizzMove-style) — DONE in 3.49
+
+Built as `Modules/FrameMover.lua` + `Data/FrameMover.lua` (our own code;
+the window list compiled with BlizzMove's research).
+
+- [x] **Move:** drag about 55 game windows; parts move the whole window.
+- [x] **Size:** Ctrl + mouse wheel, Ctrl + right-click resets.
+- [x] **Remembered per character** (decided), kept until reset (decided),
+      re-applied whenever the game re-places a window.
+- [x] **Safety:** no writes into game frames, protected windows wait for
+      combat, Escape menu left out, stands aside for BlizzMove.
+- [ ] **Still to confirm in game:** that windows the game re-places (the
+      character window next to the spellbook, the world map, the auction
+      house) stay on your spot, and that nothing is blocked in combat
+      (`/wmachine diag`).
+- [ ] **Later:** Alt-drag to pull a pop-out (reputation detail, raid info,
+      an opened mail) off its window and place it on its own, as BlizzMove
+      does; a shared layout option for all characters.

@@ -5,12 +5,12 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48.5 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.49 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
-Watching Machine is one addon made of 25 modules for raiding, guilds and
-logging, built for The Burning Crusade Classic Anniversary Edition (patch
+Watching Machine is one addon made of 26 modules for raiding, guilds,
+logging and the game's interface, built for The Burning Crusade Classic Anniversary Edition (patch
 2.5.6). Everything is reached from one dashboard (`/wmachine`). Each module
 switches on and off **per character**, keeps its own settings for each
 character, and is explained in a **guided setup** the first time you log
@@ -49,6 +49,10 @@ in.
   **Instance Tracker** (lockouts and a log of every run), **Battlegrounds
   & Arenas**, **Your Characters** (every alt's gold, gear, bags, bank and
   lockouts, with a search across them) and **Crit Tracker**.
+
+**Interface**
+- **Frame Mover** (BlizzMove-style): drag the game's own windows anywhere,
+  resize them with Ctrl + mouse wheel, remembered per character.
 
 ## Getting started: setup and characters
 
@@ -888,6 +892,39 @@ Your biggest hits, crits and heals (Logging group; `/wmachine crits`).
   raid or guild. *Reset* clears a character's records
 - **Your Characters** tooltips show each character's best crit
 
+## Interface
+
+### Frame Mover
+Move and resize the game's own windows, BlizzMove-style (Interface group;
+`/wmachine move`). The window list was compiled with the help of BlizzMove's
+research; the code is our own.
+
+- **Drag** any of the game's windows to move it: character, spellbook,
+  talents, bank, guild bank, mailbox, vendor, quest log, world map, auction
+  house, professions, trainer, inspect, macros, the social window and the
+  rest (about 55 on TBC). A drag on a tab or an inner panel (the paper doll,
+  reputation, a mail you opened) moves the whole window
+- **Ctrl + mouse wheel** over a window makes it bigger or smaller (50% to
+  200%, in tenths); lists that scroll by themselves still scroll
+- **Shift + right-click** puts a window back where the game had it;
+  **Ctrl + right-click** puts its size back
+- **Remembered per character**, across logouts and reloads, until you reset
+  it. Whenever the game opens a window or makes room for another one, the
+  window goes back to your spot
+- **The window** (`/wmachine move`): only move while Shift is held, Ctrl +
+  wheel resizing on or off, keep windows on the screen; pick one window to
+  reset its position or size or to leave it where the game puts it; *Reset
+  every window* (also `/wmachine move reset`); and the list of windows you've
+  moved on this character
+- **Safe with the game's own code:** nothing is written into the game's
+  windows or tables (only secure hooks), protected windows aren't touched in
+  combat (it waits for combat to end), the Escape menu is never moved, and
+  the game's layout cache isn't used
+- **BlizzMove installed?** Frame Mover leaves the windows to it, and its
+  card says so
+- **Turned off,** every window goes back to the game's place, size and
+  mouse settings; your layout stays saved for when you turn it on again
+
 ## Usage
 
 ### Dashboard
@@ -958,6 +995,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine crits` - Crit Tracker
 - `/wmachine gear` - Gear Sets (`gear equip <name>`, `gear undo`, `gear list`; also `/wmachine sets`)
 - `/wmachine ogri` - Ogri'la Helper for the Apexis Relics (`ogri options`, `ogri clear`; also `/wmachine relic`)
+- `/wmachine move` - Frame Mover: move and resize the game's windows (`move reset` puts every window back; also `/wmachine frames`)
 - `/wmachine attune` - Attunements: raids, keys and heroic keys per character
 - `/wmachine gs` - GearScore group list (`gs unlock`, `gs lock`, `gs reset`, `gs report`; also `/gs`)
 - `/wmachine timers` - World Timers (layers, Terokkar, dailies, Darkmoon Faire)
@@ -1064,4 +1102,5 @@ Built-in error capture system for debugging.
 - `WMCritsDB` - Crit Tracker records per character, and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
+- `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, and options
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
