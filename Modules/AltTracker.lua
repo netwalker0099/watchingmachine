@@ -239,7 +239,7 @@ function Alts:Update()
     c.seen = Now()
     -- What they wear, carry and are saved to
     c.gear = Gear()
-    local GS = WM.GearScore
+    local GS = WM:IsModuleOn("GearScore") and WM.GearScore
     if GS and GS.GearScoreFor and next(c.gear) then
         local score, ilvl, complete = GS.GearScoreFor(c.gear, class)
         if complete then c.gearScore, c.avgIlvl = score, math.floor(ilvl * 10 + 0.5) / 10 end
@@ -449,9 +449,10 @@ function Alts:ShowTooltip(owner, c)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Last seen " .. Ago(c.seen) .. (c.zone and (" in " .. c.zone) or ""), 0.6, 0.6, 0.6)
-    local crit = WM.Crits and WM.Crits.BestLine and WM.Crits:BestLine(c.key)
+    local crit = WM:IsModuleOn("Crits") and WM.Crits and WM.Crits.BestLine and WM.Crits:BestLine(c.key)
     if crit then GameTooltip:AddLine(crit, 1, 1, 1) end
-    local att = WM.Attunements and WM.Attunements.TooltipLines and WM.Attunements:TooltipLines(c.key)
+    local att = WM:IsModuleOn("Attunements") and WM.Attunements and WM.Attunements.TooltipLines
+        and WM.Attunements:TooltipLines(c.key)
     if att then
         GameTooltip:AddLine(" ")
         for _, l in ipairs(att) do GameTooltip:AddLine(l, 1, 1, 1, true) end
@@ -476,9 +477,10 @@ local ICONS = {
 local VIEW_ORDER = { "bags", "bank", "attune", "lockouts" }
 local VIEW_TIPS = { bags = "Bags and keyring", bank = "Bank (as of the last visit)", attune = "Attunements", lockouts = "Raid lockouts" }
 
+-- Shown only with the GearScore module on
 local function ScoreText(score)
     local GS = WM.GearScore
-    if not score then return "" end
+    if not score or not WM:IsModuleOn("GearScore") then return "" end
     return GS and GS.ColorText and GS.ColorText(score) or tostring(score)
 end
 
@@ -846,7 +848,7 @@ function Alts:ShowDetail(c, view, keepOpen)
     if view == "gear" then
         local gear = c.gear or {}
         for slot, b in pairs(f.slots) do SetSlot(b, gear[slot]) end
-        if c.gearScore then
+        if c.gearScore and WM:IsModuleOn("GearScore") then
             sub = sub .. "   |cFFFFD100GearScore|r " .. ScoreText(c.gearScore) .. "   |cFFFFD100iLvl|r " .. math.floor((c.avgIlvl or 0) + 0.5)
         end
         f.dollText:SetText(next(gear) and "" or "|cFF888888Log in on this character once to see its gear.|r")
@@ -872,7 +874,7 @@ function Alts:ShowDetail(c, view, keepOpen)
             sub = "|cFF888888Open the bank once on this character to see what's in it.|r"
         end
     elseif view == "attune" then
-        local AT = WM.Attunements
+        local AT = WM:IsModuleOn("Attunements") and WM.Attunements
         local i = 0
         local saved = AT and AttunementsDB and AttunementsDB.chars and AttunementsDB.chars[c.key]
         if AT and saved and saved.att then
@@ -884,6 +886,8 @@ function Alts:ShowDetail(c, view, keepOpen)
                 Line(f, i, color .. a.name .. "|r  " .. color .. (pct >= 100 and "attuned" or (pct .. "%")) .. "|r")
             end
             sub = sub .. "   " .. #AT:AttunedNames(c.key, true) .. " raids attuned"
+        elseif not AT then
+            Line(f, 1, "|cFF888888Turn on Attunements to see each character's attunements here.|r")
         else
             Line(f, 1, "|cFF888888Log in on this character once to see its attunements.|r")
         end
@@ -901,7 +905,7 @@ function Alts:ShowDetail(c, view, keepOpen)
                 .. progress .. "  |cFF66CCFFresets in " .. ResetIn(l.reset - now) .. "|r")
         end
         if #locks == 0 then Line(f, 1, "|cFF888888No raid lockouts" .. (c.saved and "." or " seen yet (log in on this character).") .. "|r") end
-        local IT = WM.modules.InstanceTracker
+        local IT = WM:IsModuleOn("InstanceTracker") and WM.modules.InstanceTracker
         if IT and IT.LockoutText then
             Line(f, #locks + 2, "|cFFFFD100Instances entered (all characters):|r " .. (IT:LockoutText() or ""))
             f.openBtn:SetText("Open Instance Tracker")
@@ -987,6 +991,7 @@ local function Soon()
     pending = true
     WM.RunAfter(1, function()
         pending = false
+        if not WM:IsModuleOn("AltTracker") then return end
         Alts:Update()
         Alts:RefreshUI()
     end)
@@ -1005,6 +1010,7 @@ function Alts:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event, unit)
+    if not WM:IsModuleOn("AltTracker") then return end
     if event == "BANKFRAME_OPENED" then
         Alts.bankOpen = true
         Alts:UpdateBank()
@@ -1025,3 +1031,47 @@ events:SetScript("OnEvent", function(_, event, unit)
         Soon()
     end
 end)
+
+-- Turned off: close the window. This character stops being saved (what was
+-- saved before stays).
+function Alts:OnModuleOff()
+    if flyout then flyout:Hide() end
+    if panel then panel:Hide() end
+    self.bankOpen = false
+end
+
+-- Turned back on: save this character now
+function Alts:OnModuleOn()
+    DB()
+    pcall(self.Update, self)
+end
+
+-- The module's page in the guided setup
+function Alts:SetupPage(L)
+    DB()
+    L:Note("One window with all your characters, on every realm, so you can see at a glance who has what without"
+        .. " logging each one in.")
+    L:Note("|cFFFFFFFFWhat it records:|r each time you log in, as you play and when you log out, it saves this"
+        .. " character's level, XP and rested XP, gold, bag space, durability, professions, class reagents (and a"
+        .. " hunter's ammo and pet), where you were, the gear you wear, your bags and keyring, your bank (when you"
+        .. " open it) and your raid lockouts. It's kept on your computer only, in Watching Machine's saved data.")
+    L:Note("|cFFFFFFFFHow you use it:|r click a character for their gear, or the small icons for their bags, bank,"
+        .. " attunements and lockouts. \"Find an item\" searches every character's gear, bags and bank at once."
+        .. " Rested XP keeps counting while you're logged out, so the window shows an estimate for now.")
+    L:Note("|cFFFFFFFFOther parts of Watching Machine use it:|r Gear Sets says when a missing set item is in your"
+        .. " bank, and the setup uses it to recognise characters that used Watching Machine before. A character only"
+        .. " appears once you've logged in on it with this on.")
+    L:Note(function()
+        local extras = {}
+        for _, m in ipairs({ { "GearScore", "each character's GearScore" }, { "Attunements", "attunement progress" },
+            { "Crits", "each character's best crit" }, { "InstanceTracker", "the instances entered, in the lockouts view" } }) do
+            if WM:IsModuleOn(m[1]) then extras[#extras + 1] = m[2] end
+        end
+        if #extras == 0 then
+            return "|cFF888888With GearScore, Attunements, Crits or Instance Tracker on, it shows their details for each character too.|r"
+        end
+        return "With the modules you have on, it also shows " .. table.concat(extras, ", ") .. "."
+    end)
+    L:Note("A deleted character can be removed with a right-click on it. Everything is in its window:"
+        .. " |cFFFFFF00/wmachine alts|r.")
+end

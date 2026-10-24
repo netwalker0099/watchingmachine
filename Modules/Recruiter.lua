@@ -42,6 +42,10 @@ local currentWhoQuery = ""
 local waitingForContinue = false
 local mainFrame = nil
 local messageFrame = nil
+local historyFrame = nil
+
+-- Off on this character: nothing scans, prefills a whisper or filters chat
+local function On() return WM:IsModuleOn("Recruiter") end
 
 -- ============================================
 -- INITIALIZATION
@@ -124,12 +128,15 @@ end
 
 -- Chat filter to hide our own outgoing recruitment whispers from chat frame
 function Recruiter:ChatFilter(self, event, msg, player, ...)
-    if not RecruitingToolDB.hideWhispers then return false end
+    if not On() or not RecruitingToolDB or not RecruitingToolDB.hideWhispers then return false end
+    if not RecruitingToolDB.message or not RecruitingToolDB.guildName then return false end
     if msg == Recruiter:GetFormattedMessage() then return true end
     return false
 end
 
 function Recruiter:InstallChatFilter()
+    if self.filterInstalled or not ChatFrame_AddMessageEventFilter then return end
+    self.filterInstalled = true
     ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", function(self, event, msg, player, ...)
         return Recruiter:ChatFilter(self, event, msg, player, ...)
     end)
@@ -177,8 +184,10 @@ end
 
 -- Open the chat editbox pre-filled with a whisper command.
 -- The user presses Enter to actually send. This is the human-paced
--- send mechanism that replaces the auto-send queue.
+-- send mechanism that replaces the auto-send queue. Returns true if the
+-- chat box was filled (never while the module is off).
 function Recruiter:OpenWhisperPrompt(name)
+    if not On() or not name then return false end
     local msg = self:GetFormattedMessage()
     local text = "/w " .. name .. " " .. msg
     if ChatFrame_OpenChat then
@@ -190,6 +199,7 @@ function Recruiter:OpenWhisperPrompt(name)
         editBox:Show()
         editBox:SetFocus()
     end
+    return true
 end
 
 -- ============================================
@@ -197,6 +207,7 @@ end
 -- ============================================
 
 function Recruiter:GetQuickStatus()
+    if not RecruitingToolDB or type(RecruitingToolDB.whispered) ~= "table" then return "|cFF888888Not started|r" end
     local harvestCount = #harvestedPlayers
     local whisperedCount = 0
     for _ in pairs(RecruitingToolDB.whispered) do whisperedCount = whisperedCount + 1 end
@@ -215,6 +226,7 @@ end
 -- ============================================
 
 function Recruiter:StartScan()
+    if not On() then return end
     if isScanning then
         self:Print("Already scanning!")
         return
@@ -239,13 +251,13 @@ function Recruiter:StopScan()
 end
 
 function Recruiter:ContinueScan()
-    if not isScanning or not waitingForContinue then return end
+    if not On() or not isScanning or not waitingForContinue then return end
     waitingForContinue = false
     self:PerformWhoQuery()
 end
 
 function Recruiter:PerformWhoQuery()
-    if not isScanning then return end
+    if not isScanning or not On() then return end
 
     local classIndex = RecruitingToolDB.currentClass
     local letterIndex = RecruitingToolDB.currentLetter
@@ -769,7 +781,7 @@ function Recruiter:UpdateMessageList()
         else
             row.sendBtn:SetText("|cFF00FF00Send|r")
             row.sendBtn:SetScript("OnClick", function()
-                Recruiter:OpenWhisperPrompt(name)
+                if not Recruiter:OpenWhisperPrompt(name) then return end
                 Recruiter:MarkAsSent(name)
                 Recruiter:AddLog("Sent to " .. name .. " (L" .. tostring(level) .. ")")
                 Recruiter:UpdateMessageList()
@@ -789,7 +801,6 @@ end
 -- HISTORY WINDOW
 -- ============================================
 
-local historyFrame = nil
 function Recruiter:ShowHistoryWindow()
     if not historyFrame then
         local panel = WM.UI:CreatePanel({
@@ -882,6 +893,77 @@ function Recruiter:Toggle()
     self:ToggleUI()
 end
 
+-- Turned off on this character: stop a scan in progress and close the
+-- windows. The harvested list is kept for when it's turned back on.
+function Recruiter:OnModuleOff()
+    isScanning, waitingForContinue, scanTimer = false, false, 0
+    if StaticPopup_Hide then
+        StaticPopup_Hide("WM_RECRUITER_CLEAR_HISTORY")
+        StaticPopup_Hide("WM_RECRUITER_MARK_ALL_SENT")
+    end
+    if mainFrame then mainFrame:Hide() end
+    if messageFrame then messageFrame:Hide() end
+    if historyFrame then historyFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function Recruiter:SetupPage(L)
+    self:InitDB()
+    L:Note("Finds players with no guild and helps you send each of them your recruiting message. It never"
+        .. " whispers anyone by itself: every message is sent by you, one at a time.")
+    L:Note("|cFFFFFFFFScanning:|r Start Scan in the window runs a /who for each ticked class and letter in your"
+        .. " level range, and waits for you to click Continue before the next one. Players with no guild are"
+        .. " collected into a list.")
+    L:Note("|cFFFFFFFFSending:|r in Show Messages, each Send button puts the whisper in your chat box. Nothing"
+        .. " is sent until you press Enter. The player is then marked as messaged, and left out of new scans"
+        .. " until the cooldown below has passed, so nobody is messaged twice in that time.")
+    L:Note("|cFFFFCC00Please recruit kindly:|r unasked-for whispers annoy people, and many reports of spam can"
+        .. " get your account silenced. Keep the message short, don't send dozens in a row, and leave people"
+        .. " alone if they say no.")
+    L:EditBox({
+        label = "Guild name:", width = 180,
+        get = function() return RecruitingToolDB.guildName end,
+        set = function(v) if v ~= "" then SetGuildName(v) end end,
+        tooltip = { "Guild Name", "Replaces %GUILD% in the message." },
+    })
+    L:Note("Message (%GUILD% becomes your guild's name):")
+    L:EditBox({
+        width = math.max(200, (L.width or 400) - 40),
+        get = function() return RecruitingToolDB.message end,
+        set = function(v) if v ~= "" then SetMessage(v) end end,
+        tooltip = { "Message", "The whisper each player gets. You can see it in your chat box before you"
+            .. " send it, and Test Message in the window sends it to yourself first." },
+    })
+    L:EditBox({
+        label = "Lowest level:", width = 40, numeric = true,
+        get = function() return tostring(RecruitingToolDB.minLevel) end,
+        set = SetMinLevel,
+        tooltip = { "Level Range", "Only players from this level up are searched for." },
+    })
+    L:EditBox({
+        label = "Highest level:", width = 40, numeric = true,
+        get = function() return tostring(RecruitingToolDB.maxLevel) end,
+        set = SetMaxLevel,
+        tooltip = { "Level Range", "Only players up to this level are searched for." },
+    })
+    L:EditBox({
+        label = "Cooldown (days):", width = 40, numeric = true,
+        get = function() return tostring(RecruitingToolDB.cooldownDays) end,
+        set = SetCooldown,
+        tooltip = { "Cooldown", "How long a player you've messaged is left out of new scans and shown as sent."
+            .. " At most 14 days. The list of who you've messaged is shared by all your characters." },
+    })
+    L:Checkbox({
+        label = "Hide my recruitment whispers from chat",
+        get = function() return RecruitingToolDB.hideWhispers end,
+        set = function(v) RecruitingToolDB.hideWhispers = v end,
+        tooltip = { "Hide Outgoing Whispers", "Keeps your own whispers out of the chat window when their text is"
+            .. " exactly the recruitment message, so a run of them doesn't fill your chat." },
+    })
+    L:Note("Which classes to scan, your whisper history and the activity log are in the Recruiting Tool"
+        .. " window: |cFFFFFF00/wmachine recruit|r.")
+end
+
 -- ============================================
 -- EVENT HANDLING
 -- ============================================
@@ -889,7 +971,7 @@ end
 local whoEventFrame = CreateFrame("Frame")
 whoEventFrame:RegisterEvent("WHO_LIST_UPDATE")
 whoEventFrame:SetScript("OnEvent", function()
-    if isScanning then
+    if isScanning and On() then
         Recruiter:ProcessWhoResults()
     end
 end)
@@ -898,6 +980,7 @@ end)
 local updateFrame = CreateFrame("Frame")
 local uiUpdateTimer = 0
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not On() then return end
     if not isScanning then
         -- Still tick UI updates if main frame is open
         if mainFrame and mainFrame:IsShown() then

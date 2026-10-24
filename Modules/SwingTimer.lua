@@ -586,7 +586,7 @@ function Swing:SetSize(width, barHeight)
     if barHeight then db.barHeight = barHeight end
     DB()   -- clamps
     self:ApplySize()
-    self:Draw()
+    if frame then self:Draw() end   -- not before it has started
 end
 
 -- Manual sizing: the frame's height follows its bars, so the grip changes
@@ -869,7 +869,8 @@ end
 
 function Swing:Refresh()
     self.kind = self:Kind()
-    self:Draw()
+    -- Options can change before it has started (the guided setup)
+    if frame and WM:IsModuleOn("SwingTimer") then self:Draw() end
 end
 
 -- ============================================
@@ -877,25 +878,27 @@ end
 -- ============================================
 
 local events = CreateFrame("Frame")
+local EVENTS = {
+    "COMBAT_LOG_EVENT_UNFILTERED", "UNIT_ATTACK_SPEED",
+    "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_SUCCEEDED",
+    "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
+    "PLAYER_ENTER_COMBAT", "PLAYER_LEAVE_COMBAT",
+    "START_AUTOREPEAT_SPELL", "STOP_AUTOREPEAT_SPELL",
+    "PLAYER_EQUIPMENT_CHANGED", "PLAYER_TALENT_UPDATE",
+    "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD",
+}
 
 function Swing:Initialize()
     DB()
     self.kind = self:Kind()
     playerGUID = UnitGUID and UnitGUID("player")
     self:CreateFrame()
-    WM:RegisterEvents(events, {
-        "COMBAT_LOG_EVENT_UNFILTERED", "UNIT_ATTACK_SPEED",
-        "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_SUCCEEDED",
-        "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-        "PLAYER_ENTER_COMBAT", "PLAYER_LEAVE_COMBAT",
-        "START_AUTOREPEAT_SPELL", "STOP_AUTOREPEAT_SPELL",
-        "PLAYER_EQUIPMENT_CHANGED", "PLAYER_TALENT_UPDATE",
-        "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD",
-    })
+    WM:RegisterEvents(events, EVENTS)
     -- Draw every frame while shown; check ranged haste a few times a second
     ticker = CreateFrame("Frame")
     local sinceRanged = 0
     ticker:SetScript("OnUpdate", function(_, elapsed)
+        if not WM:IsModuleOn("SwingTimer") then return end
         local now = GetTime()
         sinceRanged = sinceRanged + (elapsed or 0)
         if sinceRanged > 0.2 then
@@ -911,5 +914,27 @@ function Swing:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event, ...)
+    if not WM:IsModuleOn("SwingTimer") then return end
     Swing:OnEvent(event, ...)
 end)
+
+-- Turned off on this character (or Class Tools is): the bars go, the
+-- per-frame ticker stops and the combat log is no longer read
+function Swing:OnModuleOff()
+    testUntil, resizing = 0, nil
+    attacking, shooting, casting = false, false, nil
+    for _, h in pairs(hands) do h.speed, h.expires = nil, nil end
+    self.syncPrompting = false
+    if frame then frame:Hide() end
+    if ticker then ticker:Hide() end
+    events:UnregisterAllEvents()
+end
+
+-- Back on after being turned off (not at login: Initialize does that)
+function Swing:OnModuleOn()
+    if not ticker then return end   -- not started yet
+    WM:RegisterEvents(events, EVENTS)
+    ticker:Show()
+    self.kind = self:Kind()
+    playerGUID = UnitGUID and UnitGUID("player")
+end

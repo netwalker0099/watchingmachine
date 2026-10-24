@@ -20,6 +20,7 @@
 --   local fly = WM.Flyout.New({
 --       class = "WARLOCK", feature = "warlockButton",    -- Class Tools toggle
 --       anchorName = "WM_WarlockAnchor", buttonPrefix = "WM_WarlockBtn",
+--       module = "ClassWarlock",                         -- shown only while it's on
 --       title = "Warlock", emptyText = "...",
 --       store = function() return WarlockToolsDB end,  -- position + directions
 --       posX = "buttonX", posY = "buttonY", defaultX = 196,
@@ -473,14 +474,18 @@ function FlyoutMT:CreateAnchor()
     return a
 end
 
+-- Off with Class Tools (or its class part) on this character
 function FlyoutMT:IsWanted()
     local CT = WM.modules.ClassTools
+    if not WM:IsModuleOn(self.cfg.module or "ClassTools") then return false end
     return PlayerClass() == self.cfg.class and CT and CT:IsEnabled(self.cfg.class, self.cfg.feature)
 end
 
 function FlyoutMT:UpdateVisibility()
     if not self.anchor then return end
-    if InCombatLockdown() then return end   -- anchor holds secure children
+    -- The anchor holds secure children: a change in combat waits for it to end
+    if InCombatLockdown() then self.pendingVisibility = true return end
+    self.pendingVisibility = false
     if self:IsWanted() then
         self:Build()
         self.anchor:Show()
@@ -549,6 +554,7 @@ end
 function Flyout.DirectionFeature(tools, class, key, name, what, store, default, rebuild)
     tools:RegisterFeature(class, {
         key = key, kind = "choice", name = name,
+        direction = true, what = what,   -- for the guided setup's show / hide switch
         options = Flyout.DIRECTION_OPTIONS, default = default,
         desc = "Which way the " .. what .. " icons open from the button, or Hidden to leave them out.",
         get = function() return store()[key] end,
@@ -610,9 +616,18 @@ end
 -- EVENTS
 -- ============================================
 
+-- Registered at load, so it does nothing while Class Tools is off, except
+-- finish showing or hiding a button that had to wait for combat to end
+-- (turning Class Tools off in combat hides its buttons then)
 local eventFrame = CreateFrame("Frame")
 WM:RegisterEvents(eventFrame, { "BAG_UPDATE", "PLAYER_REGEN_ENABLED" })
 eventFrame:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        for _, fly in ipairs(registry) do
+            if fly.pendingVisibility then fly:UpdateVisibility() end
+        end
+    end
+    if not WM:IsModuleOn("ClassTools") then return end
     if event == "BAG_UPDATE" then
         Flyout.UpdateAllBadges()   -- shard counts; text is safe in combat
     elseif event == "PLAYER_REGEN_ENABLED" and Flyout.dockPending then

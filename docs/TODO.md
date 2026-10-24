@@ -702,3 +702,17 @@ Your highest hits, crits and heals, like the CritTracker addon.
 - [ ] **Window:** records per spell, sortable, per character (Your
       Characters can show each alt's best), with a reset button.
 - [ ] **Share:** post a record to party / raid / guild.
+
+## 23. First-run setup and per-character modules — DONE in 3.46
+
+Built as `Profiles.lua` (per-character settings and module switches) and
+`Setup.lua` (welcome, quick and guided setup); each module has
+`OnModuleOff` / `SetupPage`.
+
+- [x] **Everything off on a new character**, with a guided or quick setup,
+      or a copy of another character. Old characters keep their modules.
+- [x] **Per character:** module switches and settings (shared data stays
+      shared).
+- [x] **Turning off works at once:** events, hooks and frames stop.
+- [ ] **Later:** a "what's new" page in the setup when a version adds a
+      module, and deleting an old character's settings.

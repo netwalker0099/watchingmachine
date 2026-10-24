@@ -296,6 +296,53 @@ function AutoLogger:Toggle()
     self:ToggleUI()
 end
 
+-- Turned off: stop switching logging on. Logging the game already has on
+-- is left alone (it stops at logout, or with /chatlog and /combatlog).
+function AutoLogger:OnModuleOff()
+    if settingsPanel then settingsPanel:Hide() end
+end
+
+-- Turned back on: in a raid now, start the combat log straight away
+function AutoLogger:OnModuleOn()
+    self:InitDB()
+    self:EnableChatLog()
+    self:UpdateCombatLog()
+end
+
+-- The module's page in the guided setup
+function AutoLogger:SetupPage(L)
+    self:InitDB()
+    L:Note("The game can write your chat and your combat to files on your computer, but you have to remember to"
+        .. " switch it on (/chatlog, /combatlog). This does it for you.")
+    L:Note("|cFFFFFFFFHow it works:|r chat logging is switched on each time you log in. When you enter a raid,"
+        .. " combat logging starts and a chat line says so; when you leave, it stops. The files go in the"
+        .. " |cFF888888World of Warcraft\\_classic_anniversary_\\Logs|r folder, ready to upload to Warcraft Logs.")
+    L:Note("Turning this off only stops it switching logging on. Anything already logging carries on until you log"
+        .. " out (or type /chatlog or /combatlog).")
+    L:Checkbox({ label = "Log chat every time I log in", get = function() return AutoLoggerDB.enableChatLog end,
+        set = function(v) AutoLoggerDB.enableChatLog = v end,
+        tooltip = { "Chat logging", "Switches the game's chat log on at login. Turning this off takes effect from"
+            .. " your next login." } })
+    L:Checkbox({ label = "Log combat in raids", get = function() return AutoLoggerDB.enableCombatLog end,
+        set = function(v) AutoLoggerDB.enableCombatLog = v end,
+        tooltip = { "Combat logging", "Starts the combat log when you enter a 10, 25 or 40-player raid and stops it"
+            .. " when you leave." } })
+    L:Checkbox({ label = "Log combat in 5-man dungeons too", get = function() return AutoLoggerDB.enableInDungeons end,
+        set = function(v) AutoLoggerDB.enableInDungeons = v end,
+        disabled = function() return not AutoLoggerDB.enableCombatLog end,
+        tooltip = { "Dungeon logging", "Also logs combat in dungeons. Only while combat logging in raids is on." } })
+    L:Checkbox({ label = "Keep Advanced Combat Logging on", get = function() return AutoLoggerDB.enableAdvancedLogging end,
+        set = function(v) AutoLoggerDB.enableAdvancedLogging = v end,
+        disabled = function() return not AutoLoggerDB.enableCombatLog end,
+        tooltip = { "Advanced Combat Logging", "Checks the game's Advanced Combat Logging setting at login and when"
+            .. " you enter a raid, and turns it back on if it's off. Warcraft Logs needs it for gear and full"
+            .. " details." } })
+    L:Checkbox({ label = "Chat messages for every change (debug)", get = function() return AutoLoggerDB.debugMode end,
+        set = function(v) AutoLoggerDB.debugMode = v end,
+        tooltip = { "Debug messages", "Says in chat each time it checks the instance or a logging setting." } })
+    L:Note("The current logging status is in its window: |cFFFFFF00/wmachine logger|r.")
+end
+
 -- ============================================
 -- EVENT HANDLING
 -- ============================================
@@ -305,6 +352,8 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 
 eventFrame:SetScript("OnEvent", function(self, event)
+    -- Registered at load: does nothing while it's off on this character
+    if not WM:IsModuleOn("AutoLogger") then return end
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         AutoLogger:UpdateCombatLog()
         if settingsPanel and settingsPanel:IsShown() then

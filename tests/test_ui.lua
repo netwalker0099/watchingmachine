@@ -61,6 +61,7 @@ local function load(rel)
     f("WatchingMachine", WM)
 end
 load("Core.lua")
+load("Profiles.lua")
 load("UI.lua")
 env.WatchingMachineDB = { theme = "Default" }
 

@@ -150,7 +150,7 @@ end
 
 function GuildInvite:InviteToRaid(playerName, source)
     if not playerName or playerName == "" then return end
-    if not GuildInviteDB then return end
+    if not WM:IsModuleOn("GuildInvite") or not GuildInviteDB then return end
     if not GuildInviteDB.enabled then return end
     
     -- Must have invite permissions (leader/assist or solo)
@@ -185,6 +185,7 @@ function GuildInvite:InviteToRaid(playerName, source)
 end
 
 function GuildInvite:ConvertToRaid()
+    if not WM:IsModuleOn("GuildInvite") then return end
     if not IsInGroup() then
         self:Print("You are not in a group.")
         return
@@ -261,6 +262,7 @@ function GuildInvite:RegisterEvents()
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
+    if not WM:IsModuleOn("GuildInvite") then return end
     if not GuildInviteDB or not GuildInviteDB.enabled then return end
     
     -- Helper: check if sender is the player (ignore our own messages)
@@ -354,9 +356,49 @@ function GuildInvite:IsModuleEnabled()
 end
 
 function GuildInvite:SetModuleEnabled(v)
+    if GuildInviteDB == nil or GuildInviteDB.trigger == nil then self:InitDB() end
     GuildInviteDB.enabled = v and true or false
     self:Print(GuildInviteDB.enabled and "Enabled" or "Disabled")
     if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
+end
+
+-- Turned off on this character: nothing is invited (the event handler
+-- checks), so just close the window
+function GuildInvite:OnModuleOff()
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function GuildInvite:SetupPage(L)
+    self:InitDB()
+    L:Note("When a guildie types the trigger word on its own in guild chat, they get a group invite from you."
+        .. " Whispers, party and raid chat work too, but only from names on your guild roster.")
+    L:Note("|cFFFFFFFFHow it works:|r you need to be solo, the party leader, or leader or assist in a raid."
+        .. " When a party is full, the 6th invite turns it into a raid first. Someone saying \"raid\" or"
+        .. " \"raid convert\" in party or guild chat turns your party into a raid. Each invite is listed in the"
+        .. " invite log.")
+    L:EditBox({
+        label = "Trigger word:", width = 80,
+        get = function() return GuildInviteDB.trigger or "inv" end,
+        set = function(v) if v ~= "" then GuildInviteDB.trigger = v end end,
+        tooltip = { "Trigger Word", "The whole message must be this word (any case), so \"inv pls\" doesn't count.",
+            "Saved when you press Enter or click away." },
+    })
+    L:Checkbox({
+        label = "Announce invites in chat",
+        get = function() return GuildInviteDB.announceInvites end,
+        set = function(v) GuildInviteDB.announceInvites = v end,
+        tooltip = { "Announce Invites", "Print a line in your chat frame (only you see it) for each invite sent." },
+    })
+    L:Checkbox({
+        label = "Reply to non-guild whispers",
+        get = function() return GuildInviteDB.respondToNonGuild end,
+        set = function(v) GuildInviteDB.respondToNonGuild = v end,
+        tooltip = { "Reply to Non-Guild Whispers", "When someone outside your guild whispers the trigger word,"
+            .. " whisper back \"Sorry, raid invites are for guild members only.\"", "Off: they're silently ignored." },
+    })
+    L:Note("The invite log and a button to re-read the guild roster are in the Guild Invite window:"
+        .. " |cFFFFFF00/wmachine ginvite|r.")
 end
 
 -- guildRoster holds each member twice (with and without realm)

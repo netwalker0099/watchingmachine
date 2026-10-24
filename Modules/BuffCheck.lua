@@ -578,6 +578,7 @@ end
 -- Entry point: run a check and report it.
 -- selfInitiated controls raid announce vs local-only.
 function BuffCheck:RunCheck(selfInitiated)
+    if not WM:IsModuleOn("BuffCheck") then return end
     if not BuffCheckDB or not BuffCheckDB.enabled then return end
 
     local lines, missingCount, skipped = self:ScanGroup()
@@ -684,6 +685,7 @@ function BuffCheck:RegisterEvents()
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, initiator)
+    if not WM:IsModuleOn("BuffCheck") then return end
     if event == "READY_CHECK" then
         if not BuffCheckDB or not BuffCheckDB.enabled then return end
         -- initiator is the name of whoever started the ready check.
@@ -824,8 +826,54 @@ function BuffCheck:IsModuleEnabled()
 end
 
 function BuffCheck:SetModuleEnabled(v)
+    self:InitDB()
     BuffCheckDB.enabled = v and true or false
     if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
+end
+
+-- Turned off on this character: close the settings (ready checks are
+-- ignored while it's off)
+function BuffCheck:OnModuleOff()
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function BuffCheck:SetupPage(L)
+    self:InitDB()
+    local function opt(key)
+        return function() return BuffCheckDB[key] end, function(v) BuffCheckDB[key] = v end
+    end
+    local function group(key)
+        return function() return BuffCheckDB.checkedGroups[key] end,
+            function(v) BuffCheckDB.checkedGroups[key] = v end
+    end
+    L:Note("Every time a ready check goes out, Buff Check looks over the whole group and lists who is missing"
+        .. " each buff. Nothing to click: it runs on its own.")
+    L:Note("|cFFFFFFFFWho sees it:|r if you started the ready check the list goes to raid (or party) chat, so"
+        .. " everyone knows what to fix. If someone else started it, the list is printed only in your chat"
+        .. " window. Offline and dead players are skipped.")
+    L:Note("|cFFFFFFFFWhat counts:|r class buffs are only expected when that class is in the group, so there's no"
+        .. " Fortitude complaint without a priest. Flasks, elixirs and food are checked for everyone if you"
+        .. " turn them on.")
+    local get, set = opt("announceToRaid")
+    L:Checkbox({ label = "Announce to raid when I start the ready check", get = get, set = set,
+        tooltip = { "Announce", "Off: the list is only ever shown to you, even on your own ready checks." } })
+    get, set = opt("reportAllBuffed")
+    L:Checkbox({ label = "Also report when everyone is fully buffed", get = get, set = set,
+        tooltip = { "All buffs up", "Says \"all buffs up\" instead of staying quiet when nobody is missing anything." } })
+    get, set = opt("usePallyPower")
+    L:Checkbox({ label = "Use PallyPower blessing assignments", get = get, set = set,
+        tooltip = { "PallyPower", "If PallyPower is running, each player is checked for the blessings they were"
+            .. " assigned, and the report names the missing one. Without it, any blessing counts." } })
+    L:Header("Consumables")
+    get, set = group("flask")
+    L:Checkbox({ label = "Flask (or a battle and guardian elixir)", get = get, set = set,
+        tooltip = { "Flask", "A flask, or one battle and one guardian elixir together, counts." } })
+    get, set = group("wellfed")
+    L:Checkbox({ label = "Food buff (Well Fed or Enlightened)", get = get, set = set,
+        tooltip = { "Food buff", "Anyone who hasn't eaten a buff food is listed." } })
+    L:Note("The full list of buffs to check, and a Run Check Now button that shows the report only to you,"
+        .. " are in the Buff Check window.")
 end
 
 function BuffCheck:Toggle()

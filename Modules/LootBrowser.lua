@@ -47,6 +47,9 @@ local function DB()
     if type(LootBrowserDB.chars) ~= "table" then LootBrowserDB.chars = {} end
     return LootBrowserDB
 end
+LB.DB = DB
+
+local function On() return WM:IsModuleOn("LootBrowser") end
 
 -- ============================================
 -- EXPANSIONS AND DATA
@@ -687,7 +690,7 @@ end
 
 -- Add the lines once per tooltip showing (both hooks below may fire)
 function LB:AddTooltipSource(tooltip, itemID)
-    if not DB().tooltips or not tooltip or not itemID then return false end
+    if not On() or not DB().tooltips or not tooltip or not itemID then return false end
     if tooltip.wmLootSource == itemID then return false end
     tooltip.wmLootSource = itemID
     local lines = self:MarkLines(itemID)
@@ -844,7 +847,7 @@ function LB:LookupNames(ids)
     if lookupTicker or #ids == 0 then return end
     local request = (C_Item and C_Item.RequestLoadItemDataByID) or function(id) ItemInfo(id) end
     local function Step()
-        if not lookupQueue then return end
+        if not lookupQueue or not On() then lookupQueue, lookupTicker = nil, nil; return end
         local stop = math.min(#lookupQueue, lookupAt + LOOKUP_BATCH - 1)
         for i = lookupAt, stop do pcall(request, lookupQueue[i]) end
         lookupAt = stop + 1
@@ -1659,6 +1662,55 @@ function LB:GetQuickStatus()
 end
 
 -- ============================================
+-- ON / OFF (per character) AND THE GUIDED SETUP PAGE
+-- ============================================
+
+-- Off: close the window and drop any item names still being asked for.
+-- The tooltip hooks stay but add nothing while it's off.
+function LB:OnModuleOff()
+    if panel then panel:Hide() end
+    lookupQueue = nil
+end
+
+function LB:SetupPage(L)
+    DB()
+    L:Note("The Loot Browser is a loot table you can open anywhere. Pick an expansion and a category"
+        .. " (dungeons and raids, crafting, factions or PvP), then a page down the side: each boss, profession,"
+        .. " reputation or PvP vendor shows its items. Inside a dungeon it can open straight on that instance.")
+    L:Note("|cFFFFFFFFUsing it:|r hover an item for its tooltip, Shift-click to link it in chat, Ctrl-click to"
+        .. " try it on. Alt-click puts it on your list (Favourites to start with); right-click for your other"
+        .. " lists and to mark it best-in-slot for a spec. The search box finds items and bosses by name.")
+    L:Note("|cFFFFFFFFOn tooltips:|r every item tooltip in the game (bags, chat links, the auction house) gets a"
+        .. " line saying where it drops or who makes it, and whether it's on one of your lists.")
+    L:Checkbox({ label = "Say where items come from on their tooltips",
+        get = function() return DB().tooltips end, set = function(v) DB().tooltips = v end,
+        tooltip = { "Item tooltips", "The boss and instance it drops from, the profession that makes it, or the"
+            .. " faction or vendor that sells it, plus your list and BiS marks, on every item tooltip." } })
+    L:Checkbox({ label = "Open on the instance you're in",
+        get = function() return DB().followInstance end, set = function(v) DB().followInstance = v end,
+        tooltip = { "Follow the instance", "Inside a dungeon or raid the browser opens straight on that"
+            .. " instance's bosses." } })
+    L:Checkbox({ label = "Set pages: only your class's sets",
+        get = function() return DB().myClassSets end, set = function(v) DB().myClassSets = v end,
+        tooltip = { "Your class's sets", "Tier and PvP set pages show only the sets your class can wear. Turn it"
+            .. " off to see every class's." } })
+    L:Dropdown({ label = "Expansion to open on:", width = 180,
+        options = function()
+            local o = { { value = "auto", text = "The game's own" } }
+            for _, x in ipairs(LB:Expansions()) do o[#o + 1] = { value = x.expansion, text = x.label } end
+            return o
+        end,
+        get = function() return DB().expansion == nil and "auto" or DB().expansion end,
+        set = function(v)
+            if v == "auto" then DB().expansion = nil else DB().expansion = v end
+            state.exp, state.inst, state.boss = DB().expansion, nil, 1
+        end,
+        tooltip = { "Expansion", "Which expansion's loot the browser shows first. You can switch at the top of"
+            .. " the window at any time." } })
+    L:Note("Your lists, BiS pages and everything else are in the browser: |cFFFFFF00/wmachine loot|r.")
+end
+
+-- ============================================
 -- START-UP
 -- ============================================
 
@@ -1681,6 +1733,7 @@ function LB:Initialize()
 end
 
 events:SetScript("OnEvent", function()
+    if not On() then return end
     local ok, err = pcall(LB.OnItemInfo, LB)
     if not ok then geterrorhandler()(err) end
 end)

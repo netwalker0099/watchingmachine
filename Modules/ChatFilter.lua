@@ -115,7 +115,8 @@ end
 -- Would this chat event be hidden? Returns the matching phrase or nil.
 -- Keyword Monitor calls this before looking at a message.
 function ChatFilter:FilteredBy(event, message, sender)
-    if not ChatFilterDB or not ChatFilterDB.enabled then return nil end
+    if not WM:IsModuleOn("ChatFilter") then return nil end
+    if not ChatFilterDB or not ChatFilterDB.enabled or type(ChatFilterDB.types) ~= "table" then return nil end
     local typeKey = EVENT_TYPE[event]
     if not typeKey or not ChatFilterDB.types[typeKey] then return nil end
     if IsOwnMessage(sender) then return nil end   -- never hide what you typed
@@ -213,9 +214,10 @@ end
 
 -- Active filters: ticked premades plus your own phrases
 function ChatFilter:ActiveCount()
+    if not ChatFilterDB or type(ChatFilterDB.phrases) ~= "table" then return 0 end
     local n = #ChatFilterDB.phrases
     for _, pre in ipairs(PREMADES) do
-        if ChatFilterDB.premades[pre.key] then n = n + 1 end
+        if ChatFilterDB.premades and ChatFilterDB.premades[pre.key] then n = n + 1 end
     end
     return n
 end
@@ -272,8 +274,16 @@ function ChatFilter:IsModuleEnabled()
 end
 
 function ChatFilter:SetModuleEnabled(v)
+    if not ChatFilterDB or type(ChatFilterDB.phrases) ~= "table" then self:InitDB() end
     ChatFilterDB.enabled = v and true or false
     self:RefreshPanel()
+end
+
+-- Turned off on this character: the chat frame filter lets everything
+-- through (FilteredBy checks), so just close the window
+function ChatFilter:OnModuleOff()
+    lastLineID, lastResult = nil, nil
+    if mainFrame then mainFrame:Hide() end
 end
 
 function ChatFilter:GetQuickStatus()
@@ -447,6 +457,52 @@ function ChatFilter:CreateUI()
     mainFrame = panel
     self.mainFrame = panel
     return panel
+end
+
+-- The module's page in the guided setup
+function ChatFilter:SetupPage(L)
+    self:InitDB()
+    L:Note("Hides chat messages that contain a phrase you choose, such as an advert you're tired of seeing."
+        .. " A hidden message never appears in any of your chat tabs.")
+    L:Note("|cFFFFFFFFHow it works:|r a message is hidden when it contains one of your phrases anywhere."
+        .. " Case, colours, item-link brackets and extra spaces don't matter, and it's plain text, not"
+        .. " wildcards. Your own messages are never hidden. Keyword Monitor never sees a hidden message either.")
+    L:Header("Filter in")
+    for _, t in ipairs(CHAT_TYPES) do
+        L:Checkbox({
+            label = t.label,
+            get = function() return ChatFilterDB.types[t.key] end,
+            set = function(v) ChatFilterDB.types[t.key] = v end,
+            tooltip = { t.label, "Hide matching messages in " .. t.label:lower() .. "." },
+        })
+    end
+    L:Header("Ready-made filters")
+    for _, pre in ipairs(PREMADES) do
+        L:Checkbox({
+            label = pre.label,
+            get = function() return ChatFilter:IsPremadeOn(pre.key) end,
+            set = function(v) ChatFilter:SetPremade(pre.key, v) end,
+            tooltip = { pre.label, pre.desc, "Matches: " .. table.concat(pre.phrases, ", ") },
+        })
+    end
+    L:Header("Your phrases")
+    local list
+    L:EditBox({
+        label = "Add a phrase:", width = 190, maxLetters = 100,
+        onEnter = function(text)
+            ChatFilter:AddPhrase(text)
+            if list then list.text:Refresh(); L:Reflow() end
+        end,
+        clearOnEnter = true,
+        tooltip = { "Add a Phrase", "Type a phrase and press Enter, e.g. Guild Loot Run." },
+    })
+    list = L:Note(function()
+        local phrases = ChatFilterDB.phrases
+        if #phrases == 0 then return "No phrases yet." end
+        return "Filtering: |cFFFFFFFF" .. table.concat(phrases, ", ") .. "|r"
+    end)
+    L:Note("To remove a phrase, see how many messages each one has hidden, or switch the whole filter off for a"
+        .. " while, open the Chat Filter window: |cFFFFFF00/wmachine filter|r.")
 end
 
 function ChatFilter:Toggle()

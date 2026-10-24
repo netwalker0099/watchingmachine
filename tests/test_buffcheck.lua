@@ -52,6 +52,7 @@ local function load(rel)
     f("WatchingMachine", WM)
 end
 load("Core.lua")
+load("Profiles.lua")   -- the module switches (WM:IsModuleOn), loaded with Core in the addon
 load("Modules/BuffCheck.lua")
 load("Modules/ClassTools.lua")
 load("Modules/ClassGeneral.lua")

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.45"
+WM.version = "3.46"
 WM.modules = {}
 
 -- ============================================
@@ -1185,7 +1185,6 @@ local MODULE_INFO = {
     KeywordMonitor = {
         title = "Keyword Monitor", desc = "Monitor channels for keywords",
         about = "Watches Trade, General, LFG and the other public channels for words you choose and collects every match in one list.",
-        toggleNote = "Off pauses monitoring for this session, like the Stop button.",
         command = "keyword", color = {1, 0.67, 0}, icon = "Interface\\Icons\\INV_Misc_SpyGlass_03",
     },
     ChatFilter = {
@@ -1346,7 +1345,6 @@ local MODULE_INFO = {
     ArmorySnap = {
         title = "ArmorySnap", desc = "Raid gear & talent snapshots",
         about = "Quietly records every raid member's gear, enchants, gems and talents, and lets you browse the snapshots later.",
-        toggleNote = "Automatic scanning in raids. Manual snapshots work either way.",
         command = "armory", color = {0.4, 0.67, 1}, icon = "Interface\\Icons\\INV_Chest_Chain_09",
         tools = {
             { text = "Take a snapshot now", func = function()

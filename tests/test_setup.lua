@@ -116,10 +116,13 @@ check("a module's own switch follows", env.HazardsDB.enabled == false)
 WM:SetModuleOn("Hazards", true)
 check("... back on", env.HazardsDB.enabled == true)
 -- Parts follow their parent
-c.modules.ClassWarlock = true
-check("class parts are off while Class Tools is", not WM:IsModuleOn("ClassWarlock"))
+check("class parts are off while Class Tools is", not WM:IsModuleOn("ClassWarlock") and not WM:IsModuleOn("SwingTimer"))
 WM:SetModuleOn("ClassTools", true)
-check("Class Tools on: its parts start", WM:IsModuleOn("ClassWarlock") and started.ClassTools == 1 and started.ClassWarlock == 1)
+check("Class Tools on: its parts start (a new character too)", WM:IsModuleOn("ClassWarlock") and WM:IsModuleOn("SwingTimer")
+    and WM:IsModuleOn("ClassGeneral") and started.ClassTools == 1 and started.ClassWarlock == 1 and started.SwingTimer == 1)
+c.modules.ClassWarlock = false
+check("a part can still be off on its own", not WM:IsModuleOn("ClassWarlock") and WM:IsModuleOn("ClassGeneral"))
+c.modules.ClassWarlock = nil
 -- Commands for a module that's off
 W.printed = {}
 check("a module that's off can't be used", WM:UsableModule("GearScore") == nil and Said("is off on this character"))

@@ -191,7 +191,7 @@ end
 
 local function Monitor()
     local tools = Tools()
-    if not tools then return end
+    if not tools or not WM:IsModuleOn("ClassWarlock") then return end
     if not IsPlayerWarlock() then return end
 
     -- Nothing to check while dead
@@ -300,7 +300,7 @@ local DIR_DEFAULTS = { demonDir = "LEFT", armorDir = "UP", stoneDir = "RIGHT" }
 local function WarlockStore() return WarlockToolsDB end
 
 local warlockFlyout = WM.Flyout.New({
-    class = CLASS, feature = "warlockButton",
+    class = CLASS, feature = "warlockButton", module = "ClassWarlock",
     anchorName = "WM_WarlockAnchor", buttonPrefix = "WM_WarlockBtn",
     title = "Warlock", emptyText = "No demon, armor, stone or ritual spells known yet.",
     store = WarlockStore, posX = "buttonX", posY = "buttonY", defaultX = 240,
@@ -332,10 +332,14 @@ end
 
 local buttonEvents = CreateFrame("Frame")
 
-function Warlock:Initialize()
+-- The warlock tab's features, warning sounds and monitor. Only registers
+-- (no frames, no events), so the guided setup can list them before this
+-- has started; runs once.
+function Warlock:RegisterFeatures()
     self:InitDB()
     local tools = Tools()
-    if not tools then return end
+    if not tools or self.featuresRegistered then return end
+    self.featuresRegistered = true
 
     tools:RegisterFeature(CLASS, {
         key = "armor", name = "Warn if armor spell is missing",
@@ -376,13 +380,18 @@ function Warlock:Initialize()
     tools:RegisterAlertSound(CLASS, "wl_sac", "Demonic Sacrifice missing")
     tools:RegisterAlertSound(CLASS, "wl_soullink", "Soul Link not cast")
     tools:RegisterMonitor(Monitor)
+end
+
+function Warlock:Initialize()
+    self:RegisterFeatures()
+    if not Tools() then return end
 
     local talentWatcher = CreateFrame("Frame")
     -- CHARACTER_POINTS_CHANGED is the TBC talent event; PLAYER_TALENT_UPDATE
     -- may not exist on every Classic client, so register defensively
     WM:RegisterEvents(talentWatcher, { "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "SPELLS_CHANGED" })
     talentWatcher:SetScript("OnEvent", function()
-        Warlock:InvalidateTalentCache()
+        if WM:IsModuleOn("ClassWarlock") then Warlock:InvalidateTalentCache() end
     end)
 
     if IsPlayerWarlock() then
@@ -395,7 +404,7 @@ function Warlock:Initialize()
 end
 
 buttonEvents:SetScript("OnEvent", function(_, event)
-    if not IsPlayerWarlock() then return end
+    if not IsPlayerWarlock() or not WM:IsModuleOn("ClassWarlock") then return end
     -- Secure children can't be touched mid-combat; rebuild once it drops
     if InCombatLockdown() then return end
     if event == "PLAYER_REGEN_ENABLED" then
@@ -404,6 +413,23 @@ buttonEvents:SetScript("OnEvent", function(_, event)
         WM.RunAfter(1, function() Warlock:UpdateButton() end)
     end
 end)
+
+-- Turned off on this character: warnings cleared and the button hidden
+-- (in combat, once combat ends)
+function Warlock:OnModuleOff()
+    local tools = Tools()
+    if tools then
+        tools:ClearAlert("wl_armor")
+        tools:ClearAlert("wl_sac")
+        tools:ClearAlert("wl_soullink")
+    end
+    warlockFlyout:UpdateVisibility()
+end
+
+-- Back on: the button comes back if it's wanted
+function Warlock:OnModuleOn()
+    warlockFlyout:UpdateVisibility()
+end
 
 function Warlock:GetSoulstones()
     return soulstones

@@ -507,7 +507,7 @@ function IT:ShowRunTooltip(owner, run)
     end
     GameTooltip:AddDoubleLine("Gold looted", Money(run.gold), 0.8, 0.8, 0.8, 1, 1, 1)
     -- Trades are logged by Mail & Trade Logger, tagged with the run
-    local ML = WM.modules.MailLogger
+    local ML = WM:IsModuleOn("MailLogger") and WM.modules.MailLogger
     if ML and ML.GoldTradedInRun then
         local received, given, count = ML:GoldTradedInRun(run.id, run.char)
         if count > 0 then
@@ -718,7 +718,10 @@ function IT:CreateUI()
 
     panel:AddFooterButton({ text = "Print lockouts", width = 110, onClick = function() IT:PrintLockouts() end }, "LEFT")
     panel:AddFooterButton({ text = "Your Characters", width = 120,
-        onClick = function() if WM.modules.AltTracker then WM.modules.AltTracker:Toggle() end end }, "RIGHT")
+        onClick = function()
+            local AT = WM:UsableModule("AltTracker")
+            if AT then AT:Toggle() end
+        end }, "RIGHT")
     panel:Finish()
     -- Lockout countdowns tick while open
     local since = 0
@@ -760,6 +763,7 @@ end
 local events = CreateFrame("Frame")
 
 function IT:OnEvent(event, ...)
+    if not WM:IsModuleOn("InstanceTracker") then return end
     if event == "PLAYER_ENTERING_WORLD" then
         if InstanceKind() then self:Enter() elseif current then self:Leave() end
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
@@ -797,15 +801,70 @@ function IT:Initialize()
     if WM.Nova then WM.Nova:Start() end
     if WM.RegisterChatLink then
         WM:RegisterChatLink("itlog", function()
+            if not WM:UsableModule("InstanceTracker") then return end
             local p = IT:CreateUI()
             if not p:IsShown() then p:Show() end
         end)
-        WM:RegisterChatLink("itdel", function(id) IT:ConfirmDelete(IT:RunById(id)) end)
+        WM:RegisterChatLink("itdel", function(id)
+            if WM:UsableModule("InstanceTracker") then IT:ConfirmDelete(IT:RunById(id)) end
+        end)
     end
     -- Already inside when the addon starts (login or /reload in an instance)
     if InstanceKind() then self:Enter() end
     wasLocked = self:Lockouts().locked
-    WM.RunTicker(30, function() IT:CheckLockoutReady() end)
+    WM.RunTicker(30, function()
+        if WM:IsModuleOn("InstanceTracker") then IT:CheckLockoutReady() end
+    end)
+end
+
+-- Turned off: close the window, and end the run you're in quietly (kept as
+-- if you'd logged out, so turning it back on inside carries the run on)
+function IT:OnModuleOff()
+    if panel then panel:Hide() end
+    if current then self:Leave(true) end
+end
+
+-- Turned back on: pick up the instance you're in
+function IT:OnModuleOn()
+    DB()
+    SnapshotXP()
+    if InstanceKind() then self:Enter() end
+    wasLocked = self:Lockouts().locked
+end
+
+-- The module's page in the guided setup
+function IT:SetupPage(L)
+    DB()
+    L:Note("The game lets each account enter only 5 instances an hour and 30 a day. This logs every dungeon and raid"
+        .. " you enter, on all your characters, so you can see how many you have left and when the next one frees up.")
+    L:Note("|cFFFFFFFFHow it works:|r entering an instance prints \"Entered <instance> (2/5 this hour, 4/30 today)\"."
+        .. " A run counts from when you leave, as the server counts it. Going back into the same instance (a"
+        .. " corpse run, another wing) isn't counted twice; a reset makes the next visit a new run. Each run keeps"
+        .. " the group, time inside, mobs killed, XP, gold looted and reputation: hover it in the list.")
+    L:Checkbox({ label = "Say when I enter an instance", get = function() return DB().enterMessage end,
+        set = function(v) DB().enterMessage = v end,
+        tooltip = { "Entering an instance", "A chat line with your counts for the hour and the day. Click it to open"
+            .. " the log; the red X deletes that run if it shouldn't count." } })
+    L:Checkbox({ label = "Say when I can enter a new instance again", get = function() return DB().lockoutReady end,
+        set = function(v) DB().lockoutReady = v end,
+        tooltip = { "Lockout over", "When you've hit the 5 an hour or 30 a day, a chat line tells you once a slot is free." } })
+    L:Checkbox({ label = "Merge going back into the same instance", get = function() return DB().mergeSame end,
+        set = function(v) DB().mergeSame = v end,
+        tooltip = { "Same instance", "Coming back into the same instance adds to the earlier run instead of logging,"
+            .. " and counting, a new one." } })
+    L:Checkbox({ label = "Tell my group when I reset instances", get = function() return DB().announceReset end,
+        set = function(v) DB().announceReset = v end,
+        tooltip = { "Reset announcement", "As group leader, a reset posts \"[WM] <instance> has been reset.\" in"
+            .. " party or raid chat." } })
+    L:Checkbox({ label = "Show resets from leaders using Nova Instance Tracker", get = function() return DB().novaListen end,
+        set = function(v) DB().novaListen = v end,
+        tooltip = { "Nova Instance Tracker", "When your group leader resets with Nova Instance Tracker (or Nova World"
+            .. " Buffs), their addon tells the group; this shows it and marks the instance as reset. It only listens." } })
+    L:Dropdown({ label = "Run stats when leaving:", width = 130, options = IT.STATS_OPTIONS,
+        get = function() return DB().statsOnLeave end, set = function(v) DB().statsOnLeave = v end,
+        tooltip = { "Run stats", "Time, mobs, XP and gold for the run you've just left, in your chat window or your"
+            .. " group's chat, or not at all." } })
+    L:Note("The log, your counts and every run's details are in its window: |cFFFFFF00/wmachine instances|r.")
 end
 
 events:SetScript("OnEvent", function(_, event, ...) IT:OnEvent(event, ...) end)

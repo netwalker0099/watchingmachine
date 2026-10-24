@@ -2,7 +2,35 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.45** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.46** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.46
+
+### New — Setup, and modules per character
+
+- **First login on a character:** every module starts off, and a welcome
+  window offers a **guided setup** (a page per module: what it does, how it
+  works, a switch to turn it on, and its main settings explained), a
+  **quick setup** (a checklist with presets: Raiding, Guild officer,
+  Everything, Nothing), or **copying another character's** modules and
+  settings. `/wmachine setup` brings it back any time.
+- **Characters that already used the addon** keep every module they had on
+  and are offered the setup once.
+- **Per character:** which modules are on, and every module's settings.
+  Your settings from before become each character's starting point. Data
+  about all your characters (Your Characters, logs, enemy list, world
+  timers, loot lists, crit records, gear sets, mail log) stays shared;
+  ArmorySnap's data stays as the standalone addon uses it.
+- **Every dashboard card has an on/off switch** for this character. A
+  module that's off isn't started, and its card, the minimap tooltip and
+  `/wmachine status` say so. Opening an off module offers to turn it on;
+  its commands say how.
+- **Turning a module off works straight away:** its events, timers, hooks,
+  tooltip lines and chat filters stop and its windows and buttons hide.
+- **Parts and links:** the class tools and swing timer follow Class Tools;
+  modules that add to each other say so in the setup.
 
 ---
 

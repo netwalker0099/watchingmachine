@@ -45,9 +45,9 @@ P.SCOPE = {
     WarlockToolsDB = {},
     ShamanToolsDB = {},
     SwingTimerDB = {},
-    InstanceTrackerDB = { shared = { "runs" } },
+    InstanceTrackerDB = { shared = { "runs", "nextId" } },
     AltTrackerDB = { shared = { "chars" } },
-    PvPLogDB = { shared = { "matches" } },
+    PvPLogDB = { shared = { "matches", "nextId" } },
     WorldTimersDB = { shared = { "realms", "chars" } },
     LootBrowserDB = { shared = { "lists", "bis", "listOrder", "chars" } },
     WMGearScoreDB = { shared = { "players" } },
@@ -241,6 +241,8 @@ function WM:IsModuleOn(name)
     local c = db and type(db.chars) == "table" and db.chars[P.CharKey()]
     if not c or type(c.modules) ~= "table" then return true end
     local v = c.modules[name]
+    -- A part with no switch of its own follows its parent
+    if parent and v == nil then return true end
     if v == nil then return c.defaultOn ~= false end
     return v and true or false
 end

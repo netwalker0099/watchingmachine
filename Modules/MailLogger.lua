@@ -95,6 +95,8 @@ function MailLogger:Initialize()
 end
 
 function MailLogger:InitDB()
+    currentCharKey = currentCharKey or GetCharacterKey()
+    selectedCharKey = selectedCharKey or currentCharKey
     if not MailLoggerDB then
         MailLoggerDB = { characters = {} }
     end
@@ -203,7 +205,7 @@ end
 -- Where you are when a trade happens: the instance (and the Instance
 -- Tracker run, so a run can show the gold traded during it) or the zone
 local function TradePlace()
-    local IT = WM.modules.InstanceTracker
+    local IT = WM:IsModuleOn("InstanceTracker") and WM.modules.InstanceTracker
     local run = IT and IT.Current and IT:Current()
     if run then return run.name, run.id end
     local inside, kind = false, nil
@@ -286,6 +288,7 @@ end
 
 -- Open the window on the Trades tab (the trade chat line's link)
 function MailLogger:ShowTrades()
+    if not WM:UsableModule("MailLogger") then return end
     local frame = self:CreateUI()
     if not frame:IsShown() then frame:Show() end
     self:ShowTab("trades")
@@ -491,7 +494,7 @@ end
 -- received, so the diff doesn't record it as income.
 
 function MailLogger:SuppressMail(index)
-    if not index then return end
+    if not index or not WM:IsModuleOn("MailLogger") then return end
     local _, _, sender, subject, money, _, _, hasItem = GetInboxHeaderInfo(index)
     sender  = sender or "?"
     subject = subject or "?"
@@ -982,7 +985,7 @@ local tradeSuccessful = false
 -- far too often to diff on, and may finish a burst between any two events, so a
 -- steady re-read is both cheaper and more reliable.
 eventFrame:SetScript("OnUpdate", function(self, elapsed)
-    if not isMailboxOpen then return end
+    if not isMailboxOpen or not WM:IsModuleOn("MailLogger") then return end
     diffAccum = diffAccum + elapsed
     if diffAccum < DIFF_INTERVAL then return end
     diffAccum = 0
@@ -990,6 +993,8 @@ eventFrame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
+    -- Registered at load: does nothing while it's off on this character
+    if not WM:IsModuleOn("MailLogger") then return end
     if event == "MAIL_SHOW" then
         isMailboxOpen = true
         MailLogger:ResetInboxSnapshot()
@@ -1032,3 +1037,37 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
         tradeSuccessful = false
     end
 end)
+
+-- Turned off: close the window and forget the mailbox or trade in progress
+-- (turned on again with the mailbox open, it starts with the next visit)
+function MailLogger:OnModuleOff()
+    if mainFrame then mainFrame:Hide() end
+    isMailboxOpen = false
+    self:ResetInboxSnapshot()
+    isTrading = false
+    tradeCache = {}
+    tradePartner = nil
+    tradeSuccessful = false
+end
+
+-- The module's page in the guided setup
+function MailLogger:SetupPage(L)
+    self:InitDB()
+    L:Note("Keeps a record, on each of your characters, of the gold and items you take from the mailbox and of"
+        .. " every trade, so you can look back at who sent or traded you what, and when.")
+    L:Note("|cFFFFFFFFHow it works:|r while the mailbox is open it watches the inbox; whatever you take out is"
+        .. " logged (mail you return or delete isn't). Auction house mail is sorted into sales, purchases and"
+        .. " expired auctions. A finished trade logs who with, the gold and items each side gave, and the"
+        .. " instance you were in.")
+    for _, s in ipairs(SETTINGS) do
+        L:Checkbox({ label = s.label, get = function() return MailLoggerDB[s.key] end,
+            set = function(v) MailLoggerDB[s.key] = v end, tooltip = { s.label, s.tip } })
+    end
+    L:Note(function()
+        if WM:IsModuleOn("InstanceTracker") then
+            return "With Instance Tracker on, a trade made during a dungeon or raid run shows on that run's tooltip."
+        end
+        return "|cFF888888With Instance Tracker on too, trades are tagged with the dungeon or raid run they happened in.|r"
+    end)
+    L:Note("The logs, a summary and another character's records are in its window: |cFFFFFF00/wmachine mail|r.")
+end

@@ -83,6 +83,7 @@ end
 GS.Char = Char
 
 local function Say(msg) WM:ModulePrint("GearSets", msg) end
+local function On() return WM:IsModuleOn("GearSets") end
 
 -- ============================================
 -- ITEMS
@@ -282,7 +283,9 @@ function GS:IsWearing(set)
 end
 
 -- Is a missing item in your bank (from Your Characters' last bank visit)?
+-- Only known while Your Characters is on.
 local function InBank(str)
+    if not WM:IsModuleOn("AltTracker") then return false end
     local alts = WM.modules.AltTracker
     local c = alts and alts.DB and alts.DB().chars and alts.DB().chars[CharKey()]
     local id = ItemID(str)
@@ -601,7 +604,14 @@ function GS:SetForSpec(group)
     end
 end
 
+-- Ready for spec swaps: from now on a change from this spec equips a set
+function GS:Arm()
+    self.ready = true
+    Char().lastSpec = GS.ActiveSpec()
+end
+
 function GS:OnSpecChanged()
+    if not On() then return end
     local spec = GS.ActiveSpec()
     local c = Char()
     -- Talent info isn't ready until you're in the world: note the spec, don't swap
@@ -707,6 +717,7 @@ end
 
 -- Refresh the character sheet warning and the red marks on its slots
 function GS:UpdateDoll()
+    if not On() then return self:HideDoll() end
     local doll = rawget(_G, "PaperDollFrame")
     if type(doll) ~= "table" or not doll.IsVisible or not doll:IsVisible() then return end
     self:CreateBadge()
@@ -745,6 +756,13 @@ function GS:UpdateDoll()
     self.dollMissing = missing
 end
 
+-- Take the warning and the slot marks off the character sheet
+function GS:HideDoll()
+    if badge then badge:Hide() end
+    for _, mark in pairs(slotMarks) do mark:Hide() end
+    self.dollMissing = nil
+end
+
 -- Alt over a slot on the character sheet: what in your bags fits it
 local quick
 function GS:ItemsFor(slot)
@@ -760,7 +778,7 @@ function GS:ItemsFor(slot)
 end
 
 function GS:ShowQuickMenu(slot, anchor)
-    if not DB().quickMenu then return end
+    if not On() or not DB().quickMenu then return end
     local items = self:ItemsFor(slot)
     if #items == 0 then if quick then quick:Hide() end return end
     if not quick then
@@ -1058,8 +1076,63 @@ end
 -- DASHBOARD, COMMANDS
 -- ============================================
 
-function GS:IsModuleEnabled() return DB().auto end
-function GS:SetModuleEnabled(v) DB().auto = v and true or false end
+function GS:OnModuleOff()
+    -- Stop a swap part-way (what's already moved stays on)
+    self.job = nil
+    if panel then panel:Hide() end
+    if editor then editor:Hide() end
+    if quick then quick:Hide() end
+    self:HideDoll()
+end
+
+-- Turned back on: start from how things are now, so nothing that changed
+-- while it was off (spec, mount, zone) sets off a swap
+function GS:OnModuleOn()
+    if not self._wmStarted and not self.state then return end
+    self.state = { mount = Mounted(), pvp = InPvP() }
+    self:Arm()
+    self:UpdateDoll()
+end
+
+-- The module's page in the guided setup
+function GS:SetupPage(L)
+    DB()
+    L:Note("Gear Sets saves what you're wearing under a name and puts it back on for you: from its window, from a"
+        .. " macro (|cFFFFFF00/wmachine gear equip Tank|r), or by itself. Swaps check every step, so a slow server or"
+        .. " a full cursor doesn't leave you half-dressed, and in combat only the weapons change; the rest goes on"
+        .. " when combat ends.")
+    L:Header("Swapping when you change spec")
+    L:Note("1. Put on the gear for one spec and click |cFFFFFFFFNew set|r in the Gear Sets window."
+        .. "  2. In the set editor, pick that spec under |cFFFFFFFFTalent spec|r."
+        .. "  3. Leave |cFFFFFFFFEquip it when I switch to that spec|r ticked. Do the same for your other spec.")
+    L:Note("Now whenever you switch spec, chat says \"Switched to Spec 2: equipping ...\" and the set goes on."
+        .. " Untick the box on one set to stop just that set swapping, or turn off Automatic swaps below to stop"
+        .. " them all. A set can also go on while you're mounted or in battlegrounds, and what you wore before comes"
+        .. " back after.")
+    L:Note("|cFFFFFFFFIf something's missing:|r when a swap ends it says in chat what it couldn't find, and whether"
+        .. " it's in your bank (that needs Your Characters on, which remembers your bank). Opening your character"
+        .. " sheet shows a warning when a set's item isn't on you, and marks the slots of your last set in red.")
+    L:Checkbox({ label = "Automatic swaps (spec, mounted, battlegrounds)", get = function() return DB().auto end,
+        set = function(v) DB().auto = v end,
+        tooltip = { "Automatic swaps", "On: a set goes on when you switch to its spec, mount up or enter a"
+            .. " battleground (whichever its editor has ticked). Off: sets only go on when you equip them yourself." } })
+    L:Checkbox({ label = "Chat alert when a set's item is missing", get = function() return DB().reportMissing end,
+        set = function(v) DB().reportMissing = v end,
+        tooltip = { "Missing items", "After a swap, a red line in chat lists anything the set wanted that you"
+            .. " aren't carrying, and says if it's in your bank." } })
+    L:Checkbox({ label = "Warn on the character sheet about missing items", get = function() return DB().dollWarning end,
+        set = function(v) DB().dollWarning = v; GS:UpdateDoll() end,
+        tooltip = { "Character sheet", "A warning at the top of your character sheet when any set has an item"
+            .. " you don't have on you. Hover it for the list; click it for Gear Sets." } })
+    L:Checkbox({ label = "Say in chat when a set is on", get = function() return DB().reportDone end,
+        set = function(v) DB().reportDone = v end,
+        tooltip = { "Done", "\"Equipped Tank.\" when a set you equipped yourself is on." } })
+    L:Checkbox({ label = "Alt over a character sheet slot: what fits it", get = function() return DB().quickMenu end,
+        set = function(v) DB().quickMenu = v end,
+        tooltip = { "Quick swap", "Hold Alt and point at a slot on the character sheet to see the items in your"
+            .. " bags that fit it; click one to put it on." } })
+    L:Note("Making and editing sets, and undoing the last swap, are in its window: |cFFFFFF00/wmachine gear|r.")
+end
 
 function GS:GetQuickStatus()
     local n = #self:SetNames()
@@ -1096,7 +1169,7 @@ local events = CreateFrame("Frame")
 local driver = CreateFrame("Frame")
 local since = 0
 driver:SetScript("OnUpdate", function(_, elapsed)
-    if not GS.job then return end
+    if not GS.job or not On() then return end
     since = since + (elapsed or 0)
     if since < TICK then return end
     local dt = since
@@ -1118,6 +1191,12 @@ function GS:Initialize()
     DB()
     self.state = { mount = Mounted(), pvp = InPvP() }
     self:HookDoll()
+    -- Started after you were already in the world (at login the start-up
+    -- comes after the first loading screen, or turned on later): get ready
+    -- for spec swaps now rather than at the next loading screen
+    if IsLoggedIn and IsLoggedIn() then
+        WM.RunAfter(1, function() if not GS.ready then GS:Arm() end end)
+    end
     WM:RegisterEvents(events, { "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_TALENT_UPDATE", "PLAYER_REGEN_ENABLED",
         "PLAYER_ALIVE", "PLAYER_UNGHOST", "UNIT_AURA", "PLAYER_MOUNT_DISPLAY_CHANGED", "ZONE_CHANGED_NEW_AREA",
         "PLAYER_ENTERING_WORLD", "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "BAG_UPDATE", "PLAYER_EQUIPMENT_CHANGED",
@@ -1125,6 +1204,7 @@ function GS:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event, arg1)
+    if not On() then return end
     local ok, err = true
     if event == "ACTIVE_TALENT_GROUP_CHANGED" or event == "PLAYER_TALENT_UPDATE" then
         ok, err = pcall(GS.OnSpecChanged, GS)
@@ -1133,10 +1213,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "UNIT_AURA" or event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
         if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or arg1 == "player" then ok, err = pcall(GS.CheckTrigger, GS, "mount") end
     elseif event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
-        if event == "PLAYER_ENTERING_WORLD" and not GS.ready then
-            GS.ready = true
-            Char().lastSpec = GS.ActiveSpec()
-        end
+        if event == "PLAYER_ENTERING_WORLD" and not GS.ready then GS:Arm() end
         ok, err = pcall(GS.CheckTrigger, GS, "pvp")
     elseif event == "BANKFRAME_OPENED" then
         GS.bankOpen = true

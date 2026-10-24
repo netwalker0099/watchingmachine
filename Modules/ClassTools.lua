@@ -267,7 +267,7 @@ ClassTools.SoundChannel = SoundChannel
 -- "none" is silent.
 local lastSoundFor = {}
 function ClassTools:SetAlert(key, text, icon, sound, channel)
-    if not key then return end
+    if not key or not WM:IsModuleOn("ClassTools") then return end
     if not activeAlerts[key] then
         alertOrder[#alertOrder + 1] = key
         -- Only make noise when a warning first appears
@@ -411,7 +411,7 @@ function ClassTools:UpdateAlertFrame()
     if not f then return end
 
     local n = #alertOrder
-    if n == 0 then f:Hide() return end
+    if n == 0 or not WM:IsModuleOn("ClassTools") then f:Hide() return end
 
     local shown = math.min(n, MAX_ALERT_LINES)
     for i = 1, MAX_ALERT_LINES do
@@ -445,6 +445,7 @@ function ClassTools:StartMonitorTick()
         monitorAccum = monitorAccum + elapsed
         if monitorAccum < MONITOR_INTERVAL then return end
         monitorAccum = 0
+        if not WM:IsModuleOn("ClassTools") then return end
         ClassTools:RunMonitors()
     end)
 end
@@ -772,10 +773,255 @@ function ClassTools:CreateUI()
 end
 
 function ClassTools:Toggle()
+    if not WM:IsModuleOn("ClassTools") then return end
     local f = self:CreateUI()
     if f:IsShown() then f:Hide() else f:Show() end
 end
 
 function ClassTools:ToggleUI()
     self:Toggle()
+end
+
+-- ============================================
+-- ON / OFF
+-- ============================================
+
+-- Turned off on this character: the warnings go and the monitor tick
+-- idles. Core turns the class parts off first; each hides its own buttons
+-- and bars.
+function ClassTools:OnModuleOff()
+    self:ClearAllAlerts()
+    if alertFrame then alertFrame:Hide() end
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- ============================================
+-- GUIDED SETUP
+-- ============================================
+-- One page for Class Tools and all its parts: your own class's tools, then
+-- the General ones, grouped. Built from the feature registry, so it shows
+-- what the Class Tools window shows. The parts register their features
+-- here without starting (no frames, no events), so it works before Class
+-- Tools has run on this character.
+
+-- The part that holds a class's tools
+local CLASS_PART = { WARLOCK = "ClassWarlock", MAGE = "ClassMage", SHAMAN = "ClassShaman", PALADIN = "ClassPaladin" }
+
+-- What a class's tools are for, in a sentence or two
+local CLASS_NOTES = {
+    WARLOCK = "Warnings when your armour spell is missing, and when Demonic Sacrifice or Soul Link should be up"
+        .. " (only if you have the talent). Soulstone timers for everyone in range: |cFFFFFF00/wmachine soulstone|r."
+        .. " The warlock button is a draggable warlock crest that opens into three groups of icons: demons,"
+        .. " armours, and stones & rituals. Click an icon to cast it.",
+    MAGE = "A warning when no armour spell is up, a portal button with every portal and teleport you know, and a"
+        .. " mage button with your mana gems, armours, and food, water and table. Click an icon to cast it."
+        .. " |cFFFFFF00/wmachine portals|r lists what you know.",
+    SHAMAN = "The totem button: hover it to pick one of four totem sets, then click it to drop that set one totem"
+        .. " per click (Air, Water, Earth, then Fire). It starts again from Air when your totems are gone, after"
+        .. " combat, or on Ctrl-click. Right-click it to edit the sets; Shift-drag to move it.",
+    PALADIN = "A warning when Righteous Fury drops, for Protection paladins only, so you don't lose threat.",
+}
+
+-- General features, grouped for the page; anything not listed goes last
+local GENERAL_GROUPS = {
+    { key = "consumables", title = "Raid consumables",
+      note = "Only inside a raid instance (25-man only, unless you untick that). A warning stays in the"
+          .. " CHECK YOURSELF frame until you fix it, with the warning sound when it first appears.",
+      keys = { "flask", "food", "weaponenchant", "only25" } },
+    { key = "mana", title = "Mana potions and runes", mana = true,
+      note = "In raid combat, as your mana drops: first a nudge to drink a mana potion, then, while no potion is"
+          .. " ready (on cooldown or none left), to use a Dark or Demonic Rune. Each has its own sound.",
+      keys = { "manapotion", "potionAt", "potionSound", "manarune", "runeAt", "runeSound" } },
+    { key = "swing", title = "Swing timer", swing = true,
+      note = "A bar per hand showing the time to your next melee swing, or to your next Auto Shot for hunters. It shows"
+          .. " while you attack. |cFFFFFF00/wmachine swing|r shows it for 10 seconds so you can drag it into place.",
+      keys = { "swingTimer", "swingAnyClass", "swingSync", "swingSyncSound", "swingSyncLag",
+               "swingWidth", "swingHeight", "swingLock" } },
+    { key = "flyout", title = "Flyout buttons", flyout = true,
+      note = "How every class button opens, and whether they line up together.",
+      keys = { "flyoutOpen", "flyoutDock", "flyoutDockDir", "flyoutLock" } },
+}
+
+-- Classes that get a swing timer without the "every class" option
+local SWING_CLASSES = { WARRIOR = true, ROGUE = true, HUNTER = true, PALADIN = true, SHAMAN = true }
+local NO_MANA = { WARRIOR = true, ROGUE = true }
+-- Only for classes with a default swing timer, and the sync ones only for shamans
+local SWING_FULL = { swingSync = "SHAMAN", swingSyncSound = "SHAMAN", swingSyncLag = "SHAMAN",
+    swingWidth = true, swingHeight = true, swingLock = true }
+
+-- A setting that only matters while another (a check) is on
+local DEPENDS = {
+    potionAt = "manapotion", potionSound = "manapotion", runeAt = "manarune", runeSound = "manarune",
+    swingAnyClass = "swingTimer", swingSync = "swingTimer", swingSyncSound = "swingSync", swingSyncLag = "swingSync",
+    swingWidth = "swingTimer", swingHeight = "swingTimer", swingLock = "swingTimer",
+    flyoutDockDir = "flyoutDock",
+}
+
+-- Register every part's features without starting anything
+function ClassTools:RegisterPartFeatures()
+    self:InitDB()
+    for _, name in ipairs(WM.ModuleChildren and WM.ModuleChildren("ClassTools") or {}) do
+        local m = WM.modules[name]
+        if m and m.RegisterFeatures then m:RegisterFeatures() end
+    end
+end
+
+function ClassTools:SetupPage(L)
+    self:RegisterPartFeatures()
+    local class = self:DetectClass()
+    local label = CLASS_LABEL[class] or class or "Unknown"
+    local function Changed() if L.panel and L.panel.Refresh then L.panel:Refresh() end end
+    local lastDir = {}
+
+    local function IsOn(c, key) return self:IsEnabled(c, key) end
+
+    -- One feature: a check (with its description below it), a choice, or a
+    -- button group's direction (shown / left off, and which way it opens)
+    local function Feature(c, f, parentKey)
+        local off = parentKey and function() return not IsOn(c, parentKey) end or nil
+        if f.direction then
+            local function Hidden() return f.get() == "HIDDEN" end
+            L:Checkbox({ label = "Show the " .. (f.what or f.name) .. " icons", indent = 16,
+                get = function() return not Hidden() end,
+                set = function(v)
+                    if v then
+                        local d = lastDir[f.key] or f.default
+                        if not d or d == "HIDDEN" then d = "UP" end
+                        f.set(d)
+                    else
+                        lastDir[f.key] = f.get()
+                        f.set("HIDDEN")
+                    end
+                    if f.onChange then pcall(f.onChange, f.get()) end
+                    Changed()
+                end,
+                disabled = off,
+                tooltip = { f.name, "Untick to leave the " .. (f.what or f.name) .. " icons off the button and keep the rest." } })
+            local opts = {}
+            for _, o in ipairs(WM.Flyout and WM.Flyout.DIRECTION_OPTIONS or {}) do
+                if o.value ~= "HIDDEN" then opts[#opts + 1] = o end
+            end
+            L:Dropdown({ label = "Opens:", width = 90, indent = 40, options = opts,
+                get = function() return f.get() end,
+                set = function(v) f.set(v); if f.onChange then pcall(f.onChange, v) end end,
+                disabled = function() return Hidden() or (off and off()) end,
+                tooltip = { f.name, "Which way these icons fan out from the button. Groups that open the same way share one line." } })
+        elseif f.kind == "choice" then
+            L:Dropdown({ label = (f.name or f.key) .. ":", width = 150, indent = parentKey and 16 or 0,
+                options = f.options or {}, get = function() return f.get and f.get() end,
+                set = function(v)
+                    if f.set then f.set(v) end
+                    if f.onChange then pcall(f.onChange, v) end
+                end,
+                disabled = off,
+                tooltip = f.tooltip or (f.desc and { f.name, f.desc }) })
+        else
+            L:Checkbox({ label = f.name or f.key, indent = parentKey and 16 or 0,
+                get = function() return IsOn(c, f.key) end,
+                set = function(v) self:SetEnabled(c, f.key, v); Changed() end,
+                disabled = off,
+                tooltip = f.desc and { f.name, f.desc } })
+            if f.desc then L:Note(f.desc, 24 + (parentKey and 16 or 0)) end
+        end
+    end
+
+    L:Note("Class Tools watches you, not the raid: about once a second it checks the things you're expected to"
+        .. " keep up yourself, and anything missing goes in one small |cFFFFAA00CHECK YOURSELF|r frame near the"
+        .. " middle of your screen until you fix it. Each warning can be switched off on its own.")
+    L:Note("It knows your class: below are the " .. "|cFF" .. ClassHex(class or "") .. label .. "|r"
+        .. " tools, then the general ones every character gets.")
+
+    -- ---------- Your class ----------
+    L:Header("|cFF" .. ClassHex(class or "") .. label .. "|r tools")
+    local mine = self:GetFeatures(class)
+    if #mine == 0 then
+        L:Note("Nothing just for " .. label .. "s yet. The general checks below still apply, and new class tools"
+            .. " appear here by themselves when they're added.")
+    else
+        if CLASS_NOTES[class] then L:Note(CLASS_NOTES[class]) end
+        local button
+        for _, f in ipairs(mine) do
+            if f.direction then
+                Feature(class, f, button)
+            else
+                if f.kind ~= "choice" then
+                    button = f.key:find("Button$") and f.key or nil
+                end
+                Feature(class, f, nil)
+            end
+        end
+        local part = WM.modules[CLASS_PART[class] or ""]
+        if part and part.SetupExtras then part:SetupExtras(L, Changed) end
+    end
+
+    -- ---------- General ----------
+    local general = self:GetFeatures("GENERAL")
+    local byKey, placed = {}, {}
+    for _, f in ipairs(general) do byKey[f.key] = f end
+    local hasFlyout = false
+    for _, fly in ipairs(WM.Flyout and WM.Flyout.registry or {}) do
+        if fly.cfg.class == class then hasFlyout = true end
+    end
+    for _, g in ipairs(GENERAL_GROUPS) do
+        local show = true
+        if g.mana and NO_MANA[class] then show = false end
+        if g.flyout and not hasFlyout then show = false end
+        local any = false
+        for _, k in ipairs(g.keys) do if byKey[k] then any = true end end
+        if show and any then
+            L:Header(g.title)
+            if g.note then L:Note(g.note) end
+            for _, k in ipairs(g.keys) do
+                local f = byKey[k]
+                local want = f ~= nil
+                local full = SWING_FULL[k]
+                if want and g.swing and full then
+                    want = SWING_CLASSES[class] and (full == true or full == class) or false
+                end
+                if want then Feature("GENERAL", f, DEPENDS[k]) end
+            end
+            if g.swing and not SWING_CLASSES[class] then
+                L:Note("It's for melee classes and hunters, so a " .. label .. " only gets one with the second option ticked.")
+            end
+        end
+        for _, k in ipairs(g.keys) do placed[k] = true end
+    end
+    local others = {}
+    for _, f in ipairs(general) do
+        if not placed[f.key] and f.key ~= "soundChannel" then others[#others + 1] = f end
+    end
+    if #others > 0 then
+        L:Header("Other checks")
+        for _, f in ipairs(others) do Feature("GENERAL", f, DEPENDS[f.key]) end
+    end
+
+    -- ---------- The warning frame ----------
+    L:Header("The warning frame")
+    L:Checkbox({ label = "Play a sound when a new warning appears",
+        get = function() return ClassToolsDB and ClassToolsDB.alertSound end,
+        set = function(v) if ClassToolsDB then ClassToolsDB.alertSound = v end end,
+        tooltip = { "Warning Sound", "The raid warning sound, when a warning first appears, at most once every "
+            .. ALERT_SOUND_THROTTLE .. " seconds. The mana potion and rune warnings use their own sounds above." } })
+    if byKey.soundChannel then Feature("GENERAL", byKey.soundChannel) end
+    L:Checkbox({ label = "Lock the warning frame in place",
+        get = function() return ClassToolsDB and ClassToolsDB.alertLocked end,
+        set = function(v)
+            if ClassToolsDB then ClassToolsDB.alertLocked = v end
+            self:ApplyAlertLock()
+        end,
+        tooltip = { "Lock Warning Frame", "Stops the warning frame being dragged, and lets mouse clicks pass through it." } })
+    local function NotRunning() return not (WM:IsModuleOn("ClassTools") and alertFrame) end
+    L:Buttons({
+        { text = "Show example", width = 110, disabled = NotRunning,
+          onClick = function() self:ShowExampleAlert() end,
+          tooltip = { "Show Example", "Puts two example warnings up for a few seconds, so you can find the frame"
+              .. " and drag it where you want it. Needs Class Tools on." } },
+        { text = "Reset position", width = 110, onClick = function() self:ResetAlertPosition() end,
+          tooltip = { "Reset Position", "Moves the warning frame back to just above the centre of the screen." } },
+    })
+
+    L:Note("On your other characters this page shows their own class's tools: warlock armour and soulstones,"
+        .. " mage portals, shaman totems, paladin Righteous Fury. The General ones are the same everywhere,"
+        .. " but each character keeps its own choices.")
+    L:Note("Everything here, plus a sound for each warning, is in the Class Tools window: |cFFFFFF00/wmachine class|r.")
 end

@@ -142,19 +142,20 @@ W.click(sound)
 check("sound alert writes", env.KeywordMonitorDB.soundEnabled == false)
 check("alert checkboxes have tooltips", chat:GetScript("OnEnter") ~= nil and sound:GetScript("OnEnter") ~= nil)
 
--- Stop/Resume and the dashboard switch agree
-check("starts active", KM.stopButton:GetText() == "Stop" and KM:IsModuleEnabled())
+-- Stop/Resume and the per-character switch agree
+check("starts active", KM.stopButton:GetText() == "Stop" and not KM:IsPaused())
 W.click(KM.stopButton)
-check("stop pauses", KM:IsPaused() and not KM:IsModuleEnabled())
+check("stop pauses", KM:IsPaused() and WM:IsModuleOn("KeywordMonitor"))
 check("stop button reads Resume", KM.stopButton:GetText() == "Resume")
 check("status reads PAUSED", KM.statusText:GetText():find("PAUSED", 1, true) ~= nil)
-KM:SetModuleEnabled(true)
+W.click(KM.stopButton)
+check("resume button resumes", not KM:IsPaused() and KM.stopButton:GetText() == "Stop")
+WM:SetModuleOn("KeywordMonitor", false)
+check("switch off pauses and relabels to Resume", KM:IsPaused() and KM.stopButton:GetText() == "Resume")
+WM:SetModuleOn("KeywordMonitor", true)
 check("switch on resumes and relabels", not KM:IsPaused() and KM.stopButton:GetText() == "Stop"
     and KM.statusText:GetText():find("ACTIVE", 1, true) ~= nil)
-KM:SetModuleEnabled(false)
-check("switch off relabels to Resume", KM.stopButton:GetText() == "Resume")
-W.click(KM.stopButton)
-check("resume button resumes", KM:IsModuleEnabled())
+if not kp:IsShown() then KM:Toggle() end
 
 -- Results list
 local now = os.time()

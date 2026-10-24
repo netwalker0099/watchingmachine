@@ -100,9 +100,14 @@ check("keyword switch pauses monitoring", WM.modules.KeywordMonitor:IsPaused() =
 Toggle("KeywordMonitor")
 check("keyword switch resumes", WM.modules.KeywordMonitor:IsPaused() == false)
 
+-- ArmorySnap's auto-scan is a setting shared with the standalone addon:
+-- the card switch turns the module off for this character, leaving it alone
+local autoScan = env.ArmorySnapDB.options.enabled
 Toggle("ArmorySnap")
-check("armorysnap switch turns auto-scan off", env.ArmorySnapDB.options.enabled == false)
+check("armorysnap switch: off for this character, auto-scan setting kept",
+    not WM:IsModuleOn("ArmorySnap") and env.ArmorySnapDB.options.enabled == autoScan)
 Toggle("ArmorySnap")
+check("armorysnap switch: back on", WM:IsModuleOn("ArmorySnap"))
 
 -- change made elsewhere shows up on the card
 env.DebuffTrackerDB.enabled = false

@@ -302,7 +302,7 @@ local function SetupAnchor(a)
 end
 
 local totemFlyout = WM.Flyout.New({
-    class = CLASS, feature = "totemButton",
+    class = CLASS, feature = "totemButton", module = "ClassShaman",
     anchorName = "WM_TotemAnchor", buttonPrefix = "WM_TotemSetBtn",
     title = "Totems", emptyText = "No totem sets.",
     store = Store, posX = "buttonX", posY = "buttonY", defaultX = 284,
@@ -399,6 +399,7 @@ function Shaman:CreateEditor()
 end
 
 function Shaman:ToggleEditor()
+    if not WM:IsModuleOn("ClassShaman") then return end
     if not IsPlayerShaman() then
         self:Print("Totem sets are for shamans.")
         return
@@ -416,10 +417,13 @@ end
 
 local eventFrame = CreateFrame("Frame")
 
-function Shaman:Initialize()
+-- The shaman tab's features. Only registers (no frames, no events), so the
+-- guided setup can list them before this has started; runs once.
+function Shaman:RegisterFeatures()
     self:InitDB()
     local tools = Tools()
-    if not tools then return end
+    if not tools or self.featuresRegistered then return end
+    self.featuresRegistered = true
 
     local rebuild = function() Shaman:Refresh() end
     tools:RegisterFeature(CLASS, {
@@ -430,6 +434,11 @@ function Shaman:Initialize()
     })
     WM.Flyout.DirectionFeature(tools, CLASS, "setDir", "Totem sets expand", "totem set",
         Store, DIR_DEFAULTS.setDir, rebuild)
+end
+
+function Shaman:Initialize()
+    self:RegisterFeatures()
+    if not Tools() then return end
 
     if IsPlayerShaman() then
         totemFlyout:CreateAnchor()
@@ -441,7 +450,7 @@ function Shaman:Initialize()
 end
 
 eventFrame:SetScript("OnEvent", function(_, event)
-    if not IsPlayerShaman() then return end
+    if not IsPlayerShaman() or not WM:IsModuleOn("ClassShaman") then return end
     if event == "PLAYER_TOTEM_UPDATE" then
         Shaman:OnTotemUpdate()
     elseif InCombatLockdown() then
@@ -454,3 +463,36 @@ eventFrame:SetScript("OnEvent", function(_, event)
 end)
 
 function Shaman:IsPendingApply() return pendingApply end
+
+-- Turned off on this character: the button and the set editor close (the
+-- button in combat once combat ends)
+function Shaman:OnModuleOff()
+    if self.editor then self.editor:Hide() end
+    totemFlyout:UpdateVisibility()
+end
+
+-- Back on: the button comes back if it's wanted
+function Shaman:OnModuleOn()
+    self:Refresh()
+end
+
+-- Class Tools' guided setup, after the shaman features: the set in use and
+-- the set editor
+function Shaman:SetupExtras(L)
+    self:InitDB()
+    local opts = {}
+    for i = 1, NUM_SETS do opts[i] = { value = i, text = self:SetName(i) } end
+    L:Dropdown({ label = "Totem set in use:", width = 120, indent = 16, options = opts,
+        get = function() return Store().selected end,
+        set = function(v)
+            if totemFlyout.anchor then self:SelectSet(v)
+            elseif Store().sets[v] then Store().selected = v end
+        end,
+        tooltip = { "Totem set in use", "The set the button drops. You can also pick one by hovering the button.",
+            "The four sets start as Melee, Caster, Healer and Tremor; each picks the best totem you know for each element." } })
+    L:Buttons({ { text = "Edit totem sets", width = 130,
+        disabled = function() return not (WM:IsModuleOn("ClassShaman") and IsPlayerShaman()) end,
+        onClick = function() self:ToggleEditor() end,
+        tooltip = { "Edit totem sets", "Name each set and choose its Air, Water, Earth and Fire totem, or Auto for"
+            .. " the best you know. Also: right-click the totem button, or /wmachine totems." } } }, 16)
+end

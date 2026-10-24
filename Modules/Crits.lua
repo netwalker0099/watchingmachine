@@ -183,7 +183,7 @@ CR.Ago = Ago
 
 -- Lines for a spell's tooltip (by name; ranks share one record)
 function CR:TooltipLines(name)
-    if not DB().tooltips or not name then return nil end
+    if not WM:IsModuleOn("Crits") or not DB().tooltips or not name then return nil end
     local lines = {}
     for _, r in pairs(Records()) do
         if r.name == name then
@@ -229,6 +229,7 @@ function CR:HookTooltips()
     if type(tip) == "table" and tip.HookScript and not hookedTips[tip] then
         hookedTips[tip] = true
         tip:HookScript("OnTooltipCleared", function(t) t.wmCrits = nil end)
+        -- (Add checks the module is on, through TooltipLines)
         if not tip.HasScript or tip:HasScript("OnTooltipSetSpell") then
             tip:HookScript("OnTooltipSetSpell", function(t) pcall(Add, t) end)
         end
@@ -433,6 +434,49 @@ CR.ToggleUI = CR.Toggle
 function CR:IsModuleEnabled() return DB().enabled end
 function CR:SetModuleEnabled(v) DB().enabled = v and true or false end
 
+function CR:OnModuleOff()
+    if panel then panel:Hide() end
+    if self.menu and CloseDropDownMenus then CloseDropDownMenus() end
+end
+
+-- The module's page in the guided setup
+function CR:SetupPage(L)
+    DB()
+    L:Note("Crit Tracker reads the combat log and keeps, for every spell, ability, melee swing, shot and heal you"
+        .. " use, your biggest normal hit and your biggest crit, how often it crits, and who and where it was.")
+    L:Note("|cFFFFFFFFWhen you beat a record:|r a line in chat says so, with the old number to compare. The very first"
+        .. " hit with something isn't announced, so a new character doesn't fill your chat. Hits on players are kept"
+        .. " apart from hits on creatures.")
+    L:Note("Hover over a spell in your spellbook or on your bars to see your records for it.")
+    L:Checkbox({ label = "Say when you beat your best crit", get = function() return DB().alertCrits end,
+        set = function(v) DB().alertCrits = v end,
+        tooltip = { "New best crit", "A line in chat (and the sound below) when a crit beats your last best one." } })
+    L:Checkbox({ label = "... and your best normal hit", get = function() return DB().alertHits end,
+        set = function(v) DB().alertHits = v end,
+        tooltip = { "New best hit", "The same for normal hits. These come often while you're levelling." } })
+    L:Dropdown({ label = "Sound:", width = 150, options = function() return WM.Sounds and WM.Sounds.OPTIONS or {} end,
+        get = function() return DB().sound end,
+        set = function(v) DB().sound = v; if WM.Sounds then WM.Sounds.Play(v, DB().channel) end end,
+        tooltip = { "Sound", "Played with the chat line. Picking one plays it." } })
+    L:Checkbox({ label = "Big text on screen too", get = function() return DB().splash end,
+        set = function(v) DB().splash = v end,
+        tooltip = { "Big text", "The spell and the number in the middle of the screen." } })
+    L:Checkbox({ label = "Tell your party / raid about a new best crit", get = function() return DB().announce end,
+        set = function(v) DB().announce = v end,
+        tooltip = { "Announce", "A line in party or raid chat, at most once every 5 seconds." } })
+    L:Checkbox({ label = "Count hits on players (kept apart)", get = function() return DB().pvp end,
+        set = function(v) DB().pvp = v end,
+        tooltip = { "PvP", "Off: hits on other players aren't recorded at all." } })
+    L:Checkbox({ label = "Records on spell tooltips", get = function() return DB().tooltips end,
+        set = function(v) DB().tooltips = v end,
+        tooltip = { "Tooltips", "Your best crit, best hit and crit rate under the spell's own tooltip." } })
+    L:EditBox({ label = "Quiet below:", width = 70, numeric = true,
+        get = function() return tostring(DB().minimum or 0) end,
+        set = function(v) DB().minimum = tonumber(v) or 0 end,
+        tooltip = { "Quiet below", "New records smaller than this don't say anything (useful while levelling)." } })
+    L:Note("Your records, your other characters' and sharing one in chat are in its window: |cFFFFFF00/wmachine crits|r.")
+end
+
 function CR:GetQuickStatus()
     local best
     for _, r in pairs(Records()) do
@@ -454,7 +498,7 @@ function CR:Initialize()
 end
 
 events:SetScript("OnEvent", function()
-    if not DB().enabled or not CombatLogGetCurrentEventInfo then return end
+    if not WM:IsModuleOn("Crits") or not DB().enabled or not CombatLogGetCurrentEventInfo then return end
     local ok, err = pcall(CR.OnCombatEvent, CR, CombatLogGetCurrentEventInfo())
     if not ok then geterrorhandler()(err) end
 end)

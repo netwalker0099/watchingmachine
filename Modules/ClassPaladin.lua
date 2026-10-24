@@ -100,7 +100,7 @@ local function Tools() return WM.modules.ClassTools end
 
 local function Monitor()
     local tools = Tools()
-    if not tools then return end
+    if not tools or not WM:IsModuleOn("ClassPaladin") then return end
     if not IsPlayerPaladin() then return end
 
     if UnitIsDeadOrGhost("player") or not tools:IsEnabled(CLASS, "fury")
@@ -119,9 +119,13 @@ end
 -- REGISTRATION
 -- ============================================
 
-function Paladin:Initialize()
+-- The paladin tab's feature, warning sound and monitor. Only registers (no
+-- frames, no events), so the guided setup can list them before this has
+-- started; runs once.
+function Paladin:RegisterFeatures()
     local tools = Tools()
-    if not tools then return end
+    if not tools or self.featuresRegistered then return end
+    self.featuresRegistered = true
 
     tools:RegisterFeature(CLASS, {
         key = "fury", name = "Warn if Righteous Fury is missing",
@@ -130,8 +134,21 @@ function Paladin:Initialize()
     })
     tools:RegisterAlertSound(CLASS, "pal_fury", "Righteous Fury missing")
     tools:RegisterMonitor(Monitor)
+end
+
+function Paladin:Initialize()
+    self:RegisterFeatures()
+    if not Tools() then return end
 
     local watcher = CreateFrame("Frame")
     WM:RegisterEvents(watcher, { "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "SPELLS_CHANGED" })
-    watcher:SetScript("OnEvent", function() Paladin:InvalidateSpec() end)
+    watcher:SetScript("OnEvent", function()
+        if WM:IsModuleOn("ClassPaladin") then Paladin:InvalidateSpec() end
+    end)
+end
+
+-- Turned off on this character: its warning goes
+function Paladin:OnModuleOff()
+    local tools = Tools()
+    if tools then tools:ClearAlert("pal_fury") end
 end

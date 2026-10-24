@@ -44,6 +44,9 @@ local SCAN_INTERVAL = 1.0       -- Nameplate scan frequency
 local playerName = nil
 local playerGUID = nil
 
+-- Off on this character: no alerts, nothing tracked, nothing sent to the guild
+local function On() return WM:IsModuleOn("PvPTracker") end
+
 -- ============================================
 -- GUILD SYNC: COMMS LAYER
 -- ============================================
@@ -92,7 +95,7 @@ end
 -- ============================================
 
 local function QueueMessage(msg)
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     table.insert(sendQueue, msg)
 end
@@ -126,7 +129,7 @@ end
 
 -- Send a real-time kill broadcast: "I just got killed by this person"
 function PvPTracker:BroadcastKill(enemyName, enemyData)
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     
     local msg = "K" .. FIELD_SEP 
@@ -142,7 +145,7 @@ end
 
 -- Announce a revenge kill to guild chat
 function PvPTracker:AnnounceRevenge(enemyName)
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not PvPTrackerDB.announceRevenge then return end
     if not IsInGuild() then return end
     
@@ -202,7 +205,7 @@ end
 
 -- Send hello (announce presence)
 function PvPTracker:SendHello()
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     
     local now = GetTime()
@@ -217,7 +220,7 @@ end
 
 -- Request full sync from online guildies
 function PvPTracker:RequestSync()
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     
     local now = GetTime()
@@ -233,7 +236,7 @@ end
 
 -- Send our full enemy list (queued/throttled)
 function PvPTracker:SendFullSync()
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     
     local count = 0
@@ -395,7 +398,7 @@ end
 
 -- Master message handler
 function PvPTracker:OnAddonMessage(prefix, message, distribution, sender)
-    if prefix ~= SYNC_PREFIX then return end
+    if prefix ~= SYNC_PREFIX or not On() then return end
     if distribution ~= "GUILD" then return end
     if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     
@@ -519,6 +522,7 @@ function PvPTracker:RegisterSync()
         syncFrame = CreateFrame("Frame")
         syncFrame:RegisterEvent("CHAT_MSG_ADDON")
         syncFrame:SetScript("OnEvent", function(self, event, prefix, message, distribution, sender)
+            if not On() then return end
             if event == "CHAT_MSG_ADDON" then
                 pcall(PvPTracker.OnAddonMessage, PvPTracker, prefix, message, distribution, sender)
             end
@@ -526,6 +530,7 @@ function PvPTracker:RegisterSync()
         
         -- Queue processor on OnUpdate
         syncFrame:SetScript("OnUpdate", function(self, elapsed)
+            if not On() then return end
             ProcessQueue(elapsed)
             -- Periodic leaderboard announce
             if PvPTrackerDB and PvPTrackerDB.leaderboardEnabled then
@@ -812,7 +817,7 @@ function PvPTracker:ScanNameplates()
 end
 
 function PvPTracker:TriggerAlert(name, unit)
-    if not PvPTrackerDB.enabled then return end
+    if not On() or not PvPTrackerDB.enabled then return end
     
     local now = GetTime()
     local cooldown = PvPTrackerDB.alertCooldown or 30
@@ -985,7 +990,7 @@ end
 
 -- Broadcast our points to guild
 function PvPTracker:BroadcastPoints(points, enemyName)
-    if not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.guildSync then return end
     if not IsInGuild() then return end
     
     local msg = "L" .. FIELD_SEP .. (points or 0) .. FIELD_SEP .. EscapeField(enemyName or "")
@@ -1028,7 +1033,7 @@ end
 
 -- Check if the top leader changed and announce if configured
 function PvPTracker:CheckLeaderChange()
-    if not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
     if not PvPTrackerDB.guildSync then return end
     
     local newLeader, newPoints = self:GetLeader()
@@ -1050,7 +1055,7 @@ end
 
 -- Periodic announcement (called from timer)
 function PvPTracker:CheckPeriodicAnnounce()
-    if not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
+    if not On() or not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
     if not PvPTrackerDB.guildSync then return end
     if PvPTrackerDB.leaderboardAnnounce ~= "hourly" then return end
     
@@ -1187,22 +1192,31 @@ end
 -- EVENT REGISTRATION
 -- ============================================
 
+-- Safe to call again after UnregisterEvents (the panel's switch turns
+-- the module off and on again): the handlers are made once and re-attached
+local onEvent, onUpdate
+
 function PvPTracker:RegisterEvents()
-    if eventFrame then return end
-    
-    eventFrame = CreateFrame("Frame")
+    if not eventFrame then
+        eventFrame = CreateFrame("Frame")
+        self:MakeHandlers()
+    end
     eventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-    
+    eventFrame:SetScript("OnEvent", onEvent)
+    eventFrame:SetScript("OnUpdate", onUpdate)
+end
+
+function PvPTracker:MakeHandlers()
     -- Error throttle: if we get 5 errors in 10 seconds, disable the handler
     local errorCount = 0
     local errorResetTime = 0
     local handlerDisabled = false
     
-    eventFrame:SetScript("OnEvent", function(self, event, ...)
-        if handlerDisabled then return end
+    onEvent = function(self, event, ...)
+        if handlerDisabled or not On() then return end
         
         local ok, err
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
@@ -1233,11 +1247,11 @@ function PvPTracker:RegisterEvents()
                 PvPTracker:Print("|cFFFF0000Too many errors - PvP event handler paused. Use /reload to retry.|r")
             end
         end
-    end)
+    end
     
     -- Periodic nameplate scan (also pcall-protected)
-    eventFrame:SetScript("OnUpdate", function(self, elapsed)
-        if handlerDisabled then return end
+    onUpdate = function(self, elapsed)
+        if handlerDisabled or not On() then return end
         scanTimer = scanTimer + elapsed
         if scanTimer >= SCAN_INTERVAL then
             scanTimer = 0
@@ -1246,7 +1260,7 @@ function PvPTracker:RegisterEvents()
                 PvPTracker:Print("|cFFFF0000Scan error:|r " .. tostring(err))
             end
         end
-    end)
+    end
 end
 
 function PvPTracker:UnregisterEvents()
@@ -1484,6 +1498,7 @@ function PvPTracker:IsModuleEnabled()
 end
 
 function PvPTracker:SetModuleEnabled(v)
+    if PvPTrackerDB == nil or PvPTrackerDB.enemies == nil then self:InitDB() end
     PvPTrackerDB.enabled = v and true or false
     if PvPTrackerDB.enabled then self:RegisterEvents() else self:UnregisterEvents() end
     if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
@@ -1858,6 +1873,80 @@ function PvPTracker:Toggle()
 end
 
 PvPTracker.ToggleUI = PvPTracker.Toggle
+
+-- Turned off on this character. SetModuleEnabled(false) has already
+-- unregistered the tracking events; drop anything still queued for the
+-- guild and close the windows.
+function PvPTracker:OnModuleOff()
+    wipe(sendQueue)
+    wipe(detectedEnemies)
+    if mainFrame then mainFrame:Hide() end
+    if leaderboardFrame then leaderboardFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function PvPTracker:SetupPage(L)
+    self:InitDB()
+    local function opt(key)
+        return function() return PvPTrackerDB[key] end, function(v) PvPTrackerDB[key] = v end
+    end
+    L:Note("Keeps a kill-on-sight (KOS) list. When another player kills you in world PvP (not in battlegrounds"
+        .. " or arenas), they're added to it, with how often they've killed you and where.")
+    L:Note("|cFFFFFFFFAlerts:|r when someone on the list shows up on a nameplate, as your target or under your"
+        .. " mouse, you get a warning: a sound, a line in chat and a message in the middle of the screen. The"
+        .. " same player alerts again only after the cooldown.")
+    L:Note("|cFFFFFFFFGuild sync:|r guildies running Watching Machine share their kills, so you're warned about"
+        .. " players who killed them too. Killing someone who killed a guildie can post a revenge message in"
+        .. " guild chat, and each KOS kill earns a point on the guild leaderboard.")
+    local get, set = opt("alertSound")
+    L:Checkbox({ label = "Sound alert", get = get, set = set,
+        tooltip = { "Sound Alert", "Play a sound when a KOS enemy is spotted." } })
+    get, set = opt("alertChat")
+    L:Checkbox({ label = "Chat alert", get = get, set = set,
+        tooltip = { "Chat Alert", "A line in your chat frame (only you see it) with their guild and kills." } })
+    get, set = opt("alertScreen")
+    L:Checkbox({ label = "Screen alert", get = get, set = set,
+        tooltip = { "Screen Alert", "Flash \"ENEMY: name\" in the middle of the screen." } })
+    L:Slider({ label = "Alert again after", min = 10, max = 120, step = 5,
+        format = function(v) return v .. " sec" end,
+        get = function() return PvPTrackerDB.alertCooldown or 30 end,
+        set = function(v) PvPTrackerDB.alertCooldown = v end })
+    get, set = opt("trackManualOnly")
+    L:Checkbox({ label = "Only track names I add myself", get = get, set = set,
+        tooltip = { "Manual Tracking Only", "Players who kill you aren't added automatically; only names you"
+            .. " add in the window are tracked." } })
+    get, set = opt("guildSync")
+    L:Checkbox({ label = "Share the KOS list with my guild", get = get, set = set,
+        tooltip = { "Guild KOS Sync", "Send your kills to guildies running Watching Machine and receive theirs."
+            .. " These are hidden addon messages, not chat." } })
+    L:Checkbox({ label = "Ask the guild for their lists when I log in",
+        get = function() return PvPTrackerDB.syncOnLogin ~= false end,
+        set = function(v) PvPTrackerDB.syncOnLogin = v end,
+        disabled = function() return not PvPTrackerDB.guildSync end,
+        tooltip = { "Sync on Login", "A few seconds after you log in, ask online guildies for their KOS data"
+            .. " (at most once every 5 minutes)." } })
+    L:Checkbox({ label = "Announce revenge kills in guild chat",
+        get = function() return PvPTrackerDB.announceRevenge ~= false end,
+        set = function(v) PvPTrackerDB.announceRevenge = v end,
+        disabled = function() return not PvPTrackerDB.guildSync end,
+        tooltip = { "Announce Revenge Kills", "When you kill someone who killed a guildie, post"
+            .. " \"<you> has slain <them>! <guildie> has been avenged!\" in guild chat, which everyone sees." } })
+    get, set = opt("leaderboardEnabled")
+    L:Checkbox({ label = "KOS leaderboard points", get = get, set = set,
+        tooltip = { "KOS Leaderboard", "1 point for each KOS enemy you kill, shared with your guild." } })
+    L:Dropdown({ label = "Post the leaderboard:", width = 120,
+        options = { { value = "off", text = "Never" }, { value = "hourly", text = "Hourly" },
+            { value = "onchange", text = "On a new leader" } },
+        get = function() return PvPTrackerDB.leaderboardAnnounce or "off" end,
+        set = function(v)
+            PvPTrackerDB.leaderboardAnnounce = v
+            if v == "hourly" then lastAnnounceTime = GetTime() end
+        end,
+        tooltip = { "Post the Leaderboard", "Posts to guild chat: the top 3 once an hour, or when someone new"
+            .. " takes first place. Needs guild sync." } })
+    L:Note("The KOS list itself, adding names and the leaderboard are in the PvP Enemy Tracker window:"
+        .. " |cFFFFFF00/wmachine pvp|r.")
+end
 
 function PvPTracker:OpenSettings()
     self:Toggle()

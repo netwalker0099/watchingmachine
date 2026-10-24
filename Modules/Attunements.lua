@@ -32,6 +32,7 @@ local function DB()
 end
 
 local function Now() return (GetServerTime and GetServerTime()) or time() end
+local function On() return WM:IsModuleOn("Attunements") end
 local function CharKey() return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?") end
 local function Side() return (UnitFactionGroup and UnitFactionGroup("player")) == "Alliance" and "Alliance" or "Horde" end
 AT.CharKey = CharKey
@@ -374,6 +375,7 @@ local function Send(msg, channel)
 end
 
 function AT:Survey()
+    if not On() then return false end
     if not (IsInGuild and IsInGuild()) then
         WM:ModulePrint("Attunements", "You're not in a guild.")
         return false
@@ -385,13 +387,13 @@ function AT:Survey()
 end
 
 function AT:OnAddonMessage(prefix, msg, channel, sender)
-    if prefix ~= PREFIX or type(msg) ~= "string" then return end
+    if not On() or prefix ~= PREFIX or type(msg) ~= "string" then return end
     local short = sender and (Ambiguate and Ambiguate(sender, "none") or sender:match("^([^-]+)")) or "?"
     if short == UnitName("player") then return end
     if msg == "Q" then
         if GetTime() - lastAnswer < 30 then return end
         lastAnswer = GetTime()
-        WM.RunAfter(math.random() * 3, function() Send(AT:Encode(), "GUILD") end)
+        WM.RunAfter(math.random() * 3, function() if On() then Send(AT:Encode(), "GUILD") end end)
     else
         local r = AT.Decode(msg)
         if r then
@@ -675,6 +677,31 @@ function AT:Toggle()
 end
 AT.ToggleUI = AT.Toggle
 
+function AT:OnModuleOff()
+    if panel then panel:Hide() end
+end
+
+-- The module's page in the guided setup
+function AT:SetupPage(L)
+    DB()
+    L:Note("Attunements reads your progress straight from the game: quests you've finished or have in your log,"
+        .. " keys and quest items in your bags and bank, your level and your reputation. It checks again whenever"
+        .. " you hand in a quest, loot something or gain reputation, so there's nothing to tick off by hand.")
+    L:Note("|cFFFFFFFFIn its window:|r pick an attunement on the left to see every step. Green steps are done, the"
+        .. " yellow one is what to do next, and hovering a step tells you where to go and who to talk to. Steps the"
+        .. " game can't report, like a kill, count as done once a later one is.")
+    L:Note("|cFFFFFFFFYour characters and your guild:|r each character's progress is saved when you log in on it, so"
+        .. " \"My characters\" shows your alts side by side. \"Survey guild\" asks guild members who also run"
+        .. " Watching Machine; their answers arrive over the next few seconds.")
+    L:Checkbox({ label = "Say when you finish an attunement", get = function() return DB().announce end,
+        set = function(v) DB().announce = v end,
+        tooltip = { "Say when done", "A line in chat the moment you finish an attunement." } })
+    L:Checkbox({ label = "Show Classic attunements too", get = function() return DB().showClassic end,
+        set = function(v) DB().showClassic = v end,
+        tooltip = { "Classic attunements", "Molten Core, Onyxia, Blackwing Lair, Naxxramas and the Classic dungeon keys." } })
+    L:Note("Everything else, including the guild survey, is in its window: |cFFFFFF00/wmachine attune|r.")
+end
+
 function AT:GetQuickStatus()
     local names = self:AttunedNames(nil, true)
     local total = 0
@@ -694,11 +721,12 @@ local function Soon()
     queued = true
     WM.RunAfter(2, function()
         queued = false
-        AT:Update()
+        if On() then AT:Update() end
     end)
 end
 
 function AT:OnEvent(event, ...)
+    if not On() then return end
     if event == "CHAT_MSG_ADDON" then
         self:OnAddonMessage(...)
     else

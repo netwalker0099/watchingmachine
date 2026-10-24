@@ -65,6 +65,7 @@ function GS.OtherAddon()
 end
 
 local function Now() return (GetServerTime and GetServerTime()) or time() end
+local function On() return WM:IsModuleOn("GearScore") end
 
 -- ============================================
 -- THE FORMULA
@@ -366,7 +367,7 @@ GS.CanInspectUnit = CanInspectUnit
 
 -- Ask to inspect a unit (soon). force: even if we know a recent score.
 function GS:QueueInspect(unit, force)
-    if not CanInspectUnit(unit) then return false end
+    if not On() or not CanInspectUnit(unit) then return false end
     local guid = UnitGUID(unit)
     if not guid or queued[guid] then return false end
     local e = byGUID[guid]
@@ -379,6 +380,7 @@ function GS:QueueInspect(unit, force)
 end
 
 function GS:NextInspect()
+    if not On() then return end
     local t = GetTime()
     if current then
         if t - currentAt < INSPECT_TIMEOUT then return end
@@ -412,7 +414,7 @@ end
 GS.UnitFor = UnitFor
 
 function GS:OnInspectReady(guid)
-    if not current or current.guid ~= guid then return end
+    if not On() or not current or current.guid ~= guid then return end
     local job = current
     local unit = UnitFor(guid, job.unit)
     if not unit then
@@ -447,7 +449,7 @@ function GS:UnitLine(entry)
 end
 
 function GS:AddUnitTooltip(tip, unit)
-    if self.other or not DB().unitTooltip or not tip or not unit or not UnitIsPlayer(unit) then return false end
+    if not On() or self.other or not DB().unitTooltip or not tip or not unit or not UnitIsPlayer(unit) then return false end
     local guid = UnitGUID(unit)
     if not guid or tip.wmGearScore == guid then return false end
     local entry
@@ -534,7 +536,7 @@ function GS:ItemLines(link)
 end
 
 function GS:AddItemTooltip(tip, link)
-    if self.other or not DB().itemTooltip or not tip or type(link) ~= "string" then return false end
+    if not On() or self.other or not DB().itemTooltip or not tip or type(link) ~= "string" then return false end
     if tip.wmGearScoreItem == link then return false end
     local lines = self:ItemLines(link)
     if not lines then return false end
@@ -633,7 +635,7 @@ GS.frames = frames
 
 local function SetFrameText(f, score, ilvl)
     if not f then return end
-    if not DB().paperDoll or GS.other then f:Hide(); return end
+    if not On() or not DB().paperDoll or GS.other then f:Hide(); return end
     f.text:SetText("|cFFFFD100GearScore:|r " .. GS.ColorText(score) .. "    |cFFFFD100iLvl:|r |cFFFFFFFF"
         .. math.floor((ilvl or 0) + 0.5) .. "|r")
     f:Show()
@@ -673,12 +675,12 @@ function GS:HookFrames()
     if not frames.paperDoll and type(doll) == "table" then
         ScoreFrame("paperDoll", doll)
         local cf = rawget(_G, "CharacterFrame")
-        if type(cf) == "table" and cf.HookScript then cf:HookScript("OnShow", function() GS:UpdatePlayer() end) end
+        if type(cf) == "table" and cf.HookScript then cf:HookScript("OnShow", function() if On() then GS:UpdatePlayer() end end) end
     end
     local inspect = rawget(_G, "InspectFrame")
     if not frames.inspect and type(inspect) == "table" then
         ScoreFrame("inspect", inspect)
-        if inspect.HookScript then inspect:HookScript("OnShow", function() GS:RefreshFrames() end) end
+        if inspect.HookScript then inspect:HookScript("OnShow", function() if On() then GS:RefreshFrames() end end) end
     end
 end
 
@@ -874,6 +876,62 @@ function GS:Toggle()
 end
 GS.ToggleUI = GS.Toggle
 
+function GS:OnModuleOff()
+    if panel then panel:Hide() end
+    if self.unlocked then self:Unlock(false) end
+    for _, f in pairs(frames) do f:Hide() end
+    -- Drop anything waiting to be inspected
+    for i = #queue, 1, -1 do queue[i] = nil end
+    wipe(queued)
+    current = nil
+end
+
+function GS:OnModuleOn()
+    if self._wmStarted or self.tooltipsHooked then self:UpdatePlayer() end
+end
+
+-- The module's page in the guided setup
+function GS:SetupPage(L)
+    DB()
+    L:Note("GearScore works out a score from the gear a player is wearing: item level and quality, weighted by"
+        .. " slot, with a little extra for enchants and gems. The numbers are the same as GearScoreTBCClassic's,"
+        .. " so they match what other players quote.")
+    L:Note("|cFFFFFFFFWhere you'll see it:|r mouse over a player and their score and average item level go on the"
+        .. " tooltip. Players are inspected for it one at a time, only out of combat and within about 28 yards, and"
+        .. " never while you have your own inspect window open. Your score sits on your character sheet, and on the"
+        .. " inspect window when you inspect someone.")
+    L:Note("Item tooltips show the item's score too, and with details on, what equipping it would change for you.")
+    if GS.OtherAddon() then
+        L:Note("|cFFFF9933" .. GS.OtherAddon() .. " is loaded: tooltips and the character sheet are left to it, and"
+            .. " only the group list is used.|r")
+    end
+    L:Checkbox({ label = "GearScore on player tooltips", get = function() return DB().unitTooltip end,
+        set = function(v) DB().unitTooltip = v end,
+        tooltip = { "Player tooltips", "A GearScore and iLvl line when you mouse over another player (or yourself)." } })
+    L:Checkbox({ label = "Inspect players you mouse over", get = function() return DB().autoInspect end,
+        set = function(v) DB().autoInspect = v end,
+        tooltip = { "Inspecting", "Needed for other players' scores. Out of combat and within inspect range, one"
+            .. " player at a time. Off: only scores you already have are shown." } })
+    L:Checkbox({ label = "GearScore on item tooltips", get = function() return DB().itemTooltip end,
+        set = function(v) DB().itemTooltip = v end,
+        tooltip = { "Item tooltips", "The item's own score, on bags, links, loot and the auction house." } })
+    L:Checkbox({ label = "Item tooltip details (enchant, gems, upgrade)", get = function() return DB().itemDetails end,
+        set = function(v) DB().itemDetails = v end,
+        tooltip = { "Details", "The item's base score, its enchant and gem bonuses (or what's missing), and what"
+            .. " equipping it would change for you." } })
+    L:Checkbox({ label = "On the character and inspect frames", get = function() return DB().paperDoll end,
+        set = function(v) DB().paperDoll = v; GS:RefreshFrames() end,
+        tooltip = { "Frames", "A GearScore and iLvl line on your character sheet and the inspect window. To move"
+            .. " it: /wmachine gs unlock, drag it, then /wmachine gs lock." } })
+    L:Slider({ label = "Remember other players' scores for", min = 1, max = 30, step = 1, width = 200,
+        format = function(v) return v .. (v == 1 and " day" or " days") end,
+        get = function() return DB().keepDays or 7 end, set = function(v) DB().keepDays = v end,
+        tooltip = { "Remembering scores", "Scores you've seen are kept this long, so a player you met"
+            .. " yesterday shows a score straight away." } })
+    L:Note("Your group's scores in one list, with a button to send them to the group, are in its window:"
+        .. " |cFFFFFF00/wmachine gs|r (or /gs).")
+end
+
 function GS:GetQuickStatus()
     local score = self.playerScore or GS.UnitScore("player")
     return "You: " .. GS.ColorText(score)
@@ -907,6 +965,7 @@ local events = CreateFrame("Frame")
 local pendingPlayer = false
 
 function GS:OnEvent(event, arg1)
+    if not On() then return end
     if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" or event == "GET_ITEM_INFO_RECEIVED" then
         if pendingPlayer then return end
         pendingPlayer = true
@@ -945,7 +1004,7 @@ function GS:Initialize()
     -- /gs as a shortcut, unless another GearScore addon has it
     if type(SlashCmdList) == "table" and not SlashCmdList.GEARSCORE and not SlashCmdList.WM_GEARSCORE then
         SLASH_WM_GEARSCORE1 = "/gs"
-        SlashCmdList.WM_GEARSCORE = function(msg) GS:Command(msg) end
+        SlashCmdList.WM_GEARSCORE = function(msg) if WM:UsableModule("GearScore") then GS:Command(msg) end end
     end
 end
 

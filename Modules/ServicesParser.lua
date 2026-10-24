@@ -492,6 +492,49 @@ function ServicesParser:Toggle()
     self:ToggleUI()
 end
 
+-- Turned off on this character: forget the listings and close the window
+function ServicesParser:OnModuleOff()
+    self:InitMessageTables()
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function ServicesParser:SetupPage(L)
+    self:InitDB()
+    L:Note("Reads the adverts people post in the Services channel and sorts them by dungeon, so you can see"
+        .. " at a glance who's selling a run through the dungeon you want.")
+    L:Note("|cFFFFFFFFHow it works:|r an advert that names a dungeon (by its name or short name, such as SM,"
+        .. " Strat or Mech) goes under that dungeon's tab; one offering summons or portals goes under SUM."
+        .. " Each tab shows how many listings it has. A listing disappears after the time below, and a repeat"
+        .. " of the same advert puts it back at the top. Click one to whisper the seller.")
+    L:Note("You need to have joined the Services channel for there to be anything to read.")
+    local channelBox
+    channelBox = L:EditBox({
+        label = "Channel to read:", width = 150,
+        get = function() return ServicesParserDB.channelName end,
+        set = function(v)
+            if v ~= "" then
+                ServicesParserDB.channelName = v
+            else
+                channelBox.editBox:SetText(ServicesParserDB.channelName)   -- empty would match every channel
+            end
+        end,
+        tooltip = { "Channel to Read", "Adverts are read from any channel whose name contains this text"
+            .. " (any case)." },
+    })
+    L:Slider({ label = "Keep each listing for", min = 30, max = 600, step = 30, width = 200,
+        format = function(v) return v .. " sec" end,
+        get = function() return tonumber(ServicesParserDB.messageDuration) or 60 end,
+        set = function(v) ServicesParserDB.messageDuration = v end })
+    L:Checkbox({
+        label = "Play a sound on each new advert",
+        get = function() return ServicesParserDB.playSound end,
+        set = function(v) ServicesParserDB.playSound = v end,
+        tooltip = { "Play Sound", "A quiet click whenever a matching advert arrives, repeats included." },
+    })
+    L:Note("The listings themselves are in the Services Parser window: |cFFFFFF00/wmachine services|r.")
+end
+
 -- ============================================
 -- EVENT HANDLING
 -- ============================================
@@ -499,7 +542,9 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_CHANNEL")
 
+-- Registered at load: does nothing while the module is off on this character
 eventFrame:SetScript("OnEvent", function(self, event, msg, sender, _, _, _, _, _, _, channelName)
+    if not WM:IsModuleOn("ServicesParser") then return end
     if event == "CHAT_MSG_CHANNEL" then
         -- Make sure DB is initialized
         if not ServicesParserDB then return end
@@ -514,6 +559,7 @@ end)
 
 -- Update timer
 eventFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not WM:IsModuleOn("ServicesParser") then return end
     updateTimer = updateTimer + elapsed
     if updateTimer >= 1 then
         updateTimer = 0

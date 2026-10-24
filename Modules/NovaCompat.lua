@@ -531,6 +531,7 @@ function Nova:OnAddonMessage(prefix, message, distribution, sender)
     if prefix ~= "NIT" or type(message) ~= "string" then return nil end
     if distribution ~= "PARTY" and distribution ~= "RAID" and distribution ~= "INSTANCE_CHAT" then return nil end
     if IsMe(sender) then return nil end
+    if not WM:IsModuleOn("InstanceTracker") then return nil end
     local IT = WM.modules.InstanceTracker
     if not IT or not IT.DB or not IT.DB().novaListen then return nil end
 
@@ -561,6 +562,13 @@ function Nova:OnAddonMessage(prefix, message, distribution, sender)
     return nil
 end
 
+-- Only listens for the modules that use it: Instance Tracker (these reset
+-- notices) and World Timers (which decodes Nova World Buffs' messages with
+-- the functions above). Off on this character: nothing is read.
+function Nova:IsActive()
+    return WM:IsModuleOn("InstanceTracker") or WM:IsModuleOn("WorldTimers")
+end
+
 local events = CreateFrame("Frame")
 function Nova:Start()
     if self.started then return end
@@ -573,6 +581,7 @@ function Nova:Start()
     WM:RegisterEvents(events, { "CHAT_MSG_ADDON" })
 end
 events:SetScript("OnEvent", function(_, _, prefix, message, distribution, sender)
+    if not Nova:IsActive() then return end
     local ok, err = pcall(Nova.OnAddonMessage, Nova, prefix, message, distribution, sender)
     if not ok and WM.VerbosePrint then WM:VerbosePrint("Nova", tostring(err)) end
 end)

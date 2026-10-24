@@ -168,6 +168,8 @@ local function DB()
 end
 WT.DB = DB
 
+local function On() return WM:IsModuleOn("WorldTimers") end
+
 -- This realm and faction's timers
 function WT:Data()
     local key = ((GetRealmName and GetRealmName()) or "?") .. "-" .. ((UnitFactionGroup and UnitFactionGroup("player")) or "?")
@@ -420,7 +422,7 @@ function WT:OnWidgetUpdate(info)
     towerPending = true
     WM.RunAfter(2, function()
         towerPending = false
-        WT:ReadTowers()
+        if On() then WT:ReadTowers() end
     end)
 end
 
@@ -931,7 +933,7 @@ function WT:OnGossipClosed()
     if not b or not DB().walkAlert then return end
     -- A moment for the close button and the NPC's movement to show
     if C_Timer and type(C_Timer.After) == "function" then
-        C_Timer.After(0.5, function() WT:CheckWalking(b) end)
+        C_Timer.After(0.5, function() if On() then WT:CheckWalking(b) end end)
     else
         return self:CheckWalking(b)
     end
@@ -969,7 +971,7 @@ end
 function WT:HookGossipCloses()
     if self.gossipHooked or type(hooksecurefunc) ~= "function" then return end
     self.gossipHooked = true
-    local note = function() WT:NoteSelfClose() end
+    local note = function() if On() then WT:NoteSelfClose() end end
     local buttons = { rawget(_G, "GossipFrameCloseButton"), rawget(_G, "GossipFrameGreetingGoodbyeButton") }
     local gf = rawget(_G, "GossipFrame")
     if type(gf) == "table" and type(gf.GreetingPanel) == "table" then buttons[#buttons + 1] = gf.GreetingPanel.GoodbyeButton end
@@ -1312,6 +1314,10 @@ function WT:RefreshMapPins()
 end
 
 local function SafeRefreshPins()
+    if not On() then
+        for _, f in ipairs(pinFrames) do f:Hide() end
+        return
+    end
     local ok, err = pcall(WT.RefreshMapPins, WT)
     if not ok then geterrorhandler()(err) end
 end
@@ -1329,6 +1335,7 @@ function WT:SetupMapPins()
     if canvas.HookScript then canvas:HookScript("OnSizeChanged", SafeRefreshPins) end
     local ticker, since = CreateFrame("Frame", nil, map), 0
     ticker:SetScript("OnUpdate", function(_, elapsed)
+        if not On() then return end
         since = since + (elapsed or 0)
         if since >= 1 then since = 0; SafeRefreshPins() end
     end)
@@ -1391,6 +1398,7 @@ function WT:CreateUI()
     panel:Finish()
     local since = 0
     panel:HookScript("OnUpdate", function(_, elapsed)
+        if not On() then return end
         since = since + (elapsed or 0)
         if since >= 1 then since = 0; panel:Refresh() end
     end)
@@ -1416,12 +1424,84 @@ function WT:GetQuickStatus()
 end
 
 -- ============================================
+-- ON / OFF (per character) AND THE GUIDED SETUP PAGE
+-- ============================================
+
+-- Off: close the window, take the pins off the world map and idle the
+-- map's refresh. The tickers and hooks stay but do nothing while it's off.
+function WT:OnModuleOff()
+    if panel then panel:Hide() end
+    for _, f in ipairs(pinFrames) do f:Hide() end
+    if self.mapTicker then self.mapTicker:Hide() end
+    walkNPC = nil
+end
+
+-- Back on: the map pins again
+function WT:OnModuleOn()
+    if self.mapTicker then self.mapTicker:Show() end
+    if self.mapHooked then SafeRefreshPins() end
+end
+
+function WT:SetupPage(L)
+    DB()
+    L:Note("World Timers keeps its timers per layer, so it first needs to know which layer you're on. In"
+        .. " Shattrath, target or mouse over A'dal, Nutral, Minalei or Innkeeper Haelthol: the layer is worked"
+        .. " out from them and shown as Layer 1, 2 and so on. In Terokkar, target any creature so the towers"
+        .. " can be read.")
+    L:Note("|cFFFFFFFFWhat it tracks:|r the Terokkar Forest tower reset, today's"
+        .. " dungeon, heroic and PvP dailies (noted when you take one from the Shattrath quest givers), the Darkmoon"
+        .. " Faire's dates and place and your Sayge cooldown, and on Classic realms world buffs and Felwood's"
+        .. " Songflowers.")
+    L:Note("|cFFFFFFFFWhere to see it:|r the window (|cFFFFFF00/wmachine timers|r), pins on the world map, and"
+        .. " warnings in chat. Other players running Nova World Buffs share their timers, which fills the gaps.")
+    L:Checkbox({ label = "Warn 10 minutes before the Terokkar towers reset",
+        get = function() return DB().terokWarn end, set = function(v) DB().terokWarn = v end,
+        tooltip = { "Terokkar towers", "A chat line 10 minutes before the Spirit Towers can be captured again,"
+            .. " for each layer with a known time." } })
+    L:Checkbox({ label = "Show the timers on the world map",
+        get = function() return DB().mapPins end,
+        set = function(v)
+            DB().mapPins = v
+            if WT.mapHooked and On() then SafeRefreshPins() end
+        end,
+        tooltip = { "Map pins", "The Darkmoon Faire, Terokkar towers, Shattrath dailies and Songflowers, with"
+            .. " their timers. Hover a pin for details." } })
+    L:Checkbox({ label = "Use timers from Nova World Buffs users",
+        get = function() return DB().listenNWB end, set = function(v) DB().listenNWB = v end,
+        tooltip = { "Nova World Buffs", "Read the layers, tower times, dailies and Songflowers that Nova World"
+            .. " Buffs users share in your guild, group and nearby. Watching Machine only listens: it never"
+            .. " sends anything." } })
+    L:Checkbox({ label = "Show their \"buff about to drop\" and NPC killed notices",
+        get = function() return DB().showNWBNotices end, set = function(v) DB().showNWBNotices = v end,
+        tooltip = { "Notices", "A chat line when a Nova World Buffs user sees a world buff about to drop, or"
+            .. " the buff NPC killed or walking." } })
+    L:Checkbox({ label = "World buff warnings (30, 15, 10, 5, 1 minutes)",
+        get = function() return DB().buffWarn end, set = function(v) DB().buffWarn = v end,
+        tooltip = { "World buffs", "Rend, Onyxia and Nefarian: chat lines counting down to when the buff can be"
+            .. " dropped again. Rare on The Burning Crusade realms." } })
+    L:Checkbox({ label = "Say when the Onyxia / Nefarian NPC starts walking (Horde)",
+        get = function() return DB().walkAlert end, set = function(v) DB().walkAlert = v end,
+        tooltip = { "NPC walking", "Stand by the throne in Orgrimmar with Runthak's or Saurfang's window open:"
+            .. " it closes when they walk off to the gate, and you hear the sound below." } })
+    L:Dropdown({ label = "Walking alert sound:", width = 150,
+        options = function() return WM.Sounds and WM.Sounds.OPTIONS or {} end,
+        get = function() return DB().walkSound end,
+        set = function(v)
+            DB().walkSound = v
+            if WM.Sounds then WM.Sounds.Play(v, GeneralChecksDB and GeneralChecksDB.soundChannel) end
+        end,
+        tooltip = { "Walking alert sound", "Played when the buff NPC starts walking. Picking one plays it." } })
+    L:Note("All the timers, and a button to print them to chat, are in the window: |cFFFFFF00/wmachine timers|r.")
+end
+
+-- ============================================
 -- START-UP
 -- ============================================
 
 local events = CreateFrame("Frame")
 
 function WT:OnEvent(event, ...)
+    if not On() then return end
     if event == "PLAYER_TARGET_CHANGED" then
         self:SeeUnit("target")
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
@@ -1475,12 +1555,15 @@ function WT:Initialize()
     self:SetupMapPins()
     if WM.RegisterChatLink then
         WM:RegisterChatLink("wtimers", function()
+            if not WM:UsableModule("WorldTimers") then return end
             local p = WT:CreateUI()
             if not p:IsShown() then p:Show() end
         end)
     end
     local last = GetTime()
     WM.RunTicker(5, function()
+        -- Off: nothing. The time off still counts off the DMF cooldown when it's back on.
+        if not On() then return end
         local t = GetTime()
         WT:TickDmf(t - last)
         last = t
@@ -1488,7 +1571,7 @@ function WT:Initialize()
         WT:CheckTerokWarning(now)
         WT:CheckBuffWarnings(now)
     end)
-    WM.RunTicker(60, function() WT:ExpireLayers() end)
+    WM.RunTicker(60, function() if On() then WT:ExpireLayers() end end)
 end
 
 events:SetScript("OnEvent", function(_, event, ...)

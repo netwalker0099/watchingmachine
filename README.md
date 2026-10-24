@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.45 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.46 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -735,8 +735,8 @@ own code, written from the ground up for reliability.
   *Undo last swap* to put back what you wore before
 - **Talent spec swaps:** give a set a spec (Spec 1 or Spec 2, shown with
   its talent tree) and tick *Equip it when I switch to that spec*. Switching
-  spec then puts it on by itself. The dashboard switch turns all automatic
-  swaps on or off
+  spec then puts it on by itself. *Automatic swaps* in its options turns
+  every automatic swap on or off
 - **Mounted and battlegrounds:** a set can go on while you're mounted or in
   battlegrounds and arenas, and what you wore before goes back on after
 - **Reliable swaps:**
@@ -831,6 +831,46 @@ settings rows.
 addon files. Run them all with `LUA=/path/to/lua5.1 tests/run.sh`. The game
 never loads them, because they aren't listed in the `.toc`.
 
+## Setup and characters
+
+### First login on a character
+Every module starts **off** on a new character, and a welcome window asks how
+you'd like to set up:
+
+- **Guided setup**: a page per module. Each page explains what the module
+  does and how it works, has a switch to turn it on for this character, and
+  its main settings with an explanation of each (for Class Tools: your own
+  class's tools one by one, e.g. a warlock's potion and rune warnings and the
+  armour and minion buttons). Back and Next move through the pages; nothing
+  is final.
+- **Quick setup**: one checklist of every module with presets (*Raiding*,
+  *Guild officer*, *Everything*, *Nothing*).
+- **Copy another character**: its modules and settings.
+- **Later**: everything stays off until you run `/wmachine setup`.
+
+A character that used Watching Machine before this version keeps every
+module it had on, and is offered the setup once.
+
+### Per character
+- **Which modules are on** is per character: the switch on each dashboard
+  card turns a module on or off for the character you're playing. A module
+  that's off isn't started at all.
+- **Settings are per character too.** The first time a character logs in
+  after updating, it starts from the settings you had before.
+- **Shared between your characters:** data that's about all of them, such as
+  Your Characters, the instance and battleground logs, the PvP enemy list,
+  world timers, Loot Browser lists, crit records, gear sets (each character's
+  own) and the mail and trade log. ArmorySnap's saved data stays exactly as
+  the standalone ArmorySnap addon uses it.
+- **Parts of a module** follow it: the class tools (general, warlock, mage,
+  shaman, paladin) and the swing timer are on only while Class Tools is.
+- **Working together:** some modules add to each other when both are on, and
+  the setup says so (e.g. Gear Sets says a missing item is in your bank when
+  Your Characters is on).
+
+`/wmachine setup` brings the welcome window back (`setup quick`,
+`setup guided` go straight to one).
+
 ## Usage
 
 ### Dashboard
@@ -846,11 +886,9 @@ opens the dashboard. Everything the addon does can be reached from it.
   goes back to the size that shows every card.
 - **Hover a card** to see what the module does, its full status, and its
   slash command.
-- The **on/off switch** on a card turns the module on or off. Only modules
-  with a single on/off flag have one: Buff Check, Debuff Tracker, Aura
-  Range, ArmorySnap auto-scan, Guild Invite, PvP Tracker, Chat Filter, and
-  Keyword Monitor (which pauses for the session). An off module's icon is greyed
-  out.
+- The **on/off switch** on every card turns the module on or off for the
+  character you're playing (see *Setup and characters*). An off module's
+  icon is greyed out and its card says *Off on this character*.
 - **Open** opens the module's window.
 - **...** or **right-click** opens the module's tools: the diagnostics that
   used to be slash-command only.
@@ -866,6 +904,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
+- `/wmachine setup` - Set up which modules are on for this character (`setup quick`, `setup guided`)
 - `/wmachine settings` - Open theme/addon settings
 - `/wmachine logger` - Open Auto Logger settings
 - `/wmachine keyword` - Open Keyword Monitor
@@ -977,6 +1016,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.46
+- **Setup and per-character modules:** a new character starts with everything off and a guided or quick setup (or a copy of another character); modules and their settings are per character; every dashboard card has an on/off switch
 
 ### Version 3.45
 - New **Gear Sets** (ItemRack-style, rewritten for reliability): sets you swap in one click or by macro, automatic swaps on talent spec change (per set), mounted and in battlegrounds, missing-item chat alerts and a character sheet warning, Alt quick swap

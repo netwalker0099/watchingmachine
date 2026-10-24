@@ -42,6 +42,7 @@ function KeywordMonitor:InitDB()
     if not KeywordMonitorDB.channels then
         KeywordMonitorDB.channels = { Trade = true, General = true, LookingForGroup = true }
     end
+    if type(KeywordMonitorDB.keywords) ~= "table" then KeywordMonitorDB.keywords = {} end
     if not KeywordMonitorDB.keywordHistory then KeywordMonitorDB.keywordHistory = {} end
     if KeywordMonitorDB.alertsEnabled == nil then KeywordMonitorDB.alertsEnabled = true end
     if KeywordMonitorDB.soundEnabled == nil then KeywordMonitorDB.soundEnabled = true end
@@ -55,14 +56,20 @@ function KeywordMonitor:Print(msg)
     WM:ModulePrint("KeywordMonitor", msg)
 end
 
--- Dashboard on/off switch: off = paused, the same as the Stop button.
--- Like Stop, it lasts for this session only.
-function KeywordMonitor:IsModuleEnabled()
-    return not isMonitoringPaused
+-- Turned off on this character: stop matching, drop this session's
+-- matches and close the window. (The Stop button only pauses, for this
+-- session; the dashboard switch is the per-character one.)
+function KeywordMonitor:OnModuleOff()
+    isMonitoringPaused = true
+    if KeywordMonitorDB and type(KeywordMonitorDB.results) == "table" then KeywordMonitorDB.results = {} end
+    if self.mainFrame then self.mainFrame:Hide() end
+    self:UpdateStopButton()
 end
 
-function KeywordMonitor:SetModuleEnabled(v)
-    isMonitoringPaused = not v
+-- Turned back on: monitoring starts again, as at login
+function KeywordMonitor:OnModuleOn()
+    isMonitoringPaused = false
+    self:EnableChatMonitoring()
     self:UpdateStopButton()
 end
 
@@ -213,12 +220,13 @@ end
 -- ============================================
 
 local function OnChatMessage(self, event, message, sender, _, _, _, _, _, _, channelName)
-    if isMonitoringPaused then return end
-    if not KeywordMonitorDB then return end
+    if isMonitoringPaused or not WM:IsModuleOn("KeywordMonitor") then return end
+    if not KeywordMonitorDB or type(KeywordMonitorDB.results) ~= "table" then return end
 
     -- Chat Filter runs first: a message it hides is never checked here
+    -- (only when Chat Filter is on for this character)
     local filter = WM.modules.ChatFilter
-    if filter and filter:IsFiltered(event, message, sender) then return end
+    if filter and WM:IsModuleOn("ChatFilter") and filter:IsFiltered(event, message, sender) then return end
     
     local isMonitored, baseName = IsChannelMonitored(channelName)
     if not isMonitored then return end
@@ -485,7 +493,9 @@ function KeywordMonitor:CreateMainFrame()
         local filter = WM.modules.ChatFilter
         if not filter then return "" end
         local state
-        if not filter:IsModuleEnabled() then
+        if not WM:IsModuleOn("ChatFilter") then
+            state = "Chat Filter is off on this character."
+        elseif not filter:IsModuleEnabled() then
             state = "Chat Filter is currently off."
         else
             state = "Chat Filter is on with " .. filter:ActiveCount() .. " filter(s)."
@@ -598,6 +608,54 @@ function KeywordMonitor:Toggle()
     self:ToggleUI()
 end
 
+-- The module's page in the guided setup
+function KeywordMonitor:SetupPage(L)
+    self:InitDB()
+    L:Note("Watches the public chat channels for words you pick (an item you want to buy, a dungeon you need,"
+        .. " a raid's name) and collects every message that mentions one in its window.")
+    L:Note("|cFFFFFFFFHow it works:|r a message matches when it contains a keyword anywhere, in any case. Each"
+        .. " new match plays a sound and prints a line in your chat. The same message from the same player"
+        .. " isn't repeated within 5 minutes, and matches drop off the list after 5 minutes. Click a match to"
+        .. " whisper the sender.")
+    if WM.modules.ChatFilter then
+        L:Note("With Chat Filter on too, messages it hides are never checked for keywords.")
+    end
+    local active
+    L:EditBox({
+        label = "Add a keyword:", width = 140, onEnter = function(text)
+            AddKeyword(text)
+            if active then active.text:Refresh(); L:Reflow() end
+        end,
+        clearOnEnter = true,
+        tooltip = { "Add a Keyword", "Type a word or phrase and press Enter. Add as many as you like." },
+    })
+    active = L:Note(KeywordSummary)
+    L:Header("Channels")
+    for _, ch in ipairs(CHANNELS) do
+        L:Checkbox({
+            label = ch.key == "LookingForGroup" and "LookingForGroup (LFG)" or ch.key,
+            get = function() return KeywordMonitorDB.channels[ch.key] end,
+            set = function(v) KeywordMonitorDB.channels[ch.key] = v end,
+            tooltip = { ch.key, "Check messages in any channel whose name contains \"" .. ch.key .. "\"." },
+        })
+    end
+    L:Header("Alerts")
+    L:Checkbox({
+        label = "Chat alert",
+        get = function() return KeywordMonitorDB.alertsEnabled end,
+        set = function(v) KeywordMonitorDB.alertsEnabled = v end,
+        tooltip = { "Chat Alert", "Print each new match in your chat frame (only you see it)." },
+    })
+    L:Checkbox({
+        label = "Sound alert",
+        get = function() return KeywordMonitorDB.soundEnabled end,
+        set = function(v) KeywordMonitorDB.soundEnabled = v end,
+        tooltip = { "Sound Alert", "Play a sound on each new match." },
+    })
+    L:Note("Removing keywords, your recent keywords and the list of matches are in the Keyword Monitor window:"
+        .. " |cFFFFFF00/wmachine keyword|r. Its Stop button pauses matching until you log in again.")
+end
+
 -- ============================================
 -- EVENT HANDLING
 -- ============================================
@@ -608,6 +666,9 @@ eventFrame:RegisterEvent("PLAYER_LOGOUT")
 eventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
+    -- Registered at load: does nothing (and leaves the saved data alone)
+    -- while the module is off on this character
+    if not WM:IsModuleOn("KeywordMonitor") then return end
     if event == "CHAT_MSG_CHANNEL" then
         -- Extra safety check
         if not KeywordMonitorDB then return end
@@ -640,6 +701,7 @@ end
 local updateFrame = CreateFrame("Frame")
 local timeSinceLastUpdate = 0
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not KeywordMonitor.mainFrame or not WM:IsModuleOn("KeywordMonitor") then return end
     timeSinceLastUpdate = timeSinceLastUpdate + elapsed
     if timeSinceLastUpdate >= 1 then
         timeSinceLastUpdate = 0

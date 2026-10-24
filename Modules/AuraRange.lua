@@ -119,7 +119,7 @@ function AuraRange:Initialize()
     self:RegisterEvents()
     -- Baseline scan shortly after login so the first UNIT_AURA diff is clean
     WM.RunAfter(3, function()
-        AuraRange:ResetState()
+        if WM:IsModuleOn("AuraRange") then AuraRange:ResetState() end
     end)
 end
 
@@ -214,6 +214,7 @@ end
 local scratchBuffs = {}
 
 function AuraRange:OnPlayerAuraChanged()
+    if not WM:IsModuleOn("AuraRange") then return end
     if not AuraRangeDB or not AuraRangeDB.enabled then return end
     if suppressed then return end
 
@@ -362,6 +363,7 @@ function AuraRange:CreateAlertFrame()
         local pulse = 0.6 + 0.4 * math.abs(math.sin(pulseTimer * 3))
         self:SetBackdropBorderColor(0.9 * pulse + 0.1, 0.2, 0.2, 1)
 
+        if not WM:IsModuleOn("AuraRange") then self:Hide(); return end
         -- Expire stale alerts (totem died/expired, aura dropped for good)
         local timeout = AuraRangeDB.alertTimeout or 15
         local now = GetTime()
@@ -429,6 +431,7 @@ function AuraRange:RegisterEvents()
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
+    if not WM:IsModuleOn("AuraRange") then return end
     if event == "UNIT_AURA" then
         if arg1 == "player" then
             AuraRange:OnPlayerAuraChanged()
@@ -437,7 +440,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         -- Zone transitions legitimately drop totem buffs — clean restart
         suppressed = true
         WM.RunAfter(2, function()
-            AuraRange:ResetState()
+            if WM:IsModuleOn("AuraRange") then AuraRange:ResetState() end
         end)
     elseif event == "GROUP_ROSTER_UPDATE" then
         wipe(providerCache)
@@ -448,7 +451,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_UNGHOST" or event == "PLAYER_ALIVE" then
         -- Coming back to life: rebuild the baseline quietly
         WM.RunAfter(1, function()
-            AuraRange:ResetState()
+            if WM:IsModuleOn("AuraRange") then AuraRange:ResetState() end
         end)
     end
 end)
@@ -487,6 +490,7 @@ function AuraRange:IsModuleEnabled()
 end
 
 function AuraRange:SetModuleEnabled(v)
+    self:InitDB()
     AuraRangeDB.enabled = v and true or false
     if AuraRangeDB.enabled then
         self:ResetState()
@@ -496,6 +500,58 @@ function AuraRange:SetModuleEnabled(v)
         self:UpdateAlertFrame()
     end
     if settingsFrame and settingsFrame:IsShown() then settingsFrame:Refresh() end
+end
+
+-- Turned off on this character: drop any alerts and close everything
+function AuraRange:OnModuleOff()
+    wipe(activeAlerts)
+    wipe(alertOrder)
+    wipe(providerCache)
+    if alertFrame then alertFrame:Hide() end
+    if settingsFrame then settingsFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function AuraRange:SetupPage(L)
+    self:InitDB()
+    L:Note("Party auras and totem buffs only reach you while you stand close to whoever gives them. Aura Range"
+        .. " notices the moment one drops off you and puts up a red |cFFFF4444OUT OF RANGE|r frame naming it.")
+    L:Note("|cFFFFFFFFHow it works:|r the alert clears by itself when you step back in, the buff is put back up, or"
+        .. " the timeout runs out (the totem expired, say). Nothing fires if nobody of that class is alive in your"
+        .. " group, while you're dead, or as you change zones.")
+    L:Checkbox({ label = "Play sound when an aura is lost",
+        get = function() return AuraRangeDB.soundEnabled end,
+        set = function(v) AuraRangeDB.soundEnabled = v end,
+        tooltip = { "Alert sound", "Plays the raid warning sound when a watched buff drops off you, at most once"
+            .. " every " .. SOUND_THROTTLE .. " seconds." } })
+    L:Checkbox({ label = "Lock the alert frame",
+        get = function() return AuraRangeDB.locked end,
+        set = function(v)
+            AuraRangeDB.locked = v
+            if alertFrame then alertFrame:EnableMouse(not v) end
+        end,
+        tooltip = { "Lock", "Stops the alert frame being dragged, and lets clicks pass through it." } })
+    L:Slider({ label = "Alert timeout", width = 200, min = 5, max = 30, step = 1,
+        format = function(v) return v .. "s" end,
+        get = function() return AuraRangeDB.alertTimeout end,
+        set = function(v) AuraRangeDB.alertTimeout = v end,
+        tooltip = { "Alert timeout", "How long an alert stays up before it's taken that the buff is simply gone." } })
+    L:Header("Auras to watch")
+    local function Watch(key, label, tip)
+        L:Checkbox({ label = label,
+            get = function() return AuraRangeDB.trackedAuras[key] end,
+            set = function(v) AuraRangeDB.trackedAuras[key] = v end,
+            tooltip = { label, tip } })
+    end
+    Watch("moonkin", "Moonkin Aura (druid)", "Spell crit from a balance druid in your party.")
+    Watch("lotp", "Leader of the Pack (druid)", "Melee and ranged crit from a feral druid in your party.")
+    Watch("trueshot", "Trueshot Aura (hunter)", "Attack power from a marksman hunter in your party.")
+    Watch("paladin", "Paladin auras", "Devotion, Retribution, Concentration and the resistance auras. Off at first:"
+        .. " paladins swap these often.")
+    Watch("wrathofair", "Wrath of Air (shaman totem)", "Spell damage from your party's shaman.")
+    Watch("strength", "Strength of Earth (shaman totem)", "Strength from your party's shaman.")
+    L:Note("The other totems, a Test Alert button to place the frame, and the full list are in the Aura Range"
+        .. " window.")
 end
 
 function AuraRange:CreateUI()

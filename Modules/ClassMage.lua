@@ -144,7 +144,7 @@ Mage.FlyoutOffset = WM.Flyout.Offset       -- for tests
 local function MageStore() return MageToolsDB end
 
 local portalFlyout = WM.Flyout.New({
-    class = CLASS, feature = "portalButton",
+    class = CLASS, feature = "portalButton", module = "ClassMage",
     anchorName = "WM_MagePortalAnchor", buttonPrefix = "WM_MagePortalBtn",
     title = "Portals", emptyText = "No teleport or portal spells known yet.",
     store = MageStore, posX = "portalX", posY = "portalY", defaultX = 240,
@@ -164,7 +164,7 @@ local portalFlyout = WM.Flyout.New({
 })
 
 local utilityFlyout = WM.Flyout.New({
-    class = CLASS, feature = "utilityButton",
+    class = CLASS, feature = "utilityButton", module = "ClassMage",
     anchorName = "WM_MageUtilityAnchor", buttonPrefix = "WM_MageUtilityBtn",
     title = "Mage utility", emptyText = "No mana gem, armor or conjure spells known yet.",
     store = MageStore, posX = "utilityX", posY = "utilityY", defaultX = 196,
@@ -215,7 +215,7 @@ end
 
 local function Monitor()
     local tools = Tools()
-    if not tools then return end
+    if not tools or not WM:IsModuleOn("ClassMage") then return end
     if not IsPlayerMage() then return end
 
     if UnitIsDeadOrGhost("player") then
@@ -251,10 +251,14 @@ local function DirectionFeature(tools, key, name, what, rebuild)
     WM.Flyout.DirectionFeature(tools, CLASS, key, name, what, MageStore, DIR_DEFAULTS[key], rebuild)
 end
 
-function Mage:Initialize()
+-- The mage tab's features, warning sound and monitor. Only registers (no
+-- frames, no events), so the guided setup can list them before this has
+-- started; runs once.
+function Mage:RegisterFeatures()
     self:InitDB()
     local tools = Tools()
-    if not tools then return end
+    if not tools or self.featuresRegistered then return end
+    self.featuresRegistered = true
 
     local rebuildPortals = function() Mage:UpdatePortalButtonVisibility() end
     local rebuildUtility = function() Mage:UpdateUtilityButtonVisibility() end
@@ -286,6 +290,11 @@ function Mage:Initialize()
 
     tools:RegisterAlertSound(CLASS, "mage_armor", "Mage armor missing")
     tools:RegisterMonitor(Monitor)
+end
+
+function Mage:Initialize()
+    self:RegisterFeatures()
+    if not Tools() then return end
 
     if IsPlayerMage() then
         self:CreateAnchor()
@@ -299,7 +308,7 @@ function Mage:Initialize()
 end
 
 eventFrame:SetScript("OnEvent", function(_, event)
-    if not IsPlayerMage() then return end
+    if not IsPlayerMage() or not WM:IsModuleOn("ClassMage") then return end
     -- Secure children can't be touched mid-combat; rebuild once it drops
     if InCombatLockdown() then return end
     if event == "PLAYER_REGEN_ENABLED" then
@@ -308,6 +317,19 @@ eventFrame:SetScript("OnEvent", function(_, event)
         WM.RunAfter(1, function() Mage:UpdateButtons() end)
     end
 end)
+
+-- Turned off on this character: warning cleared and both buttons hidden
+-- (in combat, once combat ends)
+function Mage:OnModuleOff()
+    local tools = Tools()
+    if tools then tools:ClearAlert("mage_armor") end
+    self:UpdateButtons()
+end
+
+-- Back on: the buttons come back if they're wanted
+function Mage:OnModuleOn()
+    self:UpdateButtons()
+end
 
 function Mage:ReportSpells()
     local t, p = self:ScanSpellbook()

@@ -108,6 +108,7 @@ HZ.recent = {}             -- the last alerts, newest first
 
 -- Play alert kind 1-4 (throttled). Returns true if it sounded.
 function HZ:Alert(kind, label, spellID, damage)
+    if not WM:IsModuleOn("Hazards") then return false end
     local db = DB()
     if not db.enabled or not kind or kind < 1 or kind > 4 then return false end
     local t = GetTime()
@@ -308,6 +309,50 @@ HZ.ToggleUI = HZ.Toggle
 function HZ:IsModuleEnabled() return DB().enabled end
 function HZ:SetModuleEnabled(v) DB().enabled = v and true or false end
 
+function HZ:OnModuleOff()
+    if panel then panel:Hide() end
+end
+
+-- The module's page in the guided setup
+function HZ:SetupPage(L)
+    DB()
+    L:Note("Hazard Alerts listens to the combat log for spells that hit you. When one is a known raid or dungeon"
+        .. " hazard (" .. self:Count() .. " of them), it plays a sound straight away, so you can move before the"
+        .. " next tick. Lava, slime, fire, drowning and fatigue count too.")
+    L:Note("|cFFFFFFFFFour sounds:|r high damage means move now; low damage is damage you could avoid; fail means you"
+        .. " picked up a debuff a mechanic gave you; friendly fire means your own spell is hurting your group. If"
+        .. " you're tanking (Defensive Stance, bear form, Righteous Fury or main tank), hazards that are a tank's job"
+        .. " stay quiet.")
+    L:Note("Hits under 2% of your health, and hazards in content far below your level, make no sound.")
+    for _, k in ipairs(KINDS) do
+        L:Dropdown({
+            label = k.name .. ":", width = 150,
+            options = function() return WM.Sounds and WM.Sounds.OPTIONS or {} end,
+            get = function() return DB().sounds[k.key] end,
+            set = function(v) DB().sounds[k.key] = v; if WM.Sounds then WM.Sounds.Play(v, DB().channel) end end,
+            tooltip = { k.name, "The sound for this kind of alert. Picking one plays it so you can hear it." },
+        })
+    end
+    L:Dropdown({ label = "Play on:", width = 150, options = function() return WM.Sounds and WM.Sounds.CHANNELS or {} end,
+        get = function() return DB().channel end, set = function(v) DB().channel = v end,
+        tooltip = { "Sound channel", "Master plays even when your game sound effects are turned down." } })
+    L:Checkbox({ label = "Also show a warning on screen", get = function() return DB().screenText end,
+        set = function(v) DB().screenText = v end,
+        tooltip = { "Screen warning", "The hazard's name in the middle of the screen, like a raid warning." } })
+    L:Checkbox({ label = "Alert in low-level content too", get = function() return DB().oldContent end,
+        set = function(v) DB().oldContent = v end,
+        tooltip = { "Old content", "Off: hazards from content far below your level, and small hits, stay quiet." } })
+    L:Checkbox({ label = "Drowning", get = function() return DB().drowning end, set = function(v) DB().drowning = v end,
+        tooltip = { "Drowning", "A high-damage alert when your breath runs out and you start taking damage." } })
+    L:Checkbox({ label = "Fatigue (swimming too far out)", get = function() return DB().fatigue end,
+        set = function(v) DB().fatigue = v end,
+        tooltip = { "Fatigue", "A high-damage alert as soon as the fatigue bar starts to drain." } })
+    L:Checkbox({ label = "Lava, slime and fire on the ground", get = function() return DB().lava end,
+        set = function(v) DB().lava = v end,
+        tooltip = { "Environment", "A low-damage alert when the ground itself is hurting you." } })
+    L:Note("Test buttons, the last alerts and muting a spell are in its window: |cFFFFFF00/wmachine gtfo|r.")
+end
+
 function HZ:GetQuickStatus()
     return (DB().enabled and "On" or "Off") .. ", " .. #self.recent .. " alerts this session"
 end
@@ -343,6 +388,7 @@ function HZ:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event, ...)
+    if not WM:IsModuleOn("Hazards") then return end
     local ok, err
     if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         if not DB().enabled or not CombatLogGetCurrentEventInfo then return end

@@ -110,20 +110,24 @@ end
 ----------------------------------------------------------------------
 -- Instance / zone detection
 ----------------------------------------------------------------------
--- Dashboard on/off switch: automatic scanning (the Auto-scan checkbox).
--- Manual /as snap works either way.
-function AS:IsModuleEnabled()
+-- Automatic scanning (the Auto-scan checkbox, /as auto). Manual /as snap
+-- works either way. It's an ordinary setting, not the module's switch: the
+-- per-character switch is the dashboard's, and options.enabled lives in
+-- ArmorySnapDB, which every character (and the standalone addon) shares.
+function AS.IsAutoScan()
     return not (AS.db and AS.db.options and AS.db.options.enabled == false)
 end
 
-function AS:SetModuleEnabled(v)
+function AS.SetAutoScan(v)
     if not (AS.db and AS.db.options) then return end
     AS.db.options.enabled = v and true or false
     AS.RefreshBrowseFrame()
 end
 
+local function On() return WM:IsModuleOn("ArmorySnap") end
+
 function AS.ShouldAutoScan()
-    if not AS.db or AS.standaloneConflict then return false end
+    if not AS.db or AS.standaloneConflict or not On() then return false end
     if AS.db.options and AS.db.options.enabled == false then return false end
     local inInstance, instanceType = IsInInstance()
     if inInstance and instanceType == "raid" then return true end
@@ -263,6 +267,8 @@ end
 function AS.ScoreMember(member)
     if not member then return nil end
     if member.gearScore then return member.gearScore, member.avgIlvl, true end
+    -- Scores come from the GearScore module: none while it's off
+    if not WM:IsModuleOn("GearScore") then return nil end
     local GS = WM.GearScore
     if not (GS and GS.GearScoreFor) or type(member.gear) ~= "table" then return nil end
     local links = {}
@@ -292,7 +298,7 @@ function AS.SnapshotScore(snapshotKey)
 end
 
 local function ScoreText(score)
-    local GS = WM.GearScore
+    local GS = WM:IsModuleOn("GearScore") and WM.GearScore
     if not score then return "" end
     return GS and GS.ColorText and GS.ColorText(score) or tostring(score)
 end
@@ -429,6 +435,7 @@ local function FinishInspect()
 end
 
 local function OnInspectReady(guid)
+    if not On() then return end
     local s = AS.session
     if not s.inspecting or not s.currentUnit then return end
     if not s.snapshotKey then FinishInspect(); return end
@@ -651,6 +658,8 @@ function AS.TakeManualSnapshot(label)
 
     local captured, idx = 0, 0
     local function DoNext()
+        -- Turning the module off stops a manual snapshot part-way
+        if not On() then return end
         idx = idx + 1
         if idx > #queue then
             Verbose("Manual snapshot done — " .. captured .. "/" .. #queue .. " captured.")
@@ -671,6 +680,7 @@ function AS.TakeManualSnapshot(label)
             handler:RegisterEvent("INSPECT_READY")
             handler:SetScript("OnEvent", function(self, _, guid)
                 if not waiting then return end
+                if not On() then waiting = false; self:UnregisterAllEvents(); return end
                 if guid and UnitGUID(unit) ~= guid then return end
                 waiting = false; self:UnregisterAllEvents()
                 if timer then timer:Cancel() end
@@ -770,7 +780,9 @@ local function IsStandaloneLoaded()
     return false
 end
 
-function AS:Initialize()
+-- Saved-variable defaults only (also used by the setup page before the
+-- module has started)
+function AS.InitDB()
     -- SavedVariables: reuse the standalone addon's DB so existing archives
     -- carry straight over
     if not ArmorySnapDB then
@@ -786,6 +798,11 @@ function AS:Initialize()
     -- options.elvuiTheme is no longer read: the browser follows the global
     -- Watching Machine theme. It is left in place rather than cleared because
     -- ArmorySnapDB is shared with the standalone addon, which still uses it.
+    return AS.db
+end
+
+function AS:Initialize()
+    AS.InitDB()
 
     -- If the standalone ArmorySnap addon is running, stand down completely:
     -- two scanners would fight over the one-at-a-time inspect slot
@@ -805,7 +822,7 @@ function AS:Initialize()
 
     C_Timer.NewTicker(SCAN_TICK, ScannerTick)
     C_Timer.NewTicker(2, function()
-        if AS.UpdateScanStatus then AS.UpdateScanStatus() end
+        if On() and AS.UpdateScanStatus then AS.UpdateScanStatus() end
     end)
 
     -- Keep the standalone slash commands working
@@ -815,6 +832,7 @@ function AS:Initialize()
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
+    if not On() then return end
     if event == "INSPECT_READY" then
         OnInspectReady(arg1)
     elseif event == "ZONE_CHANGED_NEW_AREA" then
@@ -827,6 +845,50 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 end)
 
 ----------------------------------------------------------------------
+-- ON / OFF (per character) and the guided setup page
+----------------------------------------------------------------------
+-- Off: drop any inspect in progress and the scan session, hide the browser.
+-- Turning back on needs nothing: the next watchdog tick starts a session.
+function AS:OnModuleOff()
+    if AS.session.inspecting then FinishInspect() end
+    AS.ResetSession()
+    lastZone = nil
+    if AS.HideBrowseFrame then AS.HideBrowseFrame() end
+end
+
+function AS:SetupPage(L)
+    local options = AS.InitDB().options
+    L:Note("ArmorySnap works in the background. In a raid instance it inspects each raid member in turn (when"
+        .. " they're close enough to inspect) and saves their gear, enchants, gems and talent trees into a"
+        .. " snapshot named after the date and zone.")
+    L:Note("|cFFFFFFFFHow it works:|r a full 25-man takes around 15 to 20 seconds. Anyone out of range is tried"
+        .. " again a little later, and people who join mid-raid are picked up too. A new zone starts a new snapshot.")
+    L:Note("|cFFFFFFFFBrowsing:|r type |cFFFFFF00/as|r to open the browser: pick a snapshot, then a name, to see"
+        .. " their paper doll, talents and how many enchants and gems they're missing. |cFFFFFF00/as snap|r"
+        .. " takes a snapshot of your group right now, anywhere.")
+    L:Checkbox({ label = "Scan automatically in raid instances", get = function() return options.enabled ~= false end,
+        set = function(v) AS.SetAutoScan(v) end,
+        tooltip = { "Auto-scan", "Snapshot the raid's gear without you doing anything. Turn it off to only take"
+            .. " snapshots by hand with /as snap." } })
+    L:Checkbox({ label = "Scan in any group, not only in raids", get = function() return options.scanGroup end,
+        set = function(v) options.scanGroup = v end,
+        tooltip = { "Scan in group", "Also scan whenever you're in a party or raid out in the world or in a"
+            .. " dungeon. Needs automatic scanning." } })
+    L:Checkbox({ label = "Report scan progress in chat", get = function() return options.verbose end,
+        set = function(v) options.verbose = v end,
+        tooltip = { "Chat log", "Print a line for each member captured, and when a scan starts, finishes or"
+            .. " retries. Off keeps it quiet." } })
+    L:Dropdown({ label = "Keep snapshots for", width = 90,
+        options = { { value = 1, text = "1 day" }, { value = 7, text = "7 days" },
+            { value = 14, text = "14 days" }, { value = 30, text = "30 days" } },
+        get = function() return options.retentionDays end,
+        set = function(v) options.retentionDays = v end,
+        tooltip = { "Keep snapshots", "Older snapshots are deleted the next time you log in or reload." } })
+    L:Note("Snapshots are shared by all your characters. Everything else is in the browser: |cFFFFFF00/as|r"
+        .. " (|cFFFFFF00/as help|r lists the commands).")
+end
+
+----------------------------------------------------------------------
 -- STATUS (dashboard card)
 ----------------------------------------------------------------------
 function AS:GetQuickStatus()
@@ -834,7 +896,7 @@ function AS:GetQuickStatus()
         return "|cFFFF4444Standalone addon conflict|r"
     end
     if not AS.db then return "|cFF888888Not initialized|r" end
-    if AS.db.options.enabled == false then return "|cFFFF0000Disabled|r" end
+    if AS.db.options.enabled == false then return "|cFFFFAA00Auto-scan off|r" end
 
     local snapCount = 0
     for _ in pairs(AS.db.snapshots) do snapCount = snapCount + 1 end
@@ -851,6 +913,7 @@ end
 -- SLASH COMMANDS
 ----------------------------------------------------------------------
 function AS.HandleSlash(msg)
+    if not WM:UsableModule("ArmorySnap") then return end
     local cmd, rest = strsplit(" ", msg or "", 2)
     cmd = strlower(strtrim(cmd or ""))
 
@@ -889,7 +952,7 @@ function AS.HandleSlash(msg)
         AS.RefreshBrowseFrame()
 
     elseif cmd == "auto" or cmd == "autoscan" then
-        AS:SetModuleEnabled(AS.db.options.enabled == false)
+        AS.SetAutoScan(AS.db.options.enabled == false)
         Print("Auto-scan " .. (AS.db.options.enabled
               and "|cff00ff00ENABLED|r" or "|cffff4444DISABLED|r"))
 
@@ -1254,11 +1317,11 @@ local function CreateBrowseFrame()
     }, 150)
     row:Checkbox({
         label = "Auto-scan", font = "GameFontNormalSmall",
-        get = function() return AS:IsModuleEnabled() end,
-        set = function(v) AS:SetModuleEnabled(v) end,
+        get = function() return AS.IsAutoScan() end,
+        set = function(v) AS.SetAutoScan(v) end,
         tooltip = { "Auto-scan", "Snapshot raid gear automatically in raid instances"
             .. " (and groups, with Scan in group). Manual /as snap always works."
-            .. " Same as the dashboard switch and /as auto." },
+            .. " Same as /as auto." },
     }, 270)
 
     row = L:Row(28)
@@ -1656,7 +1719,7 @@ function AS.WatchScores()
     scoreWatch = CreateFrame("Frame")
     scoreWatch:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     scoreWatch:SetScript("OnEvent", function()
-        if not pendingScores or scoreQueued or not browseFrame or not browseFrame:IsShown() then return end
+        if not On() or not pendingScores or scoreQueued or not browseFrame or not browseFrame:IsShown() then return end
         scoreQueued = true
         C_Timer.After(0.5, function()
             scoreQueued = false
@@ -1678,6 +1741,7 @@ function AS.OnMemberCaptured()
 end
 
 function AS.ToggleBrowseFrame()
+    if not WM:UsableModule("ArmorySnap") then return end
     if AS.standaloneConflict then
         Print("Module disabled — standalone ArmorySnap addon is running.")
         return
@@ -1689,6 +1753,10 @@ function AS.ToggleBrowseFrame()
     else
         browseFrame:Show()
     end
+end
+
+function AS.HideBrowseFrame()
+    if browseFrame then browseFrame:Hide() end
 end
 
 function AS:Toggle()

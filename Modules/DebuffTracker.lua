@@ -997,6 +997,7 @@ function DebuffTracker:RegisterPullDetection()
     pullDetectFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     pullDetectFrame:RegisterEvent("UNIT_AURA")
     pullDetectFrame:SetScript("OnEvent", function(self, event, unitArg)
+        if not WM:IsModuleOn("DebuffTracker") then return end
         if event == "COMBAT_LOG_EVENT_UNFILTERED" then
             pcall(DebuffTracker.ProcessCombatLog, DebuffTracker)
         elseif event == "PLAYER_TARGET_CHANGED" then
@@ -1075,6 +1076,7 @@ function DebuffTracker:RegisterDoomWarning()
         elapsedSince = elapsedSince + elapsed
         if elapsedSince < DOOM_POLL_INTERVAL then return end
         elapsedSince = 0
+        if not WM:IsModuleOn("DebuffTracker") then return end
         pcall(DebuffTracker.CheckDoomWarning, DebuffTracker)
     end)
 end
@@ -1597,6 +1599,7 @@ local function CanLeadChecks()
 end
 
 function DebuffTracker:AutoRaidShadowResistScan()
+    if not WM:IsModuleOn("DebuffTracker") then return end
     if not DebuffTrackerDB or not DebuffTrackerDB.srRaidCheck then return end
     if srRaidPullDone or not IsInGroup() or not CanLeadChecks() then return end
     srRaidPullDone = true
@@ -1628,6 +1631,7 @@ function DebuffTracker:StartRaidShadowResistScan(auto)
     local token = srScan.token
     WM.RunAfter(SR_REPLY_WAIT, function()
         if not srScan or srScan.token ~= token then return end
+        if not WM:IsModuleOn("DebuffTracker") then return end
         for _, m in ipairs(srScan.members) do
             if not srScan.results[m.name] then srScan.queue[#srScan.queue + 1] = m end
         end
@@ -1656,14 +1660,14 @@ end
 
 local function InspectBusy()
     -- Don't take the inspect slot from Armory Snap or an open inspect window
-    local AS = WM.modules.ArmorySnap
+    local AS = WM:IsModuleOn("ArmorySnap") and WM.modules.ArmorySnap
     if AS and AS.session and AS.session.inspecting then return true end
     return InspectFrame and InspectFrame.IsShown and InspectFrame:IsShown() or false
 end
 
 function DebuffTracker:InspectNextForSR()
     local scan = srScan
-    if not scan then return end
+    if not scan or not WM:IsModuleOn("DebuffTracker") then return end
     local m = table.remove(scan.queue, 1)
     if not m then
         self:FinishRaidShadowResistScan()
@@ -1766,6 +1770,7 @@ function DebuffTracker:RegisterRaidShadowResist()
     local f = CreateFrame("Frame")
     WM:RegisterEvents(f, { "CHAT_MSG_ADDON", "INSPECT_READY" })
     f:SetScript("OnEvent", function(_, event, a1, a2, _, a4)
+        if not WM:IsModuleOn("DebuffTracker") then return end
         if event == "CHAT_MSG_ADDON" then
             if a1 == SR_PREFIX and type(a2) == "string" then
                 DebuffTracker:OnShadowResistMessage(a2, a4)
@@ -1814,6 +1819,7 @@ function DebuffTracker:ExplainShadowResist()
 end
 
 function DebuffTracker:CheckAlerts(unit)
+    if not WM:IsModuleOn("DebuffTracker") then return end
     if not DebuffTrackerDB or not DebuffTrackerDB.raidAlerts then return end
     if not IsInRaid() and not (GetNumGroupMembers and GetNumGroupMembers() > 0) then return end
     
@@ -2021,7 +2027,7 @@ function DebuffTracker:Initialize()
     inCombat = UnitAffectingCombat("player") or false
     -- Initial raid scan after a short delay (roster may not be ready yet)
     WM.RunAfter(2, function()
-        DebuffTracker:ScanRaidComposition()
+        if WM:IsModuleOn("DebuffTracker") then DebuffTracker:ScanRaidComposition() end
     end)
 end
 
@@ -2376,6 +2382,7 @@ function DebuffTracker:CreateTrackerFrame()
     
     -- Update handler
     frame:SetScript("OnUpdate", function(self, elapsed)
+        if not WM:IsModuleOn("DebuffTracker") then self:Hide(); return end
         updateTimer = updateTimer + elapsed
         specScanTimer = specScanTimer + elapsed
         
@@ -2403,6 +2410,7 @@ function DebuffTracker:CreateTrackerFrame()
     frame:RegisterEvent("PLAYER_REGEN_DISABLED")  -- Enter combat
     frame:RegisterEvent("PLAYER_REGEN_ENABLED")   -- Leave combat
     frame:SetScript("OnEvent", function(self, event)
+        if not WM:IsModuleOn("DebuffTracker") then return end
         if event == "PLAYER_REGEN_DISABLED" then
             inCombat = true
             -- Fresh encounter: reset all alert state
@@ -2656,7 +2664,7 @@ end
 
 function DebuffTracker:UpdateVisibility()
     if not trackerFrame then return end
-    if not DebuffTrackerDB or not DebuffTrackerDB.enabled then
+    if not WM:IsModuleOn("DebuffTracker") or not DebuffTrackerDB or not DebuffTrackerDB.enabled then
         trackerFrame:Hide()
         return
     end
@@ -3327,9 +3335,79 @@ function DebuffTracker:IsModuleEnabled()
 end
 
 function DebuffTracker:SetModuleEnabled(v)
+    self:InitDB()
     DebuffTrackerDB.enabled = v and true or false
     self:UpdateVisibility()
     self:RefreshSettingsUI()
+end
+
+-- Turned off on this character: hide the tracker and the settings, stop a
+-- raid shadow resist check that's under way and forget the pull in progress
+-- (every event, poll and timer does nothing while it's off)
+function DebuffTracker:OnModuleOff()
+    if srScan and srScan.current and ClearInspectPlayer then pcall(ClearInspectPlayer) end
+    srScan = nil
+    inCombat = false
+    missingTimers, alertCooldowns, alertedThisPull, deadCasterCache = {}, {}, {}, {}
+    bossEngaged, bossDeadGUID, pullAnnounced = false, nil, false
+    trackedBossGUIDs = {}
+    wipe(damageWindow)
+    focusGUID, focusName = nil, nil
+    self:ResetDoomWarning()
+    self:ResetShearMonitor(true)
+    if trackerFrame then trackerFrame:Hide() end
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- Back on: pick up the fight and the roster as they are now
+function DebuffTracker:OnModuleOn()
+    if not trackerFrame then return end
+    inCombat = UnitAffectingCombat("player") or false
+    raidScanDirty = true
+    self:UpdateVisibility()
+end
+
+-- The module's page in the guided setup
+function DebuffTracker:SetupPage(L)
+    self:InitDB()
+    L:Note("Debuff Tracker puts a small frame on screen showing which raid debuffs (armour, spell damage,"
+        .. " attack power and so on) are on your target. Lit up means it's there; dim means it's missing.")
+    L:Note("|cFFFFFFFFWhat it tracks:|r it reads your raid's classes and specs and only shows the debuffs your"
+        .. " raid can actually put up. The frame appears on boss fights and hides the rest of the time.")
+    L:Note("|cFFFFFFFFAlerts:|r if a debuff stays missing from the boss for a few seconds, it can call it out in"
+        .. " raid chat. Only the raid leader sends these, so nobody doubles up. It ignores trash, adds the raid"
+        .. " isn't killing, and anything you exclude.")
+    L:Note("|cFFFFFFFFEncounters:|r on Illidan it raid-warns \"CAST DOOM NOW\" at 68% and calls out each Shear on"
+        .. " the main tank. In Black Temple it warns you (and, as leader, the raid) if anyone is still in"
+        .. " shadow resist gear after Mother Shahraz.")
+    local function Opt(key, label, tip, after)
+        local g, s = DBGetSet(key)
+        L:Checkbox({ label = label, get = g,
+            set = function(v) s(v); if after then after() end end,
+            tooltip = tip })
+    end
+    local function Vis() DebuffTracker:UpdateVisibility() end
+    L:Header("The tracker")
+    Opt("showOnlyInRaid", "Show only in raid", { "Only in raid", "Hide the tracker in parties and when solo." }, Vis)
+    Opt("hideWhenNoTarget", "Hide when no hostile target",
+        { "Hide with no target", "The tracker only shows while you're targeting something you can attack." }, Vis)
+    Opt("autoDetect", "Choose debuffs from my raid's classes",
+        { "Auto-detect", "Tracks only the debuffs your raid can provide, and updates as people join and leave."
+            .. " Turn off to pick them yourself in the Debuff Tracker window." })
+    L:Header("Callouts")
+    Opt("raidAlerts", "Call out missing debuffs in raid chat",
+        { "Missing debuff alerts", "Sends a raid message when a debuff has been missing from the boss for a"
+            .. " few seconds. Uses /rw if you can. Only the raid leader sends them." })
+    Opt("pullAnnounce", "Announce who pulled the boss",
+        { "Pull announce", "Says who hit the boss first, for example \"First hit: Name on Gruul\"." })
+    Opt("illidanDoomWarning", "Illidan: raid warn \"CAST DOOM NOW\" at 68%",
+        { "Doom warning", "So warlocks land Curse of Doom before Illidan lifts off at 65%. Once per pull." })
+    Opt("shearMonitor", "Illidan: call out Shear on the main tank",
+        { "Shear monitor", "Calls out each Shear that lands on the tank, and prints a tally when the pull ends." })
+    Opt("srCheck", "Warn me if I'm still in shadow resist gear after Mother",
+        { "Shadow resist check", "Black Temple only. Reads your equipped gear, so buffs and auras don't count." })
+    L:Note("Delays, channels, boss health limits, exclusions and the full debuff list are in the Debuff Tracker"
+        .. " window.")
 end
 
 function DebuffTracker:Toggle()

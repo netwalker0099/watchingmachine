@@ -117,8 +117,9 @@ function Log:Start()
 end
 
 -- Read the scoreboard and the result. winner = 0 / 1 (Horde / Alliance in a
--- battleground, team 0 / 1 in an arena), nil when you left first
-function Log:Finish(winner)
+-- battleground, team 0 / 1 in an arena), nil when you left first. quiet:
+-- no chat line
+function Log:Finish(winner, quiet)
     local m = current
     if not m or m.done then return end
     m.done = true
@@ -177,7 +178,7 @@ function Log:Finish(winner)
             if p.name ~= me then list[#list + 1] = { name = p.name, class = p.class } end
         end
     end
-    if DB().announce then self:Announce(m) end
+    if DB().announce and not quiet then self:Announce(m) end
     self:RefreshUI()
 end
 
@@ -436,6 +437,7 @@ end
 local events = CreateFrame("Frame")
 
 function Log:OnEvent(event)
+    if not WM:IsModuleOn("PvPLog") then return end
     if event == "PLAYER_ENTERING_WORLD" then
         if PvPKind() then self:Start() elseif current then self:Finish(nil) end
     elseif event == "UPDATE_BATTLEFIELD_SCORE" or event == "UPDATE_BATTLEFIELD_STATUS" then
@@ -451,6 +453,7 @@ function Log:Initialize()
     WM:RegisterEvents(events, { "PLAYER_ENTERING_WORLD", "UPDATE_BATTLEFIELD_SCORE", "UPDATE_BATTLEFIELD_STATUS" })
     if WM.RegisterChatLink then
         WM:RegisterChatLink("pvplog", function()
+            if not WM:UsableModule("PvPLog") then return end
             local p = Log:CreateUI()
             if not p:IsShown() then p:Show() end
         end)
@@ -459,3 +462,32 @@ function Log:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event) Log:OnEvent(event) end)
+
+-- Turned off: close the window; a match you're in is logged as left early,
+-- without the chat line
+function Log:OnModuleOff()
+    if panel then panel:Hide() end
+    if current then self:Finish(nil, true) end
+end
+
+-- Turned back on inside a battleground or arena: log it from now
+function Log:OnModuleOn()
+    DB()
+    if PvPKind() then self:Start() end
+end
+
+-- The module's page in the guided setup
+function Log:SetupPage(L)
+    DB()
+    L:Note("Keeps a record of every battleground and arena you play, on all your characters, with totals and win"
+        .. " rates for each battleground and each arena bracket.")
+    L:Note("|cFFFFFFFFHow it works:|r a match starts being logged when you zone in. When the game declares a winner"
+        .. " it reads the scoreboard: your killing blows, honorable kills, deaths, honor, damage and healing, and in"
+        .. " arenas both teams and your rating change. Leave before the end and the match is logged as \"left early\".")
+    L:Checkbox({ label = "Result in chat after each match", get = function() return DB().announce end,
+        set = function(v) DB().announce = v end,
+        tooltip = { "Match result", "A chat line when a match ends: win or loss, how long it took and your score."
+            .. " Click it to open the log." } })
+    L:Note("World PvP kills are kept by the PvP Enemy Tracker, not here.")
+    L:Note("The matches, totals and each match's details (hover one) are in its window: |cFFFFFF00/wmachine bgs|r.")
+end

@@ -268,7 +268,7 @@ end
 
 local function Monitor()
     local tools = Tools()
-    if not tools then return end
+    if not tools or not WM:IsModuleOn("ClassGeneral") then return end
 
     -- Outside a qualifying raid, or dead, stay silent
     if UnitIsDeadOrGhost("player") or not ShouldCheckHere() then
@@ -394,10 +394,14 @@ local function SoundFeature(tools, key, name, default, what)
     })
 end
 
-function General:Initialize()
+-- The General tab's features, the warning sounds and the monitor. Only
+-- registers (no frames, no events), so the guided setup can list them
+-- before this has started; runs once.
+function General:RegisterFeatures()
     self:InitDB()
     local tools = Tools()
-    if not tools then return end
+    if not tools or self.featuresRegistered then return end
+    self.featuresRegistered = true
 
     tools:RegisterFeature(CLASS, {
         key = "flask", name = "Warn if no flask or elixirs",
@@ -471,4 +475,15 @@ function General:Initialize()
     tools:RegisterAlertSound(CLASS, "gen_food", "No food buff")
     tools:RegisterAlertSound(CLASS, "gen_oil", "No weapon oil / stone")
     tools:RegisterMonitor(Monitor)
+end
+
+function General:Initialize()
+    self:RegisterFeatures()
+end
+
+-- Turned off on this character: its warnings go (the monitor stays
+-- registered but does nothing while it's off)
+function General:OnModuleOff()
+    local tools = Tools()
+    if tools then ClearAll(tools) end
 end

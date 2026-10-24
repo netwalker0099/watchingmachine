@@ -357,11 +357,11 @@ GS.Char().sets.DPS.specAuto = true
 spec = 1
 Event("ACTIVE_TALENT_GROUP_CHANGED")
 Run()
-GS:SetModuleEnabled(false)
+GS.DB().auto = false
 spec = 2
 Event("ACTIVE_TALENT_GROUP_CHANGED")
-check("automatic swaps off: no swap", not GS.job and not GS:IsModuleEnabled())
-GS:SetModuleEnabled(true)
+check("automatic swaps off: no swap", not GS.job and GS.IsModuleEnabled == nil)
+GS.DB().auto = true
 spec = 1
 Event("ACTIVE_TALENT_GROUP_CHANGED")
 Run()

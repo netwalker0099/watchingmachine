@@ -122,7 +122,8 @@ end
 -- ============================================
 
 function WhisperLogs:AddWhisper(senderFull, message)
-    if not WhisperLogsDB then return end
+    if not WM:IsModuleOn("WhisperLogs") then return end
+    if not WhisperLogsDB or type(WhisperLogsDB.whispers) ~= "table" then return end
 
     -- Parse "Player-Realm" format from CHAT_MSG_WHISPER
     local name, senderRealmSlug, senderRealmRaw = ParseNameRealm(senderFull)
@@ -515,6 +516,38 @@ function WhisperLogs:Toggle()
     end
 end
 
+-- Turned off on this character: whispers aren't listed any more (the
+-- event handler checks), so just close the window
+function WhisperLogs:OnModuleOff()
+    if StaticPopup_Hide then StaticPopup_Hide("WM_WHISPERLOGS_CLEAR") end
+    if mainFrame then mainFrame:Hide() end
+end
+
+-- The module's page in the guided setup
+function WhisperLogs:SetupPage(L)
+    self:InitDB()
+    L:Note("Keeps a list of the players who whisper you, newest first, each with a link to their Warcraft Logs"
+        .. " page, handy when someone asks to join your group or raid.")
+    L:Note("|cFFFFFFFFHow it works:|r every whisper adds the sender to the list (up to 50 players). Scan"
+        .. " Raid/Party in the window adds everyone in your group too. Each link uses the player's own realm."
+        .. " Click a name to put its link in your chat box, ready to copy with Ctrl+C. Right-click removes it.")
+    local regions = {}
+    for _, region in ipairs(REGIONS) do regions[#regions + 1] = { value = region, text = region:upper() } end
+    L:Dropdown({
+        label = "Region:", width = 60,
+        options = regions,
+        get = function() return WhisperLogsDB.region or DEFAULT_REGION end,
+        set = function(v)
+            WhisperLogsDB.region = v
+            WhisperLogs:RebuildAllURLs()
+        end,
+        tooltip = { "Region", "Your Warcraft Logs region, used in every link. Changing it updates the links"
+            .. " already in the list." },
+    })
+    L:Note("The list is shared by all your characters. It's in the WarcraftLogs Lookup window:"
+        .. " |cFFFFFF00/wmachine wcl|r.")
+end
+
 -- ============================================
 -- STATUS
 -- ============================================
@@ -536,7 +569,10 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CHAT_MSG_WHISPER")
 
+-- Registered at load: does nothing (and leaves the saved list alone)
+-- while the module is off on this character
 eventFrame:SetScript("OnEvent", function(self, event, message, sender, ...)
+    if not WM:IsModuleOn("WhisperLogs") then return end
     if event == "CHAT_MSG_WHISPER" then
         -- Pass full sender string including realm ("Player-Realm")
         WhisperLogs:AddWhisper(sender, message)
