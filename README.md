@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.46 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.46.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -868,8 +868,10 @@ module it had on, and is offered the setup once.
   the setup says so (e.g. Gear Sets says a missing item is in your bank when
   Your Characters is on).
 
-`/wmachine setup` brings the welcome window back (`setup quick`,
-`setup guided` go straight to one).
+`/wmachine setup` (or `/wmachine resetup`, or the dashboard's **Setup**
+button) runs the setup again: everything you have on stays ticked and every
+setting keeps its value unless you change it during the setup. `setup quick`
+and `setup guided` go straight to one.
 
 ## Usage
 
@@ -904,7 +906,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
-- `/wmachine setup` - Set up which modules are on for this character (`setup quick`, `setup guided`)
+- `/wmachine setup` - Run the setup (again) for this character, keeping what's on (`setup quick`, `setup guided`; also `/wmachine resetup`)
 - `/wmachine settings` - Open theme/addon settings
 - `/wmachine logger` - Open Auto Logger settings
 - `/wmachine keyword` - Open Keyword Monitor
@@ -1016,6 +1018,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.46.1
+- **Run the setup again** with `/wmachine setup` (or `/wmachine resetup`, or the dashboard's new Setup button): what's on stays ticked and settings keep their values unless you change them
 
 ### Version 3.46
 - **Setup and per-character modules:** a new character starts with everything off and a guided or quick setup (or a copy of another character); modules and their settings are per character; every dashboard card has an on/off switch

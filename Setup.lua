@@ -85,7 +85,8 @@ function S:ShowWelcome()
                 return "|cFFFFFFFFNew: modules are switched on and off per character, and each character has its own settings.|r"
                     .. " Everything you were using is still on. Would you like to go through the setup?"
             elseif c.setup == "done" then
-                return "|cFFFFFFFF" .. S:OnCount() .. " modules are on for this character.|r Run the setup again?"
+                return "|cFFFFFFFF" .. S:OnCount() .. " modules are on for this character.|r Run the setup again? "
+                    .. "Your current setup is kept: the modules that are on stay ticked and every setting keeps its value unless you change it."
             end
             return "|cFFFFFFFFEverything is off on this character.|r Watching Machine is a toolbox of " .. #S:Modules()
                 .. " modules for raiding, guilds and logging. Pick how you'd like to choose the ones you want."
@@ -200,8 +201,9 @@ function S:OpenQuick()
         quick = WM.UI:CreatePanel({ name = "WM_SetupQuick", title = "Quick setup", width = 520, maxHeight = 640 })
         quick.draft = {}
         local L = quick.layout
-        L:Note("Tick the modules you want on this character. You can change this any time with the switch on each"
-            .. " dashboard card, or run the guided setup to learn what each one does.")
+        L:Note("Tick the modules you want on this character. What's on now is already ticked; only what you change"
+            .. " changes. You can also use the switch on each dashboard card, or the guided setup to learn what"
+            .. " each one does.")
         local btns = {}
         for _, p in ipairs(PRESETS) do
             btns[#btns + 1] = { text = p.text, width = 100, tooltip = { p.text, p.tip },
@@ -281,6 +283,11 @@ local function BuildIntro(L)
         .. " debuffs on the boss, logging your mail and trades, swapping gear sets, and so on. Over the next pages"
         .. " you'll meet each module: what it does, how it works, and its main settings. Turn on the ones you want;"
         .. " skip the rest. Nothing you choose here is final.")
+    L:Note(function()
+        if WM:CharState().setup ~= "done" then return "" end
+        return "|cFFFFFFFFRunning it again?|r Each page shows what you have now: modules that are on are ticked and"
+            .. " settings keep their values. Only what you change on a page changes."
+    end)
     L:Header("Per character")
     L:Note("Which modules are on, and every module's settings, belong to this character. Your other characters"
         .. " keep their own (you can copy one character's setup to another from the welcome window). Things that are"
@@ -378,8 +385,21 @@ function S:ShowStep(i)
         else BuildModule(L, spec.name) end
         L:Reflow()
     end
+    -- A page is built once and re-read each time it's shown: make sure the
+    -- module's settings still have their defaults (a reset or a copy may
+    -- have emptied them since)
+    if spec.kind == "module" then S.FillDefaults(spec.name) end
     g:ShowPage(page)
     return page
+end
+
+-- Fill a module's saved defaults without starting it, through its own
+-- InitDB or DB function (both only fill defaults)
+function S.FillDefaults(name)
+    local m = WM.modules[name]
+    if not m then return end
+    if type(m.InitDB) == "function" then pcall(m.InitDB, m)
+    elseif type(m.DB) == "function" then pcall(m.DB) end
 end
 
 function S:Go(step)

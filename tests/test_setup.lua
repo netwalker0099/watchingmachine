@@ -223,5 +223,64 @@ check("dashboard: off on this character", card.statusText:GetText():find("Off on
 W.click(card.switch)
 check("dashboard: the switch turns it on", WM:IsModuleOn("Recruiter"))
 
+-- ---- Running the setup again ----
+local function Snapshot()
+    local out = {}
+    for _, m in ipairs(WM.Setup:Modules()) do out[m.name] = WM:IsModuleOn(m.name) end
+    return out
+end
+local function Same(a, b, except)
+    for k, v in pairs(a) do if k ~= except and b[k] ~= v then return false end end
+    return true
+end
+c.setup = "done"
+local dashSetup
+for _, btn in ipairs(WM.dashboard.footerButtons) do if btn:GetText() == "Setup" then dashSetup = btn end end
+W.click(dashSetup)
+check("re-run: the dashboard's Setup button", wel:IsShown())
+local found
+for _, w in ipairs(wel.layout.widgets) do
+    local t = w.GetText and w:GetText()
+    if type(t) == "string" and t:find("current setup is kept", 1, true) then found = true end
+end
+check("re-run: says your setup is kept", found)
+wel:Hide()
+env.SlashCmdList.WATCHINGMACHINE("resetup")
+check("re-run: /wmachine resetup", wel:IsShown())
+wel:Hide()
+-- Quick: what's on is ticked; applying without changes changes nothing
+local before = Snapshot()
+q = WM.Setup:OpenQuick()
+check("re-run quick: ticks what's on now", Same(before, q.draft))
+WM.Setup:ApplyQuick()
+check("re-run quick: nothing changed", Same(before, Snapshot()))
+-- ... and one change changes only that
+q = WM.Setup:OpenQuick()
+local flip = before.Attunements and false or true
+q.draft.Attunements = flip
+WM.Setup:ApplyQuick()
+local after = Snapshot()
+check("re-run quick: only the change", after.Attunements == flip and Same(before, after, "Attunements"))
+-- Guided: each page shows what you have now
+env.HazardsDB.drowning = false
+local hzOn = WM:IsModuleOn("Hazards")
+before = Snapshot()
+g = WM.Setup:OpenGuided()
+WM.Setup:ShowStep(hzIndex)
+local turnOn, drownBox
+for _, w in ipairs(g.layout.widgets) do
+    local t = rawget(w, "Text") and w.Text:GetText()
+    if t and t:find("Turn on Hazard Alerts", 1, true) then turnOn = w end
+    if t == "Drowning" then drownBox = w end
+end
+check("re-run guided: the switch shows what's on", turnOn:GetChecked() == hzOn)
+check("re-run guided: settings show their values", drownBox:GetChecked() == false)
+env.HazardsDB.drowning = true
+WM.Setup:Go(1); WM.Setup:Go(-1)
+check("re-run guided: values re-read each time", drownBox:GetChecked() == true)
+for i = WM.Setup.guided and 1 or g.index, #g.pages - 1 do WM.Setup:Go(1) end
+WM.Setup:Go(1)
+check("re-run guided: paging through changes nothing", not g:IsShown() and Same(before, Snapshot()) and env.HazardsDB.drowning == true)
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

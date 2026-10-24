@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.46"
+WM.version = "3.46.1"
 WM.modules = {}
 
 -- ============================================
@@ -1089,6 +1089,12 @@ function WM:CreateDashboard()
         tooltip = { "Help", "Print every /wmachine command to chat." },
     }, "RIGHT")
     frame:AddFooterButton({
+        text = "Setup", width = 70, height = 24,
+        onClick = function() if WM.Setup then WM.Setup:ShowWelcome() end end,
+        tooltip = { "Setup", "Run the setup again for this character: guided or quick. What's on now stays on,"
+            .. " and settings keep their values, unless you change them." },
+    }, "RIGHT")
+    frame:AddFooterButton({
         text = "Settings", width = 80, height = 24,
         onClick = function() WM:ToggleSettings() end,
         tooltip = { "Settings", "UI theme and verbose chat." },
@@ -1905,7 +1911,7 @@ end
 function WM:ShowHelp()
     self:Print("=== Watching Machine Commands ===")
     print("|cFFFFFF00/wmachine|r - Toggle dashboard")
-    print("|cFFFFFF00/wmachine setup|r - Choose which modules are on for this character (setup quick / setup guided)")
+    print("|cFFFFFF00/wmachine setup|r - Run the setup (again) for this character, keeping what's on (setup quick / setup guided; also /wmachine resetup)")
     print("|cFFFFFF00/wmachine logger|r - Open Auto Logger")
     print("|cFFFFFF00/wmachine keyword|r - Open Keyword Monitor")
     print("|cFFFFFF00/wmachine filter|r - Open Chat Filter (hide spam phrases; applied before Keyword Monitor)")
@@ -2262,7 +2268,8 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         end
         WM:Print("Minimap button position reset. Drag to reposition.")
         
-    elseif cmd == "setup" or cmd == "setup quick" or cmd == "setup guided" or cmd == "wizard" then
+    elseif cmd == "setup" or cmd == "setup quick" or cmd == "setup guided" or cmd == "wizard"
+        or cmd == "resetup" or cmd == "rerun" or cmd == "setup again" then
         if WM.Setup then
             if cmd == "setup quick" then WM.Setup:OpenQuick()
             elseif cmd == "setup guided" then WM.Setup:OpenGuided()

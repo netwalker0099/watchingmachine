@@ -2,7 +2,20 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.46** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.46.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.46.1
+
+- **Run the setup again** any time: `/wmachine setup`, `/wmachine resetup`
+  or the new **Setup** button on the dashboard. Your current setup is kept:
+  modules that are on stay ticked in the quick setup and on the guided
+  pages, and every setting keeps its value, unless you change it during the
+  setup. The welcome window, quick setup and guided introduction say so.
+- Fixed: a guided page could error if that module's settings had been reset
+  since the page was first shown; each page now fills in its module's
+  defaults before showing.
 
 ---
 
