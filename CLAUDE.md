@@ -33,6 +33,11 @@ feature skip that.
       `M:OnModuleOff()` hides its windows and frames and cancels work;
       `M:OnModuleOn()` re-shows anything that should be visible. Check
       `WM:IsModuleOn("Other")` before calling into another module.
+      Exception: a module whose job is a record of every character (like
+      Your Characters) sets `M.recordsEveryCharacter = true` and gates its
+      recording on `WM:ShouldRun("Name")`, so it keeps saving alts where its
+      switch is off while it's on for any character; its window still
+      follows this character's switch.
 - [ ] `M:SetupPage(L)`: the guided setup page. Explain what it does and how
       each main feature works, then its main settings with tooltips. It must
       work before the module has started (call only a defaults-only

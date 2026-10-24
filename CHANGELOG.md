@@ -2,7 +2,20 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.47** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.47.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.47.1
+
+- **Fixed: Your Characters stopped updating your alts.** Since 3.46 each
+  character has its own module switches and a new character starts with
+  everything off, so Your Characters stopped saving any character where it
+  wasn't switched on: their gold, bags and gear stayed as they were. Now,
+  while Your Characters is on for any of your characters, it saves every
+  character you log in on (switching it off on a character only hides the
+  window there). Its card on such a character says "Off here, still saving
+  this character for your others".
 
 ---
 

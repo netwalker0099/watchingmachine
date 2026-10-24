@@ -986,12 +986,18 @@ local events = CreateFrame("Frame")
 local pending = false
 
 -- Many events come in bursts (bags, money): save at most once a second
+-- Records every character you log in on while Your Characters is on for any
+-- of them (so the window is complete); the window follows this character's
+-- own switch
+Alts.recordsEveryCharacter = true
+local function Recording() return WM:ShouldRun("AltTracker") end
+
 local function Soon()
     if pending then return end
     pending = true
     WM.RunAfter(1, function()
         pending = false
-        if not WM:IsModuleOn("AltTracker") then return end
+        if not Recording() then return end
         Alts:Update()
         Alts:RefreshUI()
     end)
@@ -1010,7 +1016,7 @@ function Alts:Initialize()
 end
 
 events:SetScript("OnEvent", function(_, event, unit)
-    if not WM:IsModuleOn("AltTracker") then return end
+    if not Recording() then return end
     if event == "BANKFRAME_OPENED" then
         Alts.bankOpen = true
         Alts:UpdateBank()
@@ -1032,8 +1038,9 @@ events:SetScript("OnEvent", function(_, event, unit)
     end
 end)
 
--- Turned off: close the window. This character stops being saved (what was
--- saved before stays).
+-- Turned off: close the window. While it's on for another of your
+-- characters, this one is still saved (so that one's window stays up to
+-- date); off everywhere, nothing is saved (what was saved stays).
 function Alts:OnModuleOff()
     if flyout then flyout:Hide() end
     if panel then panel:Hide() end
@@ -1059,8 +1066,11 @@ function Alts:SetupPage(L)
         .. " attunements and lockouts. \"Find an item\" searches every character's gear, bags and bank at once."
         .. " Rested XP keeps counting while you're logged out, so the window shows an estimate for now.")
     L:Note("|cFFFFFFFFOther parts of Watching Machine use it:|r Gear Sets says when a missing set item is in your"
-        .. " bank, and the setup uses it to recognise characters that used Watching Machine before. A character only"
-        .. " appears once you've logged in on it with this on.")
+        .. " bank, and the setup uses it to recognise characters that used Watching Machine before.")
+    L:Note("|cFFFFFFFFEvery character is kept up to date:|r while Your Characters is on for any of your characters,"
+        .. " it saves every character you log in on, even one where it's switched off, so the window always shows"
+        .. " their latest gold, bags and gear. Switching it off on a character only hides the window there. A"
+        .. " character appears once you've logged in on it.")
     L:Note(function()
         local extras = {}
         for _, m in ipairs({ { "GearScore", "each character's GearScore" }, { "Attunements", "attunement progress" },

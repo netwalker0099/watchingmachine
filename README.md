@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.47 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.47.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -456,6 +456,11 @@ instance limits (Logging group on the dashboard; `/wmachine instances`).
 ### 20. Your Characters
 Every character you log in, on every realm, in one window (Logging group;
 `/wmachine alts`, or **Your Characters** in the Instance Tracker window).
+
+- **Every character kept up to date:** while Your Characters is on for any
+  of your characters, it saves every character you log in on, even one
+  where its switch is off (that only hides the window there), so gold, bags
+  and gear are always current
 
 - Grouped by realm, with each realm's **total gold** (hover the realm) and
   your gold on all characters at the bottom
@@ -1030,6 +1035,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.47.1
+- **Your Characters** keeps every character up to date again: while it's on for any of your characters it saves each one you log in on, even where its switch is off
 
 ### Version 3.47
 - **Loot Browser:** a Collections category (badge and Sunmote vendors, world epics, mounts, companions, tabards, legendaries, Classic sets, world events), and a much faster search that no longer stalls the game

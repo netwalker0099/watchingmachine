@@ -249,6 +249,30 @@ function WM:IsModuleOn(name)
     return v and true or false
 end
 
+-- On for any of your characters. Modules that keep records about all your
+-- characters (Your Characters) record every one you log in on while this is
+-- true, so their view is complete even from a character where they're off.
+function WM:IsModuleOnAnywhere(name)
+    if self:IsModuleOn(name) then return true end
+    local chars = WatchingMachineDB and WatchingMachineDB.chars
+    if type(chars) ~= "table" then return false end
+    for _, c in pairs(chars) do
+        if type(c) == "table" then
+            local v = type(c.modules) == "table" and c.modules[name]
+            if v == true or (v == nil and c.defaultOn ~= false) then return true end
+        end
+    end
+    return false
+end
+
+-- Should this module run on this character? On here, or (for a module
+-- that records every character) on for any of them
+function WM:ShouldRun(name)
+    if self:IsModuleOn(name) then return true end
+    local m = self.modules[name]
+    return m and m.recordsEveryCharacter and self:IsModuleOnAnywhere(name) or false
+end
+
 -- Start a module that hasn't been started yet
 function WM:StartModule(name)
     local m = self.modules[name]

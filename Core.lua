@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.47"
+WM.version = "3.47.1"
 WM.modules = {}
 
 -- ============================================
@@ -767,7 +767,7 @@ function WM:OnSecurityCheckPassed()
     for name in pairs(self.modules) do names[#names + 1] = name end
     table.sort(names)
     for _, name in ipairs(names) do
-        if self:IsModuleOn(name) then self:StartModule(name) end
+        if self:ShouldRun(name) then self:StartModule(name) end
     end
 
     -- First time on this character: offer the setup
@@ -1800,7 +1800,9 @@ function WM:UpdateDashboard()
     for moduleName, card in pairs(dashboard.moduleCards) do
         local module = self.modules[moduleName]
         if module and not WM:IsModuleOn(moduleName) then
-            card.statusText:SetText("|cFF888888Off on this character|r")
+            card.statusText:SetText(WM:ShouldRun(moduleName)
+                and "|cFF888888Off here, still saving this character for your others|r"
+                or "|cFF888888Off on this character|r")
         elseif module and module.GetQuickStatus then
             local ok, status = pcall(module.GetQuickStatus, module)
             card.statusText:SetText(ok and status or "|cFFFF6666Status unavailable|r")
