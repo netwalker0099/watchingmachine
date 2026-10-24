@@ -514,20 +514,14 @@ function MailLogger:SuppressMail(index)
     end
 end
 
-if ReturnInboxItem then
-    local originalReturnInboxItem = ReturnInboxItem
-    function ReturnInboxItem(index, ...)
-        pcall(MailLogger.SuppressMail, MailLogger, index)
-        return originalReturnInboxItem(index, ...)
-    end
+-- Returned or deleted mail isn't logged. Secure hooks (they run after the
+-- call; the mail is still readable until the inbox refreshes) rather than
+-- replacing the game's functions, which would taint the mailbox.
+if hooksecurefunc and ReturnInboxItem then
+    hooksecurefunc("ReturnInboxItem", function(index) pcall(MailLogger.SuppressMail, MailLogger, index) end)
 end
-
-if DeleteInboxItem then
-    local originalDeleteInboxItem = DeleteInboxItem
-    function DeleteInboxItem(index, ...)
-        pcall(MailLogger.SuppressMail, MailLogger, index)
-        return originalDeleteInboxItem(index, ...)
-    end
+if hooksecurefunc and DeleteInboxItem then
+    hooksecurefunc("DeleteInboxItem", function(index) pcall(MailLogger.SuppressMail, MailLogger, index) end)
 end
 
 -- ============================================

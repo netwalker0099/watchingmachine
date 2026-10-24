@@ -133,8 +133,7 @@ end
 function D:SetMenuButton(on)
     WatchingMachineDB = WatchingMachineDB or {}
     WatchingMachineDB.gameMenuButton = on and true or false
-    if WM.gameMenuButton and not on then WM.gameMenuButton:Hide() end
-    if on and WM.UpdateGameMenuButton and WM.gameMenuHooked then WM:UpdateGameMenuButton() end
+    if WM.gameMenuButton then WM.gameMenuButton:SetShown(on and true or false) end
     WM:Print("Escape-menu button " .. (on and "on." or "off. Do /reload so the menu is rebuilt without it, then try"
         .. " logging out again."))
 end

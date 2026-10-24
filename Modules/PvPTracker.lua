@@ -695,6 +695,7 @@ function PvPTracker:RecordKill(killerName, killerGUID)
     if UnitExists("target") and UnitName("target") == killerName then
         killerGuild = GetGuildInfo("target")
         if not killerClass then
+            local _
             _, killerClass = UnitClass("target")
         end
         killerLevel = UnitLevel("target")

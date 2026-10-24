@@ -2,7 +2,26 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48.3
+
+- **Fixed: the Escape menu's Log Out was blocked by the game** (`/camp`
+  worked; the logout check showed "callback() blocked, blamed
+  WatchingMachine"). The cause was not the menu button: Watching Machine
+  reassigned the game's `StaticPopupDialogs` table
+  (`StaticPopupDialogs = StaticPopupDialogs or {}`), which "taints" it, and
+  the game reads that table when Escape is pressed, before building the
+  menu, so the menu's buttons were blocked from logging out. It now only
+  adds its own dialog to the table.
+- Two more writes to game globals removed: PvP Enemy Tracker leaked the
+  global `_`, and Mail & Trade Logger replaced the game's
+  `ReturnInboxItem` / `DeleteInboxItem` (now secure hooks).
+- A new test fails if any addon file assigns a game global again.
+- The menu button is back where it was, above Log Out (3.48.2 had moved it
+  below the menu, which didn't help and wasn't liked).
 
 ---
 

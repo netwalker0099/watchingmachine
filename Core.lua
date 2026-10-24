@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.48.2"
+WM.version = "3.48.3"
 WM.modules = {}
 
 -- ============================================
@@ -1181,7 +1181,10 @@ local function PlayerClass()
 end
 
 -- Two-step confirm for menu tools that discard data
-StaticPopupDialogs = StaticPopupDialogs or {}
+-- Only our own key: never assign the StaticPopupDialogs global itself.
+-- Writing a game global from addon code "taints" it, and the game reads this
+-- one when Escape is pressed, before it builds the game menu, so the menu's
+-- Log Out button was blocked ("callback() blocked, blamed WatchingMachine").
 StaticPopupDialogs["WM_CONFIRM_TOOL"] = {
     text = "%s",
     button1 = YES or "Yes",
@@ -1939,11 +1942,10 @@ function WM:CreateSettingsPanel()
         get = function() return not (WatchingMachineDB and WatchingMachineDB.gameMenuButton == false) end,
         set = function(v)
             if WatchingMachineDB then WatchingMachineDB.gameMenuButton = v and true or false end
-            if WM.UpdateGameMenuButton and WM.gameMenuHooked then WM:UpdateGameMenuButton() end
         end,
-        tooltip = { "Game Menu Button", "A Watching Machine button just below the menu Escape opens."
-            .. " Click it to open the dashboard. It sits outside the menu and changes nothing in it."
-            .. " Turned off, the addon doesn't touch the menu at all (after a /reload)." },
+        tooltip = { "Game Menu Button", "Adds a Watching Machine button above Log Out in the menu"
+            .. " Escape opens, like ElvUI's. Click it to open the dashboard. Takes effect the next"
+            .. " time the menu opens; turned off, the addon doesn't touch the menu (after a /reload)." },
     })
     L:Row(20):Text({
         font = "GameFontNormalSmall",
