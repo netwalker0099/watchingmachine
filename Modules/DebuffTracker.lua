@@ -1695,6 +1695,7 @@ function DebuffTracker:InspectNextForSR()
 
     scan.current = { unit = unit, name = m.name, guid = UnitGUID(unit) }
     local current = scan.current
+    if WM.NoteInspect then WM:NoteInspect("Debuff Tracker") end
     NotifyInspect(unit)
     WM.RunAfter(SR_INSPECT_TIMEOUT, function()
         if srScan == scan and scan.current == current then

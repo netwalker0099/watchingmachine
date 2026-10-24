@@ -57,7 +57,10 @@ env.GetInventoryItemLink = function(u, slot) return U(u) and U(u).gear[slot] end
 env.GetInventoryItemID = function(u, slot) local l = U(u) and U(u).gear[slot]; return l and Id(l) end
 local inCombat, inRange = false, true
 env.InCombatLockdown = function() return inCombat end
-env.CheckInteractDistance = function() return inRange end
+local distIndex, closeBy = nil, true
+env.CheckInteractDistance = function(_, i) distIndex = i; if i == 2 then return inRange and closeBy end return inRange end
+local resting = false
+env.IsResting = function() return resting end
 env.CanInspect = function() return true end
 local notified, cleared = {}, 0
 env.NotifyInspect = function(u) notified[#notified + 1] = u end
@@ -196,6 +199,17 @@ units.mouseover = { guid = "Player-1-0009", name = "Stranger", class = "MAGE", g
 local t2 = Tip()
 before = #notified
 clock = clock + 2
+-- In town: not inspected (crowds go past your mouse)
+resting = true
+check("in town: players you mouse over aren't inspected", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before)
+resting = false
+t2 = Tip()
+-- Within the 28-yard check but not close by: the game would say "too far away"
+closeBy = false
+check("mouseover: not inspected unless close by", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before
+    and distIndex == 2)
+closeBy = true
+t2 = Tip()
 check("unit tooltip: unknown player inspected", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before + 1)
 env.GameTooltip = t2
 t2.GetUnit = function() return "Stranger", "mouseover" end

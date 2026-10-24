@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48.3 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48.4 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -665,8 +665,11 @@ A gear score and average item level for you and every player you mouse over
   5% and gems 5 each; hunters' ranged weapons count more and melee less.
   Colours run grey, white, green, blue, purple, orange
 - **Player tooltips:** "GearScore: 1650  iLvl: 112". Players you mouse over
-  are inspected automatically: out of combat, within inspect range, one at
-  a time, never while your own inspect window is open. Scores are kept by
+  are inspected automatically: out of combat, close by (3.48.4: within
+  trade distance, since the game's own inspect range is shorter than its
+  28-yard check and it says "You are too far away" otherwise), one at a
+  time, never while your own inspect window is open, and not in towns or
+  inns unless *... in towns and inns too* is ticked. Scores are kept by
   name for a week
 - **Item tooltips:** the item's score. *Item tooltip details* adds its base
   score, enchant and gem bonuses (or what's missing), and what equipping it
@@ -869,6 +872,9 @@ Built-in error capture system for debugging.
 - `/wmachine menubutton off` (then `/reload`) removes the Watching Machine
   button from the Escape menu and stops the addon touching the menu at all;
   `/wmachine menubutton on` puts it back
+- A red game error that appears within 2 seconds of a Watching Machine
+  inspect (GearScore, ArmorySnap, Debuff Tracker) is noted too, with the
+  module, and `/wmachine diag` (the same report) shows it
 
 ## Installation
 
@@ -1099,6 +1105,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.48.4
+- **GearScore:** no more "You are too far away" in town: players you mouse over are only inspected when close by, and not in towns or inns unless you tick it
 
 ### Version 3.48.3
 - **Fixed: Log Out in the Escape menu blocked by the game** ("callback() blocked, blamed WatchingMachine"): the addon no longer writes any of the game's globals. The menu button is back above Log Out

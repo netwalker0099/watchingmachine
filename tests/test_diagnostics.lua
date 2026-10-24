@@ -96,6 +96,22 @@ D:SetMenuButton(true)
 WM:SetupGameMenuButton()
 check("on: hooked", hooks > 0)
 
+-- ---- Game errors right after our inspects ----
+local now = 100
+env.GetTime = function() return now end
+WM:NoteInspect("GearScore")
+now = 101
+Event("UI_ERROR_MESSAGE", 50, "You are too far away!")
+check("an error just after our inspect is noted, with the module", log[#log].kind == "inspecterr"
+    and log[#log].text:find("GearScore", 1, true) and log[#log].text:find("too far away", 1, true))
+local count = #log
+now = 110
+Event("UI_ERROR_MESSAGE", 50, "Not enough rage")
+check("errors long after are left alone", #log == count)
+W.printed = {}
+D:Report()
+check("report: says which module", Said("right after an inspect") and Said("GearScore"))
+
 for _ = 1, 80 do D:Note("x", "filler") end
 check("the record is kept short", #log == 60)
 

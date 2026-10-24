@@ -2,7 +2,24 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48.3** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48.4** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48.4
+
+- **Fixed: "You are too far away" now and then in town** (sitting around,
+  or jumping, which sweeps the cursor over other players). GearScore
+  inspects players you mouse over, and checked range with the game's
+  28-yard test; the game's real inspect range is shorter, so some inspects
+  failed with that message. Players you mouse over are now inspected only
+  when close by (trade distance), checked again just before the inspect.
+- **GearScore no longer inspects players you mouse over in towns and inns**
+  (where you're resting) by default: crowds go past your mouse there. A new
+  option, *... in towns and inns too*, turns it back on. Group members are
+  still scored as before.
+- `/wmachine diag` now also notes any red game error that comes within 2
+  seconds of a Watching Machine inspect, and which module made it.
 
 ---
 

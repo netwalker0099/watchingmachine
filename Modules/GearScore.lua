@@ -36,7 +36,8 @@ local DEFAULTS = {
     itemTooltip = true,     -- score on item tooltips
     itemDetails = false,    -- base / enchant / gems / upgrade lines on item tooltips
     paperDoll = true,       -- score on the character and inspect frames
-    autoInspect = true,     -- inspect players you mouse over (out of combat, in range)
+    autoInspect = true,     -- inspect players you mouse over (out of combat, close by)
+    inspectInTowns = false, -- ... also while resting (towns, inns): crowds of players
     keepDays = 7,           -- how long others' scores are kept
 }
 GS.DEFAULTS = DEFAULTS
@@ -353,12 +354,16 @@ local function InspectWindowOpen()
     return type(f) == "table" and f.IsShown and f:IsShown()
 end
 
-local function CanInspectUnit(unit)
+-- close: within trade distance (about 8-11 yards) rather than the 28-yard
+-- check. The game's real inspect range is shorter than that check, so a
+-- player passing it can still be too far, and the game then says "You are
+-- too far away" in the middle of the screen. Mouseover inspects use close.
+local function CanInspectUnit(unit, close)
     if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) or UnitIsUnit(unit, "player") then return false end
     if InCombatLockdown and InCombatLockdown() then return false end
     if CanInspect and not CanInspect(unit) then return false end
     if CheckInteractDistance then
-        local ok, near = pcall(CheckInteractDistance, unit, 1)
+        local ok, near = pcall(CheckInteractDistance, unit, close and 2 or 1)
         if ok and not near then return false end
     end
     return true
@@ -366,14 +371,15 @@ end
 GS.CanInspectUnit = CanInspectUnit
 
 -- Ask to inspect a unit (soon). force: even if we know a recent score.
-function GS:QueueInspect(unit, force)
-    if not On() or not CanInspectUnit(unit) then return false end
+-- close: only while they're close by (mouseover inspects)
+function GS:QueueInspect(unit, force, close)
+    if not On() or not CanInspectUnit(unit, close) then return false end
     local guid = UnitGUID(unit)
     if not guid or queued[guid] then return false end
     local e = byGUID[guid]
     if e and not force and Now() - (e.at or 0) < FRESH then return false end
     queued[guid] = true
-    queue[#queue + 1] = { unit = unit, guid = guid, tries = 0 }
+    queue[#queue + 1] = { unit = unit, guid = guid, tries = 0, close = close }
     while #queue > MAX_QUEUE do queued[table.remove(queue, 1).guid] = nil end
     self:NextInspect()
     return true
@@ -390,8 +396,9 @@ function GS:NextInspect()
     if InspectWindowOpen() or t - lastNotify < INSPECT_GAP then return end
     while #queue > 0 do
         local job = table.remove(queue, 1)
-        if UnitGUID(job.unit) == job.guid and CanInspectUnit(job.unit) then
+        if UnitGUID(job.unit) == job.guid and CanInspectUnit(job.unit, job.close) then
             current, currentAt, lastNotify = job, t, t
+            if WM.NoteInspect then WM:NoteInspect("GearScore") end
             NotifyInspect(job.unit)
             return job
         end
@@ -458,8 +465,10 @@ function GS:AddUnitTooltip(tip, unit)
         entry = { score = score, ilvl = ilvl }
     else
         entry = self:Known(unit)
-        if DB().autoInspect and not (entry and byGUID[guid] and Now() - (entry.at or 0) < FRESH) then
-            self:QueueInspect(unit)
+        local resting = IsResting and IsResting()
+        if DB().autoInspect and (DB().inspectInTowns or not resting)
+            and not (entry and byGUID[guid] and Now() - (entry.at or 0) < FRESH) then
+            self:QueueInspect(unit, false, true)
         end
     end
     if not entry or (entry.score or 0) <= 0 then return false end
@@ -844,7 +853,11 @@ function GS:CreateUI()
     L:Section({ key = "options", title = "Options" })
     L:Checkbox({ label = "GearScore on player tooltips", get = function() return DB().unitTooltip end, set = function(v) DB().unitTooltip = v end })
     L:Checkbox({ label = "Inspect players you mouse over", get = function() return DB().autoInspect end, set = function(v) DB().autoInspect = v end,
-        tooltip = { "Inspecting", "Out of combat and within inspect range, one player at a time. Never while your own inspect window is open." } })
+        tooltip = { "Inspecting", "Out of combat and close by, one player at a time. Never while your own inspect window is open." } })
+    L:Checkbox({ label = "... in towns and inns too", get = function() return DB().inspectInTowns end,
+        set = function(v) DB().inspectInTowns = v end, disabled = function() return not DB().autoInspect end,
+        tooltip = { "In towns", "Off: no inspecting while you're resting (towns, inns), where crowds of players go past"
+            .. " your mouse. Players in your group are still scored." } })
     L:Checkbox({ label = "GearScore on item tooltips", get = function() return DB().itemTooltip end, set = function(v) DB().itemTooltip = v end })
     L:Checkbox({ label = "Item tooltip details (enchant, gems, upgrade)", get = function() return DB().itemDetails end, set = function(v) DB().itemDetails = v end,
         tooltip = { "Details", "The item's base score, its enchant and gem bonuses (or what's missing), and what equipping it would change for you." } })
@@ -910,8 +923,13 @@ function GS:SetupPage(L)
         tooltip = { "Player tooltips", "A GearScore and iLvl line when you mouse over another player (or yourself)." } })
     L:Checkbox({ label = "Inspect players you mouse over", get = function() return DB().autoInspect end,
         set = function(v) DB().autoInspect = v end,
-        tooltip = { "Inspecting", "Needed for other players' scores. Out of combat and within inspect range, one"
-            .. " player at a time. Off: only scores you already have are shown." } })
+        tooltip = { "Inspecting", "Needed for other players' scores. Out of combat and close by, one player at a"
+            .. " time. Off: only scores you already have are shown." } })
+    L:Checkbox({ label = "... in towns and inns too", get = function() return DB().inspectInTowns end,
+        set = function(v) DB().inspectInTowns = v end, disabled = function() return not DB().autoInspect end,
+        tooltip = { "In towns", "Off (the default): no inspecting players you mouse over while you're resting"
+            .. " (towns, inns), where crowds go past your mouse and you'd see \"You are too far away\" now and then."
+            .. " Players in your group are still scored." } })
     L:Checkbox({ label = "GearScore on item tooltips", get = function() return DB().itemTooltip end,
         set = function(v) DB().itemTooltip = v end,
         tooltip = { "Item tooltips", "The item's own score, on bags, links, loot and the auction house." } })

@@ -48,6 +48,24 @@ function D:OnBlocked(event, addon, func)
 end
 
 -- ============================================
+-- ERRORS RIGHT AFTER OUR INSPECTS
+-- ============================================
+-- GearScore, ArmorySnap and the Debuff Tracker inspect players. A red game
+-- error ("You are too far away") within 2 seconds of one is noted with the
+-- module that asked, so /wmachine diag can say where it came from.
+
+D.lastInspect = nil
+function WM:NoteInspect(module)
+    D.lastInspect = { module = module, at = GetTime and GetTime() or 0 }
+end
+
+function D:OnUIError(msg)
+    local li = self.lastInspect
+    if not li or not GetTime or GetTime() - li.at > 2 then return end
+    self:Note("inspecterr", string.format("Game error just after a %s inspect: %s", li.module, tostring(msg)))
+end
+
+-- ============================================
 -- THE MENU BUTTON vs LOG OUT
 -- ============================================
 
@@ -115,6 +133,12 @@ function D:Report()
         for i = math.max(1, #blocked - 5), #blocked do p(blocked[i].when .. "  " .. blocked[i].text) end
     end
     local errs = (WatchingMachineDB and WatchingMachineDB.errorLog) or WM._errorLog or {}
+    local inspectErrs = {}
+    for _, e in ipairs(log) do if e.kind == "inspecterr" then inspectErrs[#inspectErrs + 1] = e end end
+    if #inspectErrs > 0 then
+        p(string.format("|cFFFF8800%d game error(s) right after an inspect|r (newest: %s). GearScore's options can turn off"
+            .. " inspecting players you mouse over.", #inspectErrs, inspectErrs[#inspectErrs].text))
+    end
     p("Watching Machine errors recorded: " .. #errs .. (#errs > 0 and " (/wmachine errors)" or ""))
     p("|cFFFFFFFFRecent events:|r")
     for i = math.max(1, #log - 8), #log do
@@ -144,7 +168,7 @@ end
 
 local events = CreateFrame("Frame")
 for _, ev in ipairs({ "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN", "PLAYER_CAMPING", "PLAYER_QUITING",
-    "LOGOUT_CANCEL", "PLAYER_LOGIN" }) do
+    "LOGOUT_CANCEL", "PLAYER_LOGIN", "UI_ERROR_MESSAGE" }) do
     pcall(events.RegisterEvent, events, ev)
 end
 events:SetScript("OnEvent", function(_, event, a1, a2)
@@ -157,6 +181,9 @@ events:SetScript("OnEvent", function(_, event, a1, a2)
             D:Note("camping", "Quit countdown started")
         elseif event == "LOGOUT_CANCEL" then
             D:Note("cancel", "Logout cancelled (moving, combat, or Cancel)")
+        elseif event == "UI_ERROR_MESSAGE" then
+            -- (messageType, message) on current clients, (message) on older ones
+            D:OnUIError(type(a2) == "string" and a2 or a1)
         elseif event == "PLAYER_LOGIN" then
             D:Note("login", "Logged in (v" .. tostring(WM.version) .. ")")
         end

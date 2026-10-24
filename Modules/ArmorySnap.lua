@@ -523,6 +523,7 @@ local function TryInspectUnit(unit)
 
     s.inspecting  = true
     s.currentUnit = unit
+    if WM.NoteInspect then WM:NoteInspect("ArmorySnap") end
     NotifyInspect(unit)
 
     inspectTimer = C_Timer.NewTimer(INSPECT_TIMEOUT, function()
@@ -692,6 +693,7 @@ function AS.TakeManualSnapshot(label)
                 ClearInspectPlayer()
                 C_Timer.After(CHAIN_DELAY, DoNext)
             end)
+            if WM.NoteInspect then WM:NoteInspect("ArmorySnap") end
             NotifyInspect(unit)
             timer = C_Timer.NewTimer(INSPECT_TIMEOUT, function()
                 if waiting then
