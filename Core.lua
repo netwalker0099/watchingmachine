@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.46.1"
+WM.version = "3.46.2"
 WM.modules = {}
 
 -- ============================================
@@ -1116,6 +1116,28 @@ function WM:CreateDashboard()
     fitBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.fitBtn = fitBtn
 
+    -- Hide inactive: only the modules that are on for this character
+    local hideBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    hideBtn:SetSize(104, 18)
+    hideBtn:SetPoint("LEFT", fitBtn, "RIGHT", 4, 0)
+    function hideBtn:Refresh()
+        self:SetText(WM:HideInactive() and "Show all" or "Hide inactive")
+    end
+    hideBtn:SetScript("OnClick", function(self)
+        WM:SetHideInactive(not WM:HideInactive())
+    end)
+    hideBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(WM:HideInactive() and "Show all" or "Hide inactive", 1, 0.8, 0)
+        GameTooltip:AddLine(WM:HideInactive() and "Show every module again, including the ones that are off."
+            or "Show only the modules that are on for this character. Turn more on with Show all and their"
+            .. " switches, or the Setup button.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    hideBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    hideBtn:Refresh()
+    frame.hideInactiveBtn = hideBtn
+
     -- Cards reflow live while the corner is dragged
     frame:HookScript("OnSizeChanged", function() WM:LayoutCards() end)
 
@@ -1510,12 +1532,30 @@ local function Columns(width)
     return math.max(1, math.floor((width + COL_GAP) / (CARD_MIN_W + COL_GAP)))
 end
 
+-- "Hide inactive" on the dashboard (per character): only modules that are on
+function WM:HideInactive() return self:CharState().hideInactive and true or false end
+
+local function CardShown(name)
+    return not WM:HideInactive() or ModuleOn(name)
+end
+
+-- The groups' modules that have a card showing
+local function ShownModules(group)
+    local out = {}
+    for _, name in ipairs(group.modules) do
+        if CardShown(name) then out[#out + 1] = name end
+    end
+    return out
+end
+
 -- Height of the card list laid out in this many columns
 local function CardsHeight(cols)
     local h = 0
     for _, group in ipairs(MODULE_GROUPS) do
-        h = h + GROUP_H + math.ceil(#group.modules / cols) * (CARD_H + CARD_GAP) + 4
+        local n = #ShownModules(group)
+        if n > 0 then h = h + GROUP_H + math.ceil(n / cols) * (CARD_H + CARD_GAP) + 4 end
     end
+    if h == 0 then h = GROUP_H * 3 end   -- room for the "nothing on" note
     return h
 end
 
@@ -1558,13 +1598,20 @@ function WM:LayoutCards()
     local y = 0
     for gi, group in ipairs(MODULE_GROUPS) do
         local header = dashboard.groupHeaders[gi]
+        local shown = ShownModules(group)
+        -- With inactive modules hidden, a group with nothing on goes too
+        for _, moduleName in ipairs(group.modules) do
+            local card = dashboard.moduleCards[moduleName]
+            if card then card:SetShown(CardShown(moduleName)) end
+        end
         if header then
+            header:SetShown(#shown > 0)
             header:ClearAllPoints()
             header:SetPoint("TOPLEFT", container, "TOPLEFT", 4, -(y + 4))
         end
-        y = y + GROUP_H
+        if #shown > 0 then y = y + GROUP_H end
         local n = 0
-        for _, moduleName in ipairs(group.modules) do
+        for _, moduleName in ipairs(shown) do
             local card = dashboard.moduleCards[moduleName]
             if card then
                 local col, row = n % cols, math.floor(n / cols)
@@ -1578,7 +1625,11 @@ function WM:LayoutCards()
                 n = n + 1
             end
         end
-        y = y + math.ceil(n / cols) * (CARD_H + CARD_GAP) + 4
+        if n > 0 then y = y + math.ceil(n / cols) * (CARD_H + CARD_GAP) + 4 end
+    end
+    if dashboard.noneOnText then
+        dashboard.noneOnText:SetShown(y == 0)
+        if y == 0 then y = GROUP_H * 3 end
     end
     -- Scroll child must be tall enough for everything, or the lower cards
     -- are unreachable
@@ -1592,6 +1643,14 @@ function WM:CreateModuleCards()
     local container = dashboard.cardsContainer
     local width = container:GetWidth()
     dashboard.groupHeaders = {}
+
+    -- Shown when inactive modules are hidden and none are on
+    local none = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    none:SetPoint("TOP", container, "TOP", 0, -12)
+    none:SetText("|cFF888888No modules are on for this character.|r\nClick |cFFFFFFFFShow all|r above to see"
+        .. " them all, or |cFFFFFFFFSetup|r below.")
+    none:Hide()
+    dashboard.noneOnText = none
 
     for gi, group in ipairs(MODULE_GROUPS) do
         local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1723,8 +1782,20 @@ function WM:CreateModuleCards()
     self:UpdateDashboard()
 end
 
+-- Hide (or show again) the cards of modules that are off on this character
+function WM:SetHideInactive(v)
+    self:CharState().hideInactive = v and true or false
+    if dashboard then
+        if dashboard.hideInactiveBtn then dashboard.hideInactiveBtn:Refresh() end
+        self:LayoutCards()
+        self:UpdateDashboard()
+    end
+end
+
 function WM:UpdateDashboard()
     if not dashboard or not dashboard:IsShown() then return end
+    -- A switch turned off with inactive modules hidden: its card goes
+    if self:HideInactive() then self:LayoutCards() end
 
     for moduleName, card in pairs(dashboard.moduleCards) do
         local module = self.modules[moduleName]

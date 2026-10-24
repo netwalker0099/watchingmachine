@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.46.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.46.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -886,6 +886,11 @@ opens the dashboard. Everything the addon does can be reached from it.
 - **Resizable:** drag the bottom-right corner. Cards reflow into as many
   columns as fit the width, and the size is remembered. **Fit** (top left)
   goes back to the size that shows every card.
+- **Hide inactive** (top left, next to Fit) shows only the modules that are
+  on for this character; groups with nothing on disappear, and a card goes
+  as soon as you switch its module off. **Show all** brings every card back.
+  It's remembered per character, and Fit sizes the dashboard to what's
+  showing.
 - **Hover a card** to see what the module does, its full status, and its
   slash command.
 - The **on/off switch** on every card turns the module on or off for the
@@ -1018,6 +1023,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.46.2
+- **Hide inactive** button on the dashboard: only the modules that are on for this character (Show all brings the rest back)
 
 ### Version 3.46.1
 - **Run the setup again** with `/wmachine setup` (or `/wmachine resetup`, or the dashboard's new Setup button): what's on stays ticked and settings keep their values unless you change them

@@ -67,7 +67,9 @@ end
 P.DeepCopy = DeepCopy
 
 function P.CharKey()
-    return (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+    local name = UnitName and UnitName("player")
+    local realm = GetRealmName and GetRealmName()
+    return (type(name) == "string" and name or "?") .. "-" .. (type(realm) == "string" and realm or "?")
 end
 
 P.profiles = {}      -- [saved variable] = this character's live profile table

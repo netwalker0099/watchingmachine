@@ -223,6 +223,34 @@ check("dashboard: off on this character", card.statusText:GetText():find("Off on
 W.click(card.switch)
 check("dashboard: the switch turns it on", WM:IsModuleOn("Recruiter"))
 
+-- ---- Hide inactive ----
+local hb = WM.dashboard.hideInactiveBtn
+check("hide inactive: a button at the top", hb and hb:GetText() == "Hide inactive")
+WM:SetModuleOn("Recruiter", false)
+WM:SetModuleOn("GuildInvite", true)
+W.click(hb)
+local cards2 = WM.dashboard.moduleCards
+check("hide inactive: off modules' cards hidden", not cards2.Recruiter:IsShown() and cards2.GuildInvite:IsShown()
+    and hb:GetText() == "Show all")
+check("hide inactive: saved for this character", c.hideInactive == true)
+local function HeaderFor(title)
+    for gi, g in ipairs(WM.MODULE_GROUPS) do if g.title == title then return WM.dashboard.groupHeaders[gi] end end
+end
+local savedMods = {}
+for k, v in pairs(c.modules) do savedMods[k] = v end
+for _, n in ipairs(WM.MODULE_GROUPS[3].modules) do WM:SetModuleOn(n, false) end
+check("hide inactive: a group with nothing on goes", not HeaderFor(WM.MODULE_GROUPS[3].title):IsShown())
+WM:SetModuleOn("GuildInvite", false)
+check("hide inactive: turning a switch off hides its card", not cards2.GuildInvite:IsShown())
+for _, m in ipairs(WM.Setup:Modules()) do WM:SetModuleOn(m.name, false) end
+check("hide inactive: nothing on says so", WM.dashboard.noneOnText:IsShown())
+local w, h = WM:DashboardFitSize()
+check("hide inactive: Fit sizes to what's shown", h < 400)
+W.click(hb)
+check("show all: every card back", cards2.Recruiter:IsShown() and cards2.GuildInvite:IsShown()
+    and not WM.dashboard.noneOnText:IsShown() and hb:GetText() == "Hide inactive" and c.hideInactive == false)
+for k, v in pairs(savedMods) do WM:SetModuleOn(k, v) end
+
 -- ---- Running the setup again ----
 local function Snapshot()
     local out = {}

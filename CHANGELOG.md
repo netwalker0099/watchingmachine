@@ -2,7 +2,20 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.46.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.46.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.46.2
+
+- **Hide inactive** button at the top of the dashboard, next to Fit: shows
+  only the modules that are on for this character. Groups with nothing on
+  disappear, a card goes as soon as you switch its module off, and with
+  nothing on the dashboard says so and points to Show all and Setup.
+  **Show all** brings every card back. Remembered per character; Fit sizes
+  the dashboard to the cards showing.
+- The character key no longer errors if the client hasn't given the
+  player's name yet.
 
 ---
 
