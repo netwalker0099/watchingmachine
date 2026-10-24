@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.47.2 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -745,6 +745,13 @@ own code, written from the ground up for reliability.
   changes (the rest are left alone, and a ticked empty slot means "take it
   off"). Equip from the window, the macro `/wmachine gear equip <name>`, or
   *Undo last swap* to put back what you wore before
+- **Dressing room** (3.48): the set editor shows your character wearing the
+  set, with its 19 slots around it like the character sheet. Click a slot to
+  choose from everything you own that fits (what you wear, your bags, the
+  bank when it's open), or to take it off; right-click to leave it out of
+  the set. Faded slots aren't part of the set (the model shows what you wear
+  there now). Drag the model to turn it. The slots are also listed as tick
+  boxes below
 - **Talent spec swaps:** give a set a spec (Spec 1 or Spec 2, shown with
   its talent tree) and tick *Equip it when I switch to that spec*. Switching
   spec then puts it on by itself. *Automatic swaps* in its options turns
@@ -766,8 +773,11 @@ own code, written from the ground up for reliability.
   says when it's in your bank (from Your Characters). Opening the character
   sheet shows a warning with the list, and the slots of your current set
   that are missing an item are marked red
-- **Quick swap:** hold Alt and point at a character sheet slot to see what
-  in your bags fits it; click one to put it on
+- **Slot menu** (3.48, like ItemRack's): point at a character sheet slot
+  for a row of every item that fits it, from your bags (and the bank while
+  it's open); click one to swap it in. It stays while the mouse is on the
+  slot or the row. Options: on hover (the default), only with Alt held, or
+  off
 - **The window:** every set with its icon, *wearing* / *N to change* /
   *N missing*, its spec, mounted and PvP badges; hover for the items, and
   *Equip*, *Edit* and *Delete*
@@ -1035,6 +1045,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.48
+- **Gear Sets:** a dressing room in the set editor (your character wearing the set, click a slot to choose its item), and an ItemRack-style slot menu on the character sheet (hover a slot for everything that fits it; click to swap)
 
 ### Version 3.47.2
 - **Your Characters:** logging out no longer wipes a character's gold, bags and gear (the last snapshot from playing is kept)

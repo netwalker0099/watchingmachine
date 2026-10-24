@@ -418,21 +418,50 @@ check("warning can be turned off", not badge:IsShown())
 GS.DB().dollWarning = true
 GS.Char().sets.DPS.items[19] = nil
 
--- Quick swap: Alt over a slot
+-- Slot menu: hover a character sheet slot for what else fits
 local slotFrame = env.CharacterTrinket1Slot
-alt = true
+alt = false
 slotFrame:_fire("OnEnter")
 local q = env.WM_GearSetsQuick
-check("Alt over a trinket slot: trinkets in your bags", q and q:IsShown() and q.buttons[1]:IsShown()
-    and (q.buttons[1].loc.str == GS.ItemString(TRINK_A2) or q.buttons[1].loc.str == GS.ItemString(CROP)))
+check("hover a trinket slot: the trinkets in your bags", q and q:IsShown() and q.buttons[1]:IsShown()
+    and type(q.buttons[1].choice) == "table")
+local inMenu = {}
+for _, b in ipairs(q.buttons) do if b:IsShown() then inMenu[b.choice.str] = true end end
+check("... only ones you're not wearing", inMenu[GS.ItemString(CROP)] and not inMenu[GS.ItemString(inv[13])]
+    and not inMenu[GS.ItemString(inv[14])])
+check("... no set-editor buttons here", not inMenu["off"] and not inMenu["none"])
 local pick
-for _, b in ipairs(q.buttons) do if b:IsShown() and b.loc.str == GS.ItemString(CROP) then pick = b end end
+for _, b in ipairs(q.buttons) do if b:IsShown() and b.choice.str == GS.ItemString(CROP) then pick = b end end
 pick._scripts.OnClick(pick)
 Run()
 check("click one: it goes on", inv[14] == CROP and not q:IsShown())
-alt = false
 GS:Equip({ [14] = GS.ItemString(TRINK_B) }, "x", true)
 Run()
+-- Leaving the slot and the menu closes it
+slotFrame:_fire("OnEnter")
+env.MouseIsOver = function() return false end
+q._scripts.OnUpdate(q, 0.3)
+check("mouse gone: the menu closes", not q:IsShown())
+-- Alt only, or never
+GS.DB().slotMenu = "alt"
+slotFrame:_fire("OnEnter")
+check("Alt mode: plain hover does nothing", not q:IsShown())
+alt = true
+slotFrame:_fire("OnEnter")
+check("Alt mode: Alt-hover shows it", q:IsShown())
+q:Hide()
+GS.DB().slotMenu = "off"
+slotFrame:_fire("OnEnter")
+check("off: never", not q:IsShown())
+alt = false
+GS.DB().slotMenu = "hover"
+check("an old 'quick menu off' setting carries over", (function()
+    local saved = env.WMGearSetsDB.slotMenu
+    env.WMGearSetsDB.slotMenu, env.WMGearSetsDB.quickMenu = nil, false
+    local mode = GS.DB().slotMenu
+    env.WMGearSetsDB.slotMenu, env.WMGearSetsDB.quickMenu = saved, nil
+    return mode == "off"
+end)())
 
 -- ---- Window ----
 GS:Toggle()
@@ -462,6 +491,48 @@ W.click(box)
 check("untick: not part of the set", e.draft.items[13] == nil)
 local spinfo = e.slotBoxes[14].Text:GetText()
 check("slot label", spinfo:find("Trinket 2", 1, true) and spinfo:find("Riding Crop", 1, true))
+-- The dressing room
+local room = env.WM_GearSetDressingRoom
+local model = env.WM_GearSetModel
+local tried, undressed, unitSet = {}, {}, 0
+model.SetUnit = function() unitSet = unitSet + 1; tried, undressed = {}, {} end
+model.TryOn = function(_, link) tried[#tried + 1] = link end
+model.UndressSlot = function(_, slot) undressed[slot] = true end
+e.draft.items[17] = false
+e:Refresh()
+check("dressing room: a button for every slot", (function()
+    for slot = 1, 19 do if not room.slots[slot] then return false end end
+    return true
+end)())
+check("dressing room: the set's item in its slot", room.slots[14].state == "item")
+check("dressing room: take-it-off slot", room.slots[17].state == "off" and room.slots[17].mark:GetText():find("off", 1, true))
+check("dressing room: slots not in the set are faded", room.slots[1].state == "none" and room.slots[1]._alpha < 1)
+check("dressing room: the model wears the set", unitSet > 0 and tried[1] == "item:" .. GS.ItemString(CROP) and undressed[17])
+-- Click a slot: the picker, with what you wear, your bags, take-off and not-in-set
+local sb = room.slots[13]
+sb._scripts.OnClick(sb, "LeftButton")
+local pq = env.WM_GearSetsQuick
+local kinds, worn, bagged = {}, false, false
+for _, b in ipairs(pq.buttons) do
+    if b:IsShown() then
+        if type(b.choice) == "table" then
+            if b.choice.inv then worn = true else bagged = true end
+        else kinds[b.choice] = true end
+    end
+end
+check("dressing room picker: worn and bag items that fit, and the two extras", worn and bagged and kinds.off and kinds.none)
+local bagPick
+for _, b in ipairs(pq.buttons) do
+    if b:IsShown() and type(b.choice) == "table" and not b.choice.inv then bagPick = b end
+end
+bagPick._scripts.OnClick(bagPick)
+check("dressing room: picking puts it in the set", e.draft.items[13] == bagPick.choice.str and room.slots[13].state == "item")
+check("... without equipping anything", inv[13] ~= nil and GS.ItemString(inv[13]) ~= bagPick.choice.str)
+sb._scripts.OnClick(sb, "LeftButton")
+for _, b in ipairs(pq.buttons) do if b:IsShown() and b.choice == "off" then b._scripts.OnClick(b) break end end
+check("dressing room: take it off", e.draft.items[13] == false)
+sb._scripts.OnClick(sb, "RightButton")
+check("dressing room: right-click leaves it out", e.draft.items[13] == nil and room.slots[13].state == "none")
 e:Hide()
 
 -- ---- Commands and status ----

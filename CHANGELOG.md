@@ -2,7 +2,28 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.47.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48
+
+### Gear Sets
+
+- **Dressing room** in the set editor: your character wearing the set, with
+  the 19 slots around it like the character sheet. Click a slot for
+  everything you own that fits it (what you wear, your bags, the bank while
+  it's open), plus *take it off* and *not part of the set*; right-click a
+  slot to leave it out. Slots not in the set are faded and the model shows
+  what you wear there now. Drag the model to turn it. The tick-box list of
+  slots is still there below it.
+- **Slot menu** on the character sheet, like ItemRack's: point at a slot
+  and a row of every item that fits it appears (bags, and the bank while
+  it's open; worn items marked); click one to swap it in through the same
+  swap engine as sets. It stays while the mouse is on the slot or the row.
+  A new *Slot menu* option: on hover (default), only on Alt + hover, or off.
+  (It replaces the old Alt-only quick swap; turning that off carries over.)
+- Fixed: choosing *take it off* in the picker now does that.
 
 ---
 

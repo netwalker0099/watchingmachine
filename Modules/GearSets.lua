@@ -54,12 +54,14 @@ local DEFAULTS = {
     reportDone = true,       -- "Equipped Tank." in chat
     reportMissing = true,    -- chat alert when a set's item is missing
     dollWarning = true,      -- warning on the character sheet
-    quickMenu = true,        -- Alt over a character sheet slot: what fits it
+    slotMenu = "hover",      -- character sheet slots show what else fits: hover / alt / off
 }
 
 local function DB()
     WMGearSetsDB = WMGearSetsDB or {}
     local db = WMGearSetsDB
+    -- 3.47 and before: an Alt-only menu, on unless turned off
+    if db.slotMenu == nil and db.quickMenu == false then db.slotMenu = "off" end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.chars) ~= "table" then db.chars = {} end
     return db
@@ -763,62 +765,139 @@ function GS:HideDoll()
     self.dollMissing = nil
 end
 
--- Alt over a slot on the character sheet: what in your bags fits it
-local quick
-function GS:ItemsFor(slot)
+-- ============================================
+-- SLOT PICKER: everything you could wear in a slot
+-- ============================================
+-- Hover a character sheet slot (or Alt-hover, or never: an option) for
+-- the items you own that fit it; click one to swap it in. The set
+-- editor's dressing room uses the same picker to choose a set's items.
+
+-- Items you own that fit a slot: your bags (and the bank while it's open);
+-- with worn = true, what you're wearing that fits too
+function GS:ItemsFor(slot, worn)
     local out = {}
     for _, loc in ipairs(GS.Scan().all) do
-        if not loc.inv then
+        if worn or not loc.inv then
             for _, s in ipairs(FITS[EquipLoc(loc.link) or ""] or {}) do
                 if s == slot then out[#out + 1] = loc; break end
             end
         end
     end
+    -- Worn first, then bags, then the bank
+    local function Rank(l) return l.inv and 0 or (l.bank and 2 or 1) end
+    table.sort(out, function(a, b)
+        if Rank(a) ~= Rank(b) then return Rank(a) < Rank(b) end
+        return (a.link or "") < (b.link or "")
+    end)
     return out
 end
 
-function GS:ShowQuickMenu(slot, anchor)
-    if not On() or not DB().quickMenu then return end
-    local items = self:ItemsFor(slot)
-    if #items == 0 then if quick then quick:Hide() end return end
+local quick
+local PICK_COLS, PICK_SIZE = 8, 30
+local SLOT_MENU_OPTIONS = { { value = "hover", text = "On hover" }, { value = "alt", text = "On Alt + hover" },
+    { value = "off", text = "Off" } }
+
+local function ItemIcon(str)
+    local id = ItemID(str)
+    return (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)) or (GetItemIcon and GetItemIcon(id))
+        or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+local function PickerButton(i)
+    local b = CreateFrame("Button", nil, quick)
+    b:SetSize(PICK_SIZE, PICK_SIZE)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.tag = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    b.tag:SetPoint("BOTTOMRIGHT", -1, 1)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        if btn.choice == "off" then
+            GameTooltip:SetText("Take it off")
+            GameTooltip:AddLine("The set leaves this slot empty.", 0.8, 0.8, 0.8, true)
+        elseif btn.choice == "none" then
+            GameTooltip:SetText("Not part of the set")
+            GameTooltip:AddLine("The set leaves whatever you're wearing here alone.", 0.8, 0.8, 0.8, true)
+        else
+            GameTooltip:SetHyperlink(btn.choice.link)
+            if btn.choice.inv then GameTooltip:AddLine("Wearing it now", 0.4, 1, 0.4)
+            elseif btn.choice.bank then GameTooltip:AddLine("In your bank (it's open)", 0.4, 0.8, 1) end
+        end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnClick", function(btn)
+        local pick = quick.onPick
+        quick:Hide()
+        if not pick then return end
+        if btn.choice == "off" then pick(false) else pick(btn.choice) end
+    end)
+    quick.buttons[i] = b
+    return b
+end
+
+-- Show the picker beside anchor. opts: worn (include what you're
+-- wearing), extras ("take it off" and "not part of the set" buttons),
+-- onPick(choice): a location, false (take it off) or "none"
+function GS:ShowSlotMenu(slot, anchor, opts)
+    opts = opts or {}
+    local items = self:ItemsFor(slot, opts.worn)
+    local choices = {}
+    for _, loc in ipairs(items) do choices[#choices + 1] = loc end
+    if opts.extras then choices[#choices + 1] = "off"; choices[#choices + 1] = "none" end
+    if #choices == 0 then if quick then quick:Hide() end return nil end
     if not quick then
         quick = CreateFrame("Frame", "WM_GearSetsQuick", UIParent, "BackdropTemplate")
         quick:SetFrameStrata("DIALOG")
         if WM.SkinCard then WM:SkinCard(quick, { 0.8, 0.7, 0.4 }) end
         quick.buttons = {}
-        quick:SetScript("OnLeave", function(f) if not (MouseIsOver and MouseIsOver(f)) then f:Hide() end end)
+        quick.title = quick:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        quick.title:SetPoint("TOPLEFT", 6, -5)
+        -- Stays while the mouse is on the slot or the picker
+        local since = 0
+        quick:SetScript("OnUpdate", function(f, elapsed)
+            since = since + (elapsed or 0)
+            if since < 0.25 then return end
+            since = 0
+            if not MouseIsOver then return end
+            if not MouseIsOver(f) and not (f.anchor and MouseIsOver(f.anchor)) then f:Hide() end
+        end)
     end
-    for i, loc in ipairs(items) do
-        local b = quick.buttons[i]
-        if not b then
-            b = CreateFrame("Button", nil, quick)
-            b:SetSize(30, 30)
-            b:SetPoint("LEFT", 4 + (i - 1) * 32, 0)
-            b.icon = b:CreateTexture(nil, "ARTWORK")
-            b.icon:SetAllPoints()
-            b:SetScript("OnEnter", function(btn)
-                GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-                GameTooltip:SetHyperlink(btn.loc.link)
-                GameTooltip:Show()
-            end)
-            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            b:SetScript("OnClick", function(btn)
-                quick:Hide()
-                GS:Equip({ [btn.slot] = btn.loc.str }, SLOT_NAMES[btn.slot], true)
-            end)
-            quick.buttons[i] = b
+    quick.onPick, quick.anchor, quick.slot = opts.onPick, anchor, slot
+    quick.title:SetText(SLOT_NAMES[slot] .. (#items == 0 and ": nothing else fits" or ""))
+    for i, choice in ipairs(choices) do
+        local b = quick.buttons[i] or PickerButton(i)
+        b.choice = choice
+        local col, row = (i - 1) % PICK_COLS, math.floor((i - 1) / PICK_COLS)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", 4 + col * (PICK_SIZE + 2), -18 - row * (PICK_SIZE + 2))
+        if choice == "off" then
+            b.icon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot"); b.tag:SetText("off")
+        elseif choice == "none" then
+            b.icon:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up"); b.tag:SetText("")
+        else
+            b.icon:SetTexture(ItemIcon(choice.str))
+            b.tag:SetText(choice.inv and "|cFF66FF66on|r" or choice.bank and "|cFF66CCFFbank|r" or "")
         end
-        b.loc, b.slot = loc, slot
-        local icon = (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(ItemID(loc.str))) or (GetItemIcon and GetItemIcon(ItemID(loc.str)))
-        b.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         b:Show()
     end
-    for i = #items + 1, #quick.buttons do quick.buttons[i]:Hide() end
-    quick:SetSize(8 + #items * 32, 38)
+    for i = #choices + 1, #quick.buttons do quick.buttons[i]:Hide() end
+    local cols = math.min(PICK_COLS, #choices)
+    local rows = math.ceil(#choices / PICK_COLS)
+    quick:SetSize(math.max(110, 8 + cols * (PICK_SIZE + 2)), 22 + rows * (PICK_SIZE + 2))
     quick:ClearAllPoints()
     quick:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 2, 0)
     quick:Show()
     return quick
+end
+
+-- The character sheet's slot menu: click an item to swap it in
+function GS:ShowQuickMenu(slot, anchor)
+    if not On() or DB().slotMenu == "off" then return nil end
+    return self:ShowSlotMenu(slot, anchor, { onPick = function(loc)
+        if type(loc) == "table" then GS:Equip({ [slot] = loc.str }, SLOT_NAMES[slot], true) end
+    end })
 end
 
 function GS:HookDoll()
@@ -831,12 +910,8 @@ function GS:HookDoll()
         local f = SlotFrame(slot)
         if type(f) == "table" and f.HookScript then
             f:HookScript("OnEnter", function(btn)
-                if IsAltKeyDown and IsAltKeyDown() then GS:ShowQuickMenu(slot, btn) end
-            end)
-            f:HookScript("OnLeave", function()
-                WM.RunAfter(0.4, function()
-                    if quick and quick:IsShown() and not (MouseIsOver and MouseIsOver(quick)) then quick:Hide() end
-                end)
+                local mode = DB().slotMenu
+                if mode == "hover" or (mode == "alt" and IsAltKeyDown and IsAltKeyDown()) then GS:ShowQuickMenu(slot, btn) end
             end)
         end
     end
@@ -939,9 +1014,11 @@ function GS:CreateUI()
         set = function(v) DB().reportMissing = v end })
     L:Checkbox({ label = "Warn on the character sheet about missing items", get = function() return DB().dollWarning end,
         set = function(v) DB().dollWarning = v; GS:UpdateDoll() end })
-    L:Checkbox({ label = "Alt over a character sheet slot: what fits it", get = function() return DB().quickMenu end,
-        set = function(v) DB().quickMenu = v end,
-        tooltip = { "Quick swap", "Hold Alt and point at a slot on the character sheet to see the items in your bags that fit it; click one to put it on." } })
+    L:Dropdown({ label = "Slot menu:", width = 170, options = SLOT_MENU_OPTIONS,
+        get = function() return DB().slotMenu end, set = function(v) DB().slotMenu = v end,
+        tooltip = { "Slot menu", "Point at a slot on your character sheet to see every item in your bags (and"
+            .. " the bank, while it's open) that fits it; click one to swap it in. Show it on hover, only while"
+            .. " you hold Alt, or never." } })
     L:EndSection()
     panel:Finish()
     return panel
@@ -981,14 +1058,160 @@ GS.ToggleUI = GS.Toggle
 
 -- ---- The set editor ----
 
+-- ---- The dressing room: the set on your character, slots around it ----
+
+local DOLL_LEFT = { 1, 2, 3, 15, 5, 4, 19, 9 }
+local DOLL_RIGHT = { 10, 6, 7, 8, 11, 12, 13, 14 }
+local DOLL_BOTTOM = { 16, 17, 18 }
+local DOLL_SLOT, DOLL_GAP = 36, 4
+local DOLL_H = #DOLL_LEFT * (DOLL_SLOT + DOLL_GAP) + DOLL_SLOT + 14
+GS.DOLL_H = DOLL_H
+
+local function Draft() return editor and editor.draft end
+
+-- What a slot of the set shows: its item, "take it off", or (not part of
+-- the set) what you're wearing there now, faded
+local function SlotState(slot)
+    local d = Draft()
+    local v = d and d.items[slot]
+    if v then return "item", v end
+    if v == false then return "off" end
+    return "none", ItemString(GetInventoryItemLink("player", slot))
+end
+
+local function DollSlot(room, slot)
+    local b = CreateFrame("Button", nil, room)
+    b:SetSize(DOLL_SLOT, DOLL_SLOT)
+    b.slot = slot
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.mark = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b.mark:SetPoint("BOTTOMRIGHT", -2, 2)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    if b.RegisterForClicks then b:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+    b:SetScript("OnEnter", function(btn)
+        local state, str = SlotState(slot)
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        if state == "item" and str then
+            GameTooltip:SetHyperlink(LinkFor(str):find("|H") and LinkFor(str) or ("item:" .. str))
+        else
+            GameTooltip:SetText(SLOT_NAMES[slot])
+            GameTooltip:AddLine(state == "off" and "The set takes this slot off."
+                or "Not part of the set: whatever you're wearing here stays.", 0.8, 0.8, 0.8, true)
+        end
+        GameTooltip:AddLine("Click: choose from everything you own that fits. Right-click: not part of the set.",
+            0.6, 0.8, 1, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnClick", function(btn, button)
+        local d = Draft()
+        if not d then return end
+        if button == "RightButton" then
+            d.items[slot] = nil
+            editor:Refresh()
+            return
+        end
+        GS:ShowSlotMenu(slot, btn, { worn = true, extras = true, onPick = function(choice)
+            if choice == "none" then d.items[slot] = nil
+            elseif choice == false then d.items[slot] = false
+            elseif type(choice) == "table" then d.items[slot] = choice.str end
+            editor:Refresh()
+        end })
+    end)
+    return b
+end
+
+function GS:BuildDressingRoom(parent, width)
+    local room = CreateFrame("Frame", "WM_GearSetDressingRoom", parent)
+    room:SetAllPoints()
+    room.slots = {}
+    local step = DOLL_SLOT + DOLL_GAP
+    for i, slot in ipairs(DOLL_LEFT) do
+        local b = DollSlot(room, slot)
+        b:SetPoint("TOPLEFT", 8, -4 - (i - 1) * step)
+        room.slots[slot] = b
+    end
+    for i, slot in ipairs(DOLL_RIGHT) do
+        local b = DollSlot(room, slot)
+        b:SetPoint("TOPRIGHT", -8, -4 - (i - 1) * step)
+        room.slots[slot] = b
+    end
+    for i, slot in ipairs(DOLL_BOTTOM) do
+        local b = DollSlot(room, slot)
+        b:SetPoint("BOTTOM", room, "BOTTOM", (i - 2) * step, 6)
+        room.slots[slot] = b
+    end
+    -- Your character, wearing the set; drag to turn it
+    local model = CreateFrame("DressUpModel", "WM_GearSetModel", room)
+    model:SetPoint("TOPLEFT", 8 + DOLL_SLOT + 8, -4)
+    model:SetPoint("BOTTOMRIGHT", -(8 + DOLL_SLOT + 8), DOLL_SLOT + 14)
+    model:EnableMouse(true)
+    local turning, lastX = false, 0
+    model:SetScript("OnMouseDown", function()
+        turning, lastX = true, (GetCursorPosition and GetCursorPosition()) or 0
+    end)
+    model:SetScript("OnMouseUp", function() turning = false end)
+    model:SetScript("OnUpdate", function(m)
+        if not turning or not GetCursorPosition then return end
+        local x = GetCursorPosition()
+        if type(x) ~= "number" then return end
+        if m.GetFacing and m.SetFacing then m:SetFacing((m:GetFacing() or 0) + (x - lastX) * 0.02) end
+        lastX = x
+    end)
+    room.model = model
+    local hint = room:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("BOTTOM", model, "BOTTOM", 0, 2)
+    hint:SetText("Drag to turn")
+    editor.room = room
+    return room
+end
+
+-- Show the set: the slots, and the model wearing it (slots not in the set
+-- show what you wear now)
+function GS:RefreshDressingRoom()
+    local room = editor and editor.room
+    if not room or not Draft() then return end
+    for slot, b in pairs(room.slots) do
+        local state, str = SlotState(slot)
+        b.state = state
+        if state == "off" then
+            b.icon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+            b.icon:SetDesaturated(false); b:SetAlpha(1); b.mark:SetText("|cFFFF6666off|r")
+        elseif str then
+            b.icon:SetTexture(ItemIcon(str))
+            b.icon:SetDesaturated(state == "none"); b:SetAlpha(state == "none" and 0.45 or 1)
+            b.mark:SetText("")
+        else
+            b.icon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+            b.icon:SetDesaturated(true); b:SetAlpha(0.45); b.mark:SetText("")
+        end
+    end
+    local m = room.model
+    if m.SetUnit then pcall(m.SetUnit, m, "player") end
+    for slot, v in pairs(Draft().items) do
+        if v then
+            if m.TryOn then pcall(m.TryOn, m, "item:" .. v) end
+        elseif v == false and m.UndressSlot then
+            pcall(m.UndressSlot, m, slot)
+        end
+    end
+end
+
 function GS:CreateEditor()
     if editor then return editor end
-    editor = WM.UI:CreatePanel({ name = "WM_GearSetEditor", title = "Gear Set", titleColor = "CCB366", width = 440 })
+    editor = WM.UI:CreatePanel({ name = "WM_GearSetEditor", title = "Gear Set", titleColor = "CCB366", width = 440,
+        onRefresh = function() GS:RefreshDressingRoom() end })
     local L = editor.layout
     local function D() return editor.draft end
     L:EditBox({ label = "Name:", width = 200, maxLetters = 40, get = function() return D() and D().name or "" end,
         set = function(v) D().name = v end })
-    L:Note("Tick the slots this set changes; the rest are left alone. A ticked empty slot means \"take it off\".")
+    L:Note("|cFFFFFFFFDressing room:|r click a slot to choose from everything you own that fits it (or to take it"
+        .. " off); right-click to leave it out of the set. Faded slots aren't part of the set.")
+    local roomRow = L:Row(DOLL_H)
+    GS:BuildDressingRoom(roomRow.frame)
+    L:Header("Slots as a list")
+    L:Note("Or tick the slots this set changes; the rest are left alone. A ticked empty slot means \"take it off\".")
     L:Buttons({
         { text = "Take what I'm wearing", width = 160, onClick = function()
             for slot in pairs(D().items) do D().items[slot] = ItemString(GetInventoryItemLink("player", slot)) or false end
@@ -1127,10 +1350,17 @@ function GS:SetupPage(L)
     L:Checkbox({ label = "Say in chat when a set is on", get = function() return DB().reportDone end,
         set = function(v) DB().reportDone = v end,
         tooltip = { "Done", "\"Equipped Tank.\" when a set you equipped yourself is on." } })
-    L:Checkbox({ label = "Alt over a character sheet slot: what fits it", get = function() return DB().quickMenu end,
-        set = function(v) DB().quickMenu = v end,
-        tooltip = { "Quick swap", "Hold Alt and point at a slot on the character sheet to see the items in your"
-            .. " bags that fit it; click one to put it on." } })
+    L:Header("Swapping one piece, and building sets")
+    L:Note("|cFFFFFFFFSlot menu:|r point at a slot on your character sheet and a row of every item that fits it"
+        .. " pops up, from your bags (and the bank while it's open). Click one to swap it in; move away to close it.")
+    L:Note("|cFFFFFFFFDressing room:|r the set editor shows your character wearing the set, with its slots around"
+        .. " it. Click a slot to choose from everything you own that fits (what you're wearing, your bags, the bank"
+        .. " when open), or to take it off; right-click to leave that slot out of the set. Drag the model to turn it.")
+    L:Dropdown({ label = "Slot menu:", width = 170, options = SLOT_MENU_OPTIONS,
+        get = function() return DB().slotMenu end, set = function(v) DB().slotMenu = v end,
+        tooltip = { "Slot menu", "Point at a slot on your character sheet to see every item in your bags (and"
+            .. " the bank, while it's open) that fits it; click one to swap it in. Show it on hover, only while"
+            .. " you hold Alt, or never." } })
     L:Note("Making and editing sets, and undoing the last swap, are in its window: |cFFFFFF00/wmachine gear|r.")
 end
 
