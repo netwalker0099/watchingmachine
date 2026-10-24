@@ -208,7 +208,9 @@ function Alts:UpdateBank()
 end
 
 -- Save everything about the character you're playing
-function Alts:Update()
+-- atLogout: only what's always reliable (logging out, the game can report no
+-- gold, gear or bags; the snapshot taken while playing is kept instead)
+function Alts:Update(atLogout)
     local key = CharKey()
     local c = DB().chars[key] or {}
     DB().chars[key] = c
@@ -221,8 +223,25 @@ function Alts:Update()
     c.rested = (GetXPExhaustion and tonumber(GetXPExhaustion())) or 0
     local resting = IsResting and IsResting()
     c.resting = (resting == true or resting == 1)
+    local zone = GetZoneText and GetZoneText()
+    if type(zone) == "string" and zone ~= "" then c.zone = zone end
+    c.seen = Now()
+    if atLogout then return c end
+    -- Items not loaded yet (just logged in): keep what was saved, try again soon
+    local bagFree, bagTotal = BagSpace()
+    local gear = Gear()
+    if bagTotal == 0 and not next(gear) then
+        if not self.retrying then
+            self.retrying = true
+            WM.RunAfter(3, function()
+                self.retrying = false
+                if WM:ShouldRun("AltTracker") then pcall(self.Update, self) end
+            end)
+        end
+        return c
+    end
     c.gold = (GetMoney and tonumber(GetMoney())) or c.gold or 0
-    c.bagFree, c.bagTotal = BagSpace()
+    c.bagFree, c.bagTotal = bagFree, bagTotal
     c.durability, c.durabilityLow = Durability()
     c.professions = Professions()
     c.reagents = {}
@@ -234,11 +253,8 @@ function Alts:Update()
         c.ammo = slot and GetInventoryItemCount and tonumber(GetInventoryItemCount("player", slot)) or c.ammo
         c.pet = Pet() or c.pet
     end
-    local zone = GetZoneText and GetZoneText()
-    if type(zone) == "string" then c.zone = zone end
-    c.seen = Now()
     -- What they wear, carry and are saved to
-    c.gear = Gear()
+    c.gear = gear
     local GS = WM:IsModuleOn("GearScore") and WM.GearScore
     if GS and GS.GearScoreFor and next(c.gear) then
         local score, ilvl, complete = GS.GearScoreFor(c.gear, class)
@@ -1030,7 +1046,7 @@ events:SetScript("OnEvent", function(_, event, unit)
         Alts.savedFresh = true
         Soon()
     elseif event == "PLAYER_LOGOUT" then
-        pcall(Alts.Update, Alts)
+        pcall(Alts.Update, Alts, true)
     elseif (event == "UNIT_PET" or event == "UNIT_HAPPINESS") and unit ~= "player" and unit ~= "pet" then
         return
     else

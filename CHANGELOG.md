@@ -2,7 +2,20 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.47.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.47.2** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.47.2
+
+- **Fixed: switching characters emptied the last one's gold, bags and
+  gear in Your Characters** (its bank stayed). The save when you log out
+  read them while the game was already reporting nothing. Logging out now
+  only updates what's always reliable (level, XP, rested, zone, when you
+  were last seen), and gold, bags and gear keep the snapshot taken while
+  you played, which follows every money, bag and equipment change. Just
+  after logging in, if your items haven't loaded yet, the old snapshot is
+  kept and it tries again a few seconds later.
 
 ---
 

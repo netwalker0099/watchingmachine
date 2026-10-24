@@ -15,11 +15,17 @@ env.UnitXP = function() return 0 end
 env.UnitXPMax = function() return 1 end
 env.SlashCmdList = {}
 local bagItem = "|cff1eff00|Hitem:23424::::::::70:::::|h[Fel Iron Ore]|h|r"
+-- loaded = false: what the game reports while logging out, or just after
+-- logging in before items have loaded (no bags, no gear, no gold)
+local loaded = true
 env.C_Container = {
-    GetContainerNumSlots = function(bag) return bag == 0 and 1 or 0 end,
+    GetContainerNumSlots = function(bag) return (loaded and bag == 0) and 1 or 0 end,
     GetContainerNumFreeSlots = function() return 0, 0 end,
-    GetContainerItemInfo = function(bag, slot) if bag == 0 and slot == 1 then return { hyperlink = bagItem, stackCount = 5 } end end,
+    GetContainerItemInfo = function(bag, slot) if loaded and bag == 0 and slot == 1 then return { hyperlink = bagItem, stackCount = 5 } end end,
 }
+local helm = "|cffa335ee|Hitem:28963::::::::70:::::|h[Voidheart Crown]|h|r"
+env.GetInventoryItemLink = function(_, slot) if loaded and slot == 1 then return helm end end
+env.GetMoney = function() return loaded and gold or 0 end
 for _, f in ipairs({ "Core.lua", "UI.lua", "Modules/AltTracker.lua" }) do W.load(f) end
 local WM, P = W.WM, W.WM.Profiles
 local Alts = WM.modules.AltTracker
@@ -77,6 +83,22 @@ Logout()
 gold = 999
 Login("Alt")
 check("off for every character: the alt isn't saved", not WM:ShouldRun("AltTracker") and Char("Alt-Realm").gold == 300)
+
+-- ---- Logging out, and just after logging in ----
+WM:SetModuleOn("AltTracker", true)
+gold = 4321
+Alts:Update()
+loaded = false
+Alts:Update(true)                -- PLAYER_LOGOUT: the game reports nothing
+local alt = Char("Alt-Realm")
+check("logging out keeps the gold, bags and gear", alt.gold == 4321 and #alt.bags == 1 and alt.gear[1] == helm)
+W.timers = {}
+Alts:Update()                    -- logging in, items not loaded yet
+check("items not loaded yet: the snapshot is kept", alt.gold == 4321 and #alt.bags == 1 and alt.gear[1] == helm)
+check("... and it tries again soon", #W.timers == 1)
+loaded, gold = true, 5000
+W.runTimers()
+check("loaded: saved", alt.gold == 5000 and #alt.bags == 1)
 
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end
