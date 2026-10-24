@@ -130,6 +130,9 @@ check("one that's on can", WM:UsableModule("Hazards") == WM.modules.Hazards)
 W.printed = {}
 env.SlashCmdList.WATCHINGMACHINE("crits")
 check("its slash command says how to turn it on", Said("Crit Tracker is off on this character"))
+W.printed = {}
+env.SlashCmdList.WATCHINGMACHINE("gear")
+check("/wmachine gear is Gear Sets (not ArmorySnap)", Said("Gear Sets is off on this character") and not Said("ArmorySnap"))
 
 -- ---- The welcome window ----
 W.printed = {}

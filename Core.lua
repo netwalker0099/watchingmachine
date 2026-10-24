@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.48.4"
+WM.version = "3.48.5"
 WM.modules = {}
 
 -- ============================================
@@ -2164,7 +2164,7 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:Toggle()
         end
 
-    elseif cmd == "armory" or cmd == "armorysnap" or cmd == "gear" or cmd == "snap" then
+    elseif cmd == "armory" or cmd == "armorysnap" or cmd == "snap" then
         local module = WM:UsableModule("ArmorySnap")
         if module and module.Toggle then
             module:Toggle()
@@ -2321,7 +2321,7 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
             module:ListExclusions()
         end
 
-    elseif cmd == "range" or cmd == "aurarange" or cmd == "totem" or cmd == "aura" then
+    elseif cmd == "range" or cmd == "aurarange" or cmd == "aura" then
         local module = WM:UsableModule("AuraRange")
         if module and module.Toggle then
             module:Toggle()

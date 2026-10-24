@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48.5 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -526,8 +526,11 @@ A gear score and average item level for you and every player you mouse over
   5% and gems 5 each; hunters' ranged weapons count more and melee less.
   Colours run grey, white, green, blue, purple, orange
 - **Player tooltips:** "GearScore: 1650  iLvl: 112". Players you mouse over
-  are inspected automatically: out of combat, within inspect range, one at
-  a time, never while your own inspect window is open. Scores are kept by
+  are inspected automatically: out of combat, close by (3.48.4: within
+  trade distance, since the game's own inspect range is shorter than its
+  28-yard check and it says "You are too far away" otherwise), one at a
+  time, never while your own inspect window is open, and not in towns or
+  inns unless *... in towns and inns too* is ticked. Scores are kept by
   name for a week
 - **Item tooltips:** the item's score. *Item tooltip details* adds its base
   score, enchant and gem bonuses (or what's missing), and what equipping it
@@ -967,6 +970,8 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine status` - Show status of all modules
 - `/wmachine errors` - Show captured error log
 - `/wmachine clearerrors` - Clear error log
+- `/wmachine logoutcheck` - Can't log out? What the game blocked, logout attempts, and what to try (also `/wmachine diag`: the same report, including game errors right after an inspect)
+- `/wmachine menubutton on|off` - The Watching Machine button in the Escape menu (off also stops it touching the menu)
 - `/wmachine help` - Show command help
 
 ### Game Menu Button
@@ -974,7 +979,9 @@ opens the dashboard. Everything the addon does can be reached from it.
   **Log Out** (like ElvUI's). Click it to open the dashboard
 - With **ElvUI** it sits under ElvUI's button instead of on top of it, and
   takes ElvUI's button skin (unless ElvUI's Blizzard skins are off)
-- Turn it off in Settings: *Watching Machine button in the game menu (Esc)*
+- Turn it off in Settings (*Watching Machine button in the game menu (Esc)*)
+  or with `/wmachine menubutton off`; off, the addon doesn't touch the menu
+  at all
 
 ### Minimap Button
 - **Left-click**: Toggle dashboard
@@ -1004,6 +1011,20 @@ Built-in error capture system for debugging.
 - Stored in SavedVariables (persists across sessions, max 200 entries)
 - `/wmachine errors` - show last 20 errors in chat
 - `/wmachine clearerrors` - clear the error log
+
+### Can't log out?
+- `/wmachine logoutcheck` shows what Watching Machine recorded: actions the
+  game blocked and the addon it blamed (logging out blocked is also said in
+  chat the moment it happens), logout countdowns started and cancelled,
+  clicks on the Escape-menu button, and whether that button is covering
+  Log Out (run it with the Escape menu open). It ends with what to try:
+  `/logout`, turning the menu button off, and the game's taint log
+- `/wmachine menubutton off` (then `/reload`) removes the Watching Machine
+  button from the Escape menu and stops the addon touching the menu at all;
+  `/wmachine menubutton on` puts it back
+- A red game error that appears within 2 seconds of a Watching Machine
+  inspect (GearScore, ArmorySnap, Debuff Tracker) is noted too, with the
+  module, and `/wmachine diag` (the same report) shows it
 
 ## Installation
 

@@ -68,11 +68,19 @@ feature skip that.
       `ClassTools:RegisterFeature` in the part's `RegisterFeatures()` (so the
       setup lists it before the module starts).
 
+## Tools
+
+`tools/` (not loaded by the game) holds the generators for `Data/` (loot from
+AtlasLoot, attunements from Attune, hazards from GTFO) and the script that
+rebuilds `docs/CURSEFORGE-DESCRIPTION.md` from the README. See
+`tools/README.md`.
+
 ## Releasing
 - Bump `## Version:` in `WatchingMachine.toc`, `WM.version` in `Core.lua`
   and the README header; add a README "### Version" entry, a CHANGELOG
   section (and its "Current release" line), the README module section, and
-  update `docs/TODO.md`.
+  update `docs/TODO.md`. Rebuild the CurseForge description
+  (`python3 -I tools/curseforge_description.py`).
 - Commit to `main`, then push `main` and `main:claude/wow-buff-check-module-q11r9h`.
 - Third-party addons used as a guide are rewritten in our own code; only
   facts (IDs, numbers) are kept, in our own format, with a "compiled with

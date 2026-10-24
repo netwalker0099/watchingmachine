@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.48.4 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.48.5 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1033,7 +1033,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine status` - Show status of all modules
 - `/wmachine errors` - Show captured error log
 - `/wmachine clearerrors` - Clear error log
-- `/wmachine logoutcheck` - Can't log out? What the game blocked, logout attempts, and what to try
+- `/wmachine logoutcheck` - Can't log out? What the game blocked, logout attempts, and what to try (also `/wmachine diag`: the same report, including game errors right after an inspect)
 - `/wmachine menubutton on|off` - The Watching Machine button in the Escape menu (off also stops it touching the menu)
 - `/wmachine help` - Show command help
 
@@ -1105,6 +1105,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.48.5
+- **Fixed: `/wmachine gear` opened ArmorySnap** instead of Gear Sets (an old ArmorySnap alias); README and CurseForge description brought up to date
 
 ### Version 3.48.4
 - **GearScore:** no more "You are too far away" in town: players you mouse over are only inspected when close by, and not in towns or inns unless you tick it

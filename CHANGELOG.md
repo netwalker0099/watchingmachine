@@ -2,7 +2,19 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.48.4** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.48.5** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.48.5
+
+- **Fixed: `/wmachine gear` opened ArmorySnap** instead of Gear Sets.
+  ArmorySnap still had `gear` as an old alias, checked first, so only
+  `/wmachine gear equip <name>` and the like reached Gear Sets. ArmorySnap
+  keeps `/wmachine armory`, `armorysnap` and `snap` (and `/as`).
+- Aura Range's unused `/wmachine totem` alias removed (`totem` and `totems`
+  open the shaman totem set editor, as documented).
+- README and the CurseForge description brought up to date.
 
 ---
 
