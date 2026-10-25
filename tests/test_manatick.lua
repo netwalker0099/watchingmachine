@@ -175,10 +175,17 @@ MT:Draw(now)
 check("no player frame at all: its own bar", own:IsShown() and not ov:IsShown())
 env.PlayerFrameHealthBar = health
 MT:Draw(now)
+-- ElvUI: Blizzard's player frame still exists, hidden
 health:Hide()
+env.ElvUF_Player = { Health = elv }
 MT:Draw(now)
-check("player frame hidden: spark hidden", not ov:IsShown())
+check("ElvUI: its health bar, not Blizzard's hidden one", ov:IsShown() and ov._allPoints == elv and not own:IsShown())
+env.ElvUF_Player = nil
+MT:Draw(now)
+check("no player bar showing: its own bar", own:IsShown() and not ov:IsShown())
 health:Show()
+MT:Draw(now)
+check("player frame back: on it again", ov:IsShown() and ov._allPoints == health and not own:IsShown())
 
 -- ---- When it shows ----
 mana = maxMana

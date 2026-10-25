@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.52 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.52.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1211,6 +1211,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.52.1
+- **Fixed: no mana tick spark with ElvUI** (it went on Blizzard's hidden player frame); it now uses the first player bar that's showing
 
 ### Version 3.52
 - **Mana tick spark:** an option to show it on a stand-alone bar too (your mana as a fill, with the sparks over it), and a width for that bar

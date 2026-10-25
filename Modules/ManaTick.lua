@@ -173,9 +173,11 @@ function MT:Hosts()
     local where = DB().where
     local host
     if where ~= "own" then
+        -- The first one that's showing: with ElvUI, Blizzard's player frame
+        -- still exists, hidden
         for _, name in ipairs(HOSTS[where] or {}) do
-            host = Resolve(name)
-            if host then break end
+            local f = Resolve(name)
+            if f and (not f.IsVisible or f:IsVisible()) then host = f break end
         end
     end
     local own = where == "own" or host == nil or Enabled("manaTickOwnToo")

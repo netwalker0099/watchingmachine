@@ -2,7 +2,18 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.52** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.52.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.52.1
+
+- **Fixed: no mana tick spark with ElvUI.** Blizzard's player frame still
+  exists (hidden) under ElvUI, so the spark went on its hidden health bar
+  and never showed. It now uses the first player bar that's showing
+  (Blizzard's, then ElvUI's), and its own bar when none is.
+- Where the settings are: Class Tools (`/wmachine class`), the General tab,
+  after the swing timer's options.
 
 ---
 
