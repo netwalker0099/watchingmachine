@@ -127,6 +127,33 @@ check("Well Fed satisfies the check", not l:find("Steaker", 1, true))
 check("unfed mage reported", l:find("Hungry", 1, true) ~= nil)
 check("mid-eating rogue reported", l:find("Eater", 1, true) ~= nil)
 
+-- The group list: each member with what they're missing (and GearScore)
+local rows = BC:GroupRows()
+local byN = {}
+for _, r in ipairs(rows) do byN[r.name] = r end
+check("group list: everyone", #rows == 4)
+check("group list: what each is missing", byN.Hungry.missing[1] == "Food Buff" and #byN.Hungry.missing == 1
+    and #byN.Souper.missing == 0)
+check("group list: most missing first, then by name", rows[1].name == "Eater" and rows[2].name == "Hungry")
+check("group list: no GearScore without the module", byN.Souper.score == nil)
+WM.modules.GearScore = { GroupList = function()
+    return { { name = "Souper", score = 1800 }, { name = "Hungry", score = 1500 }, { name = "Eater" } }
+end }
+DB.groupSort = "gs"
+rows = BC:GroupRows()
+check("group list: GearScore column", rows[1].name == "Souper" and rows[1].score == 1800 and rows[2].score == 1500)
+check("group list: unknown scores last", rows[3].score == nil and rows[4].score == nil)
+DB.groupSort = "gslow"
+check("group list: lowest GearScore first", BC:GroupRows()[1].name == "Hungry")
+DB.groupSort = nil
+WM.modules.GearScore = nil
+env.UnitIsConnected = function(u) return u ~= "raid4" end
+BC:ScanGroup()
+for _, r in ipairs(BC:GroupRows()) do byN[r.name] = r end
+check("group list: offline at the check", byN.Eater.missing == false)
+env.UnitIsConnected = function() return true end
+BC:ScanGroup()
+
 -- Check off -> nothing reported
 DB.checkedGroups.wellfed = false
 lines, missing = BC:ScanGroup()

@@ -437,6 +437,9 @@ function BuffCheck:ScanGroup()
     local missingBlessings = {}   -- blessingIndex -> { playerName, ... } (PallyPower mode)
     local skipped = {}
     local missingCount = 0
+    -- For the Group list: playerName -> { what they're missing }
+    local byName = {}
+    self.lastByName = byName
 
     for _, unit in ipairs(units) do
         if UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) then
@@ -444,6 +447,7 @@ function BuffCheck:ScanGroup()
             local _, class = UnitClass(unit)
             if name and class then
                 local buffSet = GetUnitBuffSet(unit)
+                byName[name] = byName[name] or {}
                 for _, group in ipairs(activeGroups) do
                     if group.appliesTo[class] and not UnitHasGroupBuff(buffSet, group) then
                         if not missingByGroup[group.key] then
@@ -452,6 +456,7 @@ function BuffCheck:ScanGroup()
                         local list = missingByGroup[group.key]
                         list[#list + 1] = name
                         missingCount = missingCount + 1
+                        table.insert(byName[name], group.name)
                     end
                 end
 
@@ -474,6 +479,8 @@ function BuffCheck:ScanGroup()
                             local list = missingBlessings[blessingID]
                             list[#list + 1] = name
                             missingCount = missingCount + 1
+                            local label = (normalName ~= "" and normalName) or greaterName
+                            if label then table.insert(byName[name], label) end
                         end
                     end
                 end
@@ -482,6 +489,7 @@ function BuffCheck:ScanGroup()
             local name = UnitName(unit)
             if name then
                 skipped[#skipped + 1] = name
+                byName[name] = false   -- offline or dead: not checked
             end
         end
     end
@@ -587,6 +595,7 @@ function BuffCheck:RunCheck(selfInitiated)
 
     local announce = selfInitiated and BuffCheckDB.announceToRaid
     self:Report(lines, missingCount, skipped, announce)
+    if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
 end
 
 -- Manual run: always local-only, and works even with the ready-check
@@ -596,6 +605,7 @@ function BuffCheck:RunLocalCheck()
     lastReport = lines
     lastReportTime = date("%H:%M:%S")
     self:Report(lines, missingCount, skipped, false)
+    if mainFrame and mainFrame:IsShown() then mainFrame:Refresh() end
 end
 
 -- ============================================
@@ -722,6 +732,78 @@ function BuffCheck:GetQuickStatus()
 end
 
 -- ============================================
+-- THE GROUP LIST: GearScore and missing buffs per member
+-- ============================================
+
+local MAX_GROUP_ROWS = 40
+BuffCheck.MAX_GROUP_ROWS = MAX_GROUP_ROWS
+
+local function GearScoreModule() return WM:IsModuleOn("GearScore") and WM.modules.GearScore or nil end
+
+-- Each member now: { name, class, score (nil: not known), missing (a list;
+-- false: offline or dead at the last check; nil: not checked yet) }
+function BuffCheck:GroupRows()
+    local scores = {}
+    local GSM = GearScoreModule()
+    if GSM and GSM.GroupList then
+        for _, e in ipairs(GSM:GroupList()) do if e.name then scores[e.name] = e.score end end
+    end
+    local rows = {}
+    for _, unit in ipairs(GetGroupUnits()) do
+        local name = UnitName(unit)
+        if name then
+            local _, class = UnitClass(unit)
+            local missing
+            if self.lastByName then missing = self.lastByName[name] end
+            rows[#rows + 1] = { name = name, class = class, score = scores[name], missing = missing }
+        end
+    end
+    local by = BuffCheckDB and BuffCheckDB.groupSort or "missing"
+    local function Missing(r) return type(r.missing) == "table" and #r.missing or -1 end
+    table.sort(rows, function(a, b)
+        if by == "gs" and (a.score or -1) ~= (b.score or -1) then return (a.score or -1) > (b.score or -1) end
+        if by == "gslow" and (a.score or 1e9) ~= (b.score or 1e9) then return (a.score or 1e9) < (b.score or 1e9) end
+        if by == "missing" and Missing(a) ~= Missing(b) then return Missing(a) > Missing(b) end
+        return a.name < b.name
+    end)
+    return rows
+end
+
+local SORTS = {
+    { value = "missing", text = "Most missing first" },
+    { value = "gs", text = "Highest GearScore" },
+    { value = "gslow", text = "Lowest GearScore" },
+    { value = "name", text = "Name" },
+}
+
+local function ClassHex(class)
+    local c = class and RAID_CLASS_COLORS[class]
+    return c and string.format("%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) or "ffffff"
+end
+
+function BuffCheck:FillGroup(p)
+    if not p.groupRows then return end
+    local rows = self:GroupRows()
+    local GSM = GearScoreModule()
+    for i, row in ipairs(p.groupRows) do
+        local r = rows[i]
+        row.hidden = r == nil
+        if r then
+            local f = row.frame
+            f.nameText:SetText("|cFF" .. ClassHex(r.class) .. r.name .. "|r")
+            if not GSM then f.gsText:SetText("|cFF666666-|r")
+            elseif r.score then f.gsText:SetText(GSM.ColorText and GSM.ColorText(r.score, tostring(r.score)) or tostring(r.score))
+            else f.gsText:SetText("|cFF888888?|r") end
+            if r.missing == false then f.missText:SetText("|cFF888888offline or dead|r")
+            elseif r.missing == nil then f.missText:SetText("|cFF888888not checked yet|r")
+            elseif #r.missing == 0 then f.missText:SetText("|cFF33FF33all buffs up|r")
+            else f.missText:SetText("|cFFFFCC00" .. table.concat(r.missing, ", ") .. "|r") end
+        end
+    end
+    p.groupEmpty.hidden = #rows > 0
+end
+
+-- ============================================
 -- SETTINGS UI
 -- ============================================
 
@@ -732,7 +814,8 @@ function BuffCheck:CreateUI()
         name = "WM_BuffCheckFrame",
         title = "Buff Check",
         titleColor = "33FF99",
-        width = 380,
+        width = 460,
+        onRefresh = function(p) BuffCheck:FillGroup(p) end,
     })
     local L = panel.layout
     local function opt(key)
@@ -805,6 +888,50 @@ function BuffCheck:CreateUI()
     L:Note("Class buffs are only checked when the providing class is in the group."
         .. " Offline and dead players are skipped.")
 
+    -- The group: GearScore and what each member was missing at the last check
+    L:Section({ key = "group", title = "Group" })
+    L:Note(function()
+        if GearScoreModule() then
+            return "Everyone in your group with their GearScore (? until GearScore has inspected them) and what they"
+                .. " were missing at the last check."
+        end
+        return "Everyone in your group and what they were missing at the last check. Turn on GearScore for a"
+            .. " GearScore column."
+    end)
+    L:Dropdown({ label = "Sort:", width = 160, options = SORTS,
+        get = function() return BuffCheckDB.groupSort or "missing" end,
+        set = function(v) BuffCheckDB.groupSort = v; panel:Refresh() end })
+    L:Buttons({ { text = "Inspect for GearScores", width = 170,
+        onClick = function()
+            local GSM = GearScoreModule()
+            if not GSM then BuffCheck:Print("Turn on GearScore for the GearScore column."); return end
+            local n = GSM.ScanGroup and GSM:ScanGroup() or 0
+            BuffCheck:Print(n > 0 and ("Inspecting " .. n .. " players for their GearScore.") or "Every GearScore is known.")
+        end,
+        tooltip = { "Inspect for GearScores", "Asks GearScore to inspect everyone in range it has no recent score"
+            .. " for (a few at a time, never in combat)." } } })
+    local head = L:Row(16)
+    local function Col(row, x, w, font)
+        local t = WM.UI.Text(row.frame, { text = "", width = w, font = font or "GameFontHighlightSmall" })
+        t:SetPoint("LEFT", x, 0)
+        return t
+    end
+    Col(head, 12, 120, "GameFontNormalSmall"):SetText("Name")
+    Col(head, 140, 70, "GameFontNormalSmall"):SetText("GearScore")
+    Col(head, 215, 220, "GameFontNormalSmall"):SetText("Missing")
+    panel.groupRows = {}
+    for i = 1, MAX_GROUP_ROWS do
+        local row = L:Row(16)
+        row.frame.nameText = Col(row, 12, 120)
+        row.frame.gsText = Col(row, 140, 70)
+        row.frame.missText = Col(row, 215, 230)
+        row.hidden = true
+        panel.groupRows[i] = row
+    end
+    panel.groupEmpty = L:Row(16)
+    Col(panel.groupEmpty, 12, 300):SetText("|cFF888888Nobody here.|r")
+    L:EndSection()
+
     panel:AddFooterButton({
         text = "Run Check Now", width = 130,
         tooltip = { "Run Check Now", "Checks the group right now and shows the report only to you." },
@@ -872,6 +999,8 @@ function BuffCheck:SetupPage(L)
     get, set = group("wellfed")
     L:Checkbox({ label = "Food buff (Well Fed or Enlightened)", get = get, set = set,
         tooltip = { "Food buff", "Anyone who hasn't eaten a buff food is listed." } })
+    L:Note("|cFFFFFFFFThe group list:|r the Buff Check window lists everyone in your group with what they were"
+        .. " missing at the last check and, with GearScore on, a GearScore column, to size up a group at a glance.")
     L:Note("The full list of buffs to check, and a Run Check Now button that shows the report only to you,"
         .. " are in the Buff Check window.")
 end
