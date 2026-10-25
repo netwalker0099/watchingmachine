@@ -1,0 +1,43 @@
+# Publishes a release when a version tag (v3.56, ...) is pushed: runs the
+# tests, checks the tag matches the toc's version, cuts that version's notes
+# from CHANGELOG.md, then the BigWigs packager builds the zip (see .pkgmeta)
+# and uploads it to CurseForge (project from ## X-Curse-Project-ID in the
+# toc, token from the CF_API_KEY secret) and as a GitHub release.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lua 5.1 for the tests
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Tests
+        run: sh tests/run.sh
+
+      - name: The tag matches the toc's version
+        run: |
+          toc=$(sed -n 's/^## Version: *//p' WatchingMachine.toc | tr -d '\r')
+          tag="${GITHUB_REF_NAME#v}"
+          echo "toc $toc, tag $tag"
+          test "$toc" = "$tag"
+
+      - name: This version's release notes
+        run: python3 -I tools/release_notes.py "$GITHUB_REF_NAME" > RELEASE_NOTES.md
+
+      - uses: BigWigsMods/packager@v2

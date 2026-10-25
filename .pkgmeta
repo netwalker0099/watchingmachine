@@ -1,0 +1,19 @@
+# BigWigs packager settings (the release workflow in .github/workflows)
+package-as: WatchingMachine
+
+# The release's notes: this version's section of CHANGELOG.md, cut out by
+# tools/release_notes.py in the workflow
+manual-changelog:
+  filename: RELEASE_NOTES.md
+  markup-type: markdown
+
+# Only what the game loads goes in the zip
+ignore:
+  - tests
+  - tools
+  - docs
+  - release
+  - README.md
+  - CHANGELOG.md
+  - CLAUDE.md
+  - RELEASE_NOTES.md

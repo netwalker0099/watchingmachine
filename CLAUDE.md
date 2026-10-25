@@ -90,6 +90,14 @@ rebuilds `docs/CURSEFORGE-DESCRIPTION.md` from the README. See
   update `docs/TODO.md`. Rebuild the CurseForge description
   (`python3 -I tools/curseforge_description.py`).
 - Commit to `main`, then push `main` and `main:claude/wow-buff-check-module-q11r9h`.
+- Publishing to CurseForge: push a tag `v<version>` (exactly the toc's
+  `## Version:`, e.g. `git tag v3.56 && git push origin v3.56`) only when
+  asked. `.github/workflows/release.yml` runs the tests, checks the tag
+  against the toc, cuts that version's CHANGELOG section
+  (`tools/release_notes.py`) and the BigWigs packager uploads the zip
+  (`.pkgmeta` lists what's left out) to the toc's `## X-Curse-Project-ID`
+  with the `CF_API_KEY` repository secret, plus a GitHub release.
+- A zip for testers without publishing: `python3 -I tools/make_release.py .`
 - Third-party addons used as a guide are rewritten in our own code; only
   facts (IDs, numbers) are kept, in our own format, with a "compiled with
   the help of X's research" credit.

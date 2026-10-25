@@ -22,6 +22,9 @@ copied. Unpack each addon into its own empty folder and pass the path in.
 - `curseforge_description.py`: rebuilds `docs/CURSEFORGE-DESCRIPTION.md`
   from `README.md` (run from the repo root after changing the README):
   `python3 -I tools/curseforge_description.py`
+- `release_notes.py`: one version's CHANGELOG section, for a release's
+  notes (the release workflow posts it to CurseForge):
+  `python3 -I tools/release_notes.py 3.56`
 - `make_release.py`: a zip for testers with only what the game loads (the
   toc, the files it lists, `Bindings.xml`, `Media`), from the committed
   files: `python3 -I tools/make_release.py .` writes
