@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.53 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.53.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1224,6 +1224,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.53.1
+- **Fixed: "The game blocked CheckInteractDistance() and blamed Watching Machine"** in combat (ArmorySnap's group scan checked range during fights); range is never asked in combat now, and the scan waits for the fight to end
 
 ### Version 3.53
 - **Swing timer, Retribution:** the point of no return (a GCD before the swing, with spell haste), the 0.4s twist window at the end of the bar, and your active seal past it

@@ -362,10 +362,7 @@ local function CanInspectUnit(unit, close)
     if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) or UnitIsUnit(unit, "player") then return false end
     if InCombatLockdown and InCombatLockdown() then return false end
     if CanInspect and not CanInspect(unit) then return false end
-    if CheckInteractDistance then
-        local ok, near = pcall(CheckInteractDistance, unit, close and 2 or 1)
-        if ok and not near then return false end
-    end
+    if WM:InteractRange(unit, close and 2 or 1) == false then return false end
     return true
 end
 GS.CanInspectUnit = CanInspectUnit

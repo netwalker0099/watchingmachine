@@ -14,6 +14,14 @@ to game tables (`StaticPopupDialogs["WM_..."] = ...`), use `hooksecurefunc`
 instead of replacing functions, and keep everything else `local`.
 `tests/test_globals.lua` fails on any other global write.
 
+## Calls the game restricts in combat
+
+`CheckInteractDistance` is blocked in combat on 2.5.x, and the game blames
+the addon even inside a `pcall`. Ask through `WM:InteractRange(unit, i)`
+(Core), which returns nil in combat without calling it;
+`tests/test_protected.lua` fails on any other direct call. Inspecting
+(`NotifyInspect`) waits for combat to end too.
+
 ## Every new module or feature goes into the setup and the panels
 
 Every module can be switched on and off per character, and has its own

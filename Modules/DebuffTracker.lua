@@ -1678,7 +1678,12 @@ function DebuffTracker:InspectNextForSR()
         scan.skipped[#scan.skipped + 1] = m.name .. " (offline)"
         return self:InspectNextForSR()
     end
-    if not CheckInteractDistance(unit, 1) or (CanInspect and not CanInspect(unit)) then
+    local near = WM:InteractRange(unit, 1)
+    if near == nil and InCombatLockdown and InCombatLockdown() then
+        scan.skipped[#scan.skipped + 1] = m.name .. " (in combat)"
+        return self:InspectNextForSR()
+    end
+    if not near or (CanInspect and not CanInspect(unit)) then
         scan.skipped[#scan.skipped + 1] = m.name
         return self:InspectNextForSR()
     end

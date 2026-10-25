@@ -518,7 +518,8 @@ local function TryInspectUnit(unit)
         return true
     end
 
-    if not CheckInteractDistance(unit, 1) then return false end
+    -- Out of range, or in combat (range can't be asked then): try later
+    if not WM:InteractRange(unit, 1) then return false end
     if CanInspect and not CanInspect(unit) then return false end
 
     s.inspecting  = true
@@ -577,6 +578,8 @@ function ScannerTick()
     end
 
     if s.inspecting then return end
+    -- Nothing is inspected in combat (and range checks are blocked then)
+    if InCombatLockdown and InCombatLockdown() then return end
 
     if s.passComplete then
         s.rosterClock = s.rosterClock - SCAN_TICK
@@ -638,6 +641,10 @@ end
 function AS.TakeManualSnapshot(label)
     local size, groupType = GetGroupSize()
     if size == 0 then Print("You are not in a group."); return end
+    if InCombatLockdown and InCombatLockdown() then
+        Print("Not in combat: inspecting has to wait until the fight is over.")
+        return
+    end
 
     local zone = label or GetRealZoneText() or "Unknown"
     local key  = GetTimestamp() .. " - " .. zone
@@ -675,7 +682,7 @@ function AS.TakeManualSnapshot(label)
             AS.ScoreMember(ci)
             snap.members[ci.name] = ci; captured = captured + 1
             DoNext()
-        elseif UnitExists(unit) and CheckInteractDistance(unit, 1) then
+        elseif UnitExists(unit) and WM:InteractRange(unit, 1) then
             local waiting, timer = true, nil
             local handler = CreateFrame("Frame")
             handler:RegisterEvent("INSPECT_READY")

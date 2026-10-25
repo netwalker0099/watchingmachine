@@ -138,6 +138,7 @@ end
 env.UnitGUID = function(u) return "GUID-" .. tostring(env.UnitName(u)) end
 env.UnitIsConnected = function(u) return env.UnitName(u) ~= "Gone" end
 env.CheckInteractDistance = function(u) return env.UnitName(u) ~= "Faraway" end
+env.InCombatLockdown = function() return false end
 env.CanInspect = function() return true end
 env.UnitIsGroupLeader = function(u) return u == "player" end
 env.UnitIsGroupAssistant = function() return false end

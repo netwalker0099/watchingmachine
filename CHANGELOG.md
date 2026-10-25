@@ -2,7 +2,24 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.53** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.53.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.53.1
+
+- **Fixed: "The game blocked CheckInteractDistance() and blamed Watching
+  Machine"** in chat during fights. On 2.5.x the game restricts
+  `CheckInteractDistance` in combat, and ArmorySnap's automatic scan (with
+  *scan my group* on, in parties too) checked each member's range every
+  few seconds, fights included. Every range check now goes through one
+  helper (`WM:InteractRange`) that never asks the game in combat:
+  - ArmorySnap's automatic scan pauses in combat and carries on after.
+  - A manual ArmorySnap snapshot in combat says it has to wait.
+  - Debuff Tracker's shadow resist scan lists anyone it couldn't check as
+    *(in combat)*.
+  - GearScore already held its inspects in combat; it uses the helper too.
+- A new test fails if any file calls `CheckInteractDistance` directly.
 
 ---
 

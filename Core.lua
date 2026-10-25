@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.53"
+WM.version = "3.53.1"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -1197,6 +1197,19 @@ StaticPopupDialogs["WM_CONFIRM_TOOL"] = {
     OnAccept = function(self, data) if data then data() end end,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
+
+-- Is a unit within an interact distance (1: inspect, 28 yards; 2: trade;
+-- 3: duel; 4: follow)? On 2.5.x CheckInteractDistance is restricted in
+-- combat: calling it then gets Watching Machine blamed for a blocked action
+-- (a pcall doesn't help). So in combat this never asks and returns nil
+-- (unknown). Every module asks through here, never the game directly.
+function WM:InteractRange(unit, index)
+    if InCombatLockdown and InCombatLockdown() then return nil end
+    if type(CheckInteractDistance) ~= "function" or not unit then return nil end
+    local ok, near = pcall(CheckInteractDistance, unit, index or 1)
+    if not ok then return nil end
+    return near and true or false
+end
 
 function WM:Confirm(text, fn)
     if StaticPopup_Show then
