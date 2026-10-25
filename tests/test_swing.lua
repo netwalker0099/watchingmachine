@@ -357,5 +357,66 @@ check("bad saved size repaired", sdb.width == 220 and sdb.barHeight == 40)
 Swing:ResetPosition()
 check("reset puts the default size back", sdb.width == 220 and sdb.barHeight == 14 and f.mh:GetWidth() == 220)
 
+-- ---- Windfury cooldown bar ----
+env.UnitClass = function() return "Shaman", "SHAMAN" end
+talents = { 5, 41, 15 }
+Swing.kind = Swing:Kind()
+Swing:EndTest()
+Swing:OnEvent("PLAYER_ENTER_COMBAT")
+MeleeHit(false); MeleeHit(true)
+local WF = Swing.wfCooldown
+WF.speed, WF.expires, Swing.wfSeen = nil, nil, false
+Swing:Draw(now)
+check("Windfury bar: hidden before any proc", not f.wf:IsShown())
+Log("SPELL_EXTRA_ATTACKS", ME, MOB, 15600, "Hand of Justice", 1, 1)
+check("another extra attack doesn't start it", WF.expires == nil and not Swing.wfSeen)
+Log("SPELL_EXTRA_ATTACKS", ME, MOB, 25504, "Windfury Attack", 1, 1)
+check("a Windfury proc starts its 3s cooldown", near(WF.expires, now + 3) and Swing.wfSeen)
+Swing:Draw(now)
+check("Windfury bar shown under the weapons", f.wf:IsShown() and f.wf.time:GetText() == "3.0")
+now = now + 1
+Swing:Draw(now)
+check("cooling down", f.wf.time:GetText() == "2.0")
+now = now + 2.5
+Swing:Draw(now)
+check("ready again", f.wf:IsShown() and f.wf.time:GetText() == "ready")
+CT:SetEnabled("GENERAL", "swingWindfury", false)
+Swing:Draw(now)
+check("option off: no Windfury bar", not f.wf:IsShown())
+CT:SetEnabled("GENERAL", "swingWindfury", true)
+env.UnitClass = function() return "Warrior", "WARRIOR" end
+Swing.kind = Swing:Kind()
+Swing:Draw(now)
+check("not a shaman: no Windfury bar", not f.wf:IsShown())
+
+-- ---- Flurry charges ----
+local flurryStacks = 0
+env.UnitBuff = function(u, i)
+    if u == "player" and i == 1 and flurryStacks > 0 then return "Flurry", "icon", flurryStacks end
+end
+flurryStacks = 3
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:Draw(now)
+check("Flurry charges read", Swing.flurry == 3)
+check("shown on the main-hand bar", f.mh.label:GetText():find("Flurry 3", 1, true) ~= nil)
+flurryStacks = 1
+Swing:OnEvent("UNIT_AURA", "target")
+check("other units' auras ignored", Swing.flurry == 3)
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:Draw(now)
+check("a charge used", f.mh.label:GetText():find("Flurry 1", 1, true) ~= nil)
+CT:SetEnabled("GENERAL", "swingFlurry", false)
+Swing:Draw(now)
+check("option off: plain label", f.mh.label:GetText() == "Main")
+CT:SetEnabled("GENERAL", "swingFlurry", true)
+flurryStacks = 0
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:Draw(now)
+check("Flurry gone: plain label", Swing.flurry == 0 and f.mh.label:GetText() == "Main")
+flurryStacks = 2
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:OnModuleOff()
+check("off: Windfury and Flurry cleared", Swing.flurry == 0 and not Swing.wfSeen and WF.expires == nil)
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

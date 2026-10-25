@@ -20,6 +20,10 @@
 --   * extra attacks (Windfury) land with the swing that gave them, so they
 --     don't restart the hand a second time
 --
+-- Shamans get a Windfury bar: Windfury Weapon's 3 second cooldown from its
+-- last proc (the first proc in the combat log shows it). Shamans and
+-- warriors see their Flurry charges on the main-hand bar.
+--
 -- Weapon sync (Enhancement shamans): the off hand should land just after
 -- the main hand. Windfury Weapon has a 3 second cooldown shared by both
 -- hands, so the main hand should be the one that gets it, and two hits
@@ -88,12 +92,17 @@ local NO_RESET_IDS = { [34120] = true, [35474] = true, [35475] = true, [35476] =
 local AUTO_SHOT = 75
 local AIMED_SHOT_DEFS = { { "Aimed Shot", 19434 } }
 local STEADY_SHOT = 34120
+-- Windfury Weapon's extra attacks, and the Flurry buff (shaman and warrior)
+local WINDFURY_DEFS = { { "Windfury Attack", 25504 }, { "Windfury Weapon", 25505 } }
+local FLURRY_DEFS = { { "Flurry", 16280 }, { "Flurry", 12970 } }
+local WF_COOLDOWN = 3       -- Windfury Weapon, shared by both hands
 
-local nextMelee, noReset, aimedShot
+local nextMelee, noReset, aimedShot, windfury, flurry
 
 local function Names()
     if not nextMelee then
         nextMelee, noReset, aimedShot = NameSet(NEXT_MELEE_DEFS), NameSet(NO_RESET_DEFS), NameSet(AIMED_SHOT_DEFS)
+        windfury, flurry = NameSet(WINDFURY_DEFS), NameSet(FLURRY_DEFS)
     end
 end
 
@@ -198,6 +207,10 @@ function Swing:IsShaman() return PlayerClass() == "SHAMAN" end
 
 local hands = { mh = {}, oh = {}, ranged = {} }
 Swing.hands = hands
+-- Windfury Weapon's cooldown: speed (3s) and expires, from its last proc
+local wfCooldown = {}
+Swing.wfCooldown = wfCooldown
+Swing.flurry = 0            -- Flurry charges on you
 local attacking, shooting = false, false
 local casting           -- spell ID being cast
 local extraPending, extraTs = 0, 0
@@ -280,6 +293,13 @@ function Swing:OnCombatEvent(ts, sub, _, srcGUID, _, _, _, dstGUID, _, _, _, ...
         elseif sub == "SPELL_EXTRA_ATTACKS" then
             extraPending = tonumber(select(4, ...)) or 1
             extraTs = ts or 0
+            -- A Windfury proc starts its cooldown
+            local spellId, spellName = ...
+            if (spellName and (windfury[spellName] or spellName:find("Windfury", 1, true)))
+                or (spellId and windfury[SpellName(spellId) or ""]) then
+                wfCooldown.speed, wfCooldown.expires = WF_COOLDOWN, now + WF_COOLDOWN
+                self.wfSeen = true
+            end
         elseif sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED" then
             local spellId, spellName = ...
             if nextMelee[spellName] or (spellId and nextMelee[SpellName(spellId) or ""]) then
@@ -348,11 +368,28 @@ function Swing:OnEvent(event, ...)
             if hands.oh.expires then Restart("oh", now) end
             if hands.ranged.expires then Restart("ranged", now) end
         end
+    elseif event == "UNIT_AURA" then
+        if (...) == "player" then self:ReadFlurry() end
     elseif event == "PLAYER_TALENT_UPDATE" or event == "CHARACTER_POINTS_CHANGED"
         or event == "SPELLS_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
         self.kind = self:Kind()
         playerGUID = UnitGUID and UnitGUID("player")
     end
+end
+
+-- Flurry charges on you (0: none), read when your buffs change
+function Swing:ReadFlurry()
+    Names()
+    local n = 0
+    if UnitBuff then
+        for i = 1, 40 do
+            local name, _, count = UnitBuff("player", i)
+            if not name then break end
+            if flurry[name] then n = math.max(1, tonumber(count) or 1); break end
+        end
+    end
+    self.flurry = n
+    return n
 end
 
 function Swing:IsAttacking() return attacking end
@@ -462,6 +499,8 @@ local COLORS = {
     latency = { 1.00, 0.10, 0.10, 0.45 },
     mark    = { 0.30, 0.70, 1.00 },
     markNow = { 0.20, 1.00, 0.20 },
+    wf      = { 0.45, 0.60, 0.95 },   -- Windfury cooling down
+    wfReady = { 0.20, 0.85, 0.30 },   -- Windfury can proc again
 }
 
 local frame, ticker
@@ -532,6 +571,8 @@ function Swing:CreateFrame()
     f.mh = NewBar(f, "Main")
     f.oh = NewBar(f, "Off")
     f.ranged = NewBar(f, "Auto Shot")
+    f.wf = NewBar(f, "Windfury")
+    f.wf.latency:Hide()
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 
     -- Resize grip, bottom-right, while unlocked: drag right for wider,
@@ -568,7 +609,7 @@ function Swing:ApplySize()
     BAR_W, BAR_H = db.width, db.barHeight
     if not frame then return end
     frame:SetWidth(BAR_W)
-    for _, key in ipairs({ "mh", "oh", "ranged" }) do
+    for _, key in ipairs({ "mh", "oh", "ranged", "wf" }) do
         local bar = frame[key]
         bar:SetSize(BAR_W, BAR_H)
         bar.mark:SetSize(3, BAR_H + 6)
@@ -658,6 +699,34 @@ local function DrawBar(bar, h, now, color)
     return true
 end
 
+-- The Windfury bar: its cooldown filling up, then "ready". Returns false
+-- if it has nothing to show (not a shaman, off, or no proc yet).
+function Swing:DrawWindfury(bar, now)
+    if not (self:IsShaman() and Enabled("swingWindfury") and self.wfSeen and wfCooldown.speed) then
+        bar:Hide()
+        return false
+    end
+    local left = math.max(0, (wfCooldown.expires or 0) - now)
+    local frac = 1 - math.min(1, left / wfCooldown.speed)
+    local c = left > 0 and COLORS.wf or COLORS.wfReady
+    bar.fill:SetWidth(math.max(1, frac * BAR_W))
+    bar.fill:SetColorTexture(c[1], c[2], c[3], 0.9)
+    bar.spark:ClearAllPoints()
+    bar.spark:SetPoint("CENTER", bar, "LEFT", frac * BAR_W, 0)
+    bar.spark:SetShown(left > 0)
+    bar.time:SetText(left > 0 and string.format("%.1f", left) or "ready")
+    bar:Show()
+    return true
+end
+
+-- The main-hand label, with your Flurry charges
+function Swing:MainLabel()
+    if Enabled("swingFlurry") and (self.flurry or 0) > 0 then
+        return "Main  |cFFFFCC00Flurry " .. self.flurry .. "|r"
+    end
+    return "Main"
+end
+
 -- Where each bar sits; returns the stack's height
 local function Stack(bars)
     local y = 0
@@ -695,7 +764,7 @@ function Swing:Draw(now)
 
     local shown = {}
     if self.kind == "ranged" or (testUntil > now and PlayerClass() == "HUNTER") then
-        f.mh:Hide(); f.oh:Hide(); f.mh.mark:Hide()
+        f.mh:Hide(); f.oh:Hide(); f.mh.mark:Hide(); f.wf:Hide()
         local h = hands.ranged
         if DrawBar(f.ranged, h, now, COLORS.swing) then
             local clipAt, windupAt = self:RangedZones(now)
@@ -709,8 +778,10 @@ function Swing:Draw(now)
         f.status:SetText("")
     else
         f.ranged:Hide()
+        f.mh.label:SetText(self:MainLabel())
         if DrawBar(f.mh, hands.mh, now, COLORS.swing) then shown[#shown + 1] = f.mh end
         if DrawBar(f.oh, hands.oh, now, COLORS.swing) then shown[#shown + 1] = f.oh end
+        if #shown > 0 and self:DrawWindfury(f.wf, now) then shown[#shown + 1] = f.wf end
         f.mh.zone1:Hide(); f.mh.zone2:Hide(); f.oh.zone1:Hide(); f.oh.zone2:Hide()
         self:DrawSync(now)
     end
@@ -827,6 +898,18 @@ function Swing.RegisterOptions(tools)
         default = true,
     })
     tools:RegisterFeature("GENERAL", {
+        key = "swingWindfury", name = "Windfury cooldown bar",
+        desc = "Enhancement: a bar under your weapons showing Windfury Weapon's 3 second cooldown (shared by both hands) from its last proc, green when it can proc again.",
+        default = true,
+        onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "swingFlurry", name = "Flurry charges on the swing timer",
+        desc = "Shamans and warriors: the main-hand bar shows how many Flurry charges you have left.",
+        default = true,
+        onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
         key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
         options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = "none",
         desc = "Played as SYNC NOW comes up, so you can press the macro without watching the bar.",
@@ -885,7 +968,7 @@ local EVENTS = {
     "PLAYER_ENTER_COMBAT", "PLAYER_LEAVE_COMBAT",
     "START_AUTOREPEAT_SPELL", "STOP_AUTOREPEAT_SPELL",
     "PLAYER_EQUIPMENT_CHANGED", "PLAYER_TALENT_UPDATE",
-    "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD",
+    "CHARACTER_POINTS_CHANGED", "SPELLS_CHANGED", "PLAYER_ENTERING_WORLD", "UNIT_AURA",
 }
 
 function Swing:Initialize()
@@ -924,6 +1007,8 @@ function Swing:OnModuleOff()
     testUntil, resizing = 0, nil
     attacking, shooting, casting = false, false, nil
     for _, h in pairs(hands) do h.speed, h.expires = nil, nil end
+    wfCooldown.speed, wfCooldown.expires = nil, nil
+    self.wfSeen, self.flurry = false, 0
     self.syncPrompting = false
     if frame then frame:Hide() end
     if ticker then ticker:Hide() end
