@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watching Machine Guide</title>
+<meta name="description" content="How to use Watching Machine, the all-in-one World of Warcraft TBC Classic Anniversary addon: raid tools, class tools, guild tools, logging and interface.">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --panel2: #f0f2f5; --line: #dde1e6; --text: #1b1f24;
+    --muted: #5f6b7a; --accent: #1f7a6e; --accent-bg: #e3f3f0; --link: #0b62c4; --code-bg: #eef0f3;
+    --ok: #1f883d; --warn: #9a6700; --bad: #c4322a; --gold: #9a6a12;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116; --panel: #161b22; --panel2: #1c232d; --line: #2a323d; --text: #e6edf3;
+      --muted: #8b97a6; --accent: #4fd1b8; --accent-bg: #12302b; --link: #6cb6ff; --code-bg: #222a35;
+      --ok: #3fb950; --warn: #d29922; --bad: #f47067; --gold: #e3a84a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --panel: #161b22; --panel2: #1c232d; --line: #2a323d; --text: #e6edf3;
+    --muted: #8b97a6; --accent: #4fd1b8; --accent-bg: #12302b; --link: #6cb6ff; --code-bg: #222a35;
+    --ok: #3fb950; --warn: #d29922; --bad: #f47067; --gold: #e3a84a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--link); }
+  code, kbd { font: .88em ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--code-bg);
+              padding: .1em .35em; border-radius: 5px; }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; }
+  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1240px; margin: 0 auto; }
+  nav.side { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+             padding: 28px 18px; border-right: 1px solid var(--line); }
+  nav.side .brand { font-weight: 700; font-size: 1.15rem; margin-bottom: 18px; }
+  nav.side .brand span { color: var(--accent); }
+  nav.side h4 { margin: 18px 0 6px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  nav.side a { display: block; padding: 3px 8px; margin: 0 -8px; border-radius: 6px; color: var(--text);
+               text-decoration: none; font-size: .93rem; }
+  nav.side a:hover { background: var(--panel2); }
+  main { padding: 28px 40px 80px; min-width: 0; }
+  header.hero { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px 30px; }
+  header.hero h1 { margin: 0 0 6px; font-size: 2rem; line-height: 1.2; }
+  header.hero h1 span { color: var(--accent); }
+  header.hero p { margin: 6px 0; color: var(--muted); max-width: 72ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .chip { display: inline-block; background: var(--accent-bg); color: var(--accent); border-radius: 999px;
+          padding: 4px 12px; font-size: .88rem; font-weight: 600; text-decoration: none; }
+  section { margin-top: 44px; }
+  h2 { font-size: 1.5rem; margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  h2 .who { font-size: .75rem; font-weight: 600; vertical-align: middle; margin-left: 8px; padding: 2px 9px;
+            border-radius: 999px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+  h3 { font-size: 1.12rem; margin: 28px 0 6px; }
+  p, li { max-width: 80ch; }
+  .lead { color: var(--muted); }
+  .open { font-size: .9rem; color: var(--muted); margin: 4px 0 12px; }
+  .open code { color: var(--text); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin: 14px 0; }
+  .tip, .note, .warn { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 8px;
+                padding: 10px 14px; margin: 14px 0; max-width: 82ch; }
+  .note { border-left-color: var(--muted); background: var(--panel2); }
+  .warn { border-left-color: var(--warn); background: var(--panel2); }
+  .tip b:first-child, .note b:first-child, .warn b:first-child { display: block; margin-bottom: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .94rem; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--panel2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  ol.steps { counter-reset: s; list-style: none; padding: 0; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 8px 0 8px 44px; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 30px; height: 30px;
+                          border-radius: 50%; background: var(--accent); color: var(--panel); font-weight: 700;
+                          display: grid; place-items: center; font-size: .9rem; }
+  .chat { background: #10141a; color: #e6e6e6; border-radius: 8px; padding: 10px 14px; max-width: 640px;
+          font: .88rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-x: auto; }
+  .chat div { white-space: pre-wrap; }
+  .chat .wm { color: #66ccff; } .chat .y { color: #ffd100; } .chat .g { color: #1eff00; } .chat .r { color: #ff4040; }
+  .chat .grey { color: #9d9d9d; } .chat .o { color: #ff8000; } .chat .p { color: #a335ee; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .grid2 .card { margin: 0; }
+  .grid2 .card h4 { margin: 0 0 4px; }
+  .grid2 .card p { margin: 0; font-size: .93rem; color: var(--muted); }
+  .grid2 .card a { text-decoration: none; }
+  .bar { position: relative; height: 18px; border-radius: 4px; background: #000a; overflow: hidden; max-width: 440px; margin: 6px 0; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #d9a626; }
+  .bar .zone { position: absolute; top: 0; bottom: 0; }
+  .bar .mark { position: absolute; top: -3px; bottom: -3px; width: 3px; }
+  .bar .spark { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; }
+  .bar .lbl { position: absolute; left: 6px; top: 0; font-size: .75rem; line-height: 18px; color: #fff; }
+  .bar .tm { position: absolute; right: 6px; top: 0; font-size: .75rem; line-height: 18px; color: #fff; }
+  .legend { font-size: .88rem; color: var(--muted); }
+  footer { margin-top: 60px; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 14px; }
+  .theme { position: fixed; right: 16px; bottom: 16px; border: 1px solid var(--line); background: var(--panel);
+           color: var(--text); border-radius: 999px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: .85rem; }
+  @media (max-width: 860px) {
+    .layout { display: block; }
+    nav.side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; }
+    nav.side .links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    nav.side h4 { width: 100%; margin: 10px 0 2px; }
+    nav.side a { margin: 0; padding: 2px 0; }
+    main { padding: 18px 16px 60px; }
+    header.hero { padding: 20px 18px; }
+    header.hero h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="side" aria-label="Contents">
+  <div class="brand">Watching <span>Machine</span> guide</div>
+  <div class="links">
+    <h4>Getting started</h4>
+    <a href="#install">Install and update</a>
+    <a href="#setup">First login: the setup</a>
+    <a href="#dashboard">The dashboard</a>
+    <a href="#characters">Per character</a>
+    <a href="#keys">Key bindings</a>
+    <h4>Raid</h4>
+    <a href="#buffcheck">Buff Check</a>
+    <a href="#debuff">Debuff Tracker</a>
+    <a href="#encounters">Encounter callouts</a>
+    <a href="#aurarange">Aura Range</a>
+    <a href="#hazards">Hazard Alerts</a>
+    <a href="#gearscore">GearScore</a>
+    <a href="#armorysnap">ArmorySnap</a>
+    <a href="#gearsets">Gear Sets</a>
+    <a href="#loot">Loot Browser</a>
+    <a href="#attune">Attunements</a>
+    <a href="#timers">World Timers</a>
+    <a href="#ogrila">Ogri'la Helper</a>
+    <h4>Class Tools</h4>
+    <a href="#classtools">How Class Tools works</a>
+    <a href="#general">General: consumables and mana</a>
+    <a href="#swing">Swing timer</a>
+    <a href="#manatick">Mana tick spark</a>
+    <a href="#flyouts">Flyout buttons</a>
+    <a href="#warlock">Warlock</a>
+    <a href="#mage">Mage</a>
+    <a href="#shaman">Shaman</a>
+    <a href="#paladin">Paladin</a>
+    <h4>Guild &amp; social</h4>
+    <a href="#ginvite">Guild Invite</a>
+    <a href="#recruit">Recruiting Tool</a>
+    <a href="#pvp">PvP Enemy Tracker</a>
+    <a href="#chatfilter">Chat Filter</a>
+    <a href="#keyword">Keyword Monitor</a>
+    <a href="#services">Services Parser</a>
+    <a href="#wcl">Whisper Logs (WCL)</a>
+    <h4>Logging</h4>
+    <a href="#autolog">Auto Logger</a>
+    <a href="#mail">Mail &amp; Trade Logger</a>
+    <a href="#instances">Instance Tracker</a>
+    <a href="#bgs">Battlegrounds &amp; Arenas</a>
+    <a href="#alts">Your Characters</a>
+    <a href="#crits">Crit Tracker</a>
+    <h4>Interface</h4>
+    <a href="#framemover">Frame Mover</a>
+    <a href="#looks">Themes, minimap, Esc menu</a>
+    <h4>Reference</h4>
+    <a href="#commands">All commands</a>
+    <a href="#trouble">Troubleshooting</a>
+  </div>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Meet <span>Watching Machine</span></h1>
+  <p>Watching Machine is one addon for World of Warcraft: <b>The Burning Crusade Classic Anniversary</b> (2.5.6) that
+     does the work of a shelf full of others: raid buff and debuff checks, class tools like a swing timer, totem sets and
+     a mana tick spark, gear sets, a loot browser, an instance lockout tracker, guild and chat tools, and more.</p>
+  <p>Everything starts from one dashboard: type <code>/wmachine</code> or click the minimap button. Every module can be
+     switched on or off <b>per character</b>, and a guided setup explains each one the first time you log in.</p>
+  <div class="chips">
+    <a class="chip" href="#install">Install it</a>
+    <a class="chip" href="#setup">The setup</a>
+    <a class="chip" href="#classtools">Class tools</a>
+    <a class="chip" href="#gearsets">Gear sets</a>
+    <a class="chip" href="#instances">Instance lockouts</a>
+    <a class="chip" href="#commands">Command list</a>
+  </div>
+</header>
+
+<!-- ============================ GETTING STARTED ============================ -->
+<section id="install">
+  <h2>Install and update <span class="who">Everyone</span></h2>
+  <p>Get it from <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge</a> (the CurseForge app keeps it
+     up to date for you) or as a zip from the <a href="https://github.com/netwalker0099/watchingmachine/releases">GitHub releases</a>.</p>
+  <ol class="steps">
+    <li>Close the game, or be ready to restart it.</li>
+    <li>Unzip into <code>World of Warcraft\_anniversary_\Interface\AddOns</code>, so you have an
+        <code>AddOns\WatchingMachine</code> folder. When updating by hand, delete the old <code>WatchingMachine</code>
+        folder first so no old files are left behind. Your settings live elsewhere (in <code>WTF</code>) and aren't touched.</li>
+    <li>Start the game. On the character select screen, check <b>AddOns</b> lists Watching Machine as enabled.</li>
+  </ol>
+  <div class="note"><b>New sound files need a full restart</b>The game only finds new sound files when it starts, so after an update that
+     adds sounds, quit and restart rather than <code>/reload</code>. Everything else updates with a <code>/reload</code>.</div>
+</section>
+
+<section id="setup">
+  <h2>First login: the setup <span class="who">Everyone</span></h2>
+  <p>Every module starts <b>off</b> on a new character, and a welcome window asks how you'd like to set up:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Choice</th><th>What it does</th></tr>
+    <tr><td><b>Guided setup</b></td><td>A page per module: what it does and how it works, a switch to turn it on, and its main
+        settings explained. <b>Back</b> and <b>Next</b> move through the pages; nothing is final. The best way to learn what's there.</td></tr>
+    <tr><td><b>Quick setup</b></td><td>One checklist of every module, with presets: <i>Raiding</i>, <i>Guild officer</i>,
+        <i>Everything</i>, <i>Nothing</i>.</td></tr>
+    <tr><td><b>Copy another character</b></td><td>Copies one of your other characters' modules and settings.</td></tr>
+    <tr><td><b>Later</b></td><td>Everything stays off until you run <code>/wmachine setup</code>.</td></tr>
+  </table></div>
+  <ul>
+    <li><code>/wmachine setup</code> (or the dashboard's <b>Setup</b> button) runs it again any time. What's on stays ticked
+        and settings keep their values unless you change them. <code>setup quick</code> and <code>setup guided</code> jump
+        straight to one.</li>
+    <li><b>What's new:</b> when an update adds a module, your next login shows it on a <i>New in Watching Machine</i>
+        page with its switch and settings. <code>/wmachine setup new</code> brings that page back.</li>
+    <li><b>Forget a character</b> you've deleted or renamed: in the welcome window or <code>/wmachine settings</code>,
+        pick it and click <i>Forget its settings</i>.</li>
+  </ul>
+</section>
+
+<section id="dashboard">
+  <h2>The dashboard <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine</code>, left-click the minimap button, the <b>Watching Machine</b> button in the Escape menu,
+     or Options → AddOns → Watching Machine.</p>
+  <p>One card per module, grouped into <b>Raid</b>, <b>Guild &amp; Social</b>, <b>Logging</b> and <b>Interface</b>.</p>
+  <ul>
+    <li><b>The switch</b> on each card turns that module on or off for the character you're playing. An off module isn't
+        running at all.</li>
+    <li><b>Open</b> opens the module's window, with all its settings.</li>
+    <li><b>…</b> (or right-click the card) opens its tools: things like "run a buff check now" or "show the swing timer".</li>
+    <li><b>Hover a card</b> to read what the module does, how it's doing, and its slash command.</li>
+    <li><b>Fit</b> sizes the dashboard to show every card; <b>Hide inactive</b> shows only the modules that are on.
+        Drag the bottom-right corner to resize; the cards reflow into columns.</li>
+  </ul>
+</section>
+
+<section id="characters">
+  <h2>Per character <span class="who">Everyone</span></h2>
+  <ul>
+    <li><b>Which modules are on</b>, and <b>every module's settings</b>, belong to the character you're on.</li>
+    <li><b>Shared between your characters:</b> things that are about all of them: Your Characters, the instance and
+        battleground logs, the PvP enemy list, world timers, Loot Browser lists and BiS marks, crit records and the mail and trade log.</li>
+    <li><b>Parts follow their module:</b> the class tools, swing timer and mana tick spark are on only while Class Tools is.</li>
+  </ul>
+</section>
+
+<section id="keys">
+  <h2>Key bindings <span class="who">Everyone</span></h2>
+  <p>Open the game's <b>Key Bindings</b> (Escape → Key Bindings) and scroll to the <b>Watching Machine</b> heading:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Binding</th><th>What it does</th></tr>
+    <tr><td><b>Gear set 1</b> … <b>Gear set 10</b></td><td>Equips the set that picked that number in its editor (the binding's
+        name shows the set's name). See <a href="#gearsets">Gear Sets</a>.</td></tr>
+    <tr><td><b>Gear sets: undo the last swap</b></td><td>Puts back what you wore before the last swap.</td></tr>
+    <tr><td><b>Drop the next totem</b></td><td>The shaman totem button: drops the next totem of your set. Works in combat. See <a href="#shaman">Shaman</a>.</td></tr>
+  </table></div>
+</section>
+
+<!-- ============================ RAID ============================ -->
+<section id="buffcheck">
+  <h2>Buff Check <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine buffcheck</code></p>
+  <p>Checks everyone's buffs on every <b>ready check</b>, by itself: nothing to click.</p>
+  <ul>
+    <li><b>You started the ready check:</b> who's missing what goes to raid or party chat, so everyone knows what to fix.</li>
+    <li><b>Someone else started it:</b> the same list is printed in your chat window only.</li>
+  </ul>
+  <div class="chat"><div><span class="wm">[WM] Buff check:</span></div><div><span class="wm">Missing Fortitude: Stabsworth, Pew</span></div><div><span class="wm">Missing Food Buff: Tankyboi</span></div></div>
+  <h3>What it checks</h3>
+  <p>Fortitude, Mark of the Wild, Arcane Intellect, paladin blessings, Divine Spirit, Shadow Protection, food buffs, flasks,
+     battle and guardian elixirs. Each one has a tick box in the window.</p>
+  <ul>
+    <li>Class buffs are only expected when that class is in the group (no priest, no Fortitude complaint), and only for
+        classes they apply to (rogues aren't told about Intellect).</li>
+    <li>A flask counts for both elixir slots. Offline and dead players are skipped.</li>
+    <li><b>PallyPower:</b> if your paladins use it, each player is checked for the blessings they were <i>assigned</i>, and the
+        report names the exact missing one.</li>
+  </ul>
+  <h3>The Group list</h3>
+  <p>The window's <b>Group</b> section lists everyone with what they were missing at the last check and, with
+     <a href="#gearscore">GearScore</a> on, a <b>GearScore column</b>: a quick way to size up a group. Sort it by most
+     missing, highest or lowest GearScore, or name. <b>Inspect for GearScores</b> fills in unknown scores.</p>
+  <div class="tip"><b>Tip</b><b>Run Check Now</b> (in the window, or the card's … menu) checks the group any time and shows the result only to you.</div>
+</section>
+
+<section id="debuff">
+  <h2>Debuff Tracker <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine debuff</code></p>
+  <p>A small display showing which important debuffs are on your target (the boss): <b style="color:var(--ok)">green</b>
+     there, <b style="color:var(--bad)">red</b> missing, <b style="color:var(--warn)">yellow</b> a weaker version.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Category</th><th>Debuffs (best first)</th></tr>
+    <tr><td>Armor</td><td>Improved Expose Armor, Expose Armor, Sunder Armor, Faerie Fire</td></tr>
+    <tr><td>Physical damage</td><td>Blood Frenzy</td></tr>
+    <tr><td>Shadow / Fire damage</td><td>Shadow Weaving, Improved Scorch, Curse of the Elements</td></tr>
+    <tr><td>Spell hit</td><td>Misery</td></tr>
+    <tr><td>Attack speed / power</td><td>Thunder Clap; Demoralizing Shout / Roar, Curse of Weakness</td></tr>
+    <tr><td>Healing</td><td>Mortal Strike, Wound Poison, Aimed Shot</td></tr>
+    <tr><td>Hunter's Mark</td><td>Hunter's Mark</td></tr>
+  </table></div>
+  <ul>
+    <li><b>Knows your raid:</b> it reads the classes and specs present and only tracks what your raid can actually put up
+        (a debuff nobody can provide isn't shown as missing). Turn auto-detect off to choose by hand.</li>
+    <li><b>Raid alerts</b> (off by default): after a few seconds without a tracked debuff on a boss, it says so in raid
+        chat (or a raid warning with assist), with a cooldown between repeats.</li>
+    <li><b>Bosses only:</b> big trash doesn't count, and on multi-boss fights it follows the mob the raid is actually
+        hitting.</li>
+  </ul>
+  <div class="tip"><b>Is this a boss?</b>Target it and type <code>/wmachine whyboss</code> to see how the tracker sees it.
+     <code>/wmachine exclude</code> stops a creature ever counting as a boss (<code>unexclude</code> to undo).</div>
+</section>
+
+<section id="encounters">
+  <h2>Encounter callouts <span class="who">Raid · Black Temple</span></h2>
+  <p class="open">Open: <code>/wmachine encounters</code> (Debuff Tracker settings, at <i>Encounter Callouts</i>)</p>
+  <div class="table-wrap"><table>
+    <tr><th>Callout</th><th>What it does</th></tr>
+    <tr><td><b>Illidan: Doom</b></td><td>Raid warning <b>CAST DOOM NOW</b> at 68%, so warlocks land Curse of Doom before he flies at 65%. Sent by the raid leader (or assists, if allowed) so it isn't doubled up.</td></tr>
+    <tr><td><b>Illidan: Shear</b></td><td>Calls out Shear on the main tank during ground phases, including dodges and parries the meters miss. A summary per pull. <code>/wmachine shear</code> for tallies, <code>shear on|off</code>.</td></tr>
+    <tr><td><b>Shadow resist gear</b></td><td>After Mother Shahraz, warns if <i>you're</i> still wearing shadow resist gear (gear only, not buffs). <code>/wmachine srcheck</code> shows what it sees per slot.</td></tr>
+    <tr><td><b>Raid SR check</b></td><td>For the leader and assists: on the first Promenade pull after Mother, lists every raider still in SR gear. <code>/wmachine srraid</code> or <b>Check Raid</b> any time.</td></tr>
+  </table></div>
+</section>
+
+<section id="aurarange">
+  <h2>Aura Range <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine range</code></p>
+  <p>Tells you the moment you step out of range of a party aura or totem: Moonkin Aura, Leader of the Pack, Trueshot Aura,
+     Tree of Life, paladin auras, Strength of Earth, Grace of Air, Wrath of Air, Totem of Wrath, Mana Spring and more.</p>
+  <ul>
+    <li>A movable warning lists exactly what you walked away from, with an optional sound, and clears as soon as you're back.</li>
+    <li>No false alarms when you're dead, when the moonkin or shaman is dead or gone, on loading screens or after leaving the group.</li>
+    <li>Per-aura tick boxes, a sound tick, a lock, and <b>Test</b> to see the warning.</li>
+  </ul>
+</section>
+
+<section id="hazards">
+  <h2>Hazard Alerts <span class="who">Raid · GTFO-style</span></h2>
+  <p class="open">Open: <code>/wmachine gtfo</code></p>
+  <p>A sound the instant you're standing in something that hurts: void zones, fire, poison clouds, cleaves, lava, slime,
+     drowning and fatigue. About 265 hazards in TBC raids and dungeons.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Alert</th><th>Means</th></tr>
+    <tr><td><b>High damage</b></td><td>Move now.</td></tr>
+    <tr><td><b>Low damage</b></td><td>You're taking damage you could avoid.</td></tr>
+    <tr><td><b>Fail</b></td><td>You failed a mechanic.</td></tr>
+    <tr><td><b>Friendly fire</b></td><td>Your own spell is hurting your group.</td></tr>
+  </table></div>
+  <ul>
+    <li><b>Tanks</b> (Righteous Fury, Bear Form, Defensive Stance, or marked main tank) hear the tank version, or nothing where standing in it is the job.</li>
+    <li>Tiny hits and old content far below your level stay quiet.</li>
+    <li>Pick a sound per alert and the channel, with <b>Test</b> buttons. <code>/wmachine gtfo mute &lt;spell ID&gt;</code> silences one hazard you don't care about (<code>unmute</code> to undo). The window lists your recent alerts.</li>
+  </ul>
+</section>
+
+<section id="gearscore">
+  <h2>GearScore <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine gs</code> (or <code>/gs</code>)</p>
+  <p>A gear score and average item level for you and everyone you mouse over, with the same numbers as
+     GearScoreTBCClassic, so the scores people quote match.</p>
+  <ul>
+    <li><b>Player tooltips:</b> "GearScore: 1650  iLvl: 112". Players you mouse over are inspected by themselves: out of
+        combat, close by, one at a time, and not in towns unless you tick <i>… in towns and inns too</i>.</li>
+    <li><b>Item tooltips:</b> the item's score, and with <i>Item tooltip details</i> its enchant and gem bonus and what equipping it would change for you.</li>
+    <li><b>Character and inspect frames</b> show the score. <code>/wmachine gs unlock</code> to drag it, <code>lock</code> to save.</li>
+    <li><b>Group list:</b> everyone in your group, highest first. <b>Scan group</b> inspects whoever's missing; <b>Send to group</b> posts the list.</li>
+  </ul>
+  <div class="note"><b>Another GearScore addon installed?</b>Its tooltips are left to it; the group list still works.</div>
+</section>
+
+<section id="armorysnap">
+  <h2>ArmorySnap <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine armory</code> (or <code>/as</code>)</p>
+  <p>Quietly snapshots every raid member's gear (with enchants and gems) and talents while you raid, so you can look back
+     at who wore what.</p>
+  <ul>
+    <li>A full 25-man is captured in 15 to 20 seconds when everyone's in range; anyone out of range is retried.</li>
+    <li><b>Browse:</b> pick a snapshot, pick a player, and see their gear laid out like the character sheet. Shift-click to link an item.</li>
+    <li>GearScore for every member and the raid's average.</li>
+    <li><code>/as snap [label]</code> takes one by hand. Scanning pauses in combat and carries on after.</li>
+  </ul>
+  <div class="note"><b>Already use the standalone ArmorySnap addon?</b>Watching Machine reads the same saved data. If both are enabled, the module stands aside and says so: disable one.</div>
+</section>
+
+<section id="gearsets">
+  <h2>Gear Sets <span class="who">Raid · ItemRack-style</span></h2>
+  <p class="open">Open: <code>/wmachine gear</code></p>
+  <p>Save what you're wearing as a set and put it back on in one click, a key, a macro, or by itself.</p>
+  <h3>Make a set</h3>
+  <ol class="steps">
+    <li>Put on the gear, open Gear Sets and click <b>New set</b>.</li>
+    <li>The editor shows your character in a <b>dressing room</b> with the 19 slots around it. Click a slot to choose from
+        everything you own that fits it (or to take it off); right-click a slot to leave it out of the set. Faded slots
+        aren't part of the set, so whatever you're wearing there stays.</li>
+    <li>Name it and click <b>Save</b>.</li>
+  </ol>
+  <h3>Put it on</h3>
+  <ul>
+    <li><b>Equip</b> in the window, <code>/wmachine gear equip Tank</code> in a macro, or a key (below).</li>
+    <li><b>Undo last swap</b> puts back what you wore before.</li>
+    <li>In combat only the weapons change; the rest goes on when combat ends. It waits out casts and death too, and checks the
+        result at the end, saying what didn't go on and why.</li>
+  </ul>
+  <h3>Automatic swaps</h3>
+  <p>In a set's editor:</p>
+  <ul>
+    <li><b>Talent spec:</b> pick Spec 1 or 2 and tick <i>Equip it when I switch to that spec</i>.</li>
+    <li><b>Form or stance:</b> Bear Form, Cat Form, a warrior stance, Stealth… Taking that form puts the set on; a form with no set of its own puts back what you wore before.</li>
+    <li><b>Mounted</b>, or <b>in battlegrounds and arenas</b>: what you wore comes back after.</li>
+  </ul>
+  <h3>Keys, scores and best in slot</h3>
+  <ul>
+    <li><b>Key binding:</b> pick <i>Gear set 1–10</i> in the editor, then bind it in <a href="#keys">Key Bindings</a>.</li>
+    <li><b>GearScore:</b> with GearScore on, each set shows its score.</li>
+    <li><b>Compare with BiS:</b> pick a spec and, with the <a href="#loot">Loot Browser</a> on, the set lists the items you've marked BiS for it that it doesn't have yet.</li>
+  </ul>
+  <h3>On the character sheet</h3>
+  <ul>
+    <li><b>Slot menu:</b> point at a slot for a row of everything you own that fits; click one to swap it in (on hover, Alt + hover, or off).</li>
+    <li>A warning when a set's item isn't on you, saying if it's in your bank (with <a href="#alts">Your Characters</a> on).</li>
+  </ul>
+</section>
+
+<section id="loot">
+  <h2>Loot Browser <span class="who">Raid · AtlasLoot-style</span></h2>
+  <p class="open">Open: <code>/wmachine loot</code> (or <code>/wmachine atlas</code>)</p>
+  <p>What every dungeon and raid boss drops, what each profession makes, reputation and PvP rewards, and collections:
+     Classic and TBC.</p>
+  <ul>
+    <li><b>Show:</b> Dungeons &amp; Raids, Crafting, Factions, PvP, Collections (badge vendors, mounts, pets, world epics,
+        sets, events) or My Lists. It opens on the instance you're in.</li>
+    <li><b>Normal / Heroic</b> switch for heroic loot. Set pages show one line per set, by default your class only.</li>
+    <li><b>Search:</b> type three letters (or press Enter) to search every item, plus instances and bosses.</li>
+    <li><b>Items:</b> hover for the tooltip, Shift-click to link, Ctrl-click to try it on.</li>
+  </ul>
+  <h3>My Lists and best in slot</h3>
+  <ul>
+    <li><b>Alt-click</b> any item to add it to your list (the one you last opened).</li>
+    <li><b>Right-click</b> an item to tick it into any list or mark it <b>BiS</b> for one of your specs.</li>
+    <li>Each list is sorted by slot and shows whether you already have the item. Lists are shared across your characters.</li>
+  </ul>
+  <div class="tip"><b>Where does this drop?</b>Every item tooltip in the game (bags, chat links, the auction house) says where it's from:
+     "Drops from: Attumen the Huntsman (Karazhan)", reputation rewards, PvP and crafting, and your BiS marks.</div>
+</section>
+
+<section id="attune">
+  <h2>Attunements <span class="who">Raid</span></h2>
+  <p class="open">Open: <code>/wmachine attune</code></p>
+  <p>Every raid attunement and key, step by step, for each of your characters: Karazhan, Nightbane, Serpentshrine,
+     The Eye, Hyjal, Black Temple, the dungeon keys, the five heroic keys, Ogri'la, Netherwing and (optionally) Classic.</p>
+  <ul>
+    <li>Steps are <b style="color:var(--ok)">green</b> done, <b style="color:var(--warn)">yellow</b> next, grey later, each with its zone. Hover a step for the quest, creature, item or reputation needed.</li>
+    <li><b>My characters</b> shows every alt's progress on the selected one.</li>
+    <li><b>Survey guild</b> asks guild members running Watching Machine for their progress.</li>
+  </ul>
+</section>
+
+<section id="timers">
+  <h2>World Timers <span class="who">Raid · World</span></h2>
+  <p class="open">Open: <code>/wmachine timers</code> · print them: <code>/wmachine wb</code> (or <code>wb guild</code>, <code>wb party</code>)</p>
+  <ul>
+    <li><b>Layers:</b> target A'dal, Nutral, Minalei or Innkeeper Haelthol in Shattrath to learn your layer (numbered like Nova World Buffs).</li>
+    <li><b>Terokkar towers:</b> when the Spirit Towers reset, per layer, with a warning 10 minutes before.</li>
+    <li><b>Dailies:</b> today's dungeon, heroic and PvP dailies.</li>
+    <li><b>Darkmoon Faire:</b> where it is, when it opens and closes, and your Sayge fortune cooldown.</li>
+    <li><b>Classic world buffs and Songflowers</b>, with warnings.</li>
+    <li><b>Map pins</b> for the Faire, towers, dailies and Songflowers.</li>
+    <li>Timers from guild and group members running <b>Nova World Buffs</b> are merged in (it only listens).</li>
+  </ul>
+</section>
+
+<section id="ogrila">
+  <h2>Ogri'la Helper <span class="who">Raid · Ogri'la</span></h2>
+  <p class="open">Open: <code>/wmachine ogri</code> · options: <code>/wmachine ogri options</code></p>
+  <p>Remembers the Apexis Relic (and Monument) colour sequence for you. It opens by itself when you start a relic.</p>
+  <ol class="steps">
+    <li>As the relic lights each colour, click it in the helper, or press <kbd>G</kbd>, <kbd>Y</kbd>, <kbd>B</kbd>, <kbd>R</kbd>.</li>
+    <li>Touch the beams. The next colour is ringed and moves on by itself each time; a wrong beam steps it back.</li>
+    <li>Left-click a colour to remove it, right-click to remove it and everything after; <b>Clear</b> starts again.</li>
+  </ol>
+  <p>It also shows your Apexis Shards and Crystals and your longest sequence.</p>
+</section>
+
+<!-- ============================ CLASS TOOLS ============================ -->
+<section id="classtools">
+  <h2>How Class Tools works <span class="who">Every class</span></h2>
+  <p class="open">Open: <code>/wmachine class</code></p>
+  <p>Class Tools has a <b>tab per class</b> plus a <b>General</b> tab for everyone; your class opens first. Each tool is a
+     tick box (on or off for this character), and each warning's <b>sound</b> is chosen right there on its class's tab.</p>
+  <h3>The CHECK YOURSELF frame</h3>
+  <p>All Class Tools warnings ("Fel Armor is missing", "Use a mana potion") appear in one movable frame that hides itself when
+     nothing's wrong. At the bottom of the window: a sound on a new warning, lock it, reset its position, and
+     <b>Show example</b> to put two test lines up so you can drag it where you want.</p>
+  <h3>Warning sounds</h3>
+  <p>Every warning can play its own sound: the shared warning sound, one of Watching Machine's sounds (Alarm, Chimes, Ding,
+     Uh-oh, Glass, Potion, Rune…), one of the game's (raid warning, ready check, queue pop…), or None. Picking one plays it.
+     <i>Warning sounds play on</i> (General tab) sets the channel: Master is heard even with game sound turned down.</p>
+</section>
+
+<section id="general">
+  <h2>General: consumables and mana <span class="who">Every class</span></h2>
+  <ul>
+    <li><b>Flask or elixirs, food buff, weapon oil or stone:</b> warned about inside raids (25-man by default; tick for 10-mans
+        too). Casters are told about wizard oil, melee about sharpening stones. <code>/wmachine consumes</code> shows what it sees.</li>
+    <li><b>Use a mana potion</b> (mana users, in combat): once you're 3000 below max and a potion is ready, naming the potion.</li>
+    <li><b>Use a Dark / Demonic Rune:</b> once you're 1500 below and no potion is ready. Not below 35% health.</li>
+    <li>Both thresholds are adjustable, and each warning has its own sound (Potion and Rune by default).</li>
+  </ul>
+</section>
+
+<section id="swing">
+  <h2>Swing timer <span class="who">Warrior · Rogue · Hunter · Ret · Enh</span></h2>
+  <p class="open">Show it to move it: <code>/wmachine swing</code> · reset: <code>/wmachine swing reset</code> · options: Class Tools → General</p>
+  <p>A bar per weapon counting to your next swing: for warriors, rogues, Retribution paladins and Enhancement shamans
+     (read from your talents), and an Auto Shot bar for hunters.</p>
+  <div class="bar"><div class="fill" style="width:62%"></div><div class="zone" style="left:96%;right:0;background:#ff1a1a73"></div><div class="spark" style="left:62%"></div><span class="lbl">Main</span><span class="tm">1.0</span></div>
+  <p class="legend">The white spark sweeps left to right; the red end of the bar is your latency.</p>
+  <ul>
+    <li>Follows TBC's rules: Heroic Strike and Cleave replace the swing, a finished cast restarts it, haste rescales it, a parry speeds it up.</li>
+    <li><b>Hunters:</b> green while a Steady Shot is safe, red where it would clip the next shot, yellow for the wind-up when moving delays it.</li>
+    <li><b>Flurry charges</b> (shamans and warriors) show on the main-hand bar.</li>
+    <li>Drag it to move, drag its corner to resize (or pick width and height), and <i>Lock the swing timer</i> when done.</li>
+  </ul>
+  <p>Shamans and paladins get extra marks: see <a href="#shaman">Shaman</a> and <a href="#paladin">Paladin</a>.</p>
+</section>
+
+<section id="manatick">
+  <h2>Mana tick spark <span class="who">Every class with mana</span></h2>
+  <p class="open">Show it: <code>/wmachine manatick</code> · options: Class Tools → General</p>
+  <p>Mana comes back in <b>ticks every 2 seconds</b>. A white spark slides across your health bar and reaches the end as the
+     next tick lands, so you can time a cast to finish just after a tick.</p>
+  <div class="bar" style="background:#1a7a1a"><div class="spark" style="left:70%"></div><div class="spark" style="left:30%;background:#ff8c1a"></div></div>
+  <p class="legend">White: the next mana tick. Orange: the five-second rule after you spend mana.</p>
+  <ul>
+    <li><b>Five-second rule:</b> after you spend mana on a spell, an orange spark crosses the bar over the 5 seconds your spirit regen is stopped.</li>
+    <li><b>Where:</b> your health bar (default), your mana bar, or a bar of its own. Works with Blizzard's and ElvUI's player frames.</li>
+    <li><b>A bar of its own too:</b> a stand-alone bar as well, showing your mana with the same sparks. Shift-drag to move it; pick its width.</li>
+    <li>Hidden at full mana out of combat (an option). Potions and Innervate don't throw it off.</li>
+  </ul>
+</section>
+
+<section id="flyouts">
+  <h2>Flyout buttons <span class="who">Mage · Warlock · Shaman</span></h2>
+  <p>The class buttons (portals, the warlock button, the totem button) open a flyout of spells. In Class Tools → General:</p>
+  <ul>
+    <li><b>Flyout buttons open:</b> on hover (default) or on click.</li>
+    <li><b>Dock flyout buttons together</b> in a row or column that moves as one; <b>Lock flyout buttons</b> to stop dragging.</li>
+    <li>Each group's direction (up, right, down, left) can also be <b>Hidden</b>.</li>
+    <li>Nothing moves in combat; changes made in combat apply after.</li>
+  </ul>
+</section>
+
+<section id="warlock">
+  <h2>Warlock <span class="who">Warlock</span></h2>
+  <ul>
+    <li><b>Armor check:</b> warns when Fel Armor, Demon Armor or Demon Skin has fallen off.</li>
+    <li><b>Demonic Sacrifice</b> and <b>Soul Link</b>: only when you've taken the talent and it makes sense (no nagging with a pet out by choice).</li>
+    <li><b>Soulstone timers:</b> <code>/wmachine soulstone</code> lists who's stoned and for how long.</li>
+    <li><b>Warlock button:</b> hover for your demons, armors, and stones &amp; rituals (Soulwell, summoning, Healthstone, Soulstone), with your Soul Shard count on each.</li>
+    <li>Each warning's sound is on the Warlock tab.</li>
+  </ul>
+</section>
+
+<section id="mage">
+  <h2>Mage <span class="who">Mage</span></h2>
+  <ul>
+    <li><b>Armor check:</b> warns when Molten, Mage, Ice or Frost Armor is missing (its sound is on the Mage tab).</li>
+    <li><b>Portal button:</b> hover for every portal and teleport you know; click to cast. <code>/wmachine portals</code> lists them.</li>
+    <li><b>Mage utility button:</b> mana gems, armors, and food &amp; water (Ritual of Refreshment, Conjure Water and Food), best rank nearest the button.</li>
+  </ul>
+</section>
+
+<section id="shaman">
+  <h2>Shaman <span class="who">Shaman</span></h2>
+  <h3>The totem button</h3>
+  <ol class="steps">
+    <li><b>Hover</b> the button and pick a set: Melee, Caster, Healer or Tremor to start with.</li>
+    <li><b>Click</b> (or press your <a href="#keys">Drop the next totem</a> key) to drop the next totem: Air, Water, Earth, then Fire.</li>
+    <li>It starts again from Air when your totems are gone, after combat, or on <b>Ctrl</b>-click.</li>
+  </ol>
+  <ul>
+    <li><b>Right-click</b> the button (or <code>/wmachine totems</code>) to edit your four sets: each element's totem, Auto (the best you know) or None.</li>
+    <li><b>Shift-drag</b> moves it. <b>Totem timers</b> above it show each totem you have down and its time left.</li>
+  </ul>
+  <h3>On the swing timer (Enhancement)</h3>
+  <ul>
+    <li><b>Weapon sync mark:</b> a blue mark on the main-hand bar shows when to press your sync macro
+        (<code>/cleartarget</code>, <code>/targetlasttarget</code>, <code>/startattack</code>) so the off hand lands just after
+        the main hand. It turns green with <b>SYNC NOW</b>, and a line says <i>In sync</i> or <i>Out of sync</i>.
+        Set <i>Off hand lands after by</i> and an optional <i>SYNC NOW sound</i>.</li>
+    <li><b>Windfury cooldown bar:</b> Windfury Weapon's 3-second cooldown after each proc, green when ready.</li>
+  </ul>
+  <p>These options are on the <b>Shaman</b> tab.</p>
+</section>
+
+<section id="paladin">
+  <h2>Paladin <span class="who">Paladin</span></h2>
+  <ul>
+    <li><b>Righteous Fury check</b> for Protection paladins only.</li>
+  </ul>
+  <h3>Seal twisting (Retribution)</h3>
+  <p>On the swing timer's main-hand bar:</p>
+  <div class="bar"><div class="fill" style="width:55%"></div><div class="zone" style="left:89%;right:0;background:#bf4dff66"></div><div class="mark" style="left:57%;background:#ffd100"></div><div class="spark" style="left:55%"></div><span class="lbl">Main</span><span class="tm">1.6</span></div>
+  <ul>
+    <li><b style="color:var(--gold)">Point of no return</b> (gold line): the swing has one GCD left (1.5s cut by spell haste, at
+        least 1s). It turns <b style="color:var(--bad)">red</b> once passed: anything on the GCD now means no twist before this swing.</li>
+    <li><b>Twist window</b> (purple, the last 0.4s): cast Seal of Blood (or the Martyr) here so Seal of Command still lands. Length adjustable 0.3–0.5s.</li>
+    <li><b>Your seal:</b> its icon just past the end of the bar, or <i>no seal</i> in red.</li>
+  </ul>
+  <p>The options are on the <b>Paladin</b> tab.</p>
+</section>
+
+<!-- ============================ GUILD & SOCIAL ============================ -->
+<section id="ginvite">
+  <h2>Guild Invite <span class="who">Group leaders</span></h2>
+  <p class="open">Open: <code>/wmachine ginvite</code></p>
+  <p>Guild members type <code>inv</code> (or your trigger word) in guild chat or a whisper, and get invited.</p>
+  <ul>
+    <li>Whisper requests are checked against your guild list first. You need to lead or assist.</li>
+    <li>The party turns into a raid only when a 6th person is invited; say <code>raid</code> to convert by hand.</li>
+    <li>Every invite is logged with the time.</li>
+  </ul>
+</section>
+
+<section id="recruit">
+  <h2>Recruiting Tool <span class="who">Officers</span></h2>
+  <p class="open">Open: <code>/wmachine recruit</code></p>
+  <p>Finds unguilded players by class and level range and sends them your recruiting message (<code>%GUILD%</code> is replaced with your guild's name).</p>
+</section>
+
+<section id="pvp">
+  <h2>PvP Enemy Tracker <span class="who">World PvP</span></h2>
+  <p class="open">Open: <code>/wmachine pvp</code></p>
+  <ul>
+    <li><b>Logs who kills you</b> in world PvP (not battlegrounds or arenas): name, class, level, guild, zone and how many times.</li>
+    <li><b>Warns you when they're near</b> (nameplates, mouseover, target, combat log): chat, sound and screen alerts, each switchable.</li>
+    <li><b>Kill-on-sight list</b> sorted by kills; add by name or <b>Add Target</b>.</li>
+    <li><b>Guild sync</b> shares the list with guild members running Watching Machine, and a <b>leaderboard</b> scores KOS kills.</li>
+  </ul>
+</section>
+
+<section id="chatfilter">
+  <h2>Chat Filter <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine filter</code></p>
+  <p>Hides chat spam by phrase before you ever see it.</p>
+  <ul>
+    <li>Premade filters (off until ticked): <b>GDKP</b>, <b>Guild Loot Run</b>, <b>Gear Carry</b>. Add your own phrases.</li>
+    <li>Ignores case, colours and link brackets. Public channels by default; say, yell and whispers if you tick them. Your own messages are never hidden.</li>
+    <li>Runs before Keyword Monitor, so hidden spam never matches a keyword.</li>
+  </ul>
+</section>
+
+<section id="keyword">
+  <h2>Keyword Monitor <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine keyword</code></p>
+  <p>Watches Trade, General, LookingForGroup and other channels for words you choose ("Kara", "enchanter"…), with a sound and
+     chat alert, and keeps matches for 5 minutes without duplicates.</p>
+</section>
+
+<section id="services">
+  <h2>Services Parser <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine services</code></p>
+  <p>Sorts boost adverts from the services channel by dungeon (Classic and TBC), with a separate tab for summons and portals.</p>
+</section>
+
+<section id="wcl">
+  <h2>Whisper Logs (WCL Lookup) <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine wcl</code></p>
+  <p>Lists who whispered you, with a ready-made <b>Warcraft Logs</b> link for each (fresh.warcraftlogs.com, the right server
+     and region, cross-realm too). <b>Scan Raid/Party</b> adds your whole group. Click to copy a link, right-click to remove.</p>
+</section>
+
+<!-- ============================ LOGGING ============================ -->
+<section id="autolog">
+  <h2>Auto Logger <span class="who">Raiders</span></h2>
+  <p class="open">Open: <code>/wmachine logger</code></p>
+  <ul>
+    <li>Turns on <b>chat logging</b> at login and <b>combat logging</b> in raids (and 5-mans if you tick it).</li>
+    <li>Keeps <b>Advanced Combat Logging</b> on, which Warcraft Logs needs for complete uploads.</li>
+  </ul>
+</section>
+
+<section id="mail">
+  <h2>Mail &amp; Trade Logger <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine mail</code></p>
+  <ul>
+    <li>Logs gold and items from mail, trades and the auction house, per character, with filters (gold, items, AH sales and buys, expired).</li>
+    <li>Bulk mail pulling is logged once, even with Postal-style addons.</li>
+    <li><b>Gold trades</b> print a clickable chat line, and each trade records which instance you were in.</li>
+  </ul>
+  <div class="chat"><div><span class="wm">[WM]</span> Trade with Booster: received <span class="y">500g</span>, gave 2 item(s) (in The Deadmines)</div></div>
+</section>
+
+<section id="instances">
+  <h2>Instance Tracker <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine instances</code> · print lockouts: <code>/wmachine lockouts</code></p>
+  <p>The game lets each account enter <b>5 instances an hour</b> and <b>30 a day</b>. This logs every dungeon and raid on
+     all your characters, so you know how many you have left and when the next one frees up.</p>
+  <div class="chat"><div><span class="wm">[WM]</span> Entered The Slave Pens (3/5 this hour, 7/30 today). <span class="r">[X]</span></div><div><span class="wm">[WM]</span> The Slave Pens: 24m 00s, 61 mobs, 18,300 XP (300/mob), 45,750 XP/hour, 4 more runs like this to level 62, 12g 40s 5c looted</div></div>
+  <ul>
+    <li><b>Entering</b> prints your counts. Click the line to open the log; click the red <b>X</b> to delete that run if it shouldn't count.</li>
+    <li><b>Leaving</b> prints the run's stats: time, mobs, XP, <b>XP per hour</b>, <b>how many more runs like it to level</b>, and gold.
+        To your chat window, your group, or off.</li>
+    <li><b>Same instance, counted once:</b> going back in after a corpse run or disconnect adds to the same run. A reset makes the next one new.</li>
+    <li><b>Hover a run</b> in the log for the group, times, XP, gold and reputation; right-click to delete.</li>
+    <li>It tells you when you can enter a new instance again, and as leader, tells your group when you reset.</li>
+  </ul>
+</section>
+
+<section id="bgs">
+  <h2>Battlegrounds &amp; Arenas <span class="who">PvP</span></h2>
+  <p class="open">Open: <code>/wmachine bgs</code></p>
+  <ul>
+    <li>Every match: result, length, killing blows, honorable kills, deaths, honor, damage and healing.</li>
+    <li><b>Arenas:</b> bracket, both teams and your rating change.</li>
+    <li><b>Totals:</b> games, wins and win rate per battleground and bracket, for one character or all.</li>
+  </ul>
+</section>
+
+<section id="alts">
+  <h2>Your Characters <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine alts</code></p>
+  <p>Every character you play, on every realm, in one window, kept up to date as you play.</p>
+  <ul>
+    <li>Level, <b>rested XP</b> (still building while you're logged out), gold (realm totals on the realm line), and when you last played it.</li>
+    <li><b>Hover</b> for bags, durability, professions, class reagents, and a hunter's ammo and pet.</li>
+    <li><b>Click</b> a character for their gear on a paper doll, with GearScore.</li>
+    <li><b>Bags</b>, <b>Bank</b>, <b>Attunements</b> and <b>Lockouts</b> buttons on each row.</li>
+    <li><b>Find an item:</b> search every character's gear, bags and bank (open each character's bank once).</li>
+    <li>Right-click a character to remove one you've deleted.</li>
+  </ul>
+</section>
+
+<section id="crits">
+  <h2>Crit Tracker <span class="who">Everyone</span></h2>
+  <p class="open">Open: <code>/wmachine crits</code></p>
+  <ul>
+    <li>Your best hit and best crit for every spell, ability, melee and ranged attack and heal, with the crit rate, target, place and date.</li>
+    <li>A <b>new best crit</b> says so in chat, with an optional sound and big text on screen.</li>
+    <li>PvP kept apart. Spell tooltips show your records; right-click a record to share it.</li>
+  </ul>
+</section>
+
+<!-- ============================ INTERFACE ============================ -->
+<section id="framemover">
+  <h2>Frame Mover <span class="who">Everyone · BlizzMove-style</span></h2>
+  <p class="open">Open: <code>/wmachine move</code></p>
+  <p>Move and resize the game's own windows: character, spellbook, talents, bank, mailbox, quest log, world map, auction
+     house, professions and about 55 more.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Do this</th><th>To</th></tr>
+    <tr><td><b>Drag</b> a window (or one of its tabs or panels)</td><td>Move it</td></tr>
+    <tr><td><kbd>Ctrl</kbd> + mouse wheel</td><td>Make it bigger or smaller</td></tr>
+    <tr><td><kbd>Shift</kbd> + right-click</td><td>Put it back where the game had it</td></tr>
+    <tr><td><kbd>Ctrl</kbd> + right-click</td><td>Put its size back</td></tr>
+    <tr><td><kbd>Alt</kbd> + drag a pop-out (reputation details, raid info, an opened mail…)</td><td>Pull it off its window and place it on its own</td></tr>
+  </table></div>
+  <ul>
+    <li>Remembered per character, or tick <i>Use one layout for all my characters</i>.</li>
+    <li>The window can leave a chosen window alone, reset one or all, and require Shift to drag.</li>
+  </ul>
+  <div class="note"><b>Using BlizzMove?</b>Frame Mover stands aside while BlizzMove is enabled. Disable BlizzMove to use Frame Mover.</div>
+</section>
+
+<section id="looks">
+  <h2>Themes, minimap, Esc menu <span class="who">Everyone</span></h2>
+  <ul>
+    <li><b>Theme</b> (<code>/wmachine settings</code>): <i>Default</i> (Blizzard style) or <i>ElvUI</i> (flat and dark; picked for you when ElvUI is installed). Applies at once.</li>
+    <li><b>Minimap button:</b> left-click for the dashboard, drag to move. <code>/wmachine minimap</code> hides it, <code>/wmachine resetminimap</code> puts it back.</li>
+    <li><b>Escape menu button:</b> a Watching Machine button above Log Out. Turn it off in Settings or with <code>/wmachine menubutton off</code>.</li>
+  </ul>
+</section>
+
+<!-- ============================ REFERENCE ============================ -->
+<section id="commands">
+  <h2>All commands</h2>
+  <p>Every command starts with <code>/wmachine</code>. <code>/wmachine help</code> lists them in game.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>/wmachine</code></td><td>Open or close the dashboard</td></tr>
+    <tr><td><code>setup</code> · <code>setup quick</code> · <code>setup guided</code> · <code>setup new</code></td><td>The setup, again; what's new</td></tr>
+    <tr><td><code>settings</code></td><td>Theme, game menu button, forget a character</td></tr>
+    <tr><td><code>buffcheck</code></td><td>Buff Check</td></tr>
+    <tr><td><code>debuff</code> · <code>encounters</code> · <code>whyboss</code> · <code>exclude</code> · <code>unexclude</code></td><td>Debuff Tracker and callouts</td></tr>
+    <tr><td><code>shear</code> · <code>srcheck</code> · <code>srraid</code></td><td>Black Temple: Shear tallies, SR gear checks</td></tr>
+    <tr><td><code>range</code></td><td>Aura Range</td></tr>
+    <tr><td><code>gtfo</code> · <code>gtfo mute &lt;id&gt;</code> · <code>gtfo test</code></td><td>Hazard Alerts</td></tr>
+    <tr><td><code>gs</code> · <code>gs report</code> · <code>gs unlock</code> / <code>lock</code></td><td>GearScore</td></tr>
+    <tr><td><code>armory</code> (or <code>/as</code>, <code>/as snap</code>)</td><td>ArmorySnap</td></tr>
+    <tr><td><code>gear</code> · <code>gear equip &lt;name&gt;</code> · <code>gear undo</code> · <code>gear list</code></td><td>Gear Sets</td></tr>
+    <tr><td><code>loot</code></td><td>Loot Browser</td></tr>
+    <tr><td><code>attune</code></td><td>Attunements</td></tr>
+    <tr><td><code>timers</code> · <code>wb</code> · <code>wb guild</code></td><td>World Timers</td></tr>
+    <tr><td><code>ogri</code> · <code>ogri options</code></td><td>Ogri'la Helper</td></tr>
+    <tr><td><code>class</code> · <code>consumes</code></td><td>Class Tools; what the consumable checks see</td></tr>
+    <tr><td><code>swing</code> · <code>swing reset</code></td><td>Show or reset the swing timer</td></tr>
+    <tr><td><code>manatick</code> · <code>manatick reset</code></td><td>Show the mana tick spark; reset its own bar</td></tr>
+    <tr><td><code>soulstone</code> · <code>portals</code> · <code>totems</code></td><td>Warlock soulstones, mage portals, shaman totem sets</td></tr>
+    <tr><td><code>ginvite</code> · <code>recruit</code> · <code>pvp</code></td><td>Guild Invite, Recruiting Tool, PvP Enemy Tracker</td></tr>
+    <tr><td><code>filter</code> · <code>keyword</code> · <code>services</code> · <code>wcl</code></td><td>Chat Filter, Keyword Monitor, Services Parser, Whisper Logs</td></tr>
+    <tr><td><code>logger</code> · <code>mail</code></td><td>Auto Logger, Mail &amp; Trade Logger</td></tr>
+    <tr><td><code>instances</code> · <code>lockouts</code></td><td>Instance Tracker</td></tr>
+    <tr><td><code>bgs</code> · <code>alts</code> · <code>crits</code></td><td>Battlegrounds &amp; Arenas, Your Characters, Crit Tracker</td></tr>
+    <tr><td><code>move</code> · <code>move reset</code></td><td>Frame Mover</td></tr>
+    <tr><td><code>minimap</code> · <code>resetminimap</code> · <code>menubutton on|off</code></td><td>Minimap and Escape menu buttons</td></tr>
+    <tr><td><code>status</code> · <code>errors</code> · <code>clearerrors</code> · <code>logoutcheck</code></td><td>Status and troubleshooting</td></tr>
+  </table></div>
+</section>
+
+<section id="trouble">
+  <h2>Troubleshooting</h2>
+  <div class="table-wrap"><table>
+    <tr><th>What you see</th><th>What to do</th></tr>
+    <tr><td>A module does nothing</td><td>Check its card's switch on the dashboard: modules are on or off <b>per character</b>.</td></tr>
+    <tr><td>"… is off on this character"</td><td>Turn it on from the dashboard, or run <code>/wmachine setup</code>.</td></tr>
+    <tr><td>A new sound plays nothing</td><td>Fully restart the game (new sound files aren't found by <code>/reload</code>).</td></tr>
+    <tr><td>Frame Mover doesn't move windows</td><td>BlizzMove (or MoveAnything) is enabled; Frame Mover leaves windows to it.</td></tr>
+    <tr><td>Can't log out with the Escape menu</td><td>Type <code>/wmachine logoutcheck</code> with the menu open and follow what it says. <code>/wmachine menubutton off</code> then <code>/reload</code> stops the addon touching the menu.</td></tr>
+    <tr><td>"The game blocked … and blamed Watching Machine"</td><td>Update to the latest version, then send the output of <code>/wmachine logoutcheck</code>.</td></tr>
+    <tr><td>Something errors</td><td><code>/wmachine errors</code> shows the last errors: send them in a report.</td></tr>
+    <tr><td>Can't find the mana tick spark</td><td><code>/wmachine manatick</code> shows it for 10 seconds, on the bar it's set to.</td></tr>
+  </table></div>
+  <p>Report problems on <a href="https://github.com/netwalker0099/watchingmachine/issues">GitHub issues</a> or the
+     <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
+</section>
+
+<footer>Watching Machine guide · written for version 3.57 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+  Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
+  World of Warcraft © Blizzard Entertainment.</footer>
+</main>
+</div>
+<button class="theme" id="theme" type="button" aria-label="Toggle light or dark theme">◐ Theme</button>
+<script>
+  (function () {
+    var root = document.documentElement, key = 'wm-guide-theme';
+    try { var saved = localStorage.getItem(key); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+    document.getElementById('theme').addEventListener('click', function () {
+      var dark = root.getAttribute('data-theme') === 'dark' ||
+        (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem(key, next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>

@@ -87,7 +87,9 @@ rebuilds `docs/CURSEFORGE-DESCRIPTION.md` from the README. See
 - Bump `## Version:` in `WatchingMachine.toc`, `WM.version` in `Core.lua`
   and the README header; add a README "### Version" entry, a CHANGELOG
   section (and its "Current release" line), the README module section, and
-  update `docs/TODO.md`. Rebuild the CurseForge description
+  update `docs/TODO.md`. A new or changed feature also goes into the
+  user guide, `docs/index.html` (GitHub Pages; one section per feature, its
+  menu link, the command table and the version in its footer). Rebuild the CurseForge description
   (`python3 -I tools/curseforge_description.py`).
 - Commit to `main`, then push `main` and `main:claude/wow-buff-check-module-q11r9h`.
 - Publishing to CurseForge: push a tag `v<version>` (exactly the toc's
