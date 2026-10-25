@@ -1,6 +1,6 @@
 -- Watching Machine: Mana Tick
 -- A white spark that slides left to right across your health bar (or mana
--- bar, or a small bar of its own), reaching the right edge as your next
+-- bar, or a bar of its own, or both), reaching the right edge as your next
 -- mana tick lands. TBC regenerates mana in ticks every 2 seconds, so you
 -- can time a cast to finish just after a tick, or stop casting just long
 -- enough to catch one.
@@ -39,6 +39,11 @@ local HOSTS = {
 }
 MT.HOSTS = HOSTS
 
+MT.WIDTH_OPTIONS = {
+    { value = 100, text = "100" }, { value = 130, text = "130" }, { value = 160, text = "160 (default)" },
+    { value = 200, text = "200" }, { value = 250, text = "250" }, { value = 300, text = "300" },
+}
+
 MT.WHERE_OPTIONS = {
     { value = "health", text = "Health bar" },
     { value = "mana", text = "Mana bar" },
@@ -49,6 +54,8 @@ local function DB()
     if type(ManaTickDB) ~= "table" then ManaTickDB = {} end
     local db = ManaTickDB
     if db.where ~= "health" and db.where ~= "mana" and db.where ~= "own" then db.where = "health" end
+    if type(db.width) ~= "number" then db.width = OWN_W end
+    db.width = math.max(80, math.min(400, math.floor(db.width + 0.5)))
     return db
 end
 MT.DB = DB
@@ -160,15 +167,25 @@ local function Resolve(name)
     if type(obj) == "table" and type(obj.GetWidth) == "function" then return obj end
 end
 
--- The bar the spark goes on now (and whether it's our own)
-function MT:Host()
+-- Where the spark shows: the player frame's bar (nil: none, or set to its
+-- own bar), and whether the bar of its own shows too
+function MT:Hosts()
     local where = DB().where
+    local host
     if where ~= "own" then
         for _, name in ipairs(HOSTS[where] or {}) do
-            local f = Resolve(name)
-            if f then return f, false end
+            host = Resolve(name)
+            if host then break end
         end
     end
+    local own = where == "own" or host == nil or Enabled("manaTickOwnToo")
+    return host, own
+end
+
+-- The bar the spark mainly goes on (and whether it's our own)
+function MT:Host()
+    local host = self:Hosts()
+    if host then return host, false end
     return self:OwnBar(), true
 end
 
@@ -191,12 +208,13 @@ function MT:CreateOverlay()
     return f
 end
 
--- The small bar of its own: Shift-drag to move it
+-- The bar of its own: your mana as a blue fill, with the sparks over it.
+-- Shift-drag to move it.
 function MT:OwnBar()
     if ownBar then return ownBar end
     local db = DB()
     local f = CreateFrame("Frame", "WM_ManaTickBar", UIParent)
-    f:SetSize(OWN_W, OWN_H)
+    f:SetSize(db.width, OWN_H)
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -211,21 +229,43 @@ function MT:OwnBar()
         local x, y = self:GetCenter()
         if x then DB().x, DB().y = x, y end
     end)
+    f:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Mana tick", 0.4, 0.6, 1)
+        GameTooltip:AddLine("The white spark reaches the end as your next mana tick lands; the orange one is the"
+            .. " five-second rule. Shift-drag to move.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.bg = f:CreateTexture(nil, "BACKGROUND")
     f.bg:SetAllPoints()
-    f.bg:SetColorTexture(0.05, 0.1, 0.3, 0.7)
+    f.bg:SetColorTexture(0, 0, 0, 0.6)
+    f.fill = f:CreateTexture(nil, "ARTWORK")
+    f.fill:SetPoint("TOPLEFT")
+    f.fill:SetPoint("BOTTOMLEFT")
+    f.fill:SetColorTexture(0.1, 0.3, 0.9, 0.8)
+    f.tick = Spark(f, 1, 1, 1)
+    f.fsr = Spark(f, 1, 0.55, 0.1)
     f:Hide()
     ownBar = f
     self.ownBar = f
     return f
 end
 
+function MT:SetWidth(w)
+    DB().width = w
+    DB()   -- clamps
+    if ownBar then ownBar:SetWidth(DB().width) end
+end
+
 function MT:ResetPosition()
     local db = DB()
     db.x, db.y = nil, nil
+    db.width = OWN_W
     if ownBar then
         ownBar:ClearAllPoints()
         ownBar:SetPoint("CENTER", UIParent, "CENTER", 0, -220)
+        ownBar:SetWidth(OWN_W)
     end
 end
 
@@ -260,31 +300,47 @@ function MT:Draw(now)
         if ownBar then ownBar:Hide() end
         return
     end
-    local host, own = self:Host()
-    if own then host:Show() elseif ownBar then ownBar:Hide() end
-    if not own and host.IsVisible and not host:IsVisible() then f:Hide() return end
-    -- Lay the overlay over the bar, just above it
-    if f.host ~= host then
-        f:ClearAllPoints()
-        f:SetAllPoints(host)
-        if host.GetFrameStrata then f:SetFrameStrata(host:GetFrameStrata() or "MEDIUM") end
-        if host.GetFrameLevel then f:SetFrameLevel((host:GetFrameLevel() or 1) + 5) end
-        f.host = host
-    end
+    local host, own = self:Hosts()
     local tickFrac = self:TickFraction(now)
     if testUntil > now and not tickFrac then tickFrac = (now % TICK) / TICK end
-    Place(f.tick, f, tickFrac)
-    Place(f.fsr, f, Enabled("manaTickFSR") and self:FSRFraction(now) or nil)
-    f:Show()
+    local fsrFrac = Enabled("manaTickFSR") and self:FSRFraction(now) or nil
+    -- On the player frame's bar: our overlay laid over it, just above it
+    if host and (not host.IsVisible or host:IsVisible()) then
+        if f.host ~= host then
+            f:ClearAllPoints()
+            f:SetAllPoints(host)
+            if host.GetFrameStrata then f:SetFrameStrata(host:GetFrameStrata() or "MEDIUM") end
+            if host.GetFrameLevel then f:SetFrameLevel((host:GetFrameLevel() or 1) + 5) end
+            f.host = host
+        end
+        Place(f.tick, f, tickFrac)
+        Place(f.fsr, f, fsrFrac)
+        f:Show()
+    else
+        f:Hide()
+    end
+    -- The bar of its own
+    if own then
+        local bar = self:OwnBar()
+        local max = MaxMana()
+        local frac = max > 0 and math.min(1, (Mana() or 0) / max) or 0
+        bar.fill:SetWidth(math.max(1, frac * (bar:GetWidth() or 0)))
+        Place(bar.tick, bar, tickFrac)
+        Place(bar.fsr, bar, fsrFrac)
+        bar:Show()
+    elseif ownBar then
+        ownBar:Hide()
+    end
 end
 
 -- /wmachine manatick: show it for 10 seconds (to find it, or move its own bar)
 function MT:Test()
     testUntil = GetTime() + 10
     self:Draw()
-    local own = select(2, self:Host())
-    WM:ModulePrint("ManaTick", "Showing the mana tick spark for 10 seconds"
-        .. (own and ". Shift-drag its bar to move it." or " on your " .. (DB().where == "mana" and "mana" or "health") .. " bar."))
+    local host, own = self:Hosts()
+    local where = host and (" on your " .. (DB().where == "mana" and "mana" or "health") .. " bar") or ""
+    WM:ModulePrint("ManaTick", "Showing the mana tick spark for 10 seconds" .. where
+        .. (own and ((host and ", and on its own bar" or " on its own bar") .. ". Shift-drag that bar to move it.") or "."))
 end
 
 function MT:EndTest() testUntil = 0 end
@@ -306,6 +362,19 @@ function MT.RegisterOptions(tools)
         desc = "Your player frame's health bar or mana bar (Blizzard's or ElvUI's), or a small bar of its own (Shift-drag to move it). Without a player frame it uses its own bar.",
         get = function() return DB().where end,
         set = function(v) DB().where = v; MT:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "manaTickOwnToo", name = "Mana tick spark on a bar of its own too",
+        desc = "A stand-alone bar as well as the one on your player frame: your mana as a blue fill with the sparks over it. Shift-drag it to move it.",
+        default = false,
+        onToggle = function() MT:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "manaTickWidth", kind = "choice", name = "Mana tick bar width",
+        options = MT.WIDTH_OPTIONS, default = OWN_W,
+        desc = "The width of the mana tick spark's own bar.",
+        get = function() return DB().width end,
+        set = function(v) MT:SetWidth(v) end,
     })
     tools:RegisterFeature("GENERAL", {
         key = "manaTickFSR", name = "Five-second rule spark",

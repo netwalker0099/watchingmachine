@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.51 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.52 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -324,12 +324,16 @@ always sits first.
   - On your health bar, your mana bar, or a small bar of its own (Shift-drag
     to move it): Blizzard's player frame or ElvUI's, or its own bar without
     one. It's laid over the bar, so the game's unit frames aren't touched
+  - **A bar of its own too** (3.52): a stand-alone bar as well as the one on
+    your player frame, showing your mana as a blue fill with the same sparks
+    over it. Shift-drag to move it; *Mana tick bar width* sets its width
   - Hidden at full mana out of combat (an option). `/wmachine manatick`
     shows it for 10 seconds; `/wmachine manatick reset` puts its own bar
     back in place
   - Options: *Mana tick spark*, *Mana tick spark on* (health bar, mana bar,
-    its own bar), *Five-second rule spark*, *Hide the mana tick spark at
-    full mana*
+    its own bar), *Mana tick spark on a bar of its own too*, *Mana tick bar
+    width*, *Five-second rule spark*, *Hide the mana tick spark at full
+    mana*
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
 `Unstable Flask of the Sorcerer` count alongside the standard flasks.
@@ -1155,7 +1159,7 @@ Built-in error capture system for debugging.
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
 - `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
-- `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position
+- `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position and width
 - `InstanceTrackerDB` - Instance log (every character) and its options
 - `AltTrackerDB` - Your Characters: every character's saved details
 - `PvPLogDB` - Battleground and arena matches (every character)

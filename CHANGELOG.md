@@ -2,7 +2,19 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.51** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.52** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.52
+
+- **Mana tick spark on a bar of its own too:** a new Class Tools > General
+  option shows the spark on a stand-alone bar as well as on your player
+  frame. The bar shows your mana as a blue fill with the white tick spark
+  and the orange five-second-rule spark over it; Shift-drag to move it.
+  *Mana tick bar width* (100 to 300) sets its width. Set *Mana tick spark
+  on* to *Its own bar* to have only the stand-alone bar.
+- `/wmachine manatick reset` also puts the bar's width back.
 
 ---
 

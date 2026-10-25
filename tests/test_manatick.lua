@@ -23,7 +23,10 @@ function W.Frame:GetFrameStrata() return self._strata or "MEDIUM" end
 function W.Frame:SetFrameStrata(s) self._strata = s end
 function W.Frame:GetFrameLevel() return self._level or 1 end
 function W.Frame:SetFrameLevel(l) self._level = l end
-function W.Frame:SetAllPoints(f) self._allPoints = f end
+function W.Frame:SetAllPoints(f)
+    self._allPoints = f
+    if f then self._w, self._h = f:GetWidth(), f:GetHeight() end
+end
 -- Blizzard's player frame bars
 local health = W.NewFrame("PlayerFrameHealthBar")
 health:SetSize(120, 12)
@@ -130,13 +133,37 @@ check("on the mana bar", ov._allPoints == manaBar)
 env.ManaTickDB.where = "own"
 MT:Draw(now)
 local own = env.WM_ManaTickBar
-check("its own bar", own and own:IsShown() and ov._allPoints == own)
+check("its own bar, with its own sparks", own and own:IsShown() and own.tick:IsShown() and not ov:IsShown())
+check("own bar: your mana as a fill", near(own.fill:GetWidth(), 0.4 * 160) and own:GetWidth() == 160)
+check("own bar: the tick spark three quarters along", near(own.tick._points[1][4], 0.75 * 160))
+check("own bar: the five-second spark too", own.fsr:IsShown())
+local moved = false
+own.StartMoving = function() moved = true end
 shift = false
 own._scripts.OnDragStart(own)
-check("own bar: plain drag doesn't move it", true)
+check("own bar: plain drag doesn't move it", not moved)
+shift = true
+own._scripts.OnDragStart(own)
+shift = false
+check("own bar: Shift-drag moves it", moved)
 env.ManaTickDB.where = "health"
 MT:Draw(now)
-check("back on the health bar: own bar hidden", ov._allPoints == health and not own:IsShown())
+check("back on the health bar: own bar hidden", ov._allPoints == health and ov:IsShown() and not own:IsShown())
+-- Both: the health bar and a stand-alone bar
+CT:SetEnabled("GENERAL", "manaTickOwnToo", true)
+MT:Draw(now)
+check("a bar of its own too: both show", ov:IsShown() and ov._allPoints == health and own:IsShown()
+    and own.tick:IsShown() and ov.tick:IsShown())
+check("both sparks in step", near(own.tick._points[1][4] / 160, ov.tick._points[1][4] / ov:GetWidth()))
+MT:SetWidth(250)
+MT:Draw(now)
+check("width option", own:GetWidth() == 250 and env.ManaTickDB.width == 250 and near(own.fill:GetWidth(), 0.4 * 250))
+MT:SetWidth(9999)
+check("width kept sensible", env.ManaTickDB.width == 400)
+MT:SetWidth(160)
+CT:SetEnabled("GENERAL", "manaTickOwnToo", false)
+MT:Draw(now)
+check("too off: just the health bar", ov:IsShown() and not own:IsShown())
 env.PlayerFrameHealthBar = false   -- (nil would give the harness's stand-in frame)
 local elv = W.NewFrame("ElvHealth")
 env.ElvUF_Player = { Health = elv }
@@ -145,7 +172,7 @@ MT:Draw(now)
 check("ElvUI's player health bar when there's no Blizzard one", ov._allPoints == elv)
 env.ElvUF_Player = nil
 MT:Draw(now)
-check("no player frame at all: its own bar", ov._allPoints == own and own:IsShown())
+check("no player frame at all: its own bar", own:IsShown() and not ov:IsShown())
 env.PlayerFrameHealthBar = health
 MT:Draw(now)
 health:Hide()

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.51 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.52 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -388,12 +388,16 @@ always sits first.
   - On your health bar, your mana bar, or a small bar of its own (Shift-drag
     to move it): Blizzard's player frame or ElvUI's, or its own bar without
     one. It's laid over the bar, so the game's unit frames aren't touched
+  - **A bar of its own too** (3.52): a stand-alone bar as well as the one on
+    your player frame, showing your mana as a blue fill with the same sparks
+    over it. Shift-drag to move it; *Mana tick bar width* sets its width
   - Hidden at full mana out of combat (an option). `/wmachine manatick`
     shows it for 10 seconds; `/wmachine manatick reset` puts its own bar
     back in place
   - Options: *Mana tick spark*, *Mana tick spark on* (health bar, mana bar,
-    its own bar), *Five-second rule spark*, *Hide the mana tick spark at
-    full mana*
+    its own bar), *Mana tick spark on a bar of its own too*, *Mana tick bar
+    width*, *Five-second rule spark*, *Hide the mana tick spark at full
+    mana*
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
 `Unstable Flask of the Sorcerer` count alongside the standard flasks.
@@ -1173,7 +1177,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
 - `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
-- `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position
+- `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position and width
 - `InstanceTrackerDB` - Instance log (every character) and its options
 - `AltTrackerDB` - Your Characters: every character's saved details
 - `PvPLogDB` - Battleground and arena matches (every character)
@@ -1207,6 +1211,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.52
+- **Mana tick spark:** an option to show it on a stand-alone bar too (your mana as a fill, with the sparks over it), and a width for that bar
 
 ### Version 3.51
 - New **mana tick spark** (Class Tools > General): a white spark slides across your health bar to each 2-second mana tick, with an orange five-second-rule spark after you spend mana (`/wmachine manatick`)

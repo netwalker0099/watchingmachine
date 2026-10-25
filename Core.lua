@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.51"
+WM.version = "3.52"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -2281,7 +2281,7 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         local module = WM:UsableModule("ManaTick")
         if module and module.ResetPosition then
             module:ResetPosition()
-            WM:Print("The mana tick bar is back at its default place.")
+            WM:Print("The mana tick bar is back at its default place and width.")
         end
 
     elseif cmd == "manatick" or cmd == "mana tick" or cmd == "tick" then
