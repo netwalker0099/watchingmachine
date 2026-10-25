@@ -2,7 +2,31 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.52.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.53** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.53
+
+### Swing timer: seal twisting for Retribution paladins
+
+On the main-hand bar, for paladins (*Paladin seal twisting marks* in Class
+Tools > General, on by default):
+
+- **Point of no return:** a gold line where the swing has one GCD left.
+  The GCD is 1.5s cut by your spell haste (`UnitSpellHaste`, or the spell
+  haste rating), never under 1s, and like the timer's other marks it's
+  moved earlier by your latency. It turns red once the spark passes it:
+  anything on the GCD from then on means no twist before this swing.
+- **Twist window:** the last 0.4s of the swing shaded at the end of the
+  bar, when Seal of Blood (or Seal of the Martyr) still lands together with
+  Seal of Command. *Twist window* sets it from 0.3 to 0.5s.
+- **Your seal:** the seal you have up, as its icon just past the end of the
+  bar, found by the aura's spell ID (or its name), or *no seal* in red.
+  Hover it for the spell's tooltip.
+- Still to confirm in game: that spell haste shortens the paladin GCD on
+  2.5.6 as expected, and how close to 0.4s the window really is with your
+  latency.
 
 ---
 

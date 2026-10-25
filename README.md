@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.52.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.53 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -370,8 +370,21 @@ always sits first.
     and *ready* when it can proc again. It appears after your first Windfury
     proc
   - **Flurry charges** (3.50, shamans and warriors) on the main-hand bar
+  - **Seal twisting** (3.53, Retribution paladins), on the main-hand bar:
+    - **Point of no return:** a gold line where the swing has a GCD left
+      (1.5s cut by your spell haste, never under 1s, and moved earlier by
+      your latency). Once the spark passes it the line turns red: anything
+      on the GCD now (Crusader Strike, a judgement) means no twist before
+      this swing
+    - **Twist window:** the last 0.4s of the swing shaded at the end of the
+      bar, when Seal of Blood (or the Martyr) still lands with Seal of
+      Command. *Twist window* sets its length (0.3 to 0.5s)
+    - **Your seal:** the seal you have up, as an icon just past the end of
+      the bar (read by spell ID, so any language), or *no seal* in red.
+      Hover it for the spell
   - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
     mark*, *Windfury cooldown bar*, *Flurry charges on the swing timer*,
+    *Paladin seal twisting marks*, *Twist window*,
     *Off hand lands after by*, width, bar height, *Lock the swing
     timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
     so you can move and resize it; `/wmachine swing reset` puts back the
@@ -1176,7 +1189,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `GeneralChecksDB` - General consumable check settings
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
-- `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
+- `SwingTimerDB` - Swing timer position, size, lock, weapon-sync lag and twist window
 - `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position and width
 - `InstanceTrackerDB` - Instance log (every character) and its options
 - `AltTrackerDB` - Your Characters: every character's saved details
@@ -1211,6 +1224,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.53
+- **Swing timer, Retribution:** the point of no return (a GCD before the swing, with spell haste), the 0.4s twist window at the end of the bar, and your active seal past it
 
 ### Version 3.52.1
 - **Fixed: no mana tick spark with ElvUI** (it went on Blizzard's hidden player frame); it now uses the first player bar that's showing

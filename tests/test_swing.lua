@@ -418,5 +418,69 @@ Swing:OnEvent("UNIT_AURA", "player")
 Swing:OnModuleOff()
 check("off: Windfury and Flurry cleared", Swing.flurry == 0 and not Swing.wfSeen and WF.expires == nil)
 
+-- ---- Paladin seal twisting ----
+env.UnitClass = function() return "Paladin", "PALADIN" end
+talents = { 0, 10, 41 }
+Swing.kind = Swing:Kind()
+local haste = 0
+env.UnitSpellHaste = function() return haste end
+check("GCD 1.5s without haste", near(Swing:GCD(), 1.5))
+haste = 25
+check("GCD cut by spell haste", near(Swing:GCD(), 1.2))
+haste = 60
+check("GCD never under 1s", near(Swing:GCD(), 1.0))
+haste = 0
+env.UnitSpellHaste = nil
+env.GetCombatRatingBonus = function() return 25 end
+check("haste from rating where the client has no UnitSpellHaste", near(Swing:GCD(), 1.2))
+env.GetCombatRatingBonus = function() return 0 end
+mhSpeed, ohSpeed = 3.5, nil
+Swing:OnEvent("PLAYER_ENTER_COMBAT")
+MeleeHit(false)
+local W_ = f.mh:GetWidth()
+local lat = Swing:Latency(now)
+check("point of no return: a GCD plus latency before the swing", near(Swing:PointOfNoReturn(now), 1.5 + lat))
+Swing:Draw(now)
+local ponr = f.mh.ponr
+check("point of no return marked", ponr:IsShown() and near(ponr._points[1][4], (1 - (1.5 + lat) / 3.5) * W_))
+check("gold before it", ponr._tex[2] > 0.5 and not Swing.pastPONR)
+local z = f.mh.zone1
+check("twist window: the last 0.4s of the swing", z:IsShown() and near(z._points[1][4], (1 - 0.4 / 3.5) * W_))
+now = H.mh.expires - 1.0
+Swing:Draw(now)
+check("past it: red, and noted", Swing.pastPONR and ponr._tex[1] == 1 and ponr._tex[2] < 0.5)
+-- The seal you have up
+env.UnitBuff = function(u, i)
+    if u == "player" and i == 1 then return "Blessing of Might", "iconMight" end
+    if u == "player" and i == 2 then return "Seal of Command", "iconCommand", 0, nil, nil, nil, nil, nil, nil, 27170 end
+end
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:Draw(now)
+check("active seal read", Swing.seal and Swing.seal.name == "Seal of Command" and Swing.seal.id == 27170)
+check("its icon past the end of the bar", f.seal:IsShown() and f.seal.icon._texture == "iconCommand"
+    and f.seal._points[1][2] == f.mh)
+env.UnitBuff = function(u, i)
+    if u == "player" and i == 1 then return "Siegel des Blutes", "iconBlood", 0, nil, nil, nil, nil, nil, nil, 31892 end
+end
+Swing:OnEvent("UNIT_AURA", "player")
+check("found by spell ID on other languages", Swing.seal and Swing.seal.name == "Siegel des Blutes")
+env.UnitBuff = function() return nil end
+Swing:OnEvent("UNIT_AURA", "player")
+Swing:Draw(now)
+check("no seal: says so", Swing.seal == nil and f.seal:IsShown() and f.seal.text:GetText():find("no seal", 1, true))
+-- Window length option
+Swing.DB().twistWindow = 0.3
+Swing:Draw(now)
+check("twist window length option", near(z._points[1][4], (1 - 0.3 / 3.5) * W_))
+Swing.DB().twistWindow = 0.4
+CT:SetEnabled("GENERAL", "swingTwist", false)
+Swing:Draw(now)
+check("option off: no twisting marks", not ponr:IsShown() and not f.seal:IsShown() and not z:IsShown())
+CT:SetEnabled("GENERAL", "swingTwist", true)
+env.UnitClass = function() return "Warrior", "WARRIOR" end
+Swing.kind = Swing:Kind()
+Swing:Draw(now)
+check("not a paladin: no twisting marks", not ponr:IsShown() and not f.seal:IsShown())
+
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

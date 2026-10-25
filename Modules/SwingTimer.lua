@@ -24,6 +24,10 @@
 -- last proc (the first proc in the combat log shows it). Shamans and
 -- warriors see their Flurry charges on the main-hand bar.
 --
+-- Retribution paladins twisting seals get, on the main-hand bar, the point
+-- of no return (a GCD before the swing), the twist window at its end, and
+-- the seal they have up.
+--
 -- Weapon sync (Enhancement shamans): the off hand should land just after
 -- the main hand. Windfury Weapon has a 3 second cooldown shared by both
 -- hands, so the main hand should be the one that gets it, and two hits
@@ -96,13 +100,24 @@ local STEADY_SHOT = 34120
 local WINDFURY_DEFS = { { "Windfury Attack", 25504 }, { "Windfury Weapon", 25505 } }
 local FLURRY_DEFS = { { "Flurry", 16280 }, { "Flurry", 12970 } }
 local WF_COOLDOWN = 3       -- Windfury Weapon, shared by both hands
+-- Paladin seals (rank 1 IDs, for the name on localized clients); any rank
+-- is matched by name or by the aura's spell ID
+local SEAL_DEFS = {
+    { "Seal of Command", 20375 }, { "Seal of Blood", 31892 }, { "Seal of the Martyr", 348700 },
+    { "Seal of Righteousness", 21084 }, { "Seal of the Crusader", 21082 }, { "Seal of Wisdom", 20166 },
+    { "Seal of Light", 20165 }, { "Seal of Justice", 20164 }, { "Seal of Vengeance", 31801 },
+}
+local SEAL_IDS = {}
+for _, d in ipairs(SEAL_DEFS) do SEAL_IDS[d[2]] = true end
+local GCD_BASE, GCD_MIN = 1.5, 1.0
+local TWIST_DEFAULT = 0.4   -- the twist window: Seal of Command still lands this close to the swing
 
-local nextMelee, noReset, aimedShot, windfury, flurry
+local nextMelee, noReset, aimedShot, windfury, flurry, seals
 
 local function Names()
     if not nextMelee then
         nextMelee, noReset, aimedShot = NameSet(NEXT_MELEE_DEFS), NameSet(NO_RESET_DEFS), NameSet(AIMED_SHOT_DEFS)
-        windfury, flurry = NameSet(WINDFURY_DEFS), NameSet(FLURRY_DEFS)
+        windfury, flurry, seals = NameSet(WINDFURY_DEFS), NameSet(FLURRY_DEFS), NameSet(SEAL_DEFS)
     end
 end
 
@@ -122,6 +137,7 @@ local function DB()
     if db.locked == nil then db.locked = false end
     if db.syncLag == nil then db.syncLag = 0.15 end
     if db.syncSound == nil then db.syncSound = "none" end
+    if type(db.twistWindow) ~= "number" then db.twistWindow = TWIST_DEFAULT end
     if type(db.width) ~= "number" then db.width = DEFAULT_W end
     if type(db.barHeight) ~= "number" then db.barHeight = DEFAULT_H end
     db.width = math.max(MIN_W, math.min(MAX_W, math.floor(db.width + 0.5)))
@@ -374,6 +390,7 @@ function Swing:OnEvent(event, ...)
         or event == "SPELLS_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
         self.kind = self:Kind()
         playerGUID = UnitGUID and UnitGUID("player")
+        if event == "PLAYER_ENTERING_WORLD" then self:ReadFlurry() end
     end
 end
 
@@ -381,15 +398,58 @@ end
 function Swing:ReadFlurry()
     Names()
     local n = 0
+    local seal
     if UnitBuff then
         for i = 1, 40 do
-            local name, _, count = UnitBuff("player", i)
+            local name, icon, count, _, _, _, _, _, _, spellId = UnitBuff("player", i)
             if not name then break end
-            if flurry[name] then n = math.max(1, tonumber(count) or 1); break end
+            if flurry[name] and n == 0 then n = math.max(1, tonumber(count) or 1) end
+            -- The seal you have up (paladins)
+            if not seal and (seals[name] or SEAL_IDS[tonumber(spellId) or 0] or name:find("^Seal of ")) then
+                seal = { name = name, icon = icon, id = tonumber(spellId) }
+            end
         end
     end
     self.flurry = n
+    self.seal = seal
     return n
+end
+
+-- ============================================
+-- PALADIN SEAL TWISTING
+-- ============================================
+-- Seal of Command lingers about 0.4s after it's replaced, so casting Seal of
+-- Blood (or the Martyr) in the last 0.4s before a swing lands both. Casting
+-- a seal needs the GCD free: once the swing has less than a GCD left,
+-- anything on the GCD (Crusader Strike, a judgement) means no twist before
+-- this swing. That's the point of no return.
+
+-- Spell haste, in percent (rating, plus buffs where the client says)
+local function SpellHaste()
+    if UnitSpellHaste then
+        local ok, h = pcall(UnitSpellHaste, "player")
+        if ok and tonumber(h) then return tonumber(h) end
+    end
+    if GetCombatRatingBonus then
+        local ok, h = pcall(GetCombatRatingBonus, CR_HASTE_SPELL or 20)
+        if ok and tonumber(h) then return tonumber(h) end
+    end
+    return 0
+end
+
+-- Your global cooldown: 1.5s cut by spell haste, never under 1s
+function Swing:GCD()
+    return math.max(GCD_MIN, GCD_BASE / (1 + SpellHaste() / 100))
+end
+
+-- Swing time left at which the point of no return comes: a GCD, moved
+-- earlier by your latency like the other marks
+function Swing:PointOfNoReturn(now)
+    return self:GCD() + self:Latency(now)
+end
+
+function Swing:IsTwisting()
+    return PlayerClass() == "PALADIN" and Enabled("swingTwist") and true or false
 end
 
 function Swing:IsAttacking() return attacking end
@@ -499,6 +559,7 @@ local COLORS = {
     latency = { 1.00, 0.10, 0.10, 0.45 },
     mark    = { 0.30, 0.70, 1.00 },
     markNow = { 0.20, 1.00, 0.20 },
+    twist   = { 0.75, 0.30, 1.00 },   -- paladin: the twist window
     wf      = { 0.45, 0.60, 0.95 },   -- Windfury cooling down
     wfReady = { 0.20, 0.85, 0.30 },   -- Windfury can proc again
 }
@@ -573,6 +634,27 @@ function Swing:CreateFrame()
     f.ranged = NewBar(f, "Auto Shot")
     f.wf = NewBar(f, "Windfury")
     f.wf.latency:Hide()
+    -- Paladin twisting, on the main-hand bar: the point of no return, the
+    -- twist window (zone1), and the seal you have up past the bar's end
+    f.mh.ponr = f.mh:CreateTexture(nil, "OVERLAY")
+    f.mh.ponr:SetColorTexture(1, 0.82, 0, 1)
+    f.mh.ponr:Hide()
+    f.seal = CreateFrame("Frame", "WM_SwingTimerSeal", f)
+    f.seal:SetPoint("LEFT", f.mh, "RIGHT", 4, 0)
+    f.seal.icon = f.seal:CreateTexture(nil, "ARTWORK")
+    f.seal.icon:SetAllPoints()
+    f.seal.text = f.seal:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.seal.text:SetPoint("LEFT", f.seal, "LEFT", 0, 0)
+    f.seal:EnableMouse(true)
+    f.seal:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local s = Swing.seal
+        if s and s.id and GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(s.id)
+        else GameTooltip:AddLine(s and s.name or "No seal", 1, 0.82, 0) end
+        GameTooltip:Show()
+    end)
+    f.seal:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.seal:Hide()
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 
     -- Resize grip, bottom-right, while unlocked: drag right for wider,
@@ -619,6 +701,8 @@ function Swing:ApplySize()
         bar.label:SetShown(fits and BAR_W >= 140)
         bar.time:SetShown(fits)
     end
+    frame.mh.ponr:SetSize(3, BAR_H + 6)
+    frame.seal:SetSize(BAR_H + 6, BAR_H + 6)
 end
 
 function Swing:SetSize(width, barHeight)
@@ -719,6 +803,47 @@ function Swing:DrawWindfury(bar, now)
     return true
 end
 
+-- Paladin twisting on the main-hand bar: the point of no return (a gold
+-- line, red once passed), the twist window at the end of the bar, and the
+-- seal you have up just past it
+function Swing:DrawTwist(now)
+    local f = frame
+    local mh = hands.mh
+    if not (self:IsTwisting() and mh.speed and mh.expires and f.mh:IsShown()) then
+        f.mh.ponr:Hide()
+        f.seal:Hide()
+        return
+    end
+    local left = mh.expires - now
+    -- The point of no return
+    local ponr = self:PointOfNoReturn(now)
+    if ponr > 0 and ponr < mh.speed then
+        local x = (1 - ponr / mh.speed) * BAR_W
+        f.mh.ponr:ClearAllPoints()
+        f.mh.ponr:SetPoint("CENTER", f.mh, "LEFT", x, 0)
+        if left > 0 and left < ponr then f.mh.ponr:SetColorTexture(1, 0.2, 0.2, 1)
+        else f.mh.ponr:SetColorTexture(1, 0.82, 0, 1) end
+        f.mh.ponr:Show()
+    else
+        f.mh.ponr:Hide()
+    end
+    self.pastPONR = left > 0 and left < ponr
+    -- The twist window: the last 0.4s (an option) of the swing
+    local w = math.min(DB().twistWindow, mh.speed)
+    Zone(f.mh.zone1, f.mh, 1 - w / mh.speed, 1, COLORS.twist)
+    -- The seal you have up
+    local s = self.seal
+    if s then
+        f.seal.icon:SetTexture(s.icon or "Interface\\Icons\\Spell_Holy_SealOfMight")
+        f.seal.icon:Show()
+        f.seal.text:SetText("")
+    else
+        f.seal.icon:Hide()
+        f.seal.text:SetText("|cFFFF4444no seal|r")
+    end
+    f.seal:Show()
+end
+
 -- The main-hand label, with your Flurry charges
 function Swing:MainLabel()
     if Enabled("swingFlurry") and (self.flurry or 0) > 0 then
@@ -764,7 +889,7 @@ function Swing:Draw(now)
 
     local shown = {}
     if self.kind == "ranged" or (testUntil > now and PlayerClass() == "HUNTER") then
-        f.mh:Hide(); f.oh:Hide(); f.mh.mark:Hide(); f.wf:Hide()
+        f.mh:Hide(); f.oh:Hide(); f.mh.mark:Hide(); f.wf:Hide(); f.seal:Hide()
         local h = hands.ranged
         if DrawBar(f.ranged, h, now, COLORS.swing) then
             local clipAt, windupAt = self:RangedZones(now)
@@ -784,6 +909,7 @@ function Swing:Draw(now)
         if #shown > 0 and self:DrawWindfury(f.wf, now) then shown[#shown + 1] = f.wf end
         f.mh.zone1:Hide(); f.mh.zone2:Hide(); f.oh.zone1:Hide(); f.oh.zone2:Hide()
         self:DrawSync(now)
+        self:DrawTwist(now)
     end
     local h = Stack(shown)
     f:SetHeight(h)
@@ -874,6 +1000,11 @@ Swing.HEIGHT_OPTIONS = {
     { value = 22, text = "22" }, { value = 28, text = "28" },
 }
 
+Swing.TWIST_OPTIONS = {
+    { value = 0.3, text = "0.30 s" }, { value = 0.35, text = "0.35 s" }, { value = 0.4, text = "0.40 s (default)" },
+    { value = 0.45, text = "0.45 s" }, { value = 0.5, text = "0.50 s" },
+}
+
 Swing.LAG_OPTIONS = {
     { value = 0.1, text = "0.10 s" }, { value = 0.15, text = "0.15 s" },
     { value = 0.2, text = "0.20 s" }, { value = 0.3, text = "0.30 s" },
@@ -908,6 +1039,19 @@ function Swing.RegisterOptions(tools)
         desc = "Shamans and warriors: the main-hand bar shows how many Flurry charges you have left.",
         default = true,
         onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "swingTwist", name = "Paladin seal twisting marks",
+        desc = "Retribution: on the main-hand bar, a gold line at the point of no return (a GCD before the swing, with spell haste and your latency; red once passed), the twist window shaded at the end of the bar, and the seal you have up just past it.",
+        default = true,
+        onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("GENERAL", {
+        key = "swingTwistWindow", kind = "choice", name = "Twist window",
+        options = Swing.TWIST_OPTIONS, default = TWIST_DEFAULT,
+        desc = "How long before the swing the twist window starts: the time Seal of Command still lands after you change seal.",
+        get = function() return DB().twistWindow end,
+        set = function(v) DB().twistWindow = v; Swing:Refresh() end,
     })
     tools:RegisterFeature("GENERAL", {
         key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
@@ -1008,7 +1152,7 @@ function Swing:OnModuleOff()
     attacking, shooting, casting = false, false, nil
     for _, h in pairs(hands) do h.speed, h.expires = nil, nil end
     wfCooldown.speed, wfCooldown.expires = nil, nil
-    self.wfSeen, self.flurry = false, 0
+    self.wfSeen, self.flurry, self.seal, self.pastPONR = false, 0, nil, false
     self.syncPrompting = false
     if frame then frame:Hide() end
     if ticker then ticker:Hide() end
