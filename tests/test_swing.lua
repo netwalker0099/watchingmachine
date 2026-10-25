@@ -32,7 +32,8 @@ local cleu
 env.CombatLogGetCurrentEventInfo = function() return unpack(cleu, 1, 24) end
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Sounds.lua", "Modules/ClassTools.lua", "Modules/ClassFlyout.lua",
-                     "Modules/SwingTimer.lua", "Modules/ClassGeneral.lua", "Modules/ClassPaladin.lua" }) do
+                     "Modules/SwingTimer.lua", "Modules/ClassGeneral.lua", "Modules/ClassPaladin.lua",
+                     "Modules/ClassShaman.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -41,6 +42,7 @@ env.WatchingMachineDB = { theme = "Default" }
 CT:InitDB()
 Gen:Initialize()
 WM.modules.ClassPaladin:RegisterFeatures()
+WM.modules.ClassShaman:RegisterFeatures()
 
 local pass, fail = 0, 0
 local function check(name, cond)
@@ -251,10 +253,10 @@ Swing:OnEvent("UNIT_ATTACK_SPEED", "player")
 Swing:Draw(now)
 check("unequal speeds are pointed out", (f.status:GetText() or ""):find("speeds differ", 1, true) ~= nil)
 ohSpeed = 2.6
-CT:SetEnabled("GENERAL", "swingSync", false)
+CT:SetEnabled("SHAMAN", "swingSync", false)
 Swing:Draw(now)
 check("sync mark off: no mark or status", not f.mh.mark:IsShown() and (f.status:GetText() or "") == "")
-CT:SetEnabled("GENERAL", "swingSync", true)
+CT:SetEnabled("SHAMAN", "swingSync", true)
 Swing:OnEvent("PLAYER_LEAVE_COMBAT")
 env.UnitAffectingCombat = function() return false end
 Swing:Draw(now)
@@ -381,10 +383,10 @@ check("cooling down", f.wf.time:GetText() == "2.0")
 now = now + 2.5
 Swing:Draw(now)
 check("ready again", f.wf:IsShown() and f.wf.time:GetText() == "ready")
-CT:SetEnabled("GENERAL", "swingWindfury", false)
+CT:SetEnabled("SHAMAN", "swingWindfury", false)
 Swing:Draw(now)
 check("option off: no Windfury bar", not f.wf:IsShown())
-CT:SetEnabled("GENERAL", "swingWindfury", true)
+CT:SetEnabled("SHAMAN", "swingWindfury", true)
 env.UnitClass = function() return "Warrior", "WARRIOR" end
 Swing.kind = Swing:Kind()
 Swing:Draw(now)
@@ -483,6 +485,15 @@ local function Has(class, key)
 end
 check("twisting options on the Paladin tab, not General", Has("PALADIN", "swingTwist") and Has("PALADIN", "swingTwistWindow")
     and not Has("GENERAL", "swingTwist") and not Has("GENERAL", "swingTwistWindow"))
+check("weapon sync and Windfury options on the Shaman tab, not General", Has("SHAMAN", "swingSync")
+    and Has("SHAMAN", "swingWindfury") and Has("SHAMAN", "swingSyncLag") and Has("SHAMAN", "swingSyncSound")
+    and not Has("GENERAL", "swingSync") and not Has("GENERAL", "swingWindfury"))
+env.ClassToolsDB.enabled.GENERAL.swingWindfury = false
+env.ClassToolsDB.enabled.SHAMAN.swingWindfury = nil
+Swing.RegisterShamanOptions(CT)
+check("3.55's General choice moves to the Shaman tab", env.ClassToolsDB.enabled.SHAMAN.swingWindfury == false
+    and env.ClassToolsDB.enabled.GENERAL.swingWindfury == nil)
+CT:SetEnabled("SHAMAN", "swingWindfury", true)
 -- A choice made under General in 3.53 is kept
 env.ClassToolsDB.enabled.GENERAL.swingTwist = false
 env.ClassToolsDB.enabled.PALADIN.swingTwist = nil

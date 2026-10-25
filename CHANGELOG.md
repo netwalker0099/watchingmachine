@@ -2,7 +2,17 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.55** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.56** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.56
+
+- **The swing timer's shaman options moved to the Shaman tab** of Class
+  Tools, after the totem button's: *Weapon sync mark on the swing timer*,
+  *Off hand lands after by*, *SYNC NOW sound* and *Windfury cooldown bar on
+  the swing timer*. Choices made under General are kept. *Flurry charges*
+  stays on General, as warriors use it too.
 
 ---
 

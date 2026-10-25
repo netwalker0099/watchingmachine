@@ -155,6 +155,12 @@ local function Enabled(key)
     return CT and CT:IsEnabled("GENERAL", key)
 end
 
+-- A Shaman tab option (the weapon sync and Windfury options live there)
+local function ShamanEnabled(key)
+    local CT = Tools()
+    return CT and CT:IsEnabled("SHAMAN", key) and true or false
+end
+
 local function PlayerClass()
     local _, c = UnitClass("player")
     return c
@@ -787,7 +793,7 @@ end
 -- The Windfury bar: its cooldown filling up, then "ready". Returns false
 -- if it has nothing to show (not a shaman, off, or no proc yet).
 function Swing:DrawWindfury(bar, now)
-    if not (self:IsShaman() and Enabled("swingWindfury") and self.wfSeen and wfCooldown.speed) then
+    if not (self:IsShaman() and ShamanEnabled("swingWindfury") and self.wfSeen and wfCooldown.speed) then
         bar:Hide()
         return false
     end
@@ -923,7 +929,7 @@ end
 function Swing:DrawSync(now)
     local f = frame
     local mh, oh = hands.mh, hands.oh
-    if not (self:IsShaman() and Enabled("swingSync") and mh.speed and oh.speed and mh.expires and oh.expires) then
+    if not (self:IsShaman() and ShamanEnabled("swingSync") and mh.speed and oh.speed and mh.expires and oh.expires) then
         f.mh.mark:Hide()
         f.status:SetText("")
         return
@@ -1025,38 +1031,10 @@ function Swing.RegisterOptions(tools)
         onToggle = function() Swing:Refresh() end,
     })
     tools:RegisterFeature("GENERAL", {
-        key = "swingSync", name = "Shaman weapon sync mark",
-        desc = "Enhancement: marks when to press your sync macro (/cleartarget, /targetlasttarget, /startattack) so the off hand lands just after the main hand, and says whether you're in sync.",
-        default = true,
-    })
-    tools:RegisterFeature("GENERAL", {
-        key = "swingWindfury", name = "Windfury cooldown bar",
-        desc = "Enhancement: a bar under your weapons showing Windfury Weapon's 3 second cooldown (shared by both hands) from its last proc, green when it can proc again.",
-        default = true,
-        onToggle = function() Swing:Refresh() end,
-    })
-    tools:RegisterFeature("GENERAL", {
         key = "swingFlurry", name = "Flurry charges on the swing timer",
         desc = "Shamans and warriors: the main-hand bar shows how many Flurry charges you have left.",
         default = true,
         onToggle = function() Swing:Refresh() end,
-    })
-    tools:RegisterFeature("GENERAL", {
-        key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
-        options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = "none",
-        desc = "Played as SYNC NOW comes up, so you can press the macro without watching the bar.",
-        get = function() return DB().syncSound end,
-        set = function(v) DB().syncSound = v end,
-        onChange = function(v)
-            if WM.Sounds then WM.Sounds.Play(v, (GeneralChecksDB and GeneralChecksDB.soundChannel) or "Master") end
-        end,
-    })
-    tools:RegisterFeature("GENERAL", {
-        key = "swingSyncLag", kind = "choice", name = "Off hand lands after by",
-        options = Swing.LAG_OPTIONS, default = 0.15,
-        desc = "How long after the main hand the sync macro aims to land the off hand.",
-        get = function() return DB().syncLag end,
-        set = function(v) DB().syncLag = v end,
     })
     tools:RegisterFeature("GENERAL", {
         key = "swingWidth", kind = "choice", name = "Swing timer width",
@@ -1080,6 +1058,50 @@ function Swing.RegisterOptions(tools)
     })
     local tdb = ClassToolsDB and ClassToolsDB.enabled and ClassToolsDB.enabled.GENERAL
     if tdb and tdb.swingLock ~= nil then DB().locked = tdb.swingLock and true or false end
+end
+
+-- The weapon sync and Windfury options, on the Shaman tab (registered by
+-- ClassShaman)
+function Swing.RegisterShamanOptions(tools)
+    -- 3.55 and before had them under General: keep the choices made there
+    local en = ClassToolsDB and ClassToolsDB.enabled
+    if en and en.GENERAL then
+        for _, key in ipairs({ "swingSync", "swingWindfury" }) do
+            if en.GENERAL[key] ~= nil then
+                en.SHAMAN = en.SHAMAN or {}
+                if en.SHAMAN[key] == nil then en.SHAMAN[key] = en.GENERAL[key] end
+                en.GENERAL[key] = nil
+            end
+        end
+    end
+    tools:RegisterFeature("SHAMAN", {
+        key = "swingSync", name = "Weapon sync mark on the swing timer",
+        desc = "Enhancement: marks when to press your sync macro (/cleartarget, /targetlasttarget, /startattack) so the off hand lands just after the main hand, and says whether you're in sync.",
+        default = true,
+    })
+    tools:RegisterFeature("SHAMAN", {
+        key = "swingWindfury", name = "Windfury cooldown bar on the swing timer",
+        desc = "Enhancement: a bar under your weapons showing Windfury Weapon's 3 second cooldown (shared by both hands) from its last proc, green when it can proc again.",
+        default = true,
+        onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("SHAMAN", {
+        key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
+        options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = "none",
+        desc = "Played as SYNC NOW comes up, so you can press the macro without watching the bar.",
+        get = function() return DB().syncSound end,
+        set = function(v) DB().syncSound = v end,
+        onChange = function(v)
+            if WM.Sounds then WM.Sounds.Play(v, (GeneralChecksDB and GeneralChecksDB.soundChannel) or "Master") end
+        end,
+    })
+    tools:RegisterFeature("SHAMAN", {
+        key = "swingSyncLag", kind = "choice", name = "Off hand lands after by",
+        options = Swing.LAG_OPTIONS, default = 0.15,
+        desc = "How long after the main hand the sync macro aims to land the off hand.",
+        get = function() return DB().syncLag end,
+        set = function(v) DB().syncLag = v end,
+    })
 end
 
 -- The seal twisting options, on the Paladin tab (registered by ClassPaladin)

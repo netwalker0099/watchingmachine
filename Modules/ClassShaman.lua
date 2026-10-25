@@ -527,6 +527,8 @@ function Shaman:RegisterFeatures()
         default = true,
         onToggle = function() Shaman:UpdateTimers() end,
     })
+    -- The swing timer's weapon sync and Windfury options
+    if WM.SwingTimer and WM.SwingTimer.RegisterShamanOptions then WM.SwingTimer.RegisterShamanOptions(tools) end
 end
 
 function Shaman:Initialize()

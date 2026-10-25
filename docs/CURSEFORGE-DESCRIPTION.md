@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.55 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.56 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -328,9 +328,8 @@ always sits first.
     - **Your seal:** the seal you have up, as an icon just past the end of
       the bar (read by spell ID, so any language), or *no seal* in red.
       Hover it for the spell
-  - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
-    mark*, *Windfury cooldown bar*, *Flurry charges on the swing timer*,
-    *Off hand lands after by*, width, bar height, *Lock the swing
+  - Options: *Swing timer*, *for every class and spec*, *Flurry charges on
+    the swing timer*, width, bar height, *Lock the swing
     timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
     so you can move and resize it; `/wmachine swing reset` puts back the
     default place and size
@@ -449,6 +448,10 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - **Totem timers** (3.50): above the button, each totem you have down (Air,
   Water, Earth, Fire) with the time it has left. *Totem timers above the
   button* turns them off
+- **The swing timer's shaman options** (3.56: on this tab): *Weapon sync
+  mark on the swing timer*, *Off hand lands after by*, *SYNC NOW sound* and
+  *Windfury cooldown bar on the swing timer* (see the swing timer, under
+  General)
 
 #### Paladin
 - **Righteous Fury check** — warns when Righteous Fury is missing, the same

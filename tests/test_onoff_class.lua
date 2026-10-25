@@ -126,7 +126,7 @@ check("warlock: general checks too", Box(page, "Warn if no flask or elixirs") an
 check("warlock: feature descriptions explained", text:find("Demonic Sacrifice", 1, true) and text:find("CHECK YOURSELF", 1, true))
 check("warlock: other characters mentioned", text:find("other characters", 1, true))
 check("warlock: swing timer only by choice", Box(page, "Swing timer for every class and spec")
-    and not Box(page, "Shaman weapon sync mark") and not Box(page, "Lock the swing timer"))
+    and not Box(page, "Weapon sync mark on the swing timer") and not Box(page, "Lock the swing timer"))
 check("warlock: flyout options for a class with buttons", Box(page, "Lock flyout buttons"))
 
 -- The user's example: potion alert on, rune alert off, armour icons on the
@@ -170,7 +170,7 @@ W.click(mageArmor)
 myClass = { "Shaman", "SHAMAN" }
 page, ok = Page()
 check("shaman: page builds with the totem button and sync", ok and Box(page, "Show the totem button")
-    and Box(page, "Shaman weapon sync mark") and Box(page, "Lock the swing timer"))
+    and Box(page, "Weapon sync mark on the swing timer") and Box(page, "Lock the swing timer"))
 local _, setDD = Dropdown(page, "Tremor")
 check("shaman: set in use", setDD and Pick(setDD, "Tremor") and env.ShamanToolsDB.selected == 4)
 
