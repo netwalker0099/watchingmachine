@@ -22,3 +22,7 @@ copied. Unpack each addon into its own empty folder and pass the path in.
 - `curseforge_description.py`: rebuilds `docs/CURSEFORGE-DESCRIPTION.md`
   from `README.md` (run from the repo root after changing the README):
   `python3 -I tools/curseforge_description.py`
+- `make_release.py`: a zip for testers with only what the game loads (the
+  toc, the files it lists, `Bindings.xml`, `Media`), from the committed
+  files: `python3 -I tools/make_release.py .` writes
+  `release/WatchingMachine-<version>.zip` (`release/` is ignored by git).

@@ -1,3 +1,6 @@
 
 # Third-party addon source, read for protocol work only; never committed
 nova-src/
+
+# Tester zips (built by tools/make_release.py)
+release/
