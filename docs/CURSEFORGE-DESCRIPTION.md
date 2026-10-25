@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.54 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.55 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -229,6 +229,14 @@ CT:RegisterFeature("SHAMAN", {
   on), one of the addon or game sounds, or **None** (silent). Picking a
   sound plays it. They use the *Warning sounds play on* channel from the
   General tab.
+- **More sounds** (3.55) in every sound list: a pack of 11 public-domain
+  (CC0) sounds (*Alarm, short*, *Alarm, long*, *Chimes*, *Ding*, *Deep
+  ding*, *Uh-oh*, *Confirm*, *Error*, *Error, low*, *Glass*, *Question*) by
+  Robin Lamb and Kenney (credits in `Media/Sounds/CREDITS.txt`), and more
+  of the game's own (boss emote and whisper warnings, queue pop, role check,
+  group invite, whisper, map ping, quest failed, ...), each offered only if
+  your client has it. New sound files need a full game restart, not a
+  /reload
 
 #### Flyout buttons (all classes)
 The mage, warlock and shaman buttons share one flyout engine (`Modules/ClassFlyout.lua`)

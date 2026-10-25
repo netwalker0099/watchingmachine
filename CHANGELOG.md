@@ -2,7 +2,31 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.54** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.55** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.55
+
+### More warning sounds
+
+Every sound list (Class Tools warnings, mana potion and rune, Hazard
+Alerts, the swing timer's SYNC NOW, ...) has more to pick from:
+
+- **11 new sounds** in `Media/Sounds`, all public domain (CC0), with
+  credits in `Media/Sounds/CREDITS.txt`:
+  - from Robin Lamb's *UI Sound Effects*: *Alarm, short*, *Alarm, long*,
+    *Chimes*, *Ding*, *Deep ding*, *Uh-oh*
+  - from Kenney's *Interface Sounds*: *Confirm*, *Error*, *Error, low*,
+    *Glass*, *Question*
+  They're 0.4 to 2 seconds long, so they're heard in a fight; together
+  about 220 KB.
+- **More of the game's sounds**, looked up by name in the game's sound list
+  so only those your client has are offered: boss emote warning, boss
+  whisper warning, queue pop, role check, group invite, whisper, map ping,
+  quest failed, tutorial pop-up and two more alarm clocks.
+- New sound files are only found after a **full game restart**, not a
+  /reload.
 
 ---
 
