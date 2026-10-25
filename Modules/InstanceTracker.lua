@@ -38,6 +38,7 @@ local DEFAULTS = {
     lockoutReady = true,        -- say when you can enter a new instance again
     enterMessage = true,        -- "Entered X (n/5 this hour) [X]" in chat
     novaListen = true,          -- show Nova Instance Tracker users' reset notices
+    xpRate = true,              -- run stats: XP per hour and runs like it to level
 }
 IT.DEFAULTS = DEFAULTS
 
@@ -234,6 +235,11 @@ function IT:Leave(loggingOut)
     current = nil
     run.left = Now()
     run.levelOut = UnitLevel("player")
+    -- XP still needed for the next level (nil at the level cap)
+    local max = tonumber(UnitXPMax("player")) or 0
+    local cap = GetMaxPlayerLevel and tonumber(GetMaxPlayerLevel())
+    local capped = (IsXPUserDisabled and IsXPUserDisabled() == true) or (cap and run.levelOut >= cap)
+    run.xpToLevel = (not capped and max > 0) and math.max(0, max - (tonumber(UnitXP("player")) or 0)) or nil
     run.loggedOut = loggingOut or nil
     if not loggingOut then self:ReportRun(run) end
     self:RefreshUI()
@@ -276,6 +282,20 @@ function IT:SeeGUID(guid)
     end
 end
 
+-- XP per hour over a run (nil: no XP, or too short to say)
+function IT.XPPerHour(run)
+    local secs = (run.left > 0 and run.left or Now()) - run.entered
+    if (run.xp or 0) <= 0 or secs < 60 then return nil end
+    return run.xp * 3600 / secs
+end
+
+-- How many more runs like this one to the next level (nil: at the cap, or
+-- no XP from it)
+function IT.RunsToLevel(run)
+    if not run.xpToLevel or (run.xp or 0) <= 0 then return nil end
+    return math.max(1, math.ceil(run.xpToLevel / run.xp))
+end
+
 -- Stats print when you leave
 function IT:RunSummary(run)
     local secs = (run.left > 0 and run.left or Now()) - run.entered
@@ -284,6 +304,15 @@ function IT:RunSummary(run)
     if run.xp > 0 then
         parts[#parts + 1] = Commas(run.xp) .. " XP"
             .. (run.mobs > 0 and (" (" .. Commas(run.xp / run.mobs) .. "/mob)") or "")
+        if DB().xpRate then
+            local rate = IT.XPPerHour(run)
+            if rate then parts[#parts + 1] = Commas(rate) .. " XP/hour" end
+            local runs = IT.RunsToLevel(run)
+            if runs then
+                parts[#parts + 1] = runs .. " more run" .. (runs == 1 and "" or "s") .. " like this to level "
+                    .. ((run.levelOut or UnitLevel("player")) + 1)
+            end
+        end
     end
     if run.gold > 0 then parts[#parts + 1] = Money(run.gold) .. " looted" end
     return table.concat(parts, ", ")
@@ -504,6 +533,12 @@ function IT:ShowRunTooltip(owner, run)
     if run.xp > 0 then
         GameTooltip:AddDoubleLine("XP", Commas(run.xp), 0.8, 0.8, 0.8, 1, 1, 1)
         if run.mobs > 0 then GameTooltip:AddDoubleLine("XP per mob", Commas(run.xp / run.mobs), 0.8, 0.8, 0.8, 1, 1, 1) end
+        local rate = IT.XPPerHour(run)
+        if rate then GameTooltip:AddDoubleLine("XP per hour", Commas(rate), 0.8, 0.8, 0.8, 1, 1, 1) end
+        local runs = IT.RunsToLevel(run)
+        if runs then
+            GameTooltip:AddDoubleLine("Runs like it to level " .. ((run.levelOut or 0) + 1), runs, 0.8, 0.8, 0.8, 1, 1, 1)
+        end
     end
     GameTooltip:AddDoubleLine("Gold looted", Money(run.gold), 0.8, 0.8, 0.8, 1, 1, 1)
     -- Trades are logged by Mail & Trade Logger, tagged with the run
@@ -693,6 +728,12 @@ function IT:CreateUI()
         tooltip = { "Run stats", "Time, mobs, XP and gold for the run you've just left, in your chat window or"
             .. " your group's chat." },
     })
+    L:Checkbox({
+        label = "Add XP per hour and runs to level",
+        get = function() return DB().xpRate end, set = function(v) DB().xpRate = v end,
+        tooltip = { "XP per hour", "Run stats also give the run's XP per hour, and how many more runs like it take"
+            .. " you to the next level (from the XP you still need when you leave). Not at the level cap." },
+    })
     L:EndSection()
 
     row = L:Row(22)
@@ -864,6 +905,11 @@ function IT:SetupPage(L)
         get = function() return DB().statsOnLeave end, set = function(v) DB().statsOnLeave = v end,
         tooltip = { "Run stats", "Time, mobs, XP and gold for the run you've just left, in your chat window or your"
             .. " group's chat, or not at all." } })
+    L:Checkbox({ label = "Add XP per hour and runs to level", get = function() return DB().xpRate end,
+        set = function(v) DB().xpRate = v end,
+        tooltip = { "XP per hour", "\"18,300 XP (300/mob), 45,750 XP/hour, 4 more runs like this to level 62\":"
+            .. " the run's XP per hour, and how many more runs like it you need for the next level. Not at the"
+            .. " level cap." } })
     L:Note("The log, your counts and every run's details are in its window: |cFFFFFF00/wmachine instances|r.")
 end
 

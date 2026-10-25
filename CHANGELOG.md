@@ -2,7 +2,25 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.56** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.57** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.57
+
+### Instance Tracker: XP per hour and runs to level
+
+- The stats printed when you leave a dungeon now end with the run's **XP
+  per hour** and **how many more runs like it** take you to the next level:
+  "Ramparts: 24m 00s, 61 mobs, 18,300 XP (300/mob), 45,750 XP/hour, 4 more
+  runs like this to level 62".
+- XP per hour is the run's XP over its time inside (left out for runs
+  under a minute). Runs to level divide the XP you still need when you
+  leave by the run's XP, rounded up; rested XP earned in the run counts.
+  Nothing about levels at the level cap.
+- The same two numbers are on the run's tooltip in the log.
+- *Add XP per hour and runs to level*, in the window and the setup page, is
+  on by default.
 
 ---
 
