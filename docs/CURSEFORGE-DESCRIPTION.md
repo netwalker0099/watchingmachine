@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.53.1 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.54 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -217,12 +217,13 @@ CT:RegisterFeature("SHAMAN", {
   warning, lock in place, reset position, and **Show example** — which puts
   two dummy lines up for six seconds so you can find and position the frame
   without waiting for a real warning.
-- **Warning sounds** (a section below): a sound for each warning of General
-  and your class:
-  - **General:** no flask or elixirs, no food buff, no weapon oil / stone
-  - **Mage:** armor missing
-  - **Warlock:** Fel / Demon Armor, Demonic Sacrifice, Soul Link
-  - **Paladin:** Righteous Fury
+- **Warning sounds** (3.54: on each class's own tab): every warning has a
+  sound choice right after its class's other options:
+  - **General tab:** no flask or elixirs, no food buff, no weapon oil /
+    stone (and the mana potion and rune sounds)
+  - **Mage tab:** mage armor missing
+  - **Warlock tab:** Fel / Demon Armor, Demonic Sacrifice, Soul Link
+  - **Paladin tab:** Righteous Fury
 
   Each one is *Shared warning sound* (the default: the sound above, if it's
   on), one of the addon or game sounds, or **None** (silent). Picking a
@@ -306,7 +307,8 @@ always sits first.
     and *ready* when it can proc again. It appears after your first Windfury
     proc
   - **Flurry charges** (3.50, shamans and warriors) on the main-hand bar
-  - **Seal twisting** (3.53, Retribution paladins), on the main-hand bar:
+  - **Seal twisting** (3.53, Retribution paladins; its options are on the
+    Paladin tab), on the main-hand bar:
     - **Point of no return:** a gold line where the swing has a GCD left
       (1.5s cut by your spell haste, never under 1s, and moved earlier by
       your latency). Once the spark passes it the line turns red: anything
@@ -320,7 +322,6 @@ always sits first.
       Hover it for the spell
   - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
     mark*, *Windfury cooldown bar*, *Flurry charges on the swing timer*,
-    *Paladin seal twisting marks*, *Twist window*,
     *Off hand lands after by*, width, bar height, *Lock the swing
     timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
     so you can move and resize it; `/wmachine swing reset` puts back the
@@ -447,6 +448,10 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   paladins: most talent points in Protection, or Holy Shield / Avenger's
   Shield learned. Holy and Retribution paladins are never nagged, and
   nothing shows before you've learned the spell or while you're dead
+- **Seal twisting** (Retribution), on the swing timer's main-hand bar: the
+  point of no return, the twist window and your active seal (see the swing
+  timer, under General). Options: *Seal twisting marks on the swing timer*
+  and *Twist window*
 
 ### Aura Range
 Visual and audio alerts when you drift out of range of party auras and shaman totems.

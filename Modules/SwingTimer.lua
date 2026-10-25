@@ -449,7 +449,8 @@ function Swing:PointOfNoReturn(now)
 end
 
 function Swing:IsTwisting()
-    return PlayerClass() == "PALADIN" and Enabled("swingTwist") and true or false
+    local CT = Tools()
+    return PlayerClass() == "PALADIN" and CT and CT:IsEnabled("PALADIN", "swingTwist") and true or false
 end
 
 function Swing:IsAttacking() return attacking end
@@ -1041,19 +1042,6 @@ function Swing.RegisterOptions(tools)
         onToggle = function() Swing:Refresh() end,
     })
     tools:RegisterFeature("GENERAL", {
-        key = "swingTwist", name = "Paladin seal twisting marks",
-        desc = "Retribution: on the main-hand bar, a gold line at the point of no return (a GCD before the swing, with spell haste and your latency; red once passed), the twist window shaded at the end of the bar, and the seal you have up just past it.",
-        default = true,
-        onToggle = function() Swing:Refresh() end,
-    })
-    tools:RegisterFeature("GENERAL", {
-        key = "swingTwistWindow", kind = "choice", name = "Twist window",
-        options = Swing.TWIST_OPTIONS, default = TWIST_DEFAULT,
-        desc = "How long before the swing the twist window starts: the time Seal of Command still lands after you change seal.",
-        get = function() return DB().twistWindow end,
-        set = function(v) DB().twistWindow = v; Swing:Refresh() end,
-    })
-    tools:RegisterFeature("GENERAL", {
         key = "swingSyncSound", kind = "choice", name = "SYNC NOW sound",
         options = WM.Sounds and WM.Sounds.OPTIONS or {}, default = "none",
         desc = "Played as SYNC NOW comes up, so you can press the macro without watching the bar.",
@@ -1092,6 +1080,30 @@ function Swing.RegisterOptions(tools)
     })
     local tdb = ClassToolsDB and ClassToolsDB.enabled and ClassToolsDB.enabled.GENERAL
     if tdb and tdb.swingLock ~= nil then DB().locked = tdb.swingLock and true or false end
+end
+
+-- The seal twisting options, on the Paladin tab (registered by ClassPaladin)
+function Swing.RegisterPaladinOptions(tools)
+    -- 3.53 had them under General: keep the choice made there
+    local en = ClassToolsDB and ClassToolsDB.enabled
+    if en and en.GENERAL and en.GENERAL.swingTwist ~= nil then
+        en.PALADIN = en.PALADIN or {}
+        if en.PALADIN.swingTwist == nil then en.PALADIN.swingTwist = en.GENERAL.swingTwist end
+        en.GENERAL.swingTwist = nil
+    end
+    tools:RegisterFeature("PALADIN", {
+        key = "swingTwist", name = "Seal twisting marks on the swing timer",
+        desc = "Retribution: on the main-hand bar, a gold line at the point of no return (a GCD before the swing, with spell haste and your latency; red once passed), the twist window shaded at the end of the bar, and the seal you have up just past it.",
+        default = true,
+        onToggle = function() Swing:Refresh() end,
+    })
+    tools:RegisterFeature("PALADIN", {
+        key = "swingTwistWindow", kind = "choice", name = "Twist window",
+        options = Swing.TWIST_OPTIONS, default = TWIST_DEFAULT,
+        desc = "How long before the swing the twist window starts: the time Seal of Command still lands after you change seal.",
+        get = function() return DB().twistWindow end,
+        set = function(v) DB().twistWindow = v; Swing:Refresh() end,
+    })
 end
 
 function Swing:Refresh()

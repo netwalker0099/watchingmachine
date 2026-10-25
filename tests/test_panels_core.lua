@@ -272,12 +272,24 @@ check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
 check("General lists its checkbox options (mana warnings, flyout dock and lock, swing timer included)",
-    #ShownFeatures() == 19 and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
-    and HasFeature("Paladin seal twisting marks")
+    #ShownFeatures() == 18 and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
+    and not HasFeature("Seal twisting marks on the swing timer")
     and HasFeature("Mana tick spark on a bar of its own too")
     and HasFeature("Dock flyout buttons together") and HasFeature("Lock flyout buttons")
     and HasFeature("Swing timer") and HasFeature("Shaman weapon sync mark") and HasFeature("Windfury cooldown bar")
     and HasFeature("Flurry charges on the swing timer"))
+-- Class settings live on their class's tab
+local function On(class, key)
+    for _, ft in ipairs(CT:GetFeatures(class)) do if ft.key == key then return true end end
+    return false
+end
+check("mage armor sound on the Mage tab only", On("MAGE", "sound_mage_armor") and not On("GENERAL", "sound_mage_armor"))
+check("warlock armor sound on the Warlock tab only", On("WARLOCK", "sound_wl_armor") and not On("GENERAL", "sound_wl_armor"))
+check("consumable sounds on General", On("GENERAL", "sound_gen_flask") and On("GENERAL", "sound_gen_food"))
+check("seal twisting on the Paladin tab only", On("PALADIN", "swingTwist") and On("PALADIN", "swingTwistWindow")
+    and not On("GENERAL", "swingTwist"))
+W.click(Tab("Paladin"))
+check("Paladin tab shows the twisting option", HasFeature("Seal twisting marks on the swing timer") ~= nil)
 W.click(Tab("Rogue"))
 check("short list stops scrolling", not cp.scrollBar:IsShown() and #ShownFeatures() == 1)
 

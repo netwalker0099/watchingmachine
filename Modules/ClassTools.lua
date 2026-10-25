@@ -232,13 +232,34 @@ function ClassTools:RegisterMonitor(fn)
     monitors[#monitors + 1] = fn
 end
 
--- Warnings that can have a sound of their own, for the Warning sounds
--- section: { class, key, label } in registration order
+-- Warnings that can have a sound of their own: { class, key, label } in
+-- registration order. Each one's sound is a choice on its own class's tab
+-- (the mage armor sound on the Mage tab, the consumable sounds on General),
+-- right after the class's other options.
 local alertSoundDefs = {}
+
+local function SoundChoices()
+    local opts = { { value = "shared", text = "Shared warning sound" } }
+    for _, o in ipairs(WM.Sounds and WM.Sounds.OPTIONS or {}) do opts[#opts + 1] = o end
+    return opts
+end
 
 function ClassTools:RegisterAlertSound(class, key, label)
     for _, d in ipairs(alertSoundDefs) do if d.key == key then return end end
     alertSoundDefs[#alertSoundDefs + 1] = { class = class, key = key, label = label }
+    self:RegisterFeature(class, {
+        key = "sound_" .. key, kind = "choice", name = label .. " sound",
+        options = SoundChoices(), default = "shared",
+        desc = "Played once when this warning appears. Shared: the shared warning sound, if it's on. None: silent."
+            .. " Picking a sound plays it.",
+        get = function()
+            return (ClassToolsDB and type(ClassToolsDB.alertSounds) == "table" and ClassToolsDB.alertSounds[key]) or "shared"
+        end,
+        set = function(v) ClassTools:SetAlertSound(key, v) end,
+        onChange = function(v)
+            if v ~= "shared" and WM.Sounds then WM.Sounds.Play(v, ClassTools.SoundChannel()) end
+        end,
+    })
 end
 
 function ClassTools:GetAlertSoundDefs() return alertSoundDefs end
@@ -738,34 +759,8 @@ function ClassTools:CreateUI()
     }, 6)
     L:Note("Tabs appear for each class that has tools built for it. Drag the warning frame to move it.")
 
-    -- One sound choice per warning, for General and your class
-    local mine = ClassTools:GetPlayerClass()
-    local shown = 0
-    for _, d in ipairs(alertSoundDefs) do
-        if d.class == "GENERAL" or d.class == mine then
-            if shown == 0 then L:Section({ key = "sounds", title = "Warning sounds" }) end
-            shown = shown + 1
-            L:Dropdown({
-                label = d.label .. ":", width = 150,
-                options = function()
-                    local opts = { { value = "shared", text = "Shared warning sound" } }
-                    for _, o in ipairs(WM.Sounds and WM.Sounds.OPTIONS or {}) do opts[#opts + 1] = o end
-                    return opts
-                end,
-                get = function() return (ClassToolsDB and ClassToolsDB.alertSounds and ClassToolsDB.alertSounds[d.key]) or "shared" end,
-                set = function(v)
-                    ClassTools:SetAlertSound(d.key, v)
-                    if v ~= "shared" and WM.Sounds then WM.Sounds.Play(v, SoundChannel()) end
-                end,
-                tooltip = { d.label, "Played once when this warning appears. Shared: the sound above, if it's on."
-                    .. " None: silent. Picking a sound plays it." },
-            })
-        end
-    end
-    if shown > 0 then
-        L:Note("The mana potion and rune sounds are in the General tab. Sounds play on the channel set there.")
-        L:EndSection()
-    end
+    L:Note("Each warning's own sound is on its class's tab (the consumable, mana potion and rune sounds on"
+        .. " General). Sounds play on the channel set in the General tab.")
 
     mainFrame = panel
     self.mainFrame = panel

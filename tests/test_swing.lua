@@ -32,7 +32,7 @@ local cleu
 env.CombatLogGetCurrentEventInfo = function() return unpack(cleu, 1, 24) end
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Sounds.lua", "Modules/ClassTools.lua", "Modules/ClassFlyout.lua",
-                     "Modules/SwingTimer.lua", "Modules/ClassGeneral.lua" }) do
+                     "Modules/SwingTimer.lua", "Modules/ClassGeneral.lua", "Modules/ClassPaladin.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -40,6 +40,7 @@ local CT, Swing, Gen = WM.modules.ClassTools, WM.modules.SwingTimer, WM.modules.
 env.WatchingMachineDB = { theme = "Default" }
 CT:InitDB()
 Gen:Initialize()
+WM.modules.ClassPaladin:RegisterFeatures()
 
 local pass, fail = 0, 0
 local function check(name, cond)
@@ -473,10 +474,22 @@ Swing.DB().twistWindow = 0.3
 Swing:Draw(now)
 check("twist window length option", near(z._points[1][4], (1 - 0.3 / 3.5) * W_))
 Swing.DB().twistWindow = 0.4
-CT:SetEnabled("GENERAL", "swingTwist", false)
+CT:SetEnabled("PALADIN", "swingTwist", false)
 Swing:Draw(now)
 check("option off: no twisting marks", not ponr:IsShown() and not f.seal:IsShown() and not z:IsShown())
-CT:SetEnabled("GENERAL", "swingTwist", true)
+CT:SetEnabled("PALADIN", "swingTwist", true)
+local function Has(class, key)
+    for _, ft in ipairs(CT:GetFeatures(class)) do if ft.key == key then return true end end
+end
+check("twisting options on the Paladin tab, not General", Has("PALADIN", "swingTwist") and Has("PALADIN", "swingTwistWindow")
+    and not Has("GENERAL", "swingTwist") and not Has("GENERAL", "swingTwistWindow"))
+-- A choice made under General in 3.53 is kept
+env.ClassToolsDB.enabled.GENERAL.swingTwist = false
+env.ClassToolsDB.enabled.PALADIN.swingTwist = nil
+Swing.RegisterPaladinOptions(CT)
+check("3.53's General choice moves to the Paladin tab", env.ClassToolsDB.enabled.PALADIN.swingTwist == false
+    and env.ClassToolsDB.enabled.GENERAL.swingTwist == nil)
+CT:SetEnabled("PALADIN", "swingTwist", true)
 env.UnitClass = function() return "Warrior", "WARRIOR" end
 Swing.kind = Swing:Kind()
 Swing:Draw(now)

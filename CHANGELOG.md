@@ -2,7 +2,23 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.53.1** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.54** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.54
+
+### Class Tools: settings on their class's tab
+
+- **Seal twisting** options moved from General to the **Paladin** tab:
+  *Seal twisting marks on the swing timer* and *Twist window*. A choice
+  made under General in 3.53 is kept.
+- **Warning sounds** moved out of the shared section at the bottom of the
+  window onto each class's own tab, after its other options: the **mage
+  armor** sound only on the Mage tab, the warlock's **Fel / Demon Armor**
+  (and Demonic Sacrifice, Soul Link) sounds on the Warlock tab, Righteous
+  Fury on the Paladin tab, and the flask, food and weapon oil sounds on
+  General. Your chosen sounds are kept.
 
 ---
 

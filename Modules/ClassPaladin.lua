@@ -133,6 +133,8 @@ function Paladin:RegisterFeatures()
         default = true,
     })
     tools:RegisterAlertSound(CLASS, "pal_fury", "Righteous Fury missing")
+    -- The swing timer's seal twisting marks
+    if WM.SwingTimer and WM.SwingTimer.RegisterPaladinOptions then WM.SwingTimer.RegisterPaladinOptions(tools) end
     tools:RegisterMonitor(Monitor)
 end
 

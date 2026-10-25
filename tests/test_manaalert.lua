@@ -251,7 +251,15 @@ for _, d in ipairs(CT:GetAlertSoundDefs()) do keys[d.key] = d.class end
 check("General warnings offer a sound", keys.gen_flask == "GENERAL" and keys.gen_food == "GENERAL" and keys.gen_oil == "GENERAL")
 -- The Class Tools window lists them
 local panel = CT:CreateUI()
-check("Warning sounds section built", panel.layout.sections and panel.layout.sections.sounds ~= nil)
+local function Feature(class, key)
+    for _, ft in ipairs(CT:GetFeatures(class)) do if ft.key == key then return ft end end
+end
+local fs = Feature("GENERAL", "sound_gen_flask")
+check("each warning's sound is a choice on its own tab", fs and fs.kind == "choice" and fs.get() == "shared")
+fs.set("wm:potion")
+check("the tab's choice sets the warning's sound", CT:AlertSound("gen_flask") == "wm:potion")
+fs.set("shared")
+check("no shared Warning sounds section any more", not (panel.layout.sections and panel.layout.sections.sounds))
 check("bad choices play nothing", not WM.Sounds.Play("wm:../x") and not WM.Sounds.Play(nil) and not WM.Sounds.Play("none"))
 
 print(("%d passed, %d failed"):format(pass, fail))
