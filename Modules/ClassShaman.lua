@@ -12,10 +12,18 @@
 --   * you Ctrl-click the button (reset=ctrl)
 -- Changing the macro is a secure change, so in combat a reset waits until
 -- combat ends, which reset=combat covers anyway.
+--
+-- The button has a key binding (Bindings.xml: a click on the secure button,
+-- so it works in combat), and timers above it for the totems you have down.
 
 local AddonName, WM = ...
 local Shaman = {}
 WM:RegisterModule("ClassShaman", Shaman)
+
+-- The key binding's name in the game's Key Bindings
+local BINDING = "CLICK WM_TotemAnchor:LeftButton"
+Shaman.BINDING = BINDING
+_G["BINDING_NAME_" .. BINDING] = "Drop the next totem (totem button)"
 
 Shaman.version = "3.16"
 
@@ -239,6 +247,82 @@ function Shaman:OnTotemUpdate()
     totemsWereDown = down
 end
 
+-- ============================================
+-- TOTEM TIMERS: the totems you have down, above the button
+-- ============================================
+
+local TOTEM_SLOTS = { FIRE = 1, EARTH = 2, WATER = 3, AIR = 4 }
+Shaman.TOTEM_SLOTS = TOTEM_SLOTS
+local TIMER_SIZE, TIMER_GAP = 20, 3
+
+-- What's down in a totem slot: name, seconds left, icon (nil: nothing)
+function Shaman:TotemLeft(slot, now)
+    if type(GetTotemInfo) ~= "function" then return nil end
+    local ok, have, name, start, duration, icon = pcall(GetTotemInfo, slot)
+    if not ok or not have or type(name) ~= "string" or name == "" then return nil end
+    local left = (tonumber(start) or 0) + (tonumber(duration) or 0) - (now or GetTime())
+    if left <= 0 then return nil end
+    return name, left, icon
+end
+
+function Shaman.TimeText(left)
+    if left >= 60 then return string.format("%dm", math.floor(left / 60 + 0.5)) end
+    return string.format("%d", math.floor(left + 0.5))
+end
+
+function Shaman:CreateTimers(anchor)
+    if self.timers or not anchor then return self.timers end
+    local f = CreateFrame("Frame", "WM_TotemTimers", anchor)
+    f:SetSize(#ELEMENTS * (TIMER_SIZE + TIMER_GAP) - TIMER_GAP, TIMER_SIZE)
+    f:SetPoint("BOTTOM", anchor, "TOP", 0, 4)
+    f.icons = {}
+    for i, element in ipairs(ELEMENTS) do
+        local b = CreateFrame("Frame", nil, f)
+        b:SetSize(TIMER_SIZE, TIMER_SIZE)
+        b:SetPoint("LEFT", (i - 1) * (TIMER_SIZE + TIMER_GAP), 0)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetAllPoints()
+        b.text = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        b.text:SetPoint("CENTER", 0, 0)
+        b.element = element
+        b:Hide()
+        f.icons[i] = b
+    end
+    local since = 0
+    f:SetScript("OnUpdate", function(_, elapsed)
+        since = since + (elapsed or 0)
+        if since < 0.2 then return end
+        since = 0
+        Shaman:UpdateTimers()
+    end)
+    f:Hide()
+    self.timers = f
+    return f
+end
+
+-- Show each element's totem and its time left; hidden with nothing down
+function Shaman:UpdateTimers(now)
+    local f = self.timers
+    if not f then return end
+    local tools = Tools()
+    local want = WM:IsModuleOn("ClassShaman") and tools and tools:IsEnabled(CLASS, "totemTimers")
+    local any = false
+    now = now or GetTime()
+    for _, b in ipairs(f.icons) do
+        local name, left, icon = nil, nil, nil
+        if want then name, left, icon = self:TotemLeft(TOTEM_SLOTS[b.element], now) end
+        if name then
+            b.icon:SetTexture(icon or ICON_TOTEM)
+            b.text:SetText(Shaman.TimeText(left))
+            b:Show()
+            any = true
+        else
+            b:Hide()
+        end
+    end
+    f:SetShown(any)
+end
+
 function Shaman:SelectSet(i)
     if InCombatLockdown() or not Store().sets[i] then return end
     Store().selected = i
@@ -281,7 +365,9 @@ local function AnchorTooltip(tip, inCombat)
         tip:AddDoubleLine(ELEMENT_NAMES[element], e and e.name or "none", 0.8, 0.8, 0.8, 1, 1, 1)
     end
     tip:AddLine(" ")
-    tip:AddLine("Click: drop the next totem (Air, Water, Earth, then Fire).", 0.9, 0.9, 0.9, true)
+    local key = GetBindingKey and GetBindingKey(BINDING)
+    tip:AddLine("Click" .. (type(key) == "string" and (" or " .. key) or "")
+        .. ": drop the next totem (Air, Water, Earth, then Fire).", 0.9, 0.9, 0.9, true)
     tip:AddLine("Ctrl-click: start again from Air.", 0.9, 0.9, 0.9, true)
     tip:AddLine("Right-click: edit sets. Shift-drag: move.", 0.9, 0.9, 0.9, true)
     if inCombat then
@@ -416,6 +502,7 @@ end
 -- ============================================
 
 local eventFrame = CreateFrame("Frame")
+Shaman.eventFrame = eventFrame
 
 -- The shaman tab's features. Only registers (no frames, no events), so the
 -- guided setup can list them before this has started; runs once.
@@ -434,6 +521,12 @@ function Shaman:RegisterFeatures()
     })
     WM.Flyout.DirectionFeature(tools, CLASS, "setDir", "Totem sets expand", "totem set",
         Store, DIR_DEFAULTS.setDir, rebuild)
+    tools:RegisterFeature(CLASS, {
+        key = "totemTimers", name = "Totem timers above the button",
+        desc = "Each totem you have down, Air, Water, Earth and Fire, with the time it has left. The button also has a key: \"Drop the next totem\" in the game's Key Bindings, under Watching Machine.",
+        default = true,
+        onToggle = function() Shaman:UpdateTimers() end,
+    })
 end
 
 function Shaman:Initialize()
@@ -441,18 +534,23 @@ function Shaman:Initialize()
     if not Tools() then return end
 
     if IsPlayerShaman() then
-        totemFlyout:CreateAnchor()
+        self:CreateTimers(totemFlyout:CreateAnchor())
         WM:RegisterEvents(eventFrame, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_TOTEM_UPDATE" })
         totemsWereDown = self:AnyTotemDown() or false
+        self:UpdateTimers()
         -- Spellbook isn't reliably populated the instant we initialise
         WM.RunAfter(2, function() Shaman:Refresh() end)
     end
 end
 
 eventFrame:SetScript("OnEvent", function(_, event)
-    if not IsPlayerShaman() or not WM:IsModuleOn("ClassShaman") then return end
+    if not IsPlayerShaman() then return end
+    -- Turned off in combat: the key binding's macro is emptied once it ends
+    if event == "PLAYER_REGEN_ENABLED" and Shaman.clearPending then Shaman:ClearMacro() end
+    if not WM:IsModuleOn("ClassShaman") then return end
     if event == "PLAYER_TOTEM_UPDATE" then
         Shaman:OnTotemUpdate()
+        Shaman:UpdateTimers()
     elseif InCombatLockdown() then
         return   -- secure changes wait for combat to end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -469,11 +567,26 @@ function Shaman:IsPendingApply() return pendingApply end
 function Shaman:OnModuleOff()
     if self.editor then self.editor:Hide() end
     totemFlyout:UpdateVisibility()
+    self:ClearMacro()
+    if self.timers then self.timers:Hide() end
+end
+
+-- Empty the button's macro, so its key binding does nothing while off
+-- (a secure change: after combat if need be)
+function Shaman:ClearMacro()
+    local a = totemFlyout.anchor
+    if not a then return end
+    if InCombatLockdown() then self.clearPending = true return end
+    self.clearPending = nil
+    if not WM:IsModuleOn("ClassShaman") then a:SetAttribute("macrotext", "") end
 end
 
 -- Back on: the button comes back if it's wanted
 function Shaman:OnModuleOn()
+    self.clearPending = nil
     self:Refresh()
+    self:ApplyMacro()
+    self:UpdateTimers()
 end
 
 -- Class Tools' guided setup, after the shaman features: the set in use and
@@ -495,4 +608,6 @@ function Shaman:SetupExtras(L)
         onClick = function() self:ToggleEditor() end,
         tooltip = { "Edit totem sets", "Name each set and choose its Air, Water, Earth and Fire totem, or Auto for"
             .. " the best you know. Also: right-click the totem button, or /wmachine totems." } } }, 16)
+    L:Note("|cFFFFFFFFA key for the button:|r give \"Drop the next totem\" a key in the game's Key Bindings, under"
+        .. " Watching Machine. It works in combat, like clicking the button.", 16)
 end

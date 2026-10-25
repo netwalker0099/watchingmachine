@@ -244,6 +244,47 @@ Shaman:InitDB()
 check("InitDB repairs sets and selection", type(env.ShamanToolsDB.sets[2]) == "table"
     and env.ShamanToolsDB.sets[2].name == "Caster" and env.ShamanToolsDB.selected == 1)
 
+-- ---- Totem timers above the button ----
+local tm = env.WM_TotemTimers
+check("timers made with the button", tm ~= nil and tm:GetParent() == a)
+totems = { false, false, false, false }
+Shaman:UpdateTimers(10)
+check("nothing down: no timers", not tm:IsShown())
+totems = { "Searing Totem", false, "Mana Spring Totem", "Grace of Air Totem" }   -- fire, earth, water, air
+Shaman:UpdateTimers(75)
+local I = tm.icons
+check("timers in Air, Water, Earth, Fire order", I[1].element == "AIR" and I[4].element == "FIRE")
+check("each totem down with its time left", tm:IsShown() and I[1]:IsShown() and I[1].text:GetText() == "45"
+    and I[2]:IsShown() and not I[3]:IsShown() and I[4]:IsShown())
+Shaman:UpdateTimers(0)
+check("a minute or more in minutes", I[1].text:GetText() == "2m")
+Shaman:UpdateTimers(130)
+check("run out: hidden", not tm:IsShown())
+CT:SetEnabled("SHAMAN", "totemTimers", false)
+Shaman:UpdateTimers(75)
+check("option off: no timers", not tm:IsShown())
+CT:SetEnabled("SHAMAN", "totemTimers", true)
+Shaman:UpdateTimers(75)
+check("option on: back", tm:IsShown())
+
+-- ---- The key binding ----
+check("binding named", env["BINDING_NAME_CLICK WM_TotemAnchor:LeftButton"] == "Drop the next totem (totem button)")
+check("binding clicks the secure button", Shaman.BINDING == "CLICK WM_TotemAnchor:LeftButton"
+    and io.open(REPO .. "/Bindings.xml"):read("*a"):find(Shaman.BINDING, 1, true) ~= nil)
+check("binding casts the sequence (the button's macro)", Seq() ~= nil)
+WM:SetModuleOn("ClassShaman", false)
+check("off: the key does nothing (empty macro)", a:GetAttribute("macrotext") == "" and not tm:IsShown())
+WM:SetModuleOn("ClassShaman", true)
+check("on again: the key casts", Seq() ~= nil)
+combat = true
+WM:SetModuleOn("ClassShaman", false)
+check("off in combat: waits (secure)", a:GetAttribute("macrotext") ~= "" and Shaman.clearPending)
+combat = false
+Shaman.eventFrame._scripts.OnEvent(Shaman.eventFrame, "PLAYER_REGEN_ENABLED")
+check("after combat: emptied", a:GetAttribute("macrotext") == "" and not Shaman.clearPending)
+WM:SetModuleOn("ClassShaman", true)
+check("on: casts again", Seq() ~= nil)
+
 -- No GetTotemInfo on this client: no reset, no error
 env.GetTotemInfo = false
 check("no totem API: unknown", Shaman:AnyTotemDown() == nil)

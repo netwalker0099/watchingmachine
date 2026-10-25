@@ -267,7 +267,7 @@ end
 CT:RegisterFeature("ROGUE", { key = "poison", name = "Warn if no poison", default = true })
 check("tabs wrap onto a second row", #Tabs() == 7 and not rows[2].hidden)
 W.click(Tab("Shaman"))
-check("thirty features listed, plus the totem button", #ShownFeatures() == 31)
+check("thirty features listed, plus the totem button and its timers", #ShownFeatures() == 32)
 check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
