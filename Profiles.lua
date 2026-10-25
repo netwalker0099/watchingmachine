@@ -56,7 +56,7 @@ P.SCOPE = {
     WMCritsDB = { shared = { "chars" } },
     OgrilaDB = {},
     WMGearSetsDB = { shared = { "chars" } },
-    WMFrameMoverDB = {},
+    WMFrameMoverDB = { shared = { "layout" } },
 }
 
 local function DeepCopy(v)

@@ -2,7 +2,9 @@
 -- The game's windows on TBC Anniversary (2.5.6), as facts: each window's
 -- frame name, the load-on-demand Blizzard addon that creates it (nil: part
 -- of the base UI), and its parts, the inner panels, tabs and pop-outs that
--- cover it, so a drag on any part moves the whole window. Compiled with
+-- cover it, so a drag on any part moves the whole window, and its
+-- pop-outs, the parts Alt + drag can pull off and place on their own.
+-- Compiled with
 -- the help of BlizzMove's research; only the facts are kept, in Watching
 -- Machine's own format.
 --
@@ -22,19 +24,23 @@ WM.FrameMoverData = {
     { frame = "BattlefieldFrame" },
     { frame = "CharacterFrame", parts = { "PaperDollFrame", "PetPaperDollFrame", "ReputationFrame",
         "ReputationDetailFrame", "SkillFrame", "PVPFrame", "PVPFrameArena", "PVPFrameHonor", "PVPTeam1", "PVPTeam2",
-        "PVPTeam3", "TokenFrame", "TokenFrameContainer", "TokenFramePopup" } },
+        "PVPTeam3", "TokenFrame", "TokenFrameContainer", "TokenFramePopup" },
+        popouts = { "ReputationDetailFrame", "TokenFramePopup" } },
     { frame = "ChatConfigFrame" },
     { frame = "DressUpFrame" },
     { frame = "FriendsFrame", parts = { "FriendsFrameFriendsScrollFrame", "FriendsFrameBattlenetFrame.BroadcastFrame",
         "GuildFrame", "GuildInfoFrame", "GuildInfoFrameScrollFrame", "GuildControlPopupFrame", "GuildEventLogFrame",
-        "RaidInfoFrame" } },
+        "RaidInfoFrame" },
+        popouts = { "FriendsFrameBattlenetFrame.BroadcastFrame", "GuildInfoFrame", "GuildControlPopupFrame",
+            "GuildEventLogFrame", "RaidInfoFrame" } },
     { frame = "GossipFrame" },
     { frame = "GuildRegistrarFrame" },
     { frame = "HelpFrame" },
     { frame = "ItemTextFrame" },
     { frame = "LootFrame" },
     { frame = "MailFrame", parts = { "MailFrameInset", "SendMailFrame", "OpenMailFrame", "OpenMailFrameInset",
-        "OpenMailSender" } },
+        "OpenMailSender" },
+        popouts = { "OpenMailFrame" } },
     { frame = "MerchantFrame" },
     { frame = "ModelPreviewFrame" },
     { frame = "PVPBannerFrame" },
@@ -59,10 +65,12 @@ WM.FrameMoverData = {
     { addon = "Blizzard_AuctionUI", frame = "AuctionFrame" },
     { addon = "Blizzard_BindingUI", frame = "KeyBindingFrame" },
     { addon = "Blizzard_Calendar", frame = "CalendarFrame", parts = { "CalendarCreateEventFrame",
-        "CalendarViewEventFrame", "CalendarViewEventFrame.HeaderFrame", "CalendarViewHolidayFrame" } },
+        "CalendarViewEventFrame", "CalendarViewEventFrame.HeaderFrame", "CalendarViewHolidayFrame" },
+        popouts = { "CalendarCreateEventFrame", "CalendarViewEventFrame", "CalendarViewHolidayFrame" } },
     { addon = "Blizzard_Channels", frame = "ChannelFrame" },
     { addon = "Blizzard_Communities", frame = "CommunitiesFrame", parts = { "CommunitiesFrame.GuildMemberDetailFrame",
-        "CommunitiesFrame.NotificationSettingsDialog" } },
+        "CommunitiesFrame.NotificationSettingsDialog" },
+        popouts = { "CommunitiesFrame.GuildMemberDetailFrame" } },
     { addon = "Blizzard_Communities", frame = "CommunitiesSettingsDialog" },
     { addon = "Blizzard_Communities", frame = "CommunitiesGuildLogFrame" },
     { addon = "Blizzard_Communities", frame = "CommunitiesGuildNewsFiltersFrame" },
@@ -101,4 +109,10 @@ WM.FrameMoverNames = {
     GuildBankFrame = "Guild bank", GuildControlUI = "Guild ranks", InspectFrame = "Inspect",
     ItemSocketingFrame = "Gem sockets", MacroFrame = "Macros", PlayerTalentFrame = "Talents", TimeManagerFrame = "Clock",
     TradeSkillFrame = "Professions", ClassTrainerFrame = "Trainer",
+    -- Pop-outs
+    ReputationDetailFrame = "Reputation details", TokenFramePopup = "Currency options",
+    ["FriendsFrameBattlenetFrame.BroadcastFrame"] = "Broadcast", GuildInfoFrame = "Guild information",
+    GuildControlPopupFrame = "Guild control", GuildEventLogFrame = "Guild event log", RaidInfoFrame = "Raid information",
+    OpenMailFrame = "Opened mail", CalendarCreateEventFrame = "New calendar event", CalendarViewEventFrame = "Calendar event",
+    CalendarViewHolidayFrame = "Calendar holiday", ["CommunitiesFrame.GuildMemberDetailFrame"] = "Guild member details",
 }

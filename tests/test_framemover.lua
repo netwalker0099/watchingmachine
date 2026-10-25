@@ -11,6 +11,11 @@ local env = W.env
 -- Frames that know where they are, their scale and their mouse settings
 local F = W.Frame
 function F:GetScale() return self._scale or 1 end
+function F:GetEffectiveScale()
+    local s, f = 1, self
+    while f do s = s * (f._scale or 1); f = f._parent end
+    return s
+end
 function F:SetScale(s) self._scale = s end
 function F:GetLeft() return self._left end
 function F:GetTop() return self._top end
@@ -32,6 +37,7 @@ local combat, keys, loaded = false, {}, {}
 env.InCombatLockdown = function() return combat end
 env.IsShiftKeyDown = function() return keys.shift or false end
 env.IsControlKeyDown = function() return keys.ctrl or false end
+env.IsAltKeyDown = function() return keys.alt or false end
 env.C_AddOns = { IsAddOnLoaded = function(a) return loaded[a] or false end }
 env.SlashCmdList = {}
 env.StaticPopup_Show = false     -- no dialog: WM:Confirm runs at once
@@ -95,7 +101,19 @@ check("Escape menu is never moved", not listed.GameMenuFrame)
 local named = true
 for name in pairs(listed) do if not WM.FrameMoverNames[name] then named = false; io.write("unnamed: ", name, "\n") end end
 check("every window has a name in the list", named)
-check("layout saved per character", WM.Profiles.SCOPE.WMFrameMoverDB ~= nil and not WM.Profiles.SCOPE.WMFrameMoverDB.shared)
+check("layout per character, plus one shared layout", WM.Profiles.SCOPE.WMFrameMoverDB ~= nil
+    and table.concat(WM.Profiles.SCOPE.WMFrameMoverDB.shared or {}, ",") == "layout")
+local popouts = 0
+for _, e in ipairs(WM.FrameMoverData) do
+    local isPart = {}
+    for _, p in ipairs(e.parts or {}) do isPart[p] = true end
+    for _, p in ipairs(e.popouts or {}) do
+        popouts = popouts + 1
+        if not isPart[p] then io.write("pop-out not a part: ", p, "\n"); popouts = -999 end
+        if not WM.FrameMoverNames[p] then io.write("pop-out unnamed: ", p, "\n"); popouts = -999 end
+    end
+end
+check("pop-outs are parts of their window, each named", popouts >= 10)
 check("card in the Interface group", (function()
     for _, g in ipairs(WM.MODULE_GROUPS) do
         for _, m in ipairs(g.modules) do if m == "FrameMover" then return g.title == "Interface" end end
@@ -353,6 +371,87 @@ FM:Command("reset")
 check("move reset: every window back", next(DB().pos) == nil and next(DB().scale) == nil
     and Anchor(CharacterFrame)[4] == 40)
 check("status after reset", FM:GetQuickStatus() == "No windows moved")
+
+-- ============================================
+-- POP-OUTS: ALT + DRAG PULLS ONE OFF ITS WINDOW
+-- ============================================
+
+local POP = "MailFrame/OpenMailFrame"
+OpenMailFrame:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", 0, 0)   -- the game docks it beside the mailbox
+OpenMailFrame._left, OpenMailFrame._top = 396, 652
+local oi = FM.info[OpenMailFrame]
+check("opened mail is a pop-out of the mailbox", oi and oi.popout and oi.key == POP and FM.frames[POP] == OpenMailFrame)
+check("a plain part is not", FM.info[PaperDollFrame].popout == nil and FM.info[PaperDollFrame].key == nil)
+W.fire(OpenMailFrame, "OnMouseDown", "LeftButton")
+check("plain drag on a pop-out still moves its window", MailFrame._moving == true and not OpenMailFrame._moving)
+W.fire(OpenMailFrame, "OnMouseUp", "LeftButton")
+FM:ResetWindow("MailFrame")
+env.IsAltKeyDown = function() return true end
+W.fire(OpenMailFrame, "OnMouseDown", "LeftButton")
+check("Alt + drag pulls it off", OpenMailFrame._moving == true and not MailFrame._moving)
+OpenMailFrame._left, OpenMailFrame._top = 700, 400
+W.fire(OpenMailFrame, "OnMouseUp", "LeftButton")
+env.IsAltKeyDown = function() return false end
+a = Anchor(OpenMailFrame)
+check("placed on its own", FM.Layout().pos[POP] and FM.Layout().pos[POP].x == 700
+    and a[1] == "TOPLEFT" and a[2] == env.UIParent and a[3] == "BOTTOMLEFT" and a[4] == 700)
+check("listed as a pop-out", FM:MovedText():find("Opened mail (off Mailbox)", 1, true) ~= nil)
+W.fire(OpenMailFrame, "OnMouseDown", "LeftButton")
+check("once placed, a plain drag moves it", OpenMailFrame._moving == true and not MailFrame._moving)
+OpenMailFrame._left, OpenMailFrame._top = 720, 410
+W.fire(OpenMailFrame, "OnMouseUp", "LeftButton")
+check("moved again", FM.Layout().pos[POP].x == 720)
+-- The game docks it again when a mail opens: back on your spot
+OpenMailFrame:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", 0, 0)
+check("the game docking it: back on your spot", Anchor(OpenMailFrame)[4] == 720)
+-- In a resized window, its spot stays on the screen where you put it
+MailFrame._scale = 0.5
+OpenMailFrame:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", 0, 0)
+check("window resized: the pop-out keeps its screen spot", Anchor(OpenMailFrame)[4] == 720 / 0.5)
+MailFrame._scale = 1
+-- Shift + right-click on the window itself: the window, not the pop-out
+keys.shift = true
+W.fire(MailFrame, "OnMouseUp", "RightButton")
+check("Shift + right-click on the window leaves the pop-out placed", FM.Layout().pos[POP] ~= nil)
+W.fire(OpenMailFrame, "OnMouseUp", "RightButton")
+keys.shift = false
+a = Anchor(OpenMailFrame)
+check("Shift + right-click on it: back on its window", FM.Layout().pos[POP] == nil and a[2] == MailFrame and a[3] == "TOPRIGHT")
+-- Resetting a window takes its pop-outs back too
+env.IsAltKeyDown = function() return true end
+W.fire(OpenMailFrame, "OnMouseDown", "LeftButton")
+W.fire(OpenMailFrame, "OnMouseUp", "LeftButton")
+env.IsAltKeyDown = function() return false end
+check("placed again", FM.Layout().pos[POP] ~= nil)
+FM:ResetWindow("MailFrame")
+check("window reset: its pop-outs go back on it", FM.Layout().pos[POP] == nil and Anchor(OpenMailFrame)[2] == MailFrame)
+
+-- ============================================
+-- ONE LAYOUT FOR ALL CHARACTERS
+-- ============================================
+
+W.fire(CharacterFrame, "OnMouseDown", "LeftButton")
+CharacterFrame._left, CharacterFrame._top = 111, 555
+W.fire(CharacterFrame, "OnMouseUp", "LeftButton")
+check("own layout has the Character window", DB().pos.CharacterFrame.x == 111 and FM.Layout() == DB())
+FM:SetShared(true)
+check("sharing: the shared layout starts from this character's", DB().useShared and FM.Layout() == DB().layout
+    and DB().layout.pos.CharacterFrame.x == 111 and DB().layout.pos.CharacterFrame ~= DB().pos.CharacterFrame)
+check("status says shared", FM:GetQuickStatus():find("(shared layout)", 1, true) ~= nil)
+W.fire(CharacterFrame, "OnMouseDown", "LeftButton")
+CharacterFrame._left, CharacterFrame._top = 222, 444
+W.fire(CharacterFrame, "OnMouseUp", "LeftButton")
+check("moves go to the shared layout, not your own", DB().layout.pos.CharacterFrame.x == 222 and DB().pos.CharacterFrame.x == 111)
+FM:SetShared(false)
+check("back to your own: the window goes to your spot", Anchor(CharacterFrame)[4] == 111 and FM.Layout() == DB())
+DB().pos.CharacterFrame = nil
+FM:SetShared(true)
+check("sharing again keeps the shared layout", DB().layout.pos.CharacterFrame.x == 222 and Anchor(CharacterFrame)[4] == 222)
+FM:SetShared(false)
+check("own layout with nothing: the game's spot", Anchor(CharacterFrame)[1] ~= "TOPLEFT" or Anchor(CharacterFrame)[3] ~= "BOTTOMLEFT")
+local sp = Page()
+check("setup page: shared layout option", sp and sp["Use one layout for all my characters"]
+    and sp["Use one layout for all my characters"].tooltip)
 
 -- ============================================
 -- BLIZZMOVE LOADED: STAND ASIDE
