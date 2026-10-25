@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.50 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.51 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -312,6 +312,24 @@ always sits first.
     timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
     so you can move and resize it; `/wmachine swing reset` puts back the
     default place and size
+- **Mana tick spark** (3.51), for every class with mana: a white spark slides
+  left to right across your player frame's **health bar** and reaches the
+  end as your next mana tick lands (TBC regenerates mana every 2 seconds),
+  so you can time a cast to finish just after a tick
+  - It finds the ticks from your mana gains. A gain off the 2 second rhythm
+    (a potion, Innervate) is ignored, unless another comes 2 seconds after
+    it, which means the rhythm itself moved
+  - **Five-second rule:** after you spend mana on a spell, an orange spark
+    crosses the bar over the 5 seconds your spirit regeneration is stopped
+  - On your health bar, your mana bar, or a small bar of its own (Shift-drag
+    to move it): Blizzard's player frame or ElvUI's, or its own bar without
+    one. It's laid over the bar, so the game's unit frames aren't touched
+  - Hidden at full mana out of combat (an option). `/wmachine manatick`
+    shows it for 10 seconds; `/wmachine manatick reset` puts its own bar
+    back in place
+  - Options: *Mana tick spark*, *Mana tick spark on* (health bar, mana bar,
+    its own bar), *Five-second rule spark*, *Hide the mana tick spark at
+    full mana*
 
 Flask detection matches on substring, so `Unstable Flask of the Beast` and
 `Unstable Flask of the Sorcerer` count alongside the standard flasks.
@@ -1047,6 +1065,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine wb [guild|party|raid]` - Print the world timers, or send them to a channel
 - `/wmachine swing` - Show the swing timer for 10 seconds to move or resize it
 - `/wmachine swing reset` - Swing timer back to its default place and size
+- `/wmachine manatick` - Show the mana tick spark for 10 seconds (`manatick reset` puts its own bar back in place)
 - `/wmachine consumes` - Show what the general raid consumable checks see
 - `/wmachine minimap` - Toggle minimap button visibility
 - `/wmachine resetminimap` - Reset minimap button position
@@ -1136,6 +1155,7 @@ Built-in error capture system for debugging.
 - `MageToolsDB` - Mage button positions and expansion directions
 - `WarlockToolsDB` - Warlock button position and expansion directions
 - `SwingTimerDB` - Swing timer position, size, lock and weapon-sync lag
+- `ManaTickDB` - Mana tick spark: which bar it's on, and its own bar's position
 - `InstanceTrackerDB` - Instance log (every character) and its options
 - `AltTrackerDB` - Your Characters: every character's saved details
 - `PvPLogDB` - Battleground and arena matches (every character)

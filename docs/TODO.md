@@ -718,6 +718,17 @@ Built as `Profiles.lua` (per-character settings and module switches) and
 - [x] **Turning off works at once:** events, hooks and frames stop.
 - [x] **What's new page, forgetting an old character's settings** (3.50).
 
+## 25. Mana tick spark — DONE in 3.51
+
+Built as `Modules/ManaTick.lua`, a part of Class Tools with its options in
+Class Tools > General: a spark on the health bar (or mana bar, or its own
+bar) to each 2 second mana tick, and the five-second rule.
+
+- [ ] **Still to confirm in game:** that mana arrives in 2 second ticks on
+      2.5.6 (not smoothed), that drinking doesn't pull the rhythm off, and
+      the ElvUI player bar names (`ElvUF_Player.Health` / `.Power`).
+- [ ] **Later:** energy ticks for rogues and cat druids, on the same spark.
+
 ## 24. Frame Mover (BlizzMove-style) — DONE in 3.49
 
 Built as `Modules/FrameMover.lua` + `Data/FrameMover.lua` (our own code;

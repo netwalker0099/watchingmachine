@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.50"
+WM.version = "3.51"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -22,7 +22,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ManaTick", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -335,6 +335,7 @@ local MODULE_COLORS = {
     ClassMage = "3FC7EB",
     ClassShaman = "0070DE",
     SwingTimer = "FFAA33",
+    ManaTick = "6699FF",
     ClassPaladin = "F58CBA",
     InstanceTracker = "66CCFF",
     AltTracker = "FFCC66",
@@ -1428,6 +1429,9 @@ local MODULE_INFO = {
               visible = function() local c = PlayerClass(); return c == "WARRIOR" or c == "ROGUE"
                   or c == "PALADIN" or c == "SHAMAN" or c == "HUNTER" end,
               func = function() Call("SwingTimer", "Test") end },
+            { text = "Show the mana tick spark (10s)",
+              visible = function() local c = PlayerClass(); return c ~= "WARRIOR" and c ~= "ROGUE" end,
+              func = function() Call("ManaTick", "Test") end },
             { text = "Edit totem sets", visible = function() return PlayerClass() == "SHAMAN" end,
               func = function() Call("ClassShaman", "ToggleEditor") end },
         },
@@ -2047,6 +2051,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine alts|r - Your Characters (gold, rested XP, ...)")
     print("|cFFFFFF00/wmachine swing|r - Show the swing timer for 10s to move or resize it")
     print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
+    print("|cFFFFFF00/wmachine manatick|r - Show the mana tick spark for 10s (manatick reset: its own bar back in place)")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
     print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
     print("|cFFFFFF00/wmachine status|r - One-line status for every module")
@@ -2271,6 +2276,17 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
         if module and module.Test then
             module:Test()
         end
+
+    elseif cmd == "manatick reset" then
+        local module = WM:UsableModule("ManaTick")
+        if module and module.ResetPosition then
+            module:ResetPosition()
+            WM:Print("The mana tick bar is back at its default place.")
+        end
+
+    elseif cmd == "manatick" or cmd == "mana tick" or cmd == "tick" then
+        local module = WM:UsableModule("ManaTick")
+        if module and module.Test then module:Test() end
 
     elseif cmd == "totems" or cmd == "totem" then
         local module = WM:UsableModule("ClassShaman")

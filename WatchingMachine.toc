@@ -4,8 +4,8 @@
 ## Title: Watching Machine
 ## Notes: Comprehensive monitoring suite - Keywords, Chat Filter, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker, Buff Check, ArmorySnap, Aura Range, Class Tools
 ## Author: Robert
-## Version: 3.50
-## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB, InstanceTrackerDB, AltTrackerDB, PvPLogDB, WorldTimersDB, LootBrowserDB, WMGearScoreDB, AttunementsDB, HazardsDB, WMCritsDB, OgrilaDB, WMGearSetsDB, WMFrameMoverDB
+## Version: 3.51
+## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB, ManaTickDB, InstanceTrackerDB, AltTrackerDB, PvPLogDB, WorldTimersDB, LootBrowserDB, WMGearScoreDB, AttunementsDB, HazardsDB, WMCritsDB, OgrilaDB, WMGearSetsDB, WMFrameMoverDB
 
 Core.lua
 Profiles.lua
@@ -30,6 +30,7 @@ Modules/AuraRange.lua
 Modules/ClassTools.lua
 Modules/ClassFlyout.lua
 Modules/SwingTimer.lua
+Modules/ManaTick.lua
 Modules/ClassGeneral.lua
 Modules/ClassWarlock.lua
 Modules/ClassMage.lua

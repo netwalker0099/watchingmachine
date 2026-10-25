@@ -157,7 +157,7 @@ local function VisibleCount(info)
     return n
 end
 env.UnitClass = function() return "Mage", "MAGE" end
-check("mage sees consumables + portals", VisibleCount(WM.MODULE_INFO.ClassTools) == 2)
+check("mage sees consumables, portals and the mana tick spark", VisibleCount(WM.MODULE_INFO.ClassTools) == 3)
 env.UnitClass = function() return "Warrior", "WARRIOR" end
 check("warrior sees consumables + swing timer", VisibleCount(WM.MODULE_INFO.ClassTools) == 2)
 

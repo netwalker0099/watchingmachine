@@ -2,7 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.50** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.51** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.51
+
+### Mana tick spark (Class Tools > General)
+
+- A **white spark** slides left to right across your player frame's health
+  bar and reaches the end as your next mana tick lands (every 2 seconds),
+  for every class with mana. It's a new part of Class Tools, so the guided
+  setup lists its options with the other General ones.
+- **Finding the ticks:** from your mana gains. Gains off the 2 second
+  rhythm (potions, Innervate) are ignored unless another comes 2 seconds
+  later, which means the rhythm moved.
+- **Five-second rule:** an orange spark crosses the bar over the 5 seconds
+  after you spend mana on a spell.
+- **Where:** the health bar (the default), the mana bar, or a small bar of
+  its own (Shift-drag to move). Works with Blizzard's and ElvUI's player
+  frames and falls back to its own bar. Laid over the bar: the game's unit
+  frames aren't touched.
+- Hidden at full mana out of combat (an option). `/wmachine manatick`
+  shows it for 10 seconds, also from the Class Tools card's tools menu;
+  `/wmachine manatick reset` puts its own bar back.
 
 ---
 

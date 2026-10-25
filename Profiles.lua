@@ -45,6 +45,7 @@ P.SCOPE = {
     WarlockToolsDB = {},
     ShamanToolsDB = {},
     SwingTimerDB = {},
+    ManaTickDB = {},
     InstanceTrackerDB = { shared = { "runs", "nextId" } },
     AltTrackerDB = { shared = { "chars" } },
     PvPLogDB = { shared = { "matches", "nextId" } },
@@ -192,7 +193,7 @@ end
 -- Parts of another module: on only while it is, and set up with it
 WM.MODULE_PARENT = {
     ClassGeneral = "ClassTools", ClassWarlock = "ClassTools", ClassMage = "ClassTools",
-    ClassShaman = "ClassTools", ClassPaladin = "ClassTools", SwingTimer = "ClassTools",
+    ClassShaman = "ClassTools", ClassPaladin = "ClassTools", SwingTimer = "ClassTools", ManaTick = "ClassTools",
 }
 
 -- Optional links: module -> { other module = what you get with both on }

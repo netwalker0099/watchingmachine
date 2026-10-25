@@ -470,6 +470,8 @@ function General:RegisterFeatures()
 
     -- Swing / Auto Shot timer
     if WM.SwingTimer then WM.SwingTimer.RegisterOptions(tools) end
+    -- Mana tick spark
+    if WM.ManaTick then WM.ManaTick.RegisterOptions(tools) end
 
     tools:RegisterAlertSound(CLASS, "gen_flask", "No flask or elixirs")
     tools:RegisterAlertSound(CLASS, "gen_food", "No food buff")
