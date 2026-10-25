@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.49 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.50 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -96,6 +96,16 @@ button) runs the setup again: everything you have on stays ticked and every
 setting keeps its value unless you change it during the setup. `setup quick`
 and `setup guided` go straight to one.
 
+### New modules and old characters
+- **What's new** (3.50): when a new version adds a module, your next login
+  on each character shows it on a *New in Watching Machine* page: what it
+  does, its switch and its settings. *Done* marks it seen; *Ask me next time*
+  shows it again. `/wmachine setup new` brings it back.
+- **Forget a character** (3.50): for a character you've deleted or renamed,
+  the welcome window and `/wmachine settings` can remove its Watching Machine
+  settings and module switches. Lists about all your characters (Your
+  Characters, the instance log) keep their own delete.
+
 ## Raid
 
 ### Buff Check
@@ -112,6 +122,11 @@ Full raid buff audit that runs automatically on every ready check.
 - Long reports are split to respect the chat message length cap
 - "Run Check Now" button for manual local checks any time
 - Optional "all buffs up!" confirmation message
+- **Group list** (3.50): the Buff Check window lists everyone in your group
+  with what they were missing at the last check and, with GearScore on, a
+  **GearScore column**. Sort by most missing, highest or lowest GearScore,
+  or name; *Inspect for GearScores* asks GearScore to inspect anyone it
+  has no recent score for
 
 ### Debuff Tracker
 Visual raid debuff monitoring with auto-detection and raid alerts.
@@ -286,8 +301,14 @@ always sits first.
   - **Resizable**: drag the grip in its bottom-right corner while it's
     unlocked (right for wider, down for taller bars), or pick *Swing timer
     width* (100–600) and *bar height* (8–40) in Class Tools > General
+  - **Windfury bar** (3.50, shamans): Windfury Weapon's 3 second cooldown
+    (shared by both hands) from its last proc, under the weapon bars; green
+    and *ready* when it can proc again. It appears after your first Windfury
+    proc
+  - **Flurry charges** (3.50, shamans and warriors) on the main-hand bar
   - Options: *Swing timer*, *for every class and spec*, *Shaman weapon sync
-    mark*, *Off hand lands after by*, width, bar height, *Lock the swing
+    mark*, *Windfury cooldown bar*, *Flurry charges on the swing timer*,
+    *Off hand lands after by*, width, bar height, *Lock the swing
     timer* (no moving or resizing). `/wmachine swing` shows it for 10 seconds
     so you can move and resize it; `/wmachine swing reset` puts back the
     default place and size
@@ -378,6 +399,12 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   four back
 - *Totem sets expand* sets the flyout's direction (or Hidden). Changes made
   in combat apply when it ends; dropping a set works in combat
+- **Key binding** (3.50): *Drop the next totem* in the game's Key Bindings,
+  under Watching Machine. It clicks the button, so it works in combat (and
+  Ctrl with the key starts again from Air)
+- **Totem timers** (3.50): above the button, each totem you have down (Air,
+  Water, Earth, Fire) with the time it has left. *Totem timers above the
+  button* turns them off
 
 #### Paladin
 - **Righteous Fury check** — warns when Righteous Fury is missing, the same
@@ -668,6 +695,17 @@ own code, written from the ground up for reliability.
 - **The window:** every set with its icon, *wearing* / *N to change* /
   *N missing*, its spec, mounted and PvP badges; hover for the items, and
   *Equip*, *Edit* and *Delete*
+- **Forms and stances** (3.50): give a set a form or stance in its editor
+  (Bear, Cat, Moonkin, a warrior stance, Stealth, ...). Taking that form puts
+  it on; taking a form with no set of its own puts back what you wore before
+- **Key bindings** (3.50): pick *Gear set 1* to *10* in a set's editor, then
+  give it a key in the game's Key Bindings under Watching Machine (the key
+  names follow your set names). There's an undo key too. The set list shows
+  the key
+- **GearScore and best in slot** (3.50): with GearScore on, each set shows
+  its score (and item level on hover). Pick a spec under *Compare with BiS*
+  and, with the Loot Browser on, the set lists the items you've marked BiS
+  for that spec that it doesn't have yet
 
 ## Guild & Social
 
@@ -908,6 +946,13 @@ research; the code is our own.
   200%, in tenths); lists that scroll by themselves still scroll
 - **Shift + right-click** puts a window back where the game had it;
   **Ctrl + right-click** puts its size back
+- **Pop-outs** (3.50): **Alt + drag** a pop-out (reputation details, raid
+  info, guild info, an opened mail, a calendar event, ...) to pull it off its
+  window and place it on its own. After that a plain drag moves it, and
+  Shift + right-click puts it back on its window
+- **One layout for all characters** (3.50): an option per character. The
+  first character to share starts the shared layout from its own; a
+  character's own layout is kept for when it stops sharing
 - **Remembered per character**, across logouts and reloads, until you reset
   it. Whenever the game opens a window or makes room for another one, the
   window goes back to your spot
@@ -963,7 +1008,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 
 ### Slash Commands
 - `/wmachine` - Toggle the main dashboard
-- `/wmachine setup` - Run the setup (again) for this character, keeping what's on (`setup quick`, `setup guided`; also `/wmachine resetup`)
+- `/wmachine setup` - Run the setup (again) for this character, keeping what's on (`setup quick`, `setup guided`, `setup new` for what's new; also `/wmachine resetup`)
 - `/wmachine settings` - Open theme/addon settings
 - `/wmachine logger` - Open Auto Logger settings
 - `/wmachine keyword` - Open Keyword Monitor
@@ -1102,5 +1147,5 @@ Built-in error capture system for debugging.
 - `WMCritsDB` - Crit Tracker records per character, and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
-- `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, and options
+- `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, options, and the layout shared by all characters
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction

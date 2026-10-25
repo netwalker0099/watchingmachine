@@ -104,7 +104,7 @@ General. Settled as:
 - **Tests:** `tests/test_swing.lua` drives a fake combat log.
 - **Still to confirm in game:** how Windfury Weapon's extra attack is
   logged, and whether the Auto Shot wind-up scales with haste.
-- **Not built:** a Windfury cooldown bar and Flurry charges.
+- **Built in 3.50:** a Windfury cooldown bar and Flurry charges.
 
 ---
 
@@ -149,8 +149,8 @@ settled as:
 - **Still to confirm in game:** that a sequence reset in combat waits for
   combat to end cleanly, and the totem spell IDs (used only for localized
   clients).
-- **Not built:** a keybinding (Bindings.xml) for the button, and per-totem
-  timers on the bar.
+- **Built in 3.50:** a key binding (Bindings.xml) for the button, and
+  timers for the totems you have down.
 
 ---
 
@@ -554,8 +554,8 @@ from which boss), in our own format.
 Built as `Modules/GearScore.lua`, using GearScoreTBCClassic (MIT) as the
 guide: its formula, so the numbers match. Player and item tooltips, the
 character and inspect frames, a throttled inspect queue, a group list.
-ArmorySnap snapshots scored in 3.38. Not done: reading TacoTip's comm data,
-and a GearScore column in Buff Check.
+ArmorySnap snapshots scored in 3.38; a GearScore column in Buff Check in
+3.50. Not done: reading TacoTip's comm data (needs the TacoTip files).
 
 A gear score for every player, in the style of the GearScore / TacoTip
 addons, worked out locally from equipped items.
@@ -674,8 +674,10 @@ ItemRack used only for the idea).
 - [x] **Automatic:** talent spec (per set, can be switched off), mounted,
       battlegrounds and arenas, each putting your old gear back after.
 - [x] **Missing items:** chat alert after a swap, character sheet warning.
-- [ ] **Later:** key bindings per set, Druid form and stance swaps, and
-      showing a set's GearScore and its missing BiS pieces.
+- [x] **Key bindings, forms and stances, GearScore and missing BiS**
+      (3.50).
+- [ ] **Still to confirm in game:** that a druid can swap gear in forms
+      as expected, and the form names the stance bar gives.
 
 ## 21. Ogri'la helper (Ogri'Lazy-style) — DONE in 3.44
 
@@ -714,8 +716,7 @@ Built as `Profiles.lua` (per-character settings and module switches) and
 - [x] **Per character:** module switches and settings (shared data stays
       shared).
 - [x] **Turning off works at once:** events, hooks and frames stop.
-- [ ] **Later:** a "what's new" page in the setup when a version adds a
-      module, and deleting an old character's settings.
+- [x] **What's new page, forgetting an old character's settings** (3.50).
 
 ## 24. Frame Mover (BlizzMove-style) — DONE in 3.49
 
@@ -732,6 +733,4 @@ the window list compiled with BlizzMove's research).
       character window next to the spellbook, the world map, the auction
       house) stay on your spot, and that nothing is blocked in combat
       (`/wmachine diag`).
-- [ ] **Later:** Alt-drag to pull a pop-out (reputation detail, raid info,
-      an opened mail) off its window and place it on its own, as BlizzMove
-      does; a shared layout option for all characters.
+- [x] **Alt-drag pop-outs, a layout shared by all characters** (3.50).

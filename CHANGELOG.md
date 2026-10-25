@@ -2,7 +2,62 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.49** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.50** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.50
+
+The smaller items from the to-do list.
+
+### Gear Sets
+- **Key bindings:** ten *Gear set N* keys and an undo key under Watching
+  Machine in the game's Key Bindings (a new `Bindings.xml`). A set picks its
+  number in the editor; the key names follow your set names, and the set
+  list shows the bound key.
+- **Forms and stances:** a set can go on in a form or stance (druid forms,
+  warrior stances, Stealth, ...). Taking a form with no set of its own puts
+  back what you wore before the first form's set.
+- **GearScore and best in slot:** with GearScore on, each set shows its
+  score. *Compare with BiS* picks a spec; with the Loot Browser on, the set
+  lists the items marked BiS for that spec that it doesn't have yet (both
+  rings and both trinkets counted together, only for slots the set covers).
+
+### Frame Mover
+- **Pop-outs:** Alt + drag pulls a pop-out (reputation details, raid info,
+  guild info, an opened mail, calendar events, ...) off its window and
+  places it on its own. A plain drag then moves it; Shift + right-click
+  puts it back, and resetting the window puts back its pop-outs. Spots are
+  kept against the screen, so resizing the window doesn't move them.
+- **One layout for all characters:** a per-character option. The first
+  character to share starts the shared layout from its own, and each
+  character's own layout is kept for when it stops sharing.
+
+### Buff Check
+- **Group list** in its window: everyone in the group with what they were
+  missing at the last check and, with GearScore on, a GearScore column.
+  Sortable, with an *Inspect for GearScores* button; refreshed after every
+  check.
+
+### Swing timer and totems
+- **Windfury cooldown bar** (shamans): Windfury Weapon's 3 second cooldown
+  from its last proc, under the weapon bars, green *ready* when it can proc
+  again. Still to confirm in game: the extra attack's name in the combat
+  log ("Windfury Attack" is expected).
+- **Flurry charges** (shamans and warriors) on the main-hand bar.
+- **Totem button key:** *Drop the next totem* in Key Bindings (it clicks
+  the secure button, so it works in combat). Turned off, the button's macro
+  is emptied so the key does nothing.
+- **Totem timers** above the button: each totem you have down with its time
+  left.
+
+### Setup
+- **What's new:** a module added by a later version shows, once per
+  character, on a *New in Watching Machine* page with its switch and
+  settings. `/wmachine setup new` brings it back. Characters from before
+  count everything they have as seen.
+- **Forget a character:** remove a deleted or renamed character's settings
+  and module switches, from the welcome window or `/wmachine settings`.
 
 ---
 
