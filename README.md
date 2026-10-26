@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.57 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.58 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -557,11 +557,13 @@ instance limits (Logging group on the dashboard; `/wmachine instances`).
   leaving, the same-instance merge, lockouts, and Nova reset notices
 - **Leaving an instance** prints the run's stats to your chat window, to your
   group, or not at all
-- **XP per hour and runs to level** (3.57) in those stats: "18,300 XP
-  (300/mob), 45,750 XP/hour, 4 more runs like this to level 62". The runs
-  count from the XP you still need when you leave. Not at the level cap, nor
-  for runs under a minute. The run's tooltip in the log shows both too;
-  *Add XP per hour and runs to level* turns them off
+- **Share of a level, XP per hour and runs to level** (3.57, 3.58) in
+  those stats: "18,300 XP (300/mob, 23% of a level), 45,750 XP/hour, 4 more
+  runs like this to level 62". The share is of a whole level at the level
+  you leave on; the runs count from the XP you still need then. Not at the
+  level cap, and no hourly rate for runs under a minute. The run's tooltip
+  in the log shows them too; *Add % of a level, XP per hour and runs to
+  level* turns them off
 - **Resets:** as group leader, a reset tells your group in party or raid chat
 - **Nova Instance Tracker users:** when your group leader runs Nova Instance
   Tracker (or Nova World Buffs) and resets, their addon's notice is shown
@@ -1248,6 +1250,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.58
+- **Instance Tracker:** the stats after a dungeon say what share of a level the run was ("23% of a level")
 
 ### Version 3.57
 - **Instance Tracker:** the stats after a dungeon give your XP per hour and how many more runs like it take you to the next level

@@ -111,6 +111,9 @@ check("stats printed on leaving", LastPrint():find("The Deadmines: 25m 00s, 2 mo
 check("XP still needed recorded on leaving", run.xpToLevel == 60000 - 200)
 check("XP per hour", math.floor(IT.XPPerHour(run)) == 118080 and LastPrint():find("118,080 XP/hour", 1, true) ~= nil)
 check("runs like it to level", IT.RunsToLevel(run) == 2 and LastPrint():find("2 more runs like this to level 42", 1, true) ~= nil)
+check("share of a level: the run's XP over the level's", run.levelXP == 60000 and math.floor(IT.LevelPercent(run)) == 82
+    and LastPrint():find("(24,600/mob, 82% of a level)", 1, true) ~= nil)
+check("under 10%: one decimal", IT.PercentText(4.54) == "4.5%" and IT.PercentText(23.4) == "23%")
 local function Fake(t) local r = { name = "Test", entered = 0, left = 0, mobs = 0, xp = 0, gold = 0 }
     for k, v in pairs(t) do r[k] = v end; return r end
 check("one run to go: singular", IT:RunSummary(Fake({ left = 600, xp = 5000, xpToLevel = 3000, levelOut = 50 }))
@@ -119,9 +122,14 @@ check("under a minute: no hourly rate", IT.XPPerHour(Fake({ left = 45, xp = 900 
 check("no XP: no rate, no runs", IT.XPPerHour(Fake({ left = 600 })) == nil and IT.RunsToLevel(Fake({ left = 600, xpToLevel = 100 })) == nil)
 check("at the level cap: no runs to level", IT.RunsToLevel(Fake({ left = 600, xp = 500, xpToLevel = nil })) == nil
     and not IT:RunSummary(Fake({ left = 600, xp = 500, levelOut = 70 })):find("more run", 1, true))
+check("at the level cap: no share of a level", IT.LevelPercent(Fake({ left = 600, xp = 500 })) == nil
+    and not IT:RunSummary(Fake({ left = 600, xp = 500, levelOut = 70 })):find("of a level", 1, true))
+check("no mobs: the share alone in brackets", IT:RunSummary(Fake({ left = 600, xp = 3000, levelXP = 60000 }))
+    :find("3,000 XP (5.0% of a level)", 1, true) ~= nil)
 IT.DB().xpRate = false
-check("option off: no rate or runs", not IT:RunSummary(run):find("XP/hour", 1, true)
-    and not IT:RunSummary(run):find("more run", 1, true))
+check("option off: no rate, runs or share", not IT:RunSummary(run):find("XP/hour", 1, true)
+    and not IT:RunSummary(run):find("more run", 1, true) and not IT:RunSummary(run):find("of a level", 1, true)
+    and IT:RunSummary(run):find("(24,600/mob)", 1, true) ~= nil)
 IT.DB().xpRate = true
 
 -- ---- Same instance again: merged, not counted twice ----

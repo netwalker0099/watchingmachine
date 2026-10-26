@@ -2,7 +2,18 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.57** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.58** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.58
+
+- **Instance Tracker: share of a level.** The stats on leaving a dungeon
+  now say what part of a level the run's XP was: "18,300 XP (300/mob, 23%
+  of a level)". It's measured against a whole level at the level you leave
+  on, with one decimal under 10% ("4.5% of a level"). It's on the run's
+  tooltip in the log too, and nothing is shown at the level cap.
+- The option is now *Add % of a level, XP per hour and runs to level*.
 
 ---
 
