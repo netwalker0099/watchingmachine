@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.59"
+WM.version = "3.60"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)

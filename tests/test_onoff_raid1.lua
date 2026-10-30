@@ -22,6 +22,7 @@ local units = { player = { name = "Me", class = "MAGE" } }
 local grouped = false
 env.UnitBuff = function(u, i) return buffs[u] and buffs[u][i] end
 env.UnitDebuff = function() return nil end
+env.InCombatLockdown = function() return false end
 env.UnitExists = function(u) return units[u] ~= nil end
 env.UnitName = function(u) return units[u] and units[u].name end
 env.UnitClass = function(u) local c = units[u] and units[u].class; return c, c end
@@ -157,7 +158,8 @@ check("DebuffTracker: on again shows the tracker", tf:IsShown())
 DT:StartRaidShadowResistScan()
 check("DebuffTracker: raid SR check running", DT:IsRaidShadowResistScanning())
 WM:SetModuleOn("DebuffTracker", false)
-check("DebuffTracker: off stops the raid SR check", not DT:IsRaidShadowResistScanning())
+check("DebuffTracker: off stops the raid SR check", not DT:IsRaidShadowResistScanning()
+    and not DT:IsRaidShadowResistQueued())
 W.runTimers()
 WM:SetModuleOn("DebuffTracker", true)
 check("DebuffTracker: on again agrees with its own switch", DT:IsModuleEnabled())

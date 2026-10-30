@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.59 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.60 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -163,7 +163,7 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
   - Warns you locally with a screen flash and sound by default; optional Say/Party/Raid/`/rw` announce. Unlike the other callouts this is **not** limited to the raid leader, since it's about your own gear
   - One warning per pull (20s cooldown), `/wmachine srcheck` to see exactly what it detects per slot
   - Counts the item's own resistance plus socketed gems (Void Sphere's +4 Resist All), enchants and active socket bonuses
-  - **Raid-wide check** for the raid leader and assistants: on every pull of a Promenade robot or Illidari pack after Mother it lists every raider still in SR gear, on screen and optionally to Say/Party/Raid/`/rw`. Raiders running Watching Machine report their own gear; everyone else is inspected, which needs them within inspect range (anyone out of range is listed as not checked). `/wmachine srraid` or the **Check Raid** button runs it any time
+  - **Raid-wide check** for the raid leader and assistants: after each Promenade robot or Illidari pack you kill after Mother (3.60: once a trash mob dies and combat is over, since inspecting doesn't work in combat) it lists every raider still in SR gear, on screen and optionally to Say/Party/Raid/`/rw`. Raiders running Watching Machine report their own gear; everyone else is inspected, which needs them within inspect range (anyone out of range is listed as not checked). `/wmachine srraid` or the **Check Raid** button runs it any time (in combat, as soon as combat ends)
 - **Encounter callouts** (Doom warning, Shear monitor, SR check) are the *Encounter Callouts* section of Debuff Tracker settings; `/wmachine encounters` opens the panel scrolled to it
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
@@ -1256,6 +1256,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.60
+- **Fixed: the raid shadow resist check after Mother** ran while you engaged the Promenade trash, when inspecting doesn't work, so most raiders came back "not checked". It now runs after a trash mob dies, once combat is over
 
 ### Version 3.59
 - **Mana potion and rune warnings:** only on bosses in 10 and 25-man raids (an option), and Mana Potion Injectors count as potions

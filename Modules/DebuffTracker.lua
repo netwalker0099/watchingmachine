@@ -1322,7 +1322,8 @@ end
 -- Staying in it for the Grand Promenade constructs afterwards costs a lot of
 -- stats, and it is easy to forget. This arms when Mother dies (or the moment
 -- you engage one of the trigger mobs, so a /reload still works) and warns on
--- your next pull if the set is still on.
+-- your next pull if the set is still on. The raid-wide check runs after a
+-- trigger mob dies, once combat is over: inspecting doesn't work in combat.
 --
 -- Detection reads EQUIPPED GEAR only, never UnitResistance, so Shadow
 -- Protection and Shadow Resistance Aura can't trigger a false warning.
@@ -1343,6 +1344,9 @@ local SR_WARN_COOLDOWN = 20   -- seconds between warnings, so one pull warns onc
 local srArmed = false
 local srLastWarn = 0
 local srRaidPullDone = false  -- the raid-wide scan has run for this pull
+-- A raid scan waiting for combat to end: "auto" (a trigger mob died) or
+-- "manual" (/wmachine srraid in combat); false: none
+local srScanAfterCombat = false
 
 -- Raid-wide check: raiders running Watching Machine report their own gear
 -- over SR_PREFIX; everyone who doesn't answer is inspected one at a time.
@@ -1461,6 +1465,7 @@ function DebuffTracker:ResetShadowResistCheck()
     srArmed = false
     srLastWarn = 0
     srRaidPullDone = false
+    srScanAfterCombat = false
 end
 
 -- Each pull gets its own raid-wide check
@@ -1522,8 +1527,10 @@ function DebuffTracker:CheckShadowResistGear()
     end
 end
 
--- Combat-log path: arms on Mother's death, and arms+fires on engaging a
--- Grand Promenade mob (covers reloading after Mother is already dead).
+-- Combat-log path: arms on Mother's death; engaging a Grand Promenade mob
+-- arms it and checks your own gear (read from what you wear, so it works
+-- in combat); a Promenade mob dying queues the raid-wide check for when
+-- combat ends (inspecting doesn't work in combat).
 function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destName)
     if not DebuffTrackerDB then return end
     if not DebuffTrackerDB.srCheck and not DebuffTrackerDB.srRaidCheck then return end
@@ -1531,32 +1538,51 @@ function DebuffTracker:HandleShadowResistCombatLog(subevent, sourceName, destNam
     if subevent == "UNIT_DIED" then
         if destName and destName == MOTHER_NAME then
             srArmed = true
+        elseif destName and SR_TRIGGER_MOBS[destName:lower()] then
+            srArmed = true
+            self:QueueRaidShadowResistScan()
         end
         return
     end
 
-    -- Armed and this pull already checked: nothing left to do
-    if srArmed and srRaidPullDone then return end
-
+    if srArmed then return end
     local a = sourceName and SR_TRIGGER_MOBS[sourceName:lower()]
     local b = destName and SR_TRIGGER_MOBS[destName:lower()]
     if a or b then
-        if not srArmed then
-            srArmed = true
-            self:CheckShadowResistGear()
-        end
-        -- Every robot / Promenade pull: check who in the raid is still in SR
+        srArmed = true
+        self:CheckShadowResistGear()
+    end
+end
+
+-- A Promenade mob died: the raid-wide check runs once this fight is over
+function DebuffTracker:QueueRaidShadowResistScan()
+    if not DebuffTrackerDB or not DebuffTrackerDB.srRaidCheck then return end
+    if srRaidPullDone then return end
+    if InCombatLockdown and InCombatLockdown() then
+        srScanAfterCombat = srScanAfterCombat or "auto"
+    else
         self:AutoRaidShadowResistScan()
     end
+end
+
+function DebuffTracker:IsRaidShadowResistQueued() return srScanAfterCombat end
+
+-- Combat's over: run a queued raid-wide check
+function DebuffTracker:RunQueuedShadowResistScan()
+    local kind = srScanAfterCombat
+    if not kind then return end
+    srScanAfterCombat = false
+    if kind == "manual" then self:StartRaidShadowResistScan(false)
+    else self:AutoRaidShadowResistScan() end
 end
 
 -- ============================================
 -- RAID-WIDE SHADOW RESIST CHECK
 -- ============================================
 -- Lets the raid leader see who is still in SR gear after Mother. Runs on
--- its own on each pull of a trigger mob (the Promenade robots and the
--- Illidari packs), for the leader or an assistant only so 25 people aren't
--- all inspecting, or any time with /wmachine srraid.
+-- its own after each trigger mob dies (the Promenade robots and the
+-- Illidari packs), once combat is over, for the leader or an assistant only
+-- so 25 people aren't all inspecting, or any time with /wmachine srraid.
 
 local function ShortName(name)
     if not name then return nil end
@@ -1617,6 +1643,17 @@ function DebuffTracker:StartRaidShadowResistScan(auto)
     end
     if not IsInGroup() then
         self:Print("Not in a group - use /wmachine srcheck for your own gear.")
+        return
+    end
+    -- Inspecting doesn't work in combat: wait for it to end
+    if InCombatLockdown and InCombatLockdown() then
+        if auto then
+            srRaidPullDone = false
+            srScanAfterCombat = srScanAfterCombat or "auto"
+        else
+            self:Print("In combat: the raid SR check runs as soon as combat ends.")
+            srScanAfterCombat = "manual"
+        end
         return
     end
     local members = GroupMembers()
@@ -2449,6 +2486,8 @@ function DebuffTracker:CreateTrackerFrame()
             -- Report the pull's Shear tally before clearing it
             DebuffTracker:ReportShearSummary()
             DebuffTracker:ResetShearMonitor(true)
+            -- A Promenade pack died this fight: check the raid's gear now
+            DebuffTracker:RunQueuedShadowResistScan()
             wipe(damageWindow)
             focusGUID, focusName = nil, nil
             RefreshGroupGUIDs()
@@ -3133,8 +3172,9 @@ function DebuffTracker:CreateUI()
         label = "Check the whole raid after Mother", get = get, set = set,
         tooltip = {
             "Raid Shadow Resist Check",
-            "Lists every raider still in shadow resist gear each time you pull a Promenade robot"
-                .. " or an Illidari pack after Mother. Runs only for the raid leader and assistants.",
+            "Lists every raider still in shadow resist gear after each Promenade robot or Illidari"
+                .. " pack you kill after Mother, once combat is over (inspecting doesn't work in combat)."
+                .. " Runs only for the raid leader and assistants.",
             " ",
             "Raiders running Watching Machine report their own gear. Everyone else is inspected,"
                 .. " which only works within inspect range (about 28 yards); anyone out of range is"
@@ -3353,6 +3393,7 @@ end
 function DebuffTracker:OnModuleOff()
     if srScan and srScan.current and ClearInspectPlayer then pcall(ClearInspectPlayer) end
     srScan = nil
+    srScanAfterCombat = false
     inCombat = false
     missingTimers, alertCooldowns, alertedThisPull, deadCasterCache = {}, {}, {}, {}
     bossEngaged, bossDeadGUID, pullAnnounced = false, nil, false
@@ -3412,6 +3453,10 @@ function DebuffTracker:SetupPage(L)
         { "Shear monitor", "Calls out each Shear that lands on the tank, and prints a tally when the pull ends." })
     Opt("srCheck", "Warn me if I'm still in shadow resist gear after Mother",
         { "Shadow resist check", "Black Temple only. Reads your equipped gear, so buffs and auras don't count." })
+    Opt("srRaidCheck", "Check the whole raid for shadow resist gear after Mother",
+        { "Raid shadow resist check", "Raid leader and assistants: after each Grand Promenade pack dies, once combat"
+            .. " is over, lists every raider still in shadow resist gear. Raiders with Watching Machine report their own;"
+            .. " others are inspected, within inspect range." })
     L:Note("Delays, channels, boss health limits, exclusions and the full debuff list are in the Debuff Tracker"
         .. " window.")
 end

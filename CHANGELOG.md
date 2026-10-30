@@ -2,7 +2,26 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.59** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.60** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.60
+
+### Black Temple: the raid shadow resist check runs after the trash dies
+
+- **Fixed: the raid-wide shadow resist check after Mother Shahraz** fired
+  the moment you engaged a Grand Promenade robot or Illidari pack. In
+  combat the game doesn't allow range checks or inspects, so most raiders
+  came back "not checked". It now runs after one of those mobs **dies**, as
+  soon as **combat is over**, once per pull, for the raid leader and
+  assistants as before.
+- `/wmachine srraid` (or *Check Raid*) in combat says it waits, and runs
+  when combat ends.
+- Your own gear check is unchanged: it reads what you wear, which works in
+  combat, so it still warns you as the pull starts.
+- The guided setup now has the *Check the whole raid for shadow resist gear
+  after Mother* option too.
 
 ---
 
