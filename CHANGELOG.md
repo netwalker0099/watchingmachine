@@ -2,7 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.61** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.62** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.62
+
+### Black Temple: the raid shadow resist check confirms it checked everyone
+
+- **`/wmachine srraid`** (or *Check Raid* in the Debuff Tracker window)
+  now ends with a full report:
+  - **"All N checked"**, or **"X of N checked"** and who wasn't, with the
+    reason (offline, out of inspect range, in combat, no inspect reply,
+    your own inspect window open)
+  - every member's shadow resist from gear, highest first, those at the
+    threshold or over it in red
+  - who is still in SR gear, announced as before
+- **Fixed: "inspect busy".** When the group gear scan (Armory Snap) was
+  inspecting at the same moment, the check gave up on that player. It now
+  waits a few seconds, then inspects anyway.
+- **A second try:** anyone out of range or who didn't answer the inspect
+  is tried once more before the report.
+- **The threshold is now 40 gear SR** (was 60), so a Black Temple shadow
+  resist neck on its own counts. A saved 60 (the old default) moves to 40
+  once; any other value you picked stays.
 
 ---
 

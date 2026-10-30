@@ -233,7 +233,7 @@ local defaults = {
     shearSummary = true,         -- Print a per-pull summary when combat ends
     -- Black Temple shadow resist gear check (post-Mother Shahraz)
     srCheck = true,              -- Warn if still wearing SR gear after Mother
-    srCheckThreshold = 60,       -- Gear-only shadow resist that counts as "still on"
+    srCheckThreshold = 40,       -- Gear-only shadow resist that counts as "still on"
     srCheckChannel = "LOCAL",    -- LOCAL, SAY, PARTY, RAID, RAID_WARNING
     srRaidCheck = true,          -- Leader/assist: check the whole raid after Mother
     srRaidChannel = "LOCAL",     -- Where the raid check's list goes
@@ -1521,7 +1521,7 @@ function DebuffTracker:CheckShadowResistGear()
     if not srArmed then return end
 
     local total, pieces = self:GetGearShadowResist()
-    local threshold = DebuffTrackerDB.srCheckThreshold or 60
+    local threshold = DebuffTrackerDB.srCheckThreshold or 40
     if total >= threshold then
         self:WarnShadowResist(total, pieces)
     end
@@ -1657,7 +1657,8 @@ function DebuffTracker:StartRaidShadowResistScan(auto)
         return
     end
     local members = GroupMembers()
-    srScan = { results = {}, skipped = {}, queue = {}, members = members, token = {} }
+    -- missed: [name] = why it couldn't be checked; retry: missed once, tried again
+    srScan = { results = {}, missed = {}, retry = {}, queue = {}, members = members, token = {}, auto = auto }
 
     local total, pieces = self:GetGearShadowResist("player")
     srScan.results[UnitName("player")] = { sr = total, pieces = pieces, via = "self" }
@@ -1695,11 +1696,24 @@ function DebuffTracker:OnShadowResistMessage(msg, sender)
     end
 end
 
-local function InspectBusy()
-    -- Don't take the inspect slot from Armory Snap or an open inspect window
+-- Another addon part is mid-inspect (ArmorySnap's group scan)
+local function ArmorySnapInspecting()
     local AS = WM:IsModuleOn("ArmorySnap") and WM.modules.ArmorySnap
-    if AS and AS.session and AS.session.inspecting then return true end
+    return AS and AS.session and AS.session.inspecting and true or false
+end
+local function InspectWindowOpen()
     return InspectFrame and InspectFrame.IsShown and InspectFrame:IsShown() or false
+end
+local SR_BUSY_WAITS = 4   -- tries (SR_INSPECT_GAP apart) before taking the inspect from ArmorySnap
+
+-- Couldn't check someone: try them once more at the end, then report why
+local function Missed(scan, m, why, final)
+    if final or m.retried then
+        scan.missed[m.name] = why
+    else
+        m.retried, m.why = true, why
+        scan.retry[#scan.retry + 1] = m
+    end
 end
 
 function DebuffTracker:InspectNextForSR()
@@ -1707,29 +1721,43 @@ function DebuffTracker:InspectNextForSR()
     if not scan or not WM:IsModuleOn("DebuffTracker") then return end
     local m = table.remove(scan.queue, 1)
     if not m then
+        -- Anyone missed gets one more try before the report
+        if #scan.retry > 0 then
+            scan.queue, scan.retry = scan.retry, {}
+            WM.RunAfter(SR_INSPECT_GAP, function() DebuffTracker:InspectNextForSR() end)
+            return
+        end
         self:FinishRaidShadowResistScan()
         return
     end
+    if scan.results[m.name] then return self:InspectNextForSR() end   -- answered meanwhile
     local unit = m.unit
     if UnitName(unit) ~= m.name or not UnitIsConnected(unit) then
-        scan.skipped[#scan.skipped + 1] = m.name .. " (offline)"
+        Missed(scan, m, "offline", true)
         return self:InspectNextForSR()
     end
     local near = WM:InteractRange(unit, 1)
     if near == nil and InCombatLockdown and InCombatLockdown() then
-        scan.skipped[#scan.skipped + 1] = m.name .. " (in combat)"
+        Missed(scan, m, "in combat", true)
         return self:InspectNextForSR()
     end
-    if not near or (CanInspect and not CanInspect(unit)) then
-        scan.skipped[#scan.skipped + 1] = m.name
+    if not near then
+        Missed(scan, m, "out of inspect range")
         return self:InspectNextForSR()
     end
-    if InspectBusy() then
+    if CanInspect and not CanInspect(unit) then
+        Missed(scan, m, "can't be inspected")
+        return self:InspectNextForSR()
+    end
+    -- Your own inspect window: don't change who it shows
+    if InspectWindowOpen() then
+        Missed(scan, m, "close your inspect window")
+        return self:InspectNextForSR()
+    end
+    -- ArmorySnap mid-inspect: wait a little, then take the inspect anyway
+    -- (ArmorySnap tries its player again later)
+    if ArmorySnapInspecting() and (m.waits or 0) < SR_BUSY_WAITS then
         m.waits = (m.waits or 0) + 1
-        if m.waits > 3 then
-            scan.skipped[#scan.skipped + 1] = m.name .. " (inspect busy)"
-            return self:InspectNextForSR()
-        end
         table.insert(scan.queue, 1, m)
         WM.RunAfter(SR_INSPECT_GAP, function() DebuffTracker:InspectNextForSR() end)
         return
@@ -1742,7 +1770,7 @@ function DebuffTracker:InspectNextForSR()
     WM.RunAfter(SR_INSPECT_TIMEOUT, function()
         if srScan == scan and scan.current == current then
             scan.current = nil
-            scan.skipped[#scan.skipped + 1] = m.name .. " (no inspect reply)"
+            Missed(scan, m, "no inspect reply")
             if ClearInspectPlayer then ClearInspectPlayer() end
             DebuffTracker:InspectNextForSR()
         end
@@ -1764,28 +1792,41 @@ function DebuffTracker:FinishRaidShadowResistScan()
     local scan = srScan
     srScan = nil
     if not scan then return end
-    local threshold = DebuffTrackerDB.srCheckThreshold or 60
+    local threshold = DebuffTrackerDB.srCheckThreshold or 40
 
-    local still, checked = {}, 0
+    -- Everyone checked, highest SR first; those at the threshold or over it
+    local all, still, checked = {}, {}, 0
     for name, r in pairs(scan.results) do
         checked = checked + 1
+        all[#all + 1] = { name = name, sr = r.sr, pieces = r.pieces or 0 }
         if r.sr >= threshold then still[#still + 1] = { name = name, sr = r.sr } end
     end
+    table.sort(all, function(a, b) if a.sr ~= b.sr then return a.sr > b.sr end return a.name < b.name end)
     table.sort(still, function(a, b) return a.sr > b.sr end)
-    self.lastRaidSR = { still = still, checked = checked, skipped = scan.skipped, time = GetTime() }
+    local missed = {}
+    for name, why in pairs(scan.missed) do missed[#missed + 1] = name .. " (" .. why .. ")" end
+    table.sort(missed)
+    local total = checked + #missed
+    self.lastRaidSR = { still = still, all = all, checked = checked, total = total, missed = missed, time = GetTime() }
 
-    self:Print("=== Raid shadow resist gear ===")
+    self:Print(string.format("=== Raid shadow resist gear (warns at %d SR) ===", threshold))
+    if #missed == 0 then
+        print(string.format("  |cFF00FF00All %d checked.|r", checked))
+    else
+        print(string.format("  |cFFFFCC00%d of %d checked.|r Not checked: %s", checked, total, table.concat(missed, ", ")))
+    end
+    local parts = {}
+    for _, a in ipairs(all) do
+        local text = a.name .. " " .. a.sr .. (a.pieces > 0 and (" (" .. a.pieces .. " piece" .. (a.pieces == 1 and "" or "s") .. ")") or "")
+        parts[#parts + 1] = (a.sr >= threshold and "|cFFFF4444" or "|cFFAAAAAA") .. text .. "|r"
+    end
+    if #parts > 0 then print("  " .. table.concat(parts, ", ")) end
     if #still == 0 then
         print(string.format("  |cFF00FF00Nobody is in SR gear|r (%d checked)", checked))
     else
-        local parts = {}
-        for _, s in ipairs(still) do parts[#parts + 1] = s.name .. " (" .. s.sr .. ")" end
-        print(string.format("  |cFFFF4444Still in SR gear (%d):|r %s", #still, table.concat(parts, ", ")))
-        print(string.format("  %d checked, threshold %d SR", checked, threshold))
-    end
-    if #scan.skipped > 0 then
-        print("  |cFF888888Couldn't check (out of inspect range or no reply): "
-            .. table.concat(scan.skipped, ", ") .. "|r")
+        local names = {}
+        for _, x in ipairs(still) do names[#names + 1] = x.name .. " (" .. x.sr .. ")" end
+        print(string.format("  |cFFFF4444Still in SR gear (%d):|r %s", #still, table.concat(names, ", ")))
     end
     if #still == 0 then return end
 
@@ -1828,7 +1869,7 @@ end
 -- /wmachine srcheck
 function DebuffTracker:ExplainShadowResist()
     local total, pieces, detail = self:GetGearShadowResist()
-    local threshold = DebuffTrackerDB and DebuffTrackerDB.srCheckThreshold or 60
+    local threshold = DebuffTrackerDB and DebuffTrackerDB.srCheckThreshold or 40
 
     self:Print("=== Shadow resist gear ===")
     if pieces == 0 then
@@ -2153,7 +2194,13 @@ function DebuffTracker:InitDB()
     if DebuffTrackerDB.shearThrottle == nil then DebuffTrackerDB.shearThrottle = 0 end
     if DebuffTrackerDB.shearSummary == nil then DebuffTrackerDB.shearSummary = true end
     if DebuffTrackerDB.srCheck == nil then DebuffTrackerDB.srCheck = true end
-    if DebuffTrackerDB.srCheckThreshold == nil then DebuffTrackerDB.srCheckThreshold = 60 end
+    if DebuffTrackerDB.srCheckThreshold == nil then DebuffTrackerDB.srCheckThreshold = 40 end
+    -- 3.62: the default went from 60 to 40 (a Black Temple SR neck alone is
+    -- under 60); move the old default once, keep anything chosen by hand
+    if not DebuffTrackerDB.srThreshold40 then
+        DebuffTrackerDB.srThreshold40 = true
+        if DebuffTrackerDB.srCheckThreshold == 60 then DebuffTrackerDB.srCheckThreshold = 40 end
+    end
     if DebuffTrackerDB.srCheckChannel == nil then DebuffTrackerDB.srCheckChannel = "LOCAL" end
     
     -- v2.3.1 migration: force-disable raid alerts once on upgrade.
@@ -3177,10 +3224,10 @@ function DebuffTracker:CreateUI()
                 .. " Runs only for the raid leader and assistants.",
             " ",
             "Raiders running Watching Machine report their own gear. Everyone else is inspected,"
-                .. " which only works within inspect range (about 28 yards); anyone out of range is"
-                .. " listed as not checked.",
+                .. " which only works within inspect range; anyone missed is tried once more, then"
+                .. " listed as not checked with the reason.",
             " ",
-            { "/wmachine srraid - run it now" },
+            { "/wmachine srraid (or Check Raid) - run it now; it says whether everyone was checked" },
         },
     }, 8)
     row:Cycle({
@@ -3197,7 +3244,7 @@ function DebuffTracker:CreateUI()
     row:Slider({
         name = "WM_DebuffSRThresholdSlider", label = "Warn at gear SR of", width = 165,
         min = 10, max = 250, step = 10,
-        get = function() return DebuffTrackerDB.srCheckThreshold or 60 end,
+        get = function() return DebuffTrackerDB.srCheckThreshold or 40 end,
         set = function(v) DebuffTrackerDB.srCheckThreshold = v end,
         tooltip = {
             "Shadow Resist Threshold",
@@ -3222,8 +3269,9 @@ function DebuffTracker:CreateUI()
         onClick = function() DebuffTracker:StartRaidShadowResistScan() end,
         tooltip = {
             "Check Raid",
-            "Lists every raider still in shadow resist gear now, against the threshold above."
-                .. " Takes a few seconds per raider who isn't running Watching Machine.",
+            "Checks everyone in your group now: each one's shadow resist from gear, who's at the"
+                .. " threshold above or over it, and whether everyone was checked (who wasn't, and why)."
+                .. " Takes a few seconds per player who isn't running Watching Machine.",
         },
     }, 8)
     L:Note("Trigger mobs: Shadowmoon Reaver, Promenade Sentinel and the Illidari packs on the"
@@ -3456,7 +3504,8 @@ function DebuffTracker:SetupPage(L)
     Opt("srRaidCheck", "Check the whole raid for shadow resist gear after Mother",
         { "Raid shadow resist check", "Raid leader and assistants: after each Grand Promenade pack dies, once combat"
             .. " is over, lists every raider still in shadow resist gear. Raiders with Watching Machine report their own;"
-            .. " others are inspected, within inspect range." })
+            .. " others are inspected, within inspect range. /wmachine srraid (or Check Raid in the window) runs it"
+            .. " any time, lists everyone's shadow resist and says whether everyone was checked." })
     L:Note("Delays, channels, boss health limits, exclusions and the full debuff list are in the Debuff Tracker"
         .. " window.")
 end

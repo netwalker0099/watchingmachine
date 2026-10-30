@@ -19,6 +19,15 @@ local DT = WM.modules.DebuffTracker
 DT:InitDB()
 local DB = env.DebuffTrackerDB
 check("check on by default", DB.srCheck == true)
+check("warns at 40 SR by default", DB.srCheckThreshold == 40)
+-- 3.62: the old default of 60 moves to 40 once; a value picked later stays
+DB.srCheckThreshold, DB.srThreshold40 = 60, nil
+DT:InitDB()
+check("old default 60 moves to 40", DB.srCheckThreshold == 40 and DB.srThreshold40)
+DB.srCheckThreshold = 60
+DT:InitDB()
+check("60 chosen after the move stays", DB.srCheckThreshold == 60)
+DB.srCheckThreshold = 40
 
 -- ---- one tooltip line ----
 local Line = DT.ShadowResistFromLine
@@ -191,7 +200,14 @@ RunTimers()
 check("addon users aren't inspected", #inspected == 1)
 check("scan finished", not DT:IsRaidShadowResistScanning())
 check("lists who is still in SR gear, highest first", has("Still in SR gear (2):|r Addonuser (180), Inspected (64)"))
-check("lists who couldn't be checked", has("Faraway") and has("Gone (offline)"))
+check("lists who couldn't be checked, and why", has("Faraway (out of inspect range)") and has("Gone (offline)"))
+check("says how many were checked", has("3 of 5 checked.|r Not checked: Faraway (out of inspect range), Gone (offline)"))
+check("lists everyone checked with their SR", has("Addonuser 180 (6 pieces)") and has("Inspected 64 (1 piece)")
+    and has("Me 0"))
+check("out of range: tried again before the report", (function()
+    local n = 0
+    for _, l in ipairs(printed) do if l:find("Faraway", 1, true) then n = n + 1 end end
+    return n == 1 end)())
 check("leader is clean, not listed", not has("Me ("))
 check("announces to the chosen channel", chat[1] and chat[1][2] == "RAID"
     and chat[1][1] == "Still in SR gear: Addonuser, Inspected - swap out!")
@@ -244,6 +260,36 @@ DT:OnShadowResistMessage("Q", "Leader-Spineshatter")
 check("replies with own gear", sent[1] and sent[1][2] == "R:40:1" and sent[1][3] == "RAID")
 DT:OnShadowResistMessage("Q", "Other-Spineshatter")
 check("one reply per few seconds", #sent == 1)
+
+-- Manual check with ArmorySnap mid-inspect and someone walking into range
+roster = { "Me", "Walker" }
+local near = false
+env.CheckInteractDistance = function(u) return env.UnitName(u) ~= "Walker" or near end
+local realOn = WM.IsModuleOn
+local AS = { session = { inspecting = true } }
+WM.modules.ArmorySnap = AS
+WM.IsModuleOn = function(self, name) if name == "ArmorySnap" then return true end return realOn(self, name) end
+printed, inspected, sent = {}, {}, {}
+DT:StartRaidShadowResistScan(false)
+table.remove(timers, 1).fn()             -- reply wait over: Walker is out of range
+check("out of range: queued for a retry", #inspected == 0 and DT:IsRaidShadowResistScanning())
+near = true
+table.remove(timers, 1).fn()             -- the retry pass: ArmorySnap is inspecting
+check("waits for ArmorySnap's inspect", #inspected == 0)
+for _ = 1, 4 do table.remove(timers, 1).fn() end
+check("then takes the inspect anyway", inspected[1] == "Walker")
+DT:OnShadowResistInspectReady("GUID-Walker")
+RunTimers()
+check("everyone checked: says so", has("All 2 checked.") and not has("Not checked"))
+WM.IsModuleOn, WM.modules.ArmorySnap = realOn, nil
+
+-- Your own inspect window open: not checked, and says why
+env.InspectFrame = { IsShown = function() return true end }
+printed, inspected = {}, {}
+DT:StartRaidShadowResistScan(false)
+RunTimers()
+check("inspect window open: says to close it", #inspected == 0 and has("Walker (close your inspect window)"))
+env.InspectFrame = false
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

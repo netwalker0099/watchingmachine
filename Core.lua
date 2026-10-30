@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.61"
+WM.version = "3.62"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -2042,7 +2042,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine shear on|off|r - Toggle the Shear monitor")
     print("|cFFFFFF00/wmachine encounters|r - Debuff Tracker settings, opened at Encounter Callouts")
     print("|cFFFFFF00/wmachine srcheck|r - Show your equipped shadow resist gear")
-    print("|cFFFFFF00/wmachine srraid|r - List raiders still in shadow resist gear")
+    print("|cFFFFFF00/wmachine srraid|r - Check everyone's shadow resist gear now")
     print("|cFFFFFF00/wmachine class|r - Open Class Tools for your class")
     print("|cFFFFFF00/wmachine soulstone|r - Soulstone timers in your group (warlock)")
     print("|cFFFFFF00/wmachine consumes|r - What the general raid checks see")

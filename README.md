@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.61 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.62 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -159,11 +159,11 @@ Visual raid debuff monitoring with auto-detection and raid alerts.
 - **Black Temple shadow resist gear check**: warns if you're still in SR gear after Mother Shahraz
   - Arms when Mother Shahraz dies, and also the moment you engage a Grand Promenade pull (Shadowmoon Reaver, Promenade Sentinel, Illidari Archon/Assassin/Battle-mage/Blood Lord), so a mid-raid `/reload` still works
   - Reads **equipped gear only**, so Shadow Protection and Shadow Resistance Aura can't cause a false warning
-  - Configurable threshold (default 60 gear SR) so an odd piece with incidental resistance is ignored
+  - Configurable threshold (default 40 gear SR; 60 before 3.62) so an odd piece with incidental resistance is ignored
   - Warns you locally with a screen flash and sound by default; optional Say/Party/Raid/`/rw` announce. Unlike the other callouts this is **not** limited to the raid leader, since it's about your own gear
   - One warning per pull (20s cooldown), `/wmachine srcheck` to see exactly what it detects per slot
   - Counts the item's own resistance plus socketed gems (Void Sphere's +4 Resist All), enchants and active socket bonuses
-  - **Raid-wide check** for the raid leader and assistants: after each Promenade robot or Illidari pack you kill after Mother (3.60: once a trash mob dies and combat is over, since inspecting doesn't work in combat) it lists every raider still in SR gear, on screen and optionally to Say/Party/Raid/`/rw`. Raiders running Watching Machine report their own gear; everyone else is inspected, which needs them within inspect range (anyone out of range is listed as not checked). `/wmachine srraid` or the **Check Raid** button runs it any time (in combat, as soon as combat ends)
+  - **Raid-wide check** for the raid leader and assistants: after each Promenade robot or Illidari pack you kill after Mother (3.60: once a trash mob dies and combat is over, since inspecting doesn't work in combat) it lists every raider still in SR gear, on screen and optionally to Say/Party/Raid/`/rw`. Raiders running Watching Machine report their own gear; everyone else is inspected, which needs them within inspect range. `/wmachine srraid` or the **Check Raid** button runs it any time (in combat, as soon as combat ends). The report (3.62) lists everyone's gear SR, highest first, and says **"All N checked"** or **"X of N checked"** with who wasn't and why; anyone missed is tried once more first
 - **Encounter callouts** (Doom warning, Shear monitor, SR check) are the *Encounter Callouts* section of Debuff Tracker settings; `/wmachine encounters` opens the panel scrolled to it
 - Configurable: show only in raid, show only on boss, categories to track
 - Draggable frame, lockable position
@@ -1258,6 +1258,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.62
+- **Raid shadow resist check confirms everyone was checked:** the report lists every member's gear SR and says "All N checked" or "X of N checked" with who wasn't and why. Anyone missed gets a second try, and it no longer gives up on someone because the group gear scan is inspecting
+- **Shadow resist threshold now 40** (was 60), so a Black Temple SR neck on its own counts
 
 ### Version 3.61
 - **GearScore:** no inspecting while you're dead or in combat, and a shorter inspect distance, so it stops trying to inspect players out of range
