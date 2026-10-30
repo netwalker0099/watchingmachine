@@ -55,10 +55,14 @@ env.UnitIsPlayer = function(u) return U(u) ~= nil end
 env.UnitIsUnit = function(a, b) return U(a) ~= nil and U(a) == U(b) end
 env.GetInventoryItemLink = function(u, slot) return U(u) and U(u).gear[slot] end
 env.GetInventoryItemID = function(u, slot) local l = U(u) and U(u).gear[slot]; return l and Id(l) end
-local inCombat, inRange = false, true
+local inCombat, inRange, dead = false, true, false
 env.InCombatLockdown = function() return inCombat end
+env.UnitAffectingCombat = function() return inCombat end
+env.UnitIsDeadOrGhost = function() return dead end
+-- inRange: within trade distance (index 2, group inspects); closeBy: also
+-- within duel distance (index 3, mouseover inspects)
 local distIndex, closeBy = nil, true
-env.CheckInteractDistance = function(_, i) distIndex = i; if i == 2 then return inRange and closeBy end return inRange end
+env.CheckInteractDistance = function(_, i) distIndex = i; if i == 3 then return inRange and closeBy end return inRange end
 local resting = false
 env.IsResting = function() return resting end
 env.CanInspect = function() return true end
@@ -155,6 +159,19 @@ check("not in combat", not GS:QueueInspect("target", true))
 inCombat, inRange = false, false
 check("not out of range", not GS:QueueInspect("target", true))
 inRange = true
+dead = true
+check("not while you're dead", not GS:QueueInspect("target", true))
+dead = false
+env.UnitAffectingCombat = function() return true end
+check("not while you're in combat (before the lockdown)", not GS:QueueInspect("target", true))
+env.UnitAffectingCombat = function() return inCombat end
+GS.CanInspectUnit("target")
+check("group inspects: within trade distance (about 11 yards), not the 28-yard check", distIndex == GS.RANGE_GROUP
+    and GS.RANGE_GROUP == 2)
+local realRange = WM.InteractRange
+WM.InteractRange = function() return nil end
+check("range unknown: no inspect", not GS.CanInspectUnit("target"))
+WM.InteractRange = realRange
 -- The mouseover moved on: found again by GUID
 units.party1 = units.target
 units.mouseover, units.target = nil, nil
@@ -204,10 +221,10 @@ resting = true
 check("in town: players you mouse over aren't inspected", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before)
 resting = false
 t2 = Tip()
--- Within the 28-yard check but not close by: the game would say "too far away"
+-- Within trade distance but not duel distance: not close enough for a mouseover
 closeBy = false
-check("mouseover: not inspected unless close by", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before
-    and distIndex == 2)
+check("mouseover: not inspected unless close by (duel distance, about 10 yards)",
+    not GS:AddUnitTooltip(t2, "mouseover") and #notified == before and distIndex == GS.RANGE_CLOSE and GS.RANGE_CLOSE == 3)
 closeBy = true
 t2 = Tip()
 check("unit tooltip: unknown player inspected", not GS:AddUnitTooltip(t2, "mouseover") and #notified == before + 1)

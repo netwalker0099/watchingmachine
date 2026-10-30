@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.60 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.61 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -753,11 +753,13 @@ A gear score and average item level for you and every player you mouse over
   5% and gems 5 each; hunters' ranged weapons count more and melee less.
   Colours run grey, white, green, blue, purple, orange
 - **Player tooltips:** "GearScore: 1650  iLvl: 112". Players you mouse over
-  are inspected automatically: out of combat, close by (3.48.4: within
-  trade distance, since the game's own inspect range is shorter than its
-  28-yard check and it says "You are too far away" otherwise), one at a
-  time, never while your own inspect window is open, and not in towns or
-  inns unless *... in towns and inns too* is ticked. Scores are kept by
+  are inspected automatically: close by, one at a time, never in combat
+  or while you're dead (3.61), never while your own inspect window is open,
+  and not in towns or inns unless *... in towns and inns too* is ticked.
+  The game's own inspect range is shorter than its 28-yard check (it says
+  "You are too far away" otherwise), so players you mouse over must be
+  within duel distance (about 10 yards) and your group's within trade
+  distance (about 11 yards; 3.61, was 28). Scores are kept by
   name for a week
 - **Item tooltips:** the item's score. *Item tooltip details* adds its base
   score, enchant and gem bonuses (or what's missing), and what equipping it
@@ -1256,6 +1258,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.61
+- **GearScore:** no inspecting while you're dead or in combat, and a shorter inspect distance, so it stops trying to inspect players out of range
 
 ### Version 3.60
 - **Fixed: the raid shadow resist check after Mother** ran while you engaged the Promenade trash, when inspecting doesn't work, so most raiders came back "not checked". It now runs after a trash mob dies, once combat is over

@@ -354,15 +354,22 @@ local function InspectWindowOpen()
     return type(f) == "table" and f.IsShown and f:IsShown()
 end
 
--- close: within trade distance (about 8-11 yards) rather than the 28-yard
--- check. The game's real inspect range is shorter than that check, so a
--- player passing it can still be too far, and the game then says "You are
--- too far away" in the middle of the screen. Mouseover inspects use close.
+-- How close a player must be. The game's 28-yard inspect check is longer
+-- than its real inspect range, so a player passing it can still be too far
+-- and the game says "You are too far away" mid-screen. Group inspects use
+-- trade distance (about 11 yards); mouseover inspects (close) the shorter
+-- duel distance (about 10 yards), as a crowd moves past your mouse.
+local RANGE_GROUP, RANGE_CLOSE = 2, 3
+GS.RANGE_GROUP, GS.RANGE_CLOSE = RANGE_GROUP, RANGE_CLOSE
+
+-- Never while you're dead or in combat; and only when the range is known
 local function CanInspectUnit(unit, close)
     if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) or UnitIsUnit(unit, "player") then return false end
     if InCombatLockdown and InCombatLockdown() then return false end
+    if UnitAffectingCombat and UnitAffectingCombat("player") then return false end
+    if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return false end
     if CanInspect and not CanInspect(unit) then return false end
-    if WM:InteractRange(unit, close and 2 or 1) == false then return false end
+    if not WM:InteractRange(unit, close and RANGE_CLOSE or RANGE_GROUP) then return false end
     return true
 end
 GS.CanInspectUnit = CanInspectUnit
@@ -832,7 +839,7 @@ function GS:CreateUI()
     local L = panel.layout
     L:Row(18):Text({ text = function()
         if GS.other then return "|cFFFF9933" .. GS.other .. " is loaded: tooltips and the character frame are left to it.|r" end
-        return "|cFF888888Your group's scores. Players are inspected when in range (about 28 yards) and out of combat.|r"
+        return "|cFF888888Your group's scores. Players are inspected when close by (about 11 yards), never in combat or while you're dead.|r"
     end, width = 380 }, 8)
     local head = L:Row(16)
     head:Text({ text = "|cFFFFD100Name|r" }, 4)
@@ -850,7 +857,8 @@ function GS:CreateUI()
     L:Section({ key = "options", title = "Options" })
     L:Checkbox({ label = "GearScore on player tooltips", get = function() return DB().unitTooltip end, set = function(v) DB().unitTooltip = v end })
     L:Checkbox({ label = "Inspect players you mouse over", get = function() return DB().autoInspect end, set = function(v) DB().autoInspect = v end,
-        tooltip = { "Inspecting", "Out of combat and close by, one player at a time. Never while your own inspect window is open." } })
+        tooltip = { "Inspecting", "Close by (about 10 yards), one player at a time. Never in combat, while you're dead,"
+            .. " or while your own inspect window is open." } })
     L:Checkbox({ label = "... in towns and inns too", get = function() return DB().inspectInTowns end,
         set = function(v) DB().inspectInTowns = v end, disabled = function() return not DB().autoInspect end,
         tooltip = { "In towns", "Off: no inspecting while you're resting (towns, inns), where crowds of players go past"
@@ -907,8 +915,9 @@ function GS:SetupPage(L)
         .. " slot, with a little extra for enchants and gems. The numbers are the same as GearScoreTBCClassic's,"
         .. " so they match what other players quote.")
     L:Note("|cFFFFFFFFWhere you'll see it:|r mouse over a player and their score and average item level go on the"
-        .. " tooltip. Players are inspected for it one at a time, only out of combat and within about 28 yards, and"
-        .. " never while you have your own inspect window open. Your score sits on your character sheet, and on the"
+        .. " tooltip. Players are inspected for it one at a time, only close by (about 10 yards for players you"
+        .. " mouse over, 11 for your group), never in combat or while you're dead, and never while you have your own"
+        .. " inspect window open. Your score sits on your character sheet, and on the"
         .. " inspect window when you inspect someone.")
     L:Note("Item tooltips show the item's score too, and with details on, what equipping it would change for you.")
     if GS.OtherAddon() then
@@ -920,8 +929,8 @@ function GS:SetupPage(L)
         tooltip = { "Player tooltips", "A GearScore and iLvl line when you mouse over another player (or yourself)." } })
     L:Checkbox({ label = "Inspect players you mouse over", get = function() return DB().autoInspect end,
         set = function(v) DB().autoInspect = v end,
-        tooltip = { "Inspecting", "Needed for other players' scores. Out of combat and close by, one player at a"
-            .. " time. Off: only scores you already have are shown." } })
+        tooltip = { "Inspecting", "Needed for other players' scores. Close by, one player at a time, never in combat"
+            .. " or while you're dead. Off: only scores you already have are shown." } })
     L:Checkbox({ label = "... in towns and inns too", get = function() return DB().inspectInTowns end,
         set = function(v) DB().inspectInTowns = v end, disabled = function() return not DB().autoInspect end,
         tooltip = { "In towns", "Off (the default): no inspecting players you mouse over while you're resting"

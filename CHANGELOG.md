@@ -2,7 +2,24 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.60** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.61** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.61
+
+### GearScore: closer, and never dead or in combat
+
+- **No inspecting while you're dead or in combat.** It already waited out
+  the combat lockdown; it now also waits while you're in combat at all
+  and while you're dead or a ghost.
+- **A shorter inspect distance**, so it stops trying to inspect players
+  the game says are too far away:
+  - your group (party, raid, *Scan group*): trade distance, about 11
+    yards, instead of the 28-yard check
+  - players you mouse over: duel distance, about 10 yards (was trade
+    distance)
+- When the range can't be told, it doesn't inspect (before, it tried).
 
 ---
 
