@@ -36,7 +36,10 @@ Built in Class Tools > General. The open questions were settled as:
   or none carried.
 - **Still to confirm in game:** the item IDs, especially Cenarion Mana Salve
   `32903`, Bottled Nethergon Energy `32902`, Fel Mana Potion `31677`, Mad
-  Alchemist's Potion `34440` and Unstable Mana Potion `28101`.
+  Alchemist's Potion `34440`, Unstable Mana Potion `28101` and Mana Potion
+  Injector `33093` (3.59).
+- **3.59:** only on bosses in 10 and 25-man raids (encounter events, or a
+  boss targeted in the raid), an option; injectors count as potions.
 
 ---
 

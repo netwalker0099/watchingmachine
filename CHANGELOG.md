@@ -2,7 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.58** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.59** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.59
+
+### Mana potion and rune warnings (Class Tools > General)
+
+- **Only on bosses, in 10 and 25-man raids.** The potion and rune warnings
+  no longer come up on trash. A boss fight is known from the game's
+  encounter start and end events; as a backup (a /reload mid-fight), a
+  boss targeted by you or anyone in the raid counts too: a world boss or a
+  skull-level enemy. *Mana warnings only on bosses* (on by default) can be
+  unticked to have them on every fight in those raids.
+- They run in **10 and 25-man** raids whatever *Only in 25-man raids* says:
+  that option is now just for the flask, food and weapon oil checks. Other
+  raid sizes (Classic 20s and 40s) and dungeons stay quiet.
+- **Mana Potion Injector** (Engineering) counts as a mana potion, after
+  Super Mana Potion; it shares the potion cooldown, so when it's on
+  cooldown the rune warning takes over as usual.
+- `/wmachine consumes` says whether you're in a 10 or 25-man raid and in a
+  boss fight right now.
+- Still to confirm in game: the injector's item ID (33093), and that the
+  encounter events fire on 2.5.6.
 
 ---
 

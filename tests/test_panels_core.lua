@@ -273,7 +273,7 @@ check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
 check("General lists its checkbox options (mana warnings, flyout dock and lock, swing timer included)",
-    #ShownFeatures() == 16 and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
+    #ShownFeatures() == 17 and HasFeature("Mana warnings only on bosses") and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
     and not HasFeature("Seal twisting marks on the swing timer")
     and HasFeature("Mana tick spark on a bar of its own too")
     and HasFeature("Dock flyout buttons together") and HasFeature("Lock flyout buttons")

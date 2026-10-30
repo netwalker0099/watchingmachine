@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.58 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.59 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -268,10 +268,16 @@ always sits first.
   about **sharpening stones / weightstones**
 - The off hand is checked only when a real **weapon** is equipped there —
   shields and held items share the slot but can't take an oil
-- **Mana potion / rune warnings** (mana users, in combat):
+- **Mana potion / rune warnings** (mana users, in combat, on **bosses in
+  10 and 25-man raids**, 3.59):
   - **Use a mana potion** once your mana is 3000 below max and a potion is
     ready. It names the potion and prefers the free raid-zone ones where
-    they work.
+    they work. A **Mana Potion Injector** (Engineering) counts as a potion.
+  - **Bosses only:** a boss fight is known from the game's encounter
+    events, or a boss (a world boss or skull-level enemy) targeted by you or
+    anyone in the raid. *Mana warnings only on bosses* (on) can be unticked
+    for every fight in those raids. *Only in 25-man raids* is for the flask,
+    food and oil checks; the mana warnings run in 10 and 25-man raids.
   - **Use a Dark / Demonic Rune** once you're 1500 below and no potion is
     ready, either on cooldown or none left. Not below 35% health.
   - Both thresholds are adjustable. A warning stays up until you're 500 back

@@ -106,10 +106,12 @@ end
 -- ============================================
 -- MANA POTION / RUNE
 -- ============================================
--- In combat, as mana drops: drink a mana potion once you're down by the
--- potion threshold; when no potion is ready (on cooldown, or none left),
--- use a Dark / Demonic Rune once you're down by the rune threshold. Runes
--- have their own cooldown, separate from potions.
+-- In a boss fight in a 10 or 25-man raid, as mana drops: drink a mana
+-- potion (or use an injector) once you're down by the potion threshold;
+-- when no potion is ready (on cooldown, or none left), use a Dark / Demonic
+-- Rune once you're down by the rune threshold. Runes have their own
+-- cooldown, separate from potions. "Mana warnings only on bosses" off: any
+-- fight in those raids.
 
 -- Item IDs, best first. The raid-zone potions are free but only usable in
 -- their own instance; IsUsableItem rules them out anywhere else. An ID
@@ -118,6 +120,7 @@ local MANA_POTIONS = {
     32903,  -- Cenarion Mana Salve (Coilfang Reservoir)
     32902,  -- Bottled Nethergon Energy (Tempest Keep)
     22832,  -- Super Mana Potion
+    33093,  -- Mana Potion Injector (Engineering; shares the potion cooldown)
     31677,  -- Fel Mana Potion
     34440,  -- Mad Alchemist's Potion
     28101,  -- Unstable Mana Potion
@@ -249,6 +252,43 @@ local function CheckMana(tools)
 end
 
 -- ============================================
+-- BOSS FIGHTS
+-- ============================================
+-- The game's encounter events say when a boss fight starts and ends. As a
+-- backup (an event missed, a /reload mid-fight), a boss targeted by you or
+-- anyone in the raid counts too: a world boss, or a skull-level enemy.
+
+local encounterActive = false
+
+function General:OnEncounterEvent(event)
+    if event == "ENCOUNTER_START" then encounterActive = true
+    elseif event == "ENCOUNTER_END" or event == "PLAYER_ENTERING_WORLD" then encounterActive = false end
+end
+
+local function IsBossUnit(unit)
+    if not UnitExists(unit) or UnitIsPlayer(unit) or UnitIsDead(unit) then return false end
+    if UnitClassification(unit) == "worldboss" then return true end
+    return tonumber(UnitLevel(unit)) == -1 and UnitCanAttack("player", unit) and true or false
+end
+
+function General.InBossFight()
+    if encounterActive then return true end
+    for i = 1, 5 do if IsBossUnit("boss" .. i) then return true end end
+    if IsBossUnit("target") then return true end
+    local n = tonumber(GetNumGroupMembers and GetNumGroupMembers()) or 0
+    if IsInRaid and IsInRaid() then
+        for i = 1, n do if IsBossUnit("raid" .. i .. "target") then return true end end
+    end
+    return false
+end
+
+-- The mana warnings' raids: 10 and 25-man
+local function ManaRaid()
+    local inRaid, maxPlayers = RaidContext()
+    return inRaid and (maxPlayers == 10 or maxPlayers == 25)
+end
+
+-- ============================================
 -- MONITOR
 -- ============================================
 
@@ -270,21 +310,23 @@ local function Monitor()
     local tools = Tools()
     if not tools or not WM:IsModuleOn("ClassGeneral") then return end
 
-    -- Outside a qualifying raid, or dead, stay silent
-    if UnitIsDeadOrGhost("player") or not ShouldCheckHere() then
-        -- In a raid the 25-man setting is skipping: say so if it costs a warning
-        local inRaid, maxPlayers = RaidContext()
-        if inRaid and GeneralChecksDB and tools:IsEnabled(CLASS, "manapotion")
-            and UnitAffectingCombat("player") and UnitPowerType("player") == 0
-            and ManaDeficit() >= GeneralChecksDB.potionAt then
-            NoteSkip("\"Only in 25-man raids\" is on and this instance reports "
-                .. tostring(maxPlayers) .. " players.")
-        end
-        ClearAll(tools)
-        return
+    if UnitIsDeadOrGhost("player") then ClearAll(tools) return end
+
+    -- Mana: in 10 and 25-man raids, on bosses (unless that's turned off)
+    if GeneralChecksDB and ManaRaid()
+        and (not tools:IsEnabled(CLASS, "manaBossOnly") or General.InBossFight()) then
+        CheckMana(tools)
+    else
+        ClearMana(tools)
     end
 
-    CheckMana(tools)
+    -- Flask, food and weapon checks: in raids (25-man only, unless untick)
+    if not ShouldCheckHere() then
+        tools:ClearAlert("gen_flask")
+        tools:ClearAlert("gen_food")
+        tools:ClearAlert("gen_oil")
+        return
+    end
 
     if tools:IsEnabled(CLASS, "flask") then
         local warning = FlaskWarning()
@@ -357,6 +399,10 @@ function General:Explain()
         local rune, runeCD = FirstReady(MANA_RUNES)
         print("  mana down by: " .. ManaDeficit() .. "   (potion at " .. GeneralChecksDB.potionAt
             .. ", rune at " .. GeneralChecksDB.runeAt .. ", in combat only)")
+        local bossOnly = Tools() and Tools():IsEnabled(CLASS, "manaBossOnly")
+        print("  mana warnings: 10 or 25-man raid: " .. tostring(ManaRaid())
+            .. "   boss fight now: " .. tostring(General.InBossFight())
+            .. "   (only on bosses: " .. tostring(bossOnly) .. ")")
         print("  mana potion: " .. (potion and ("|cFF00FF00" .. ItemLabel(potion, "ready") .. "|r")
             or (potionCD and "|cFFFFCC00on cooldown|r" or "|cFFFF4444none ready|r"))
             .. "   rune: " .. (rune and ("|cFF00FF00" .. ItemLabel(rune, "ready") .. "|r")
@@ -420,7 +466,7 @@ function General:RegisterFeatures()
     })
     tools:RegisterFeature(CLASS, {
         key = "manapotion", name = "Warn to drink a mana potion",
-        desc = "In combat, once your mana is down by the amount below and a mana potion is ready.",
+        desc = "On a boss in a 10 or 25-man raid, once your mana is down by the amount below and a mana potion (or a Mana Potion Injector) is ready.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {
@@ -433,7 +479,7 @@ function General:RegisterFeatures()
     SoundFeature(tools, "potionSound", "Potion warning sound", "wm:potion", "the mana potion warning")
     tools:RegisterFeature(CLASS, {
         key = "manarune", name = "Warn to use a Dark / Demonic Rune",
-        desc = "In combat, when no mana potion is ready (on cooldown or none left), once your mana is down by the amount below. Not below 35% health, since runes cost health.",
+        desc = "On a boss in a 10 or 25-man raid, when no mana potion is ready (on cooldown or none left), once your mana is down by the amount below. Not below 35% health, since runes cost health.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {
@@ -445,6 +491,11 @@ function General:RegisterFeatures()
     })
     SoundFeature(tools, "runeSound", "Rune warning sound", "wm:rune", "the rune warning")
     tools:RegisterFeature(CLASS, {
+        key = "manaBossOnly", name = "Mana warnings only on bosses",
+        desc = "The potion and rune warnings only while you fight a boss in a 10 or 25-man raid. Untick for every fight in those raids.",
+        default = true,
+    })
+    tools:RegisterFeature(CLASS, {
         key = "soundChannel", kind = "choice", name = "Warning sounds play on",
         options = WM.Sounds and WM.Sounds.CHANNELS or {}, default = "Master",
         desc = "Master plays even with game sound effects turned down.",
@@ -454,7 +505,7 @@ function General:RegisterFeatures()
     })
     tools:RegisterFeature(CLASS, {
         key = "only25", name = "Only in 25-man raids",
-        desc = "Untick to check in 10-man raids too.",
+        desc = "The flask, food and weapon checks. Untick to check in 10-man raids too. (The mana warnings run in both.)",
         default = true,
         onToggle = function(v) GeneralChecksDB.only25 = v and true or false end,
     })
@@ -479,8 +530,16 @@ function General:RegisterFeatures()
     tools:RegisterMonitor(Monitor)
 end
 
+local events = CreateFrame("Frame")
+General.events = events
+events:SetScript("OnEvent", function(_, event)
+    if not WM:IsModuleOn("ClassGeneral") then return end
+    General:OnEncounterEvent(event)
+end)
+
 function General:Initialize()
     self:RegisterFeatures()
+    WM:RegisterEvents(events, { "ENCOUNTER_START", "ENCOUNTER_END", "PLAYER_ENTERING_WORLD" })
 end
 
 -- Turned off on this character: its warnings go (the monitor stays
@@ -488,4 +547,5 @@ end
 function General:OnModuleOff()
     local tools = Tools()
     if tools then ClearAll(tools) end
+    self:OnEncounterEvent("ENCOUNTER_END")
 end

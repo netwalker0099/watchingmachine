@@ -17,10 +17,19 @@ env.UnitIsDeadOrGhost = function() return false end
 env.UnitBuff = function() return nil end   -- no buffs; only the mana alerts matter here
 env.IsInInstance = function() return true, "raid" end
 env.GetInstanceInfo = function() return nil, nil, nil, nil, 25 end
+-- The target: nothing by default; a boss when a test says so
+local targetBoss = false
+env.UnitExists = function(u) return u == "player" or (u == "target" and targetBoss ~= false) end
+env.UnitIsPlayer = function(u) return u == "player" end
+env.UnitIsDead = function() return false end
+env.UnitClassification = function(u) return (u == "target" and targetBoss == "worldboss") and "worldboss" or "elite" end
+env.UnitLevel = function(u) return (u == "target" and targetBoss == "skull") and -1 or 70 end
+env.UnitCanAttack = function() return true end
+env.GetNumGroupMembers = function() return 0 end
 -- 2.5.6 has only the namespaced item functions; the old globals are gone
 -- (their fallback for GetItemCooldown is nil), so don't provide them
 local NAMES = { [22832] = "Super Mana Potion", [13444] = "Major Mana Potion", [12662] = "Demonic Rune",
-    [20520] = "Dark Rune", [32902] = "Bottled Nethergon Energy" }
+    [20520] = "Dark Rune", [32902] = "Bottled Nethergon Energy", [33093] = "Mana Potion Injector" }
 env.C_Item = {
     GetItemCount = function(id) return bags[id] or 0 end,
     IsUsableItem = function(id) if usable[id] == false then return false, false end; return true, false end,
@@ -50,6 +59,7 @@ CT.ClearAlert = function(_, key) alerts[key] = nil end
 CT.RegisterMonitor = function(_, fn) monitor = fn end
 CT:InitDB()
 Gen:Initialize()
+Gen:OnEncounterEvent("ENCOUNTER_START")   -- the tests below are on a boss
 
 local pass, fail = 0, 0
 local function check(name, cond)
@@ -148,12 +158,57 @@ check("pre-pull potion cooldown: says so", #said == 2 and said[2]:find("on coold
 cooldowns[22832] = nil
 mana = maxMana - 1000; Tick()
 check("under the threshold: nothing said", #said == 2)
-mana = maxMana - 3500
+Gen.Print = realPrint
+
+-- ---- bosses in 10 and 25-man raids ----
+Reset()
+bags[22832] = 5
+mana = maxMana - 3500; Tick()
+check("on a boss: warns", Potion() ~= nil)
+check("only on bosses by default", CT:IsEnabled("GENERAL", "manaBossOnly"))
+Gen:OnEncounterEvent("ENCOUNTER_END"); Tick()
+check("encounter over (trash): silent", Potion() == nil)
+targetBoss = "worldboss"; Tick()
+check("a world boss targeted counts (missed encounter event)", Potion() ~= nil)
+targetBoss = "skull"; Tick()
+check("a skull-level enemy targeted counts", Potion() ~= nil)
+targetBoss = false; Tick()
+check("plain trash targeted: silent", Potion() == nil)
+CT:SetEnabled("GENERAL", "manaBossOnly", false); Tick()
+check("bosses-only off: every fight", Potion() ~= nil)
+CT:SetEnabled("GENERAL", "manaBossOnly", true)
+Gen:OnEncounterEvent("ENCOUNTER_START"); Tick()
+check("next boss: warns again", Potion() ~= nil)
+Gen:OnEncounterEvent("PLAYER_ENTERING_WORLD"); Tick()
+check("a loading screen ends the encounter", Potion() == nil)
+Gen:OnEncounterEvent("ENCOUNTER_START")
 env.GeneralChecksDB.only25 = true
 env.GetInstanceInfo = function() return nil, nil, nil, nil, 10 end; Tick()
-check("25-man only in a 10-man: says so", #said == 3 and said[3]:find("reports 10 players", 1, true))
+check("10-man boss: warns, whatever the 25-man-only option (that's for flask, food, oil)", Potion() ~= nil)
+env.GetInstanceInfo = function() return nil, nil, nil, nil, 40 end; Tick()
+check("40-man raid: silent", Potion() == nil)
+env.GetInstanceInfo = function() return nil, nil, nil, nil, 20 end; Tick()
+check("20-man raid: silent", Potion() == nil)
+env.GetInstanceInfo = function() return nil, nil, nil, nil, 5 end
+env.IsInInstance = function() return true, "party" end; Tick()
+check("a dungeon boss: silent", Potion() == nil)
+env.IsInInstance = function() return true, "raid" end
 env.GetInstanceInfo = function() return nil, nil, nil, nil, 25 end
-Gen.Print = realPrint
+
+-- ---- Mana Potion Injector ----
+Reset()
+bags[33093] = 3
+mana = maxMana - 3500; Tick()
+check("an injector counts as a mana potion", Potion() == "Use a mana potion (Mana Potion Injector)")
+cooldowns[33093] = 120; bags[12662] = 2; Tick()
+check("injector on cooldown: the rune instead", Potion() == nil and Rune() ~= nil)
+check("injector on the potion list after Super Mana Potion", (function()
+    for i, id in ipairs(Gen.MANA_POTIONS) do
+        if id == 33093 then return Gen.MANA_POTIONS[i - 1] == 22832 end
+    end
+end)())
+Reset()
+bags[22832] = 5   -- the checks below drink a Super Mana Potion
 
 -- ---- thresholds are options ----
 env.GeneralChecksDB.potionAt = 4500
