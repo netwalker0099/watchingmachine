@@ -234,7 +234,8 @@ W.click(Tab("Warlock"))
 check("switching tab marks it", Tab("Warlock"):GetText() == "|cFF00FF00Warlock|r"
     and Tab("Mage"):GetText() == "Mage")
 check("header follows the tab", Header():find("Warlock", 1, true) and not Header():find("your class", 1, true))
-check("warlock features shown", #ShownFeatures() == 5 and HasFeature("Track soulstone timers")
+check("warlock features shown", #ShownFeatures() == 7 and HasFeature("Track soulstone timers")
+    and HasFeature("Soulstone frame: every warlock's soulstone")
     and HasFeature("Show the warlock button"))
 
 local calls = {}
@@ -267,13 +268,13 @@ end
 CT:RegisterFeature("ROGUE", { key = "poison", name = "Warn if no poison", default = true })
 check("tabs wrap onto a second row", #Tabs() == 7 and not rows[2].hidden)
 W.click(Tab("Shaman"))
-check("thirty features listed, plus the totem button, its timers, weapon sync and Windfury", #ShownFeatures() == 34
+check("thirty features listed, plus the totem button, its timers, shields, weapon sync and Windfury", #ShownFeatures() == 36
     and HasFeature("Weapon sync mark on the swing timer") and HasFeature("Windfury cooldown bar on the swing timer"))
 check("long list stays within 486", cp:GetHeight() <= 486)
 check("long list scrolls", cp.scrollBar:IsShown() and cp.layout.height > cp:GetHeight())
 W.click(Tab("General"))
 check("General lists its checkbox options (mana warnings, flyout dock and lock, swing timer included)",
-    #ShownFeatures() == 17 and HasFeature("Mana warnings only on bosses") and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
+    #ShownFeatures() == 18 and HasFeature("Watch Righteous Fury on tanking paladins") and HasFeature("Mana warnings only on bosses") and HasFeature("Mana tick spark") and HasFeature("Five-second rule spark")
     and not HasFeature("Seal twisting marks on the swing timer")
     and HasFeature("Mana tick spark on a bar of its own too")
     and HasFeature("Dock flyout buttons together") and HasFeature("Lock flyout buttons")

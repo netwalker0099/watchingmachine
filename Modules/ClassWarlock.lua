@@ -189,6 +189,142 @@ local function Tools()
     return CT
 end
 
+-- ============================================
+-- SOULSTONE FRAME: every warlock in the group and their soulstone
+-- ============================================
+-- Each warlock's row says who their soulstone is on (and its time left),
+-- that it's on cooldown (it was used, or the stone is gone), or that it's
+-- ready. A soulstone is seen two ways: the combat log when it's put on
+-- someone (which warlock, on whom, when), and the Soulstone Resurrection
+-- buff on group members (its caster and time left), which also covers a
+-- /reload. The cooldown is 30 minutes from the cast, the same as the buff.
+-- Casts are saved (WarlockToolsDB.stones, by server time) so a /reload keeps
+-- them.
+
+local STONE_COOLDOWN = 1800
+local STONE_TICK = 0.5
+
+local function Now() return (GetServerTime and GetServerTime()) or time() end
+
+local function Stones()
+    if type(WarlockToolsDB) ~= "table" then return {} end
+    if type(WarlockToolsDB.stones) ~= "table" then WarlockToolsDB.stones = {} end
+    return WarlockToolsDB.stones
+end
+
+local function ClassRGB(class)
+    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if c then return c.r, c.g, c.b end
+    return 1, 1, 1
+end
+
+-- The combat log: a warlock put a soulstone on someone
+function Warlock:OnCombatLog(sub, srcName, destName, spellName)
+    if sub ~= "SPELL_AURA_APPLIED" and sub ~= "SPELL_AURA_REFRESH" then return end
+    if spellName ~= SOULSTONE_BUFF or not srcName then return end
+    local short = Ambiguate and Ambiguate(srcName, "short") or srcName
+    local dest = destName and (Ambiguate and Ambiguate(destName, "short") or destName)
+    Stones()[short] = { at = Now(), target = dest }
+end
+
+-- The warlocks in the group, and the soulstones on group members by caster.
+-- Returns { { name, class, unit } ... }, { [warlock] = { target, left } }
+function Warlock:GroupStones()
+    local locks, on = {}, {}
+    local tools = Tools()
+    local units = tools and tools.GroupUnits() or { "player" }
+    local now = GetTime()
+    for _, unit in ipairs(units) do
+        if UnitExists(unit) then
+            local name = UnitName(unit)
+            local _, class = UnitClass(unit)
+            if class == CLASS and name then locks[#locks + 1] = { name = name, class = class, unit = unit } end
+            if UnitIsConnected(unit) then
+                for i = 1, 40 do
+                    local n, _, _, _, duration, expires, source = UnitBuff(unit, i)
+                    if not n then break end
+                    if n == SOULSTONE_BUFF then
+                        local caster = source and UnitName(source)
+                        if caster then
+                            local left = (tonumber(expires) or 0) > 0 and (expires - now) or nil
+                            on[caster] = { target = name, left = left }
+                            -- Learn (or correct) the cast time from the buff
+                            local rec = Stones()[caster]
+                            local dur = tonumber(duration) or 0
+                            if left and dur > 0 then
+                                local at = Now() - (dur - left)
+                                if not rec or math.abs((rec.at or 0) - at) > 5 then
+                                    Stones()[caster] = { at = math.floor(at + 0.5), target = name }
+                                end
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+    table.sort(locks, function(a, b) return a.name < b.name end)
+    return locks, on
+end
+
+-- One row per warlock
+function Warlock:StoneRows()
+    local rows = {}
+    local tools = Tools()
+    if not tools or not WM:IsModuleOn("ClassWarlock") or not IsPlayerWarlock() then return rows end
+    if not tools:IsEnabled(CLASS, "soulstoneFrame") or not IsInGroup() then return rows end
+    if tools:IsEnabled(CLASS, "stoneRaidOnly") and not IsInRaid() then return rows end
+    local locks, on = self:GroupStones()
+    local now = Now()
+    for _, l in ipairs(locks) do
+        local r, g, b = ClassRGB(l.class)
+        local stone, rec = on[l.name], Stones()[l.name]
+        local cd = rec and rec.at and (rec.at + STONE_COOLDOWN - now) or nil
+        local right
+        if stone then
+            right = "|cFF88FF88on " .. stone.target .. "|r" .. (stone.left and ("  " .. tools.Clock(stone.left)) or "")
+        elseif cd and cd > 0 then
+            right = "|cFFFFAA44cooldown " .. tools.Clock(cd) .. "|r"
+        elseif rec then
+            right = "|cFF44FF44ready|r"
+        else
+            right = "|cFF999999ready?|r"
+        end
+        rows[#rows + 1] = { icon = ICON_STONE, text = l.name, right = right, r = r, g = g, b = b }
+    end
+    return rows
+end
+
+function Warlock:CreateStoneFrame()
+    if self.stoneFrame then return self.stoneFrame end
+    local tools = Tools()
+    if not tools then return nil end
+    self.stoneFrame = tools:CreateTrackerFrame({
+        name = "WM_WarlockSoulstones", title = "Soulstones", store = function() return WarlockToolsDB end,
+        posX = "stoneX", posY = "stoneY", x = 260, y = -140, width = 230, rows = 10,
+        tip = { "Soulstones", "Each warlock in your group: who their soulstone is on and its time left, its"
+            .. " 30-minute cooldown once used, or ready. \"ready?\" means no soulstone from them has been seen"
+            .. " yet (it's only seen within combat log range)." },
+    })
+    return self.stoneFrame
+end
+
+function Warlock:UpdateStones()
+    if self.stoneFrame then self.stoneFrame:SetRows(self:StoneRows()) end
+end
+
+local stoneTicker = CreateFrame("Frame")
+local stoneSince = 0
+stoneTicker:SetScript("OnUpdate", function(_, elapsed)
+    stoneSince = stoneSince + (elapsed or 0)
+    if stoneSince < STONE_TICK then return end
+    stoneSince = 0
+    if not Warlock.stoneFrame then return end
+    if not WM:IsModuleOn("ClassWarlock") then Warlock.stoneFrame:Hide() return end
+    Warlock:UpdateStones()
+end)
+
 local function Monitor()
     local tools = Tools()
     if not tools or not WM:IsModuleOn("ClassWarlock") then return end
@@ -331,6 +467,7 @@ end
 -- ============================================
 
 local buttonEvents = CreateFrame("Frame")
+local stoneEvents = CreateFrame("Frame")
 
 -- The warlock tab's features, warning sounds and monitor. Only registers
 -- (no frames, no events), so the guided setup can list them before this
@@ -360,6 +497,18 @@ function Warlock:RegisterFeatures()
         key = "soulstones", name = "Track soulstone timers",
         desc = "Soulstones on you and others in range. /wmachine soulstone",
         default = true,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "soulstoneFrame", name = "Soulstone frame: every warlock's soulstone",
+        desc = "In a group, a small Soulstones frame lists each warlock: who their soulstone is on and its time left, its 30-minute cooldown once it's used, or ready. Shift-drag the frame to move it.",
+        default = true,
+        onToggle = function() Warlock:UpdateStones() end,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "stoneRaidOnly", name = "Soulstone frame only in raids",
+        desc = "Hide the Soulstones frame in a party.",
+        default = false,
+        onToggle = function() Warlock:UpdateStones() end,
     })
 
     local rebuild = function() Warlock:UpdateButton() end
@@ -396,12 +545,20 @@ function Warlock:Initialize()
 
     if IsPlayerWarlock() then
         warlockFlyout:CreateAnchor()
+        self:CreateStoneFrame()
+        WM:RegisterEvents(stoneEvents, { "COMBAT_LOG_EVENT_UNFILTERED" })
         -- SPELLS_CHANGED picks up a new spell or talent (Felguard)
         WM:RegisterEvents(buttonEvents, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED" })
         -- Spellbook isn't reliably populated the instant we initialise
         WM.RunAfter(2, function() Warlock:UpdateButton() end)
     end
 end
+
+stoneEvents:SetScript("OnEvent", function()
+    if not WM:IsModuleOn("ClassWarlock") or not CombatLogGetCurrentEventInfo then return end
+    local _, sub, _, _, srcName, _, _, _, destName, _, _, _, spellName = CombatLogGetCurrentEventInfo()
+    Warlock:OnCombatLog(sub, srcName, destName, spellName)
+end)
 
 buttonEvents:SetScript("OnEvent", function(_, event)
     if not IsPlayerWarlock() or not WM:IsModuleOn("ClassWarlock") then return end
@@ -424,11 +581,13 @@ function Warlock:OnModuleOff()
         tools:ClearAlert("wl_soullink")
     end
     warlockFlyout:UpdateVisibility()
+    if self.stoneFrame then self.stoneFrame:Hide() end
 end
 
 -- Back on: the button comes back if it's wanted
 function Warlock:OnModuleOn()
     warlockFlyout:UpdateVisibility()
+    self:UpdateStones()
 end
 
 function Warlock:GetSoulstones()

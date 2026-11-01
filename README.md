@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.62 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.63 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -287,7 +287,7 @@ CT:RegisterFeature("SHAMAN", {
 - **Warning sounds** (3.54: on each class's own tab): every warning has a
   sound choice right after its class's other options:
   - **General tab:** no flask or elixirs, no food buff, no weapon oil /
-    stone (and the mana potion and rune sounds)
+    stone, Righteous Fury off a tank (and the mana potion and rune sounds)
   - **Mage tab:** mage armor missing
   - **Warlock tab:** Fel / Demon Armor, Demonic Sacrifice, Soul Link
   - **Paladin tab:** Righteous Fury
@@ -444,6 +444,13 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
   the real expiry from the buff itself, so it works regardless of which
   warlock cast it or whether you saw the cast. `/wmachine soulstone` lists
   who's stoned and for how long
+- **Soulstone frame** (3.63): in a group, a small *Soulstones* frame lists
+  every warlock: who their soulstone is on and its time left, its 30-minute
+  cooldown once it's used, or **ready** (*ready?*: none of their soulstones
+  seen yet). Soulstones are seen in the combat log as they're put on
+  someone, and from the buff on group members (its caster and time left),
+  which also covers a `/reload`. Shift-drag to move it. *Soulstone frame
+  only in raids* hides it in a party
 - Talents are cached for five seconds for speed, and the cache is dropped
   immediately on a respec (`CHARACTER_POINTS_CHANGED` / `PLAYER_TALENT_UPDATE`)
   so the checks never act on an old build
@@ -521,12 +528,24 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - **Totem timers** (3.50): above the button, each totem you have down (Air,
   Water, Earth, Fire) with the time it has left. *Totem timers above the
   button* turns them off
+- **Shields frame** (3.63), shift-drag to move:
+  - **Shield timer:** your Water Shield or Lightning Shield, its charges and
+    time left. In combat or a group it turns red when you have neither
+  - **Earth Shield** (Restoration): who it's on, their health (with a bar),
+    its charges and time left. Out of sight it shows what the combat log
+    last said; in a group it turns red when it isn't on anyone
 - **The swing timer's shaman options** (3.56: on this tab): *Weapon sync
   mark on the swing timer*, *Off hand lands after by*, *SYNC NOW sound* and
   *Windfury cooldown bar on the swing timer* (see the swing timer, under
   General)
 
 ### 18. Class — Paladin
+- **Righteous Fury watch on other paladins** (3.63, on the **General** tab,
+  for every class): in a group, once a paladin has had Righteous Fury on
+  (so they're tanking), you're warned when it falls off while they're
+  alive, and it's announced once (at most every 30 seconds) to *Me only*,
+  *Party*, *Raid* or *Say* (*Say* only inside an instance). The warning
+  stays until it's back on, also after a resurrection
 - **Righteous Fury check** — warns when Righteous Fury is missing, the same
   way the mage and warlock armor checks do. Only for **Protection**
   paladins: most talent points in Protection, or Holy Shield / Avenger's
@@ -1258,6 +1277,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.63
+- **Shaman:** a Shields frame with your Water / Lightning Shield (charges, time left) and who has your Earth Shield, with their health and its charges
+- **Warlock:** a Soulstones frame listing every warlock in the group: who their soulstone is on, its cooldown, or ready
+- **Everyone:** a Righteous Fury watch on tanking paladins in your group, telling you or announcing to Party, Raid or Say when it falls off
 
 ### Version 3.62
 - **Raid shadow resist check confirms everyone was checked:** the report lists every member's gear SR and says "All N checked" or "X of N checked" with who wasn't and why. Anyone missed gets a second try, and it no longer gives up on someone because the group gear scan is inspecting

@@ -2,7 +2,35 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.62** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.63** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+
+---
+
+## 3.63
+
+### Shaman: shield timer and Earth Shield frame
+
+- A small **Shields** frame (shift-drag to move):
+  - **Your shield:** Water Shield or Lightning Shield, its charges and time
+    left. In combat or a group it turns red when you have neither.
+  - **Earth Shield** (once you know it): who it's on, their health with a
+    bar, its charges and time left. Out of sight it keeps what the combat
+    log last said; in a group it turns red when it isn't on anyone.
+- Two options on the Shaman tab: *Shield timer* and *Earth Shield*.
+
+### Warlock: Soulstones frame
+
+- In a group, a **Soulstones** frame lists every warlock: who their
+  soulstone is on and its time left, its 30-minute cooldown once it's used,
+  or ready. Seen from the combat log and from the buff on group members,
+  so it survives a `/reload`. Option: *only in raids*.
+
+### Everyone: Righteous Fury watch on tanking paladins
+
+- On the General tab: once a paladin in your group has had Righteous Fury
+  on, you're warned when it falls off while they're alive, and it's
+  announced once to **Me only** (default), **Party**, **Raid** or **Say**
+  (Say only inside an instance). It has its own warning sound.
 
 ---
 

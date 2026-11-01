@@ -498,6 +498,199 @@ function Shaman:ToggleEditor()
 end
 
 -- ============================================
+-- SHIELDS: your Water / Lightning Shield, and who has your Earth Shield
+-- ============================================
+-- One small frame. Your own shield: charges and time left (in combat or a
+-- group, a red line when it's missing). Earth Shield (Restoration talent):
+-- who has it, their health, its charges and time left. Its target comes from
+-- the combat log (so it's known outside your group too), and its charges and
+-- time are read from the buff whenever that player is a unit we can see.
+
+local WATER_SHIELD, LIGHTNING_SHIELD, EARTH_SHIELD = 24398, 324, 974
+local ICON_WATER = "Interface\\Icons\\Ability_Shaman_WaterShield"
+local ICON_LIGHTNING = "Interface\\Icons\\Spell_Nature_LightningShield"
+local ICON_EARTH = "Interface\\Icons\\Spell_Nature_SkinofEarth"
+local ES_DURATION = 600
+local SHIELD_TICK = 0.25
+local ES_SEARCH_EVERY = 2   -- target unknown (after a /reload): look through the group this often
+
+local spellNames = {}
+local function SpellName(id, fallback)
+    if spellNames[id] == nil then
+        local ok, n = pcall(GetSpellInfo, id)
+        spellNames[id] = (ok and type(n) == "string") and n or fallback
+    end
+    return spellNames[id]
+end
+
+local function Knows(id)
+    for _, fn in ipairs({ IsPlayerSpell, IsSpellKnown }) do
+        if type(fn) == "function" then
+            local ok, v = pcall(fn, id)
+            if ok and v == true then return true end
+        end
+    end
+    return false
+end
+
+-- A buff on a unit by name, optionally only one you cast:
+-- count, seconds left, icon
+local function FindBuff(unit, name, mine, now)
+    for i = 1, 40 do
+        local n, icon, count, _, _, expires, source = UnitBuff(unit, i)
+        if not n then return nil end
+        if n == name and (not mine or source == "player") then
+            local left = (tonumber(expires) or 0) > 0 and (expires - now) or nil
+            return tonumber(count) or 0, left, icon
+        end
+    end
+end
+
+-- Your own Water or Lightning Shield: name, charges, seconds left, icon
+function Shaman:OwnShield(now)
+    now = now or GetTime()
+    for _, s in ipairs({ { WATER_SHIELD, "Water Shield", ICON_WATER }, { LIGHTNING_SHIELD, "Lightning Shield", ICON_LIGHTNING } }) do
+        local name = SpellName(s[1], s[2])
+        local count, left, icon = FindBuff("player", name, false, now)
+        if count then return name, count, left, icon or s[3] end
+    end
+end
+
+-- Earth Shield from the combat log: { guid, name, charges, expires }
+local esTarget
+local esSearchAt = 0
+
+function Shaman:OnCombatLog(sub, srcGUID, destGUID, destName, spellName, amount)
+    if not srcGUID or srcGUID ~= UnitGUID("player") then return end
+    if spellName ~= SpellName(EARTH_SHIELD, "Earth Shield") then return end
+    if sub == "SPELL_AURA_APPLIED" or sub == "SPELL_AURA_REFRESH" then
+        esTarget = { guid = destGUID, name = destName, expires = GetTime() + ES_DURATION }
+    elseif esTarget and destGUID == esTarget.guid then
+        if sub == "SPELL_AURA_REMOVED_DOSE" or sub == "SPELL_AURA_APPLIED_DOSE" then
+            esTarget.charges = tonumber(amount) or esTarget.charges
+        elseif sub == "SPELL_AURA_REMOVED" then
+            esTarget = nil
+        end
+    end
+end
+
+function Shaman:EarthShieldTarget() return esTarget end
+
+local function SeeUnits()
+    local units = Tools() and Tools().GroupUnits() or { "player" }
+    for _, u in ipairs({ "target", "focus", "mouseover" }) do units[#units + 1] = u end
+    return units
+end
+
+-- The unit your Earth Shield is on, if we can see it; after a /reload (no
+-- combat log yet), found by looking through the group every few seconds
+local function EarthShieldUnit(now)
+    local esName = SpellName(EARTH_SHIELD, "Earth Shield")
+    if esTarget then
+        for _, u in ipairs(SeeUnits()) do
+            if UnitExists(u) and UnitGUID(u) == esTarget.guid then return u end
+        end
+        return nil
+    end
+    if now < esSearchAt then return nil end
+    esSearchAt = now + ES_SEARCH_EVERY
+    for _, u in ipairs(SeeUnits()) do
+        if UnitExists(u) and FindBuff(u, esName, true, now) then
+            esTarget = { guid = UnitGUID(u), name = UnitName(u) }
+            return u
+        end
+    end
+end
+
+local function ClassColor(unit)
+    local _, class = UnitClass(unit)
+    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if c then return c.r, c.g, c.b end
+    return 1, 1, 1
+end
+
+-- The rows the frame shows now
+function Shaman:ShieldRows(now)
+    now = now or GetTime()
+    local tools = Tools()
+    local rows = {}
+    if not tools or not WM:IsModuleOn("ClassShaman") or not IsPlayerShaman() then return rows end
+    local busy = (InCombatLockdown and InCombatLockdown()) or IsInGroup()
+
+    if tools:IsEnabled(CLASS, "shieldTimer") then
+        local name, count, left, icon = self:OwnShield(now)
+        if name then
+            rows[#rows + 1] = { icon = icon, text = name,
+                right = count .. (left and ("  " .. tools.Clock(left)) or ""),
+                r = 0.8, g = 0.9, b = 1 }
+        elseif busy and (Knows(LIGHTNING_SHIELD) or Knows(WATER_SHIELD)) then
+            rows[#rows + 1] = { icon = ICON_LIGHTNING, text = "No Water or Lightning Shield", r = 1, g = 0.3, b = 0.3 }
+        end
+    end
+
+    if tools:IsEnabled(CLASS, "earthShield") and Knows(EARTH_SHIELD) then
+        local unit = EarthShieldUnit(now)
+        if unit and not UnitIsDeadOrGhost(unit) then
+            local count, left = FindBuff(unit, SpellName(EARTH_SHIELD, "Earth Shield"), true, now)
+            if count then
+                esTarget.charges = count
+                if left then esTarget.expires = now + left end
+                local hp, max = UnitHealth(unit) or 0, UnitHealthMax(unit) or 0
+                local frac = max > 0 and hp / max or 0
+                local r, g, b = ClassColor(unit)
+                rows[#rows + 1] = { icon = ICON_EARTH,
+                    text = (UnitName(unit) or esTarget.name or "?") .. "  " .. math.floor(frac * 100 + 0.5) .. "%",
+                    right = count .. (left and ("  " .. tools.Clock(left)) or ""), r = r, g = g, b = b,
+                    bar = frac, barR = 1 - frac, barG = frac, barB = 0.1 }
+            elseif esTarget and esTarget.guid == UnitGUID(unit) then
+                esTarget = nil   -- seen without it: gone
+            end
+        elseif esTarget and esTarget.expires and esTarget.expires > now then
+            -- Out of sight: what the combat log last said
+            rows[#rows + 1] = { icon = ICON_EARTH, text = esTarget.name or "?",
+                right = (esTarget.charges and (esTarget.charges .. "  ") or "") .. tools.Clock(esTarget.expires - now),
+                r = 0.7, g = 0.7, b = 0.7 }
+        elseif esTarget and esTarget.expires and esTarget.expires <= now then
+            esTarget = nil
+        end
+        if not esTarget and IsInGroup() then
+            rows[#rows + 1] = { icon = ICON_EARTH, text = "Earth Shield isn't on anyone", r = 1, g = 0.3, b = 0.3 }
+        end
+    end
+    return rows
+end
+
+function Shaman:CreateShieldFrame()
+    if self.shieldFrame then return self.shieldFrame end
+    local tools = Tools()
+    if not tools then return nil end
+    self.shieldFrame = tools:CreateTrackerFrame({
+        name = "WM_ShamanShields", title = "Shields", store = Store, posX = "shieldX", posY = "shieldY",
+        x = -260, y = -140, width = 210, rows = 2,
+        tip = { "Shields", "Your Water or Lightning Shield (charges, time left), and who has your Earth Shield:"
+            .. " their health, its charges and time left." },
+    })
+    return self.shieldFrame
+end
+
+function Shaman:UpdateShields(now)
+    local f = self.shieldFrame
+    if not f then return end
+    f:SetRows(self:ShieldRows(now))
+end
+
+local shieldTicker = CreateFrame("Frame")
+local shieldSince = 0
+shieldTicker:SetScript("OnUpdate", function(_, elapsed)
+    shieldSince = shieldSince + (elapsed or 0)
+    if shieldSince < SHIELD_TICK then return end
+    shieldSince = 0
+    if not Shaman.shieldFrame then return end
+    if not WM:IsModuleOn("ClassShaman") then Shaman.shieldFrame:Hide() return end
+    Shaman:UpdateShields()
+end)
+
+-- ============================================
 -- REGISTRATION
 -- ============================================
 
@@ -527,6 +720,19 @@ function Shaman:RegisterFeatures()
         default = true,
         onToggle = function() Shaman:UpdateTimers() end,
     })
+    local shields = function() Shaman:UpdateShields() end
+    tools:RegisterFeature(CLASS, {
+        key = "shieldTimer", name = "Shield timer: Water / Lightning Shield",
+        desc = "A small Shields frame with your Water Shield or Lightning Shield, its charges and the time it has left. In combat or in a group it turns red when you have neither. Shift-drag the frame to move it.",
+        default = true,
+        onToggle = shields,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "earthShield", name = "Earth Shield: who has it, their health and charges",
+        desc = "Restoration (once you know Earth Shield): in the Shields frame, who your Earth Shield is on, their health, its charges and time left. In a group it turns red when it isn't on anyone.",
+        default = true,
+        onToggle = shields,
+    })
     -- The swing timer's weapon sync and Windfury options
     if WM.SwingTimer and WM.SwingTimer.RegisterShamanOptions then WM.SwingTimer.RegisterShamanOptions(tools) end
 end
@@ -537,7 +743,9 @@ function Shaman:Initialize()
 
     if IsPlayerShaman() then
         self:CreateTimers(totemFlyout:CreateAnchor())
-        WM:RegisterEvents(eventFrame, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_TOTEM_UPDATE" })
+        WM:RegisterEvents(eventFrame, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_TOTEM_UPDATE",
+            "COMBAT_LOG_EVENT_UNFILTERED" })
+        self:CreateShieldFrame()
         totemsWereDown = self:AnyTotemDown() or false
         self:UpdateTimers()
         -- Spellbook isn't reliably populated the instant we initialise
@@ -550,7 +758,11 @@ eventFrame:SetScript("OnEvent", function(_, event)
     -- Turned off in combat: the key binding's macro is emptied once it ends
     if event == "PLAYER_REGEN_ENABLED" and Shaman.clearPending then Shaman:ClearMacro() end
     if not WM:IsModuleOn("ClassShaman") then return end
-    if event == "PLAYER_TOTEM_UPDATE" then
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        if not CombatLogGetCurrentEventInfo then return end
+        local _, sub, _, srcGUID, _, _, _, destGUID, destName, _, _, _, spellName, _, _, amount = CombatLogGetCurrentEventInfo()
+        Shaman:OnCombatLog(sub, srcGUID, destGUID, destName, spellName, amount)
+    elseif event == "PLAYER_TOTEM_UPDATE" then
         Shaman:OnTotemUpdate()
         Shaman:UpdateTimers()
     elseif InCombatLockdown() then
@@ -571,6 +783,7 @@ function Shaman:OnModuleOff()
     totemFlyout:UpdateVisibility()
     self:ClearMacro()
     if self.timers then self.timers:Hide() end
+    if self.shieldFrame then self.shieldFrame:Hide() end
 end
 
 -- Empty the button's macro, so its key binding does nothing while off
@@ -589,6 +802,7 @@ function Shaman:OnModuleOn()
     self:Refresh()
     self:ApplyMacro()
     self:UpdateTimers()
+    self:UpdateShields()
 end
 
 -- Class Tools' guided setup, after the shaman features: the set in use and

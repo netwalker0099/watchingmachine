@@ -394,6 +394,129 @@ function ClassTools:CreateAlertFrame()
     return f
 end
 
+-- ============================================
+-- TRACKER FRAMES (shields, soulstones)
+-- ============================================
+-- A small titled list: each row an icon, a line of text, a right-hand text
+-- and an optional bar under the text (a health bar). Shift-drag to move;
+-- the position goes into opts.store() as opts.posX / opts.posY.
+--   opts: name, title, store, posX, posY, x, y (default offset from centre),
+--         width, rows (max), tip ({ title, text })
+--   f:SetRows({ { icon, text, right, r, g, b, bar, barR, barG, barB }, ... })
+--   hides the frame with no rows.
+local TRACK_ROW_H = 18
+
+function ClassTools:CreateTrackerFrame(opts)
+    local width, maxRows = opts.width or 210, opts.rows or 8
+    local f = CreateFrame("Frame", opts.name, UIParent, "BackdropTemplate")
+    f:SetSize(width, 20)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } })
+    f:SetBackdropColor(0, 0, 0, 0.55)
+    f:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.9)
+    local db = opts.store()
+    if db and db[opts.posX] and db[opts.posY] then
+        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", db[opts.posX], db[opts.posY])
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", opts.x or 0, opts.y or 0)
+    end
+    f:SetScript("OnDragStart", function(self)
+        if IsShiftKeyDown and IsShiftKeyDown() then self:StartMoving() end
+    end)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local x, y = self:GetCenter()
+        local s = opts.store()
+        if x and s then s[opts.posX], s[opts.posY] = x, y end
+    end)
+    if opts.tip then
+        f:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(opts.tip[1], 1, 0.82, 0)
+            GameTooltip:AddLine(opts.tip[2] .. " Shift-drag to move.", 0.9, 0.9, 0.9, true)
+            GameTooltip:Show()
+        end)
+        f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.title:SetPoint("TOPLEFT", 6, -4)
+    f.title:SetText(opts.title or "")
+    f.rows = {}
+    for i = 1, maxRows do
+        local row = CreateFrame("Frame", nil, f)
+        row:SetSize(width - 8, TRACK_ROW_H)
+        row:SetPoint("TOPLEFT", 4, -18 - (i - 1) * TRACK_ROW_H)
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(16, 16)
+        row.icon:SetPoint("LEFT", 0, 0)
+        row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        row.bar = row:CreateTexture(nil, "BACKGROUND")
+        row.bar:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 3, 0)
+        row.bar:SetHeight(4)
+        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.text:SetPoint("LEFT", row.icon, "RIGHT", 4, 1)
+        row.text:SetJustifyH("LEFT")
+        row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.right:SetPoint("RIGHT", -2, 1)
+        row.right:SetJustifyH("RIGHT")
+        row:Hide()
+        f.rows[i] = row
+    end
+    function f:SetRows(list)
+        local n = math.min(#list, #self.rows)
+        for i, row in ipairs(self.rows) do
+            local e = list[i]
+            if i <= n then
+                row.icon:SetTexture(e.icon)
+                row.text:SetText(e.text or "")
+                row.text:SetTextColor(e.r or 1, e.g or 1, e.b or 1)
+                row.right:SetText(e.right or "")
+                if e.bar then
+                    row.bar:SetWidth(math.max(1, (width - 34) * math.max(0, math.min(1, e.bar))))
+                    row.bar:SetColorTexture(e.barR or 0.1, e.barG or 0.8, e.barB or 0.1, 0.8)
+                    row.bar:Show()
+                else
+                    row.bar:Hide()
+                end
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+        self:SetHeight(20 + n * TRACK_ROW_H + 2)
+        self:SetShown(n > 0)
+    end
+    f:Hide()
+    return f
+end
+
+-- mm:ss (or "45s") for a tracker row
+function ClassTools.Clock(left)
+    left = math.max(0, math.floor((left or 0) + 0.5))
+    if left < 60 then return left .. "s" end
+    return string.format("%d:%02d", math.floor(left / 60), left % 60)
+end
+
+-- The player's group: "player" then party or raid units (not the player twice)
+function ClassTools.GroupUnits()
+    local units = { "player" }
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local u = "raid" .. i
+            if not UnitIsUnit(u, "player") then units[#units + 1] = u end
+        end
+    elseif IsInGroup() then
+        for i = 1, 4 do
+            if UnitExists("party" .. i) then units[#units + 1] = "party" .. i end
+        end
+    end
+    return units
+end
+
 -- Lock state is read on drag, but the mouse flag has to be flipped on the
 -- live frame or a locked frame still swallows clicks.
 function ClassTools:ApplyAlertLock()
@@ -922,7 +1045,9 @@ function ClassTools:SetupPage(L)
 
     L:Note("Class Tools watches you, not the raid: about once a second it checks the things you're expected to"
         .. " keep up yourself, and anything missing goes in one small |cFFFFAA00CHECK YOURSELF|r frame near the"
-        .. " middle of your screen until you fix it. Each warning can be switched off on its own.")
+        .. " middle of your screen until you fix it. Each warning can be switched off on its own. A few look at"
+        .. " your group too: Righteous Fury on tanking paladins (General), who has your Earth Shield (Shaman)"
+        .. " and every warlock's soulstone (Warlock).")
     L:Note("It knows your class: below are the " .. "|cFF" .. ClassHex(class or "") .. label .. "|r"
         .. " tools, then the general ones every character gets.")
 

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.62"
+WM.version = "3.63"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -1428,7 +1428,7 @@ local MODULE_INFO = {
     },
     ClassTools = {
         title = "Class Tools", desc = "Tools for the class you're playing",
-        about = "Per-class checks and helpers (missing armor spells, soulstones, portal and totem buttons) plus raid consumable warnings for everyone, in one CHECK YOURSELF frame.",
+        about = "Per-class checks and helpers (missing armor spells, soulstones, portal and totem buttons, shaman shields) plus raid consumable warnings and a Righteous Fury watch on tanking paladins for everyone, in one CHECK YOURSELF frame.",
         command = "class", color = {1, 0.6, 0.87}, icon = "Interface\\Icons\\INV_Misc_Gear_01",
         classIcon = true,   -- the player's class crest; the gear is the fallback
         tools = {

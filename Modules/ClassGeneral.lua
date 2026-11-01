@@ -299,11 +299,117 @@ local function Tools()
     return CT
 end
 
+-- ============================================
+-- RIGHTEOUS FURY WATCH: the tanking paladins in your group
+-- ============================================
+-- Other players' talents can't be read without inspecting, so a paladin
+-- counts as tanking once we've seen Righteous Fury on them. When it falls
+-- off while they're alive (it also goes when they die), you get a warning
+-- line, and an announce once to the channel you picked (Me only by default).
+-- The warning stays while a tanking paladin is up without it, after a
+-- resurrection too. Only players we can see are judged: buffs on someone
+-- far away aren't sent to us.
+
+local RIGHTEOUS_FURY = 25780
+local ICON_FURY = "Interface\\Icons\\Spell_Holy_SealOfFury"
+local RF_ANNOUNCE_GAP = 30     -- seconds between announces for one paladin
+local rfState = {}             -- [name] = { tank, on, announced }
+local rfName
+
+local RF_CHANNELS = {
+    { value = "LOCAL", text = "Me only" },
+    { value = "PARTY", text = "Party" },
+    { value = "RAID",  text = "Raid" },
+    { value = "SAY",   text = "Say" },
+}
+
+local function FuryName()
+    if not rfName then
+        local ok, n = pcall(GetSpellInfo, RIGHTEOUS_FURY)
+        rfName = (ok and type(n) == "string") and n or "Righteous Fury"
+    end
+    return rfName
+end
+
+local function HasFury(unit)
+    local want = FuryName()
+    for i = 1, 40 do
+        local n = UnitBuff(unit, i)
+        if not n then return false end
+        if n == want then return true end
+    end
+    return false
+end
+
+-- Where an announce goes: the chosen channel if it works here, else nil
+-- (say only works inside an instance without a key press)
+local function FuryChannel()
+    local ch = GeneralChecksDB and GeneralChecksDB.rfChannel or "LOCAL"
+    if ch == "LOCAL" or not IsInGroup() then return nil end
+    if ch == "RAID" and not IsInRaid() then return "PARTY" end
+    if ch == "SAY" and not (IsInInstance and IsInInstance()) then return nil end
+    return ch
+end
+
+function General:AnnounceFury(name)
+    local msg = "Righteous Fury dropped off " .. name .. "!"
+    local ch = FuryChannel()
+    if ch then pcall(SendChatMessage, msg, ch) else self:Print("|cFFFF6666" .. msg .. "|r") end
+end
+
+local function FuryKey(name) return "gen_rf_" .. name end
+
+local function ClearFury(tools)
+    for name in pairs(rfState) do tools:ClearAlert(FuryKey(name)) end
+    wipe(rfState)
+end
+
+local function FuryMonitor()
+    local tools = Tools()
+    if not tools or not WM:IsModuleOn("ClassGeneral") then return end
+    if not tools:IsEnabled(CLASS, "rfWatch") or not IsInGroup() then
+        if next(rfState) then ClearFury(tools) end
+        return
+    end
+    local seen, now = {}, GetTime()
+    for _, unit in ipairs(tools.GroupUnits()) do
+        local name = UnitName(unit)
+        local _, class = UnitClass(unit)
+        if class == "PALADIN" and name and not UnitIsUnit(unit, "player") then
+            seen[name] = true
+            local st = rfState[name] or {}
+            rfState[name] = st
+            if not UnitIsConnected(unit) or UnitIsDeadOrGhost(unit) then
+                st.on = false                         -- dead: it drops, nobody's fault
+                tools:ClearAlert(FuryKey(name))
+            elseif UnitIsVisible(unit) then
+                local on = HasFury(unit)
+                if on then
+                    st.tank = true
+                    tools:ClearAlert(FuryKey(name))
+                elseif st.tank then
+                    tools:SetAlert(FuryKey(name), name .. ": Righteous Fury is off", ICON_FURY, tools:AlertSound("gen_rf"))
+                    if st.on and now - (st.announced or -1000) > RF_ANNOUNCE_GAP then
+                        st.announced = now
+                        General:AnnounceFury(name)
+                    end
+                end
+                st.on = on
+            end
+        end
+    end
+    for name in pairs(rfState) do
+        if not seen[name] then tools:ClearAlert(FuryKey(name)); rfState[name] = nil end
+    end
+end
+General.FuryMonitor = FuryMonitor
+
 local function ClearAll(tools)
     tools:ClearAlert("gen_flask")
     tools:ClearAlert("gen_food")
     tools:ClearAlert("gen_oil")
     ClearMana(tools)
+    ClearFury(tools)
 end
 
 local function Monitor()
@@ -423,6 +529,7 @@ function General:InitDB()
     if GeneralChecksDB.potionSound == nil then GeneralChecksDB.potionSound = "wm:potion" end
     if GeneralChecksDB.runeSound == nil then GeneralChecksDB.runeSound = "wm:rune" end
     if GeneralChecksDB.soundChannel == nil then GeneralChecksDB.soundChannel = "Master" end
+    if GeneralChecksDB.rfChannel == nil then GeneralChecksDB.rfChannel = "LOCAL" end
 end
 
 -- A sound choice for one warning; picking a sound plays it, so the
@@ -510,6 +617,21 @@ function General:RegisterFeatures()
         onToggle = function(v) GeneralChecksDB.only25 = v and true or false end,
     })
 
+    tools:RegisterFeature(CLASS, {
+        key = "rfWatch", name = "Watch Righteous Fury on tanking paladins",
+        desc = "In a group: once a paladin has had Righteous Fury on (so they're tanking), warns you when it falls off while they're alive, and announces it once to the channel below. The warning stays until it's back on.",
+        default = true,
+    })
+    tools:RegisterFeature(CLASS, {
+        key = "rfChannel", kind = "choice", name = "Righteous Fury announce to",
+        options = RF_CHANNELS, default = "LOCAL",
+        get = function() return GeneralChecksDB.rfChannel end,
+        set = function(v) GeneralChecksDB.rfChannel = v end,
+        tooltip = { "Righteous Fury announce", "Me only: a line in your chat and the warning frame.",
+            "Party or Raid: tells the group (Raid in a party goes to Party). Say: only inside an instance, since"
+            .. " the game blocks addon /say outside; elsewhere it tells only you." },
+    })
+
     -- Keep the saved flag and the feature toggle in step on load
     local tdb = ClassToolsDB and ClassToolsDB.enabled and ClassToolsDB.enabled[CLASS]
     if tdb and tdb.only25 ~= nil then
@@ -527,7 +649,9 @@ function General:RegisterFeatures()
     tools:RegisterAlertSound(CLASS, "gen_flask", "No flask or elixirs")
     tools:RegisterAlertSound(CLASS, "gen_food", "No food buff")
     tools:RegisterAlertSound(CLASS, "gen_oil", "No weapon oil / stone")
-    tools:RegisterMonitor(Monitor)
+    tools:RegisterAlertSound(CLASS, "gen_rf", "Righteous Fury off a tank")
+    -- One monitor: the Righteous Fury watch runs after the checks on you
+    tools:RegisterMonitor(function() Monitor(); pcall(FuryMonitor) end)
 end
 
 local events = CreateFrame("Frame")
