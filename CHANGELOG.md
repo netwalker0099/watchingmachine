@@ -2,9 +2,32 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.63** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.64** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.64
+
+### Righteous Fury watch: tanks by Holy Shield
+
+- A paladin now counts as a tank once seen with **Holy Shield** (the
+  Protection talent), not Righteous Fury, so a Holy paladin who keeps
+  Righteous Fury on is never warned about.
+- A paladin first seen with Holy Shield but without Righteous Fury is
+  warned about and announced too.
+
+### Shaman: Earth Shield unit frame
+
+- Earth Shield moves out of the Shields frame into its own **unit frame**,
+  styled like an ElvUI party frame: a flat class-coloured health bar with
+  the name and health (`12.3k | 85%`), a thin power bar, a 1px border
+  (white while they're your target) and the Earth Shield aura beside it
+  with its charges, time left and a cooldown swipe.
+- Works like one: click to target them (click-casting addons such as
+  Clique pick it up), mouse over for their tooltip, faded out of range,
+  *Dead* / *Offline*. *No Earth Shield* in a group when it isn't on anyone.
+- Shift-drag to move (out of combat). A new target in combat is drawn at
+  once and becomes clickable when combat ends.
 
 ## 3.63
 

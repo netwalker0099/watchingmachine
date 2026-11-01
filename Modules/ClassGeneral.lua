@@ -303,7 +303,8 @@ end
 -- RIGHTEOUS FURY WATCH: the tanking paladins in your group
 -- ============================================
 -- Other players' talents can't be read without inspecting, so a paladin
--- counts as tanking once we've seen Righteous Fury on them. When it falls
+-- counts as tanking once we've seen Holy Shield (the Protection talent) on
+-- them; Righteous Fury alone doesn't count, as some healers use it. When it falls
 -- off while they're alive (it also goes when they die), you get a warning
 -- line, and an announce once to the channel you picked (Me only by default).
 -- The warning stays while a tanking paladin is up without it, after a
@@ -311,10 +312,11 @@ end
 -- far away aren't sent to us.
 
 local RIGHTEOUS_FURY = 25780
+local HOLY_SHIELD = 20925
 local ICON_FURY = "Interface\\Icons\\Spell_Holy_SealOfFury"
 local RF_ANNOUNCE_GAP = 30     -- seconds between announces for one paladin
 local rfState = {}             -- [name] = { tank, on, announced }
-local rfName
+local rfName, hsName
 
 local RF_CHANNELS = {
     { value = "LOCAL", text = "Me only" },
@@ -331,14 +333,24 @@ local function FuryName()
     return rfName
 end
 
-local function HasFury(unit)
-    local want = FuryName()
+local function HolyShieldName()
+    if not hsName then
+        local ok, n = pcall(GetSpellInfo, HOLY_SHIELD)
+        hsName = (ok and type(n) == "string") and n or "Holy Shield"
+    end
+    return hsName
+end
+
+-- Righteous Fury on, Holy Shield on
+local function FuryBuffs(unit)
+    local rf, hs = FuryName(), HolyShieldName()
+    local hasRF, hasHS = false, false
     for i = 1, 40 do
         local n = UnitBuff(unit, i)
-        if not n then return false end
-        if n == want then return true end
+        if not n then break end
+        if n == rf then hasRF = true elseif n == hs then hasHS = true end
     end
-    return false
+    return hasRF, hasHS
 end
 
 -- Where an announce goes: the chosen channel if it works here, else nil
@@ -383,13 +395,16 @@ local function FuryMonitor()
                 st.on = false                         -- dead: it drops, nobody's fault
                 tools:ClearAlert(FuryKey(name))
             elseif UnitIsVisible(unit) then
-                local on = HasFury(unit)
-                if on then
-                    st.tank = true
+                local on, holyShield = FuryBuffs(unit)
+                local newTank = holyShield and not st.tank
+                if holyShield then st.tank = true end
+                if on or not st.tank then
                     tools:ClearAlert(FuryKey(name))
-                elseif st.tank then
+                else
                     tools:SetAlert(FuryKey(name), name .. ": Righteous Fury is off", ICON_FURY, tools:AlertSound("gen_rf"))
-                    if st.on and now - (st.announced or -1000) > RF_ANNOUNCE_GAP then
+                    -- Announced when it drops, or when a paladin first shows
+                    -- as a tank (Holy Shield) without it
+                    if (st.on or newTank) and now - (st.announced or -1000) > RF_ANNOUNCE_GAP then
                         st.announced = now
                         General:AnnounceFury(name)
                     end
@@ -619,7 +634,7 @@ function General:RegisterFeatures()
 
     tools:RegisterFeature(CLASS, {
         key = "rfWatch", name = "Watch Righteous Fury on tanking paladins",
-        desc = "In a group: once a paladin has had Righteous Fury on (so they're tanking), warns you when it falls off while they're alive, and announces it once to the channel below. The warning stays until it's back on.",
+        desc = "In a group: once a paladin has used Holy Shield (so they're Protection and tanking; Righteous Fury alone doesn't count, as some healers use it), warns you when it falls off while they're alive, and announces it once to the channel below. The warning stays until it's back on.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {

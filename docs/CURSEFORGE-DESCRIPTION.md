@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.63 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.64 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -464,12 +464,20 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 - **Totem timers** (3.50): above the button, each totem you have down (Air,
   Water, Earth, Fire) with the time it has left. *Totem timers above the
   button* turns them off
-- **Shields frame** (3.63), shift-drag to move:
-  - **Shield timer:** your Water Shield or Lightning Shield, its charges and
-    time left. In combat or a group it turns red when you have neither
-  - **Earth Shield** (Restoration): who it's on, their health (with a bar),
-    its charges and time left. Out of sight it shows what the combat log
-    last said; in a group it turns red when it isn't on anyone
+- **Shields frame** (3.63), shift-drag to move: your Water Shield or
+  Lightning Shield, its charges and time left. In combat or a group it
+  turns red when you have neither (*Shield timer*)
+- **Earth Shield frame** (Restoration; 3.64 a unit frame), shift-drag to
+  move out of combat: a unit frame like an ElvUI party frame for whoever
+  has your Earth Shield. A flat class-coloured health bar with their name
+  and health, a thin power bar, and the Earth Shield aura beside it with
+  its charges, time left and a cooldown swipe. Click to target them
+  (click-casting addons such as Clique work on it), mouse over for their
+  tooltip; white border while they're your target, faded out of range,
+  *Dead* / *Offline* when they are. Out of sight it shows what the combat
+  log last said; in a group it says *No Earth Shield* when it isn't on
+  anyone. A new target in combat is drawn at once and becomes clickable
+  when combat ends (the game locks secure frames in combat)
 - **The swing timer's shaman options** (3.56: on this tab): *Weapon sync
   mark on the swing timer*, *Off hand lands after by*, *SYNC NOW sound* and
   *Windfury cooldown bar on the swing timer* (see the swing timer, under
@@ -477,8 +485,9 @@ Flask detection matches on substring, so `Unstable Flask of the Beast` and
 
 #### Paladin
 - **Righteous Fury watch on other paladins** (3.63, on the **General** tab,
-  for every class): in a group, once a paladin has had Righteous Fury on
-  (so they're tanking), you're warned when it falls off while they're
+  for every class): in a group, once a paladin has used **Holy Shield**
+  (3.64; so they're Protection and tanking, while a healer who keeps
+  Righteous Fury on is left alone), you're warned when it falls off while they're
   alive, and it's announced once (at most every 30 seconds) to *Me only*,
   *Party*, *Raid* or *Say* (*Say* only inside an instance). The warning
   stays until it's back on, also after a resurrection

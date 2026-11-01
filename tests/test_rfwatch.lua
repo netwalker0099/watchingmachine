@@ -21,7 +21,9 @@ local dead, visible, online = {}, { party1 = true, party2 = true }, {}
 env.UnitIsDeadOrGhost = function(u) return dead[u] or false end
 env.UnitIsConnected = function(u) return not online[u] end
 env.UnitIsVisible = function(u) return visible[u] or false end
-env.GetSpellInfo = function(id) if id == 25780 then return "Righteous Fury" end end
+env.GetSpellInfo = function(id)
+    if id == 25780 then return "Righteous Fury" elseif id == 20925 then return "Holy Shield" end
+end
 local buffs = {}
 env.UnitBuff = function(u, i) return buffs[u] and buffs[u][i] end
 local sent = {}
@@ -55,12 +57,19 @@ local TANK = "gen_rf_Tankadin"
 
 check("on by default, telling only you", CT:IsEnabled("GENERAL", "rfWatch") and env.GeneralChecksDB.rfChannel == "LOCAL")
 
--- Holyadin never has Righteous Fury: never warned about
+-- Holyadin uses Righteous Fury too, but never Holy Shield: never a tank
+buffs.party2 = { "Righteous Fury" }
 Tick()
-check("no Righteous Fury seen yet: not a tank, no warning", next(alerts) == nil)
+check("nothing seen yet: no warning", next(alerts) == nil)
 buffs.party1 = { "Blessing of Kings", "Righteous Fury" }
 Tick()
-check("Righteous Fury seen: a tank, nothing wrong", next(alerts) == nil and #printed == 0)
+check("Righteous Fury alone: not a tank, nothing said", next(alerts) == nil and #printed == 0)
+buffs.party2 = {}
+Tick()
+check("a healer's Righteous Fury dropping: nothing", next(alerts) == nil and #printed == 0)
+buffs.party1 = { "Blessing of Kings", "Righteous Fury", "Holy Shield" }
+Tick()
+check("Holy Shield seen: a tank, nothing wrong", next(alerts) == nil and #printed == 0)
 
 -- It falls off
 buffs.party1 = { "Blessing of Kings" }
@@ -127,19 +136,19 @@ roster.party1 = nil
 Tick()
 check("left the group: warning gone", alerts[TANK] == nil)
 roster.party1 = { "Tankadin", "PALADIN" }
-buffs.party1 = { "Righteous Fury" }; Tick()
+buffs.party1 = { "Righteous Fury", "Holy Shield" }; Tick()
 buffs.party1 = {}; Tick(31)
 CT:SetEnabled("GENERAL", "rfWatch", false)
 Tick()
 check("option off: warning gone", alerts[TANK] == nil)
 CT:SetEnabled("GENERAL", "rfWatch", true)
-buffs.party1 = { "Righteous Fury" }; Tick()
+buffs.party1 = { "Righteous Fury", "Holy Shield" }; Tick()
 buffs.party1 = {}; Tick(31)
 check("option on: watching again", alerts[TANK])
 local before = #sent
 WM:SetModuleOn("ClassGeneral", false)
 check("module off: warning gone", alerts[TANK] == nil)
-buffs.party1 = { "Righteous Fury" }; Tick()
+buffs.party1 = { "Righteous Fury", "Holy Shield" }; Tick()
 buffs.party1 = {}; Tick(31)
 check("module off: nothing", alerts[TANK] == nil and #sent == before)
 
@@ -149,6 +158,15 @@ roster.player = { "Me", "PALADIN" }
 buffs.player = { "Righteous Fury" }; Tick()
 buffs.player = {}; Tick(31)
 check("yourself: not watched here", alerts.gen_rf_Me == nil)
+
+-- A paladin first seen with Holy Shield but no Righteous Fury: warned and announced
+roster.player = { "Me", "MAGE" }
+roster.party2 = { "Newtank", "PALADIN" }
+env.GeneralChecksDB.rfChannel = "PARTY"
+local n = #sent
+buffs.party2 = { "Holy Shield" }; Tick(31)
+check("Holy Shield without Righteous Fury: warned and announced", alerts.gen_rf_Newtank
+    and sent[n + 1] and sent[n + 1][1] == "Righteous Fury dropped off Newtank!")
 
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

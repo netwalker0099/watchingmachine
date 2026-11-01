@@ -513,7 +513,7 @@
     <li><b>Use a Dark / Demonic Rune:</b> once you're 1500 below and no potion is ready. Not below 35% health.</li>
     <li><b>Bosses only:</b> trash fights stay quiet. Untick <i>Mana warnings only on bosses</i> to have them on every fight in a raid.</li>
     <li>Both thresholds are adjustable, and each warning has its own sound (Potion and Rune by default).</li>
-    <li><b>Righteous Fury watch:</b> once a paladin in your group has had Righteous Fury on, you're warned when it falls off
+    <li><b>Righteous Fury watch:</b> once a paladin in your group has used Holy Shield (so they're tanking; a healer who keeps Righteous Fury on is left alone), you're warned when it falls off
         while they're alive, and it's announced once to Me only, Party, Raid or Say (Say inside instances only).</li>
   </ul>
 </section>
@@ -597,8 +597,13 @@
   <h3>Shields frame</h3>
   <ul>
     <li><b>Your shield:</b> Water Shield or Lightning Shield, its charges and time left; red in combat or a group when you have neither.</li>
-    <li><b>Earth Shield</b> (Restoration): who it's on, their health with a bar, its charges and time left; red in a group when it isn't on anyone.</li>
-    <li>Shift-drag to move it. Each line has its own option on the Shaman tab.</li>
+    <li>Shift-drag to move it.</li>
+  </ul>
+  <h3>Earth Shield frame</h3>
+  <ul>
+    <li><b>A unit frame</b> like an ElvUI party frame for whoever has your Earth Shield (Restoration): class-coloured health bar with their name and health, a thin power bar, and the Earth Shield aura with its charges, time left and a cooldown swipe.</li>
+    <li><b>Click</b> to target them (click-casting addons such as Clique work on it); mouse over for their tooltip. White border while they're your target, faded out of range, <i>Dead</i> or <i>Offline</i> when they are.</li>
+    <li><i>No Earth Shield</i> in a group when it isn't on anyone. Shift-drag to move (out of combat). A new target in combat becomes clickable once combat ends.</li>
   </ul>
   <h3>On the swing timer (Enhancement)</h3>
   <ul>
@@ -843,7 +848,7 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.63 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+<footer>Watching Machine guide · written for version 3.64 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
   Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>

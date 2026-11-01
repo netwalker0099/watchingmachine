@@ -500,9 +500,10 @@ end
 -- ============================================
 -- SHIELDS: your Water / Lightning Shield, and who has your Earth Shield
 -- ============================================
--- One small frame. Your own shield: charges and time left (in combat or a
--- group, a red line when it's missing). Earth Shield (Restoration talent):
--- who has it, their health, its charges and time left. Its target comes from
+-- A small Shields frame with your own shield: charges and time left (in
+-- combat or a group, a red line when it's missing). Earth Shield (Restoration
+-- talent) gets a unit frame of its own (below): who has it, their health,
+-- its charges and time left. Its target comes from
 -- the combat log (so it's known outside your group too), and its charges and
 -- time are read from the buff whenever that player is a unit we can see.
 
@@ -609,7 +610,7 @@ local function ClassColor(unit)
     return 1, 1, 1
 end
 
--- The rows the frame shows now
+-- The rows the Shields frame shows now (your own shield)
 function Shaman:ShieldRows(now)
     now = now or GetTime()
     local tools = Tools()
@@ -627,37 +628,272 @@ function Shaman:ShieldRows(now)
             rows[#rows + 1] = { icon = ICON_LIGHTNING, text = "No Water or Lightning Shield", r = 1, g = 0.3, b = 0.3 }
         end
     end
+    return rows
+end
 
-    if tools:IsEnabled(CLASS, "earthShield") and Knows(EARTH_SHIELD) then
-        local unit = EarthShieldUnit(now)
-        if unit and not UnitIsDeadOrGhost(unit) then
-            local count, left = FindBuff(unit, SpellName(EARTH_SHIELD, "Earth Shield"), true, now)
-            if count then
-                esTarget.charges = count
-                if left then esTarget.expires = now + left end
-                local hp, max = UnitHealth(unit) or 0, UnitHealthMax(unit) or 0
-                local frac = max > 0 and hp / max or 0
-                local r, g, b = ClassColor(unit)
-                rows[#rows + 1] = { icon = ICON_EARTH,
-                    text = (UnitName(unit) or esTarget.name or "?") .. "  " .. math.floor(frac * 100 + 0.5) .. "%",
-                    right = count .. (left and ("  " .. tools.Clock(left)) or ""), r = r, g = g, b = b,
-                    bar = frac, barR = 1 - frac, barG = frac, barB = 0.1 }
-            elseif esTarget and esTarget.guid == UnitGUID(unit) then
-                esTarget = nil   -- seen without it: gone
-            end
-        elseif esTarget and esTarget.expires and esTarget.expires > now then
-            -- Out of sight: what the combat log last said
-            rows[#rows + 1] = { icon = ICON_EARTH, text = esTarget.name or "?",
-                right = (esTarget.charges and (esTarget.charges .. "  ") or "") .. tools.Clock(esTarget.expires - now),
-                r = 0.7, g = 0.7, b = 0.7 }
-        elseif esTarget and esTarget.expires and esTarget.expires <= now then
+-- A unit token a secure button can hold (not target / focus / mouseover)
+local function GroupToken(unit)
+    return unit and (unit == "player" or unit:find("^party%d") or unit:find("^raid%d")) and unit or nil
+end
+
+-- What the Earth Shield frame shows now, or nil for no frame:
+--   { unit (when we can see them), token (for clicks), name, class,
+--     charges, left, hp, max, dead, offline, far, none }
+function Shaman:EarthShieldState(now)
+    now = now or GetTime()
+    local tools = Tools()
+    if not tools or not WM:IsModuleOn("ClassShaman") or not IsPlayerShaman() then return nil end
+    if not tools:IsEnabled(CLASS, "earthShield") or not Knows(EARTH_SHIELD) then return nil end
+    local unit = EarthShieldUnit(now)
+    if unit then
+        local _, class = UnitClass(unit)
+        local st = { unit = unit, token = GroupToken(unit), name = UnitName(unit) or (esTarget and esTarget.name) or "?",
+            class = class, hp = UnitHealth(unit) or 0, max = UnitHealthMax(unit) or 0 }
+        if UnitIsConnected and not UnitIsConnected(unit) then st.offline = true end
+        if UnitIsDeadOrGhost(unit) then
+            st.dead = true       -- Earth Shield goes when they die
             esTarget = nil
+            return st
         end
-        if not esTarget and IsInGroup() then
-            rows[#rows + 1] = { icon = ICON_EARTH, text = "Earth Shield isn't on anyone", r = 1, g = 0.3, b = 0.3 }
+        local count, left = FindBuff(unit, SpellName(EARTH_SHIELD, "Earth Shield"), true, now)
+        if count then
+            esTarget.charges = count
+            if left then esTarget.expires = now + left end
+            st.charges, st.left = count, left
+            if UnitIsVisible and not UnitIsVisible(unit) then st.far = true end
+            if st.token and st.token ~= "player" and UnitInRange then
+                local inRange, checked = UnitInRange(unit)
+                if checked and not inRange then st.far = true end
+            end
+            return st
+        elseif esTarget and esTarget.guid == UnitGUID(unit) then
+            esTarget = nil   -- seen without it: gone
+        end
+    elseif esTarget and esTarget.expires and esTarget.expires > now then
+        -- Out of sight: what the combat log last said
+        return { name = esTarget.name or "?", charges = esTarget.charges, left = esTarget.expires - now, far = true }
+    elseif esTarget and esTarget.expires and esTarget.expires <= now then
+        esTarget = nil
+    end
+    if IsInGroup() then return { none = true, name = "No Earth Shield" } end
+    return nil
+end
+
+-- ---- the Earth Shield unit frame ----
+-- Looks and works like a party frame in ElvUI: a flat class-coloured health
+-- bar with the name and health on it, a thin power bar under it, a 1px black
+-- border (white while they're your target), faded out of range, and the
+-- Earth Shield aura beside it (charges, time left and a cooldown swipe).
+-- It's a secure unit button: click to target them (or cast on them with a
+-- click-casting addon), mouse over for their tooltip. A secure button can't
+-- change who it's on, show or hide in combat, so a new Earth Shield target
+-- in combat is drawn at once and clickable once combat ends.
+local BAR_TEX = "Interface\\Buttons\\WHITE8X8"
+local ES_W, ES_HEALTH_H, ES_POWER_H = 170, 30, 5
+local POWER_COLORS = { [0] = { 0, 0.55, 1 }, [1] = { 1, 0, 0 }, [2] = { 1, 0.5, 0.25 }, [3] = { 1, 1, 0 } }
+
+local function ShortNumber(n)
+    if n >= 1000000 then return string.format("%.1fm", n / 1000000) end
+    if n >= 1000 then return string.format("%.1fk", n / 1000) end
+    return tostring(math.floor(n))
+end
+
+local function Outline(fs, size)
+    local font = GameFontNormalSmall and GameFontNormalSmall:GetFont()
+    if type(font) == "string" then fs:SetFont(font, size, "OUTLINE") end
+    if fs.SetShadowOffset then fs:SetShadowOffset(0, 0) end
+end
+
+local function NewBar(parent)
+    local bar = CreateFrame("StatusBar", nil, parent)
+    bar:SetStatusBarTexture(BAR_TEX)
+    bar:SetMinMaxValues(0, 1)
+    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+    bar.bg:SetAllPoints(bar)
+    bar.bg:SetTexture(BAR_TEX)
+    return bar
+end
+
+-- Shown or hidden (in combat a secure frame can't be: faded to nothing,
+-- and hidden on the next update after combat)
+local function SetFrameVisible(f, want, alpha)
+    if not (InCombatLockdown and InCombatLockdown()) then
+        f:SetShown(want)
+    end
+    f:SetAlpha(want and (alpha or 1) or 0)
+end
+
+function Shaman:CreateEarthShieldFrame()
+    if self.esFrame then return self.esFrame end
+    local f = CreateFrame("Button", "WM_EarthShieldFrame", UIParent, "SecureUnitButtonTemplate,BackdropTemplate")
+    f:SetSize(ES_W, ES_HEALTH_H + ES_POWER_H + 3)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:RegisterForClicks("AnyUp")
+    f:RegisterForDrag("LeftButton")
+    f:SetAttribute("type1", "target")
+    f:SetBackdrop({ bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1 })
+    f:SetBackdropColor(0, 0, 0, 0.6)
+    f:SetBackdropBorderColor(0, 0, 0, 1)
+    local db = Store()
+    if db.esX and db.esY then
+        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", db.esX, db.esY)
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", -260, -60)
+    end
+    f:SetScript("OnDragStart", function(self)
+        if IsShiftKeyDown and IsShiftKeyDown() and not InCombatLockdown() then self:StartMoving() end
+    end)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local x, y = self:GetCenter()
+        if x and ShamanToolsDB then ShamanToolsDB.esX, ShamanToolsDB.esY = x, y end
+    end)
+    f:SetScript("OnEnter", function(self)
+        local st = self.state
+        if st and st.unit and UnitExists(st.unit) then
+            if GameTooltip_SetDefaultAnchor then GameTooltip_SetDefaultAnchor(GameTooltip, self)
+            else GameTooltip:SetOwner(self, "ANCHOR_TOP") end
+            GameTooltip:SetUnit(st.unit)
+        else
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("Earth Shield", 1, 0.82, 0)
+        end
+        GameTooltip:AddLine("Who has your Earth Shield, their health and its charges. Click to target them."
+            .. " Shift-drag to move.", 0.9, 0.9, 0.9, true)
+        GameTooltip:Show()
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    f.health = NewBar(f)
+    f.health:SetPoint("TOPLEFT", 1, -1)
+    f.health:SetPoint("TOPRIGHT", -1, -1)
+    f.health:SetHeight(ES_HEALTH_H)
+    f.power = NewBar(f)
+    f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -1)
+    f.power:SetPoint("TOPRIGHT", f.health, "BOTTOMRIGHT", 0, -1)
+    f.power:SetHeight(ES_POWER_H)
+    f.highlight = f:CreateTexture(nil, "HIGHLIGHT")
+    f.highlight:SetAllPoints(f.health)
+    f.highlight:SetColorTexture(1, 1, 1, 0.12)
+    f.name = f.health:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.name:SetPoint("LEFT", 4, 0)
+    f.name:SetJustifyH("LEFT")
+    Outline(f.name, 11)
+    f.hp = f.health:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.hp:SetPoint("RIGHT", -4, 0)
+    f.hp:SetJustifyH("RIGHT")
+    Outline(f.hp, 11)
+
+    -- The Earth Shield aura, to the right
+    local size = ES_HEALTH_H + ES_POWER_H + 3
+    local aura = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    aura:SetSize(size, size)
+    aura:SetPoint("LEFT", f, "RIGHT", 2, 0)
+    aura:SetBackdrop({ bgFile = BAR_TEX, edgeFile = BAR_TEX, edgeSize = 1 })
+    aura:SetBackdropColor(0, 0, 0, 0.6)
+    aura:SetBackdropBorderColor(0, 0, 0, 1)
+    aura.icon = aura:CreateTexture(nil, "ARTWORK")
+    aura.icon:SetPoint("TOPLEFT", 1, -1)
+    aura.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    aura.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    aura.icon:SetTexture(ICON_EARTH)
+    aura.cd = CreateFrame("Cooldown", nil, aura, "CooldownFrameTemplate")
+    aura.cd:SetAllPoints(aura.icon)
+    aura.cd:SetReverse(true)
+    if aura.cd.SetHideCountdownNumbers then aura.cd:SetHideCountdownNumbers(true) end
+    local over = CreateFrame("Frame", nil, aura)
+    over:SetAllPoints(aura)
+    over:SetFrameLevel((aura:GetFrameLevel() or 0) + 3)
+    aura.count = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    aura.count:SetPoint("BOTTOMRIGHT", -1, 2)
+    Outline(aura.count, 14)
+    aura.time = over:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    aura.time:SetPoint("TOP", 0, -2)
+    Outline(aura.time, 10)
+    f.aura = aura
+
+    -- Click-casting addons (Clique) pick up frames listed here
+    if type(ClickCastFrames) == "table" then ClickCastFrames[f] = true end
+    f:Hide()
+    self.esFrame = f
+    return f
+end
+
+function Shaman:UpdateEarthShield(now)
+    local f = self.esFrame
+    if not f then return end
+    now = now or GetTime()
+    local st = self:EarthShieldState(now)
+    f.state = st
+    -- Who a click goes to: a secure change, so out of combat only
+    local token = st and st.token or nil
+    if f.secureUnit ~= token and not (InCombatLockdown and InCombatLockdown()) then
+        f:SetAttribute("unit", token)
+        f.secureUnit = token
+    end
+    if not st then SetFrameVisible(f, false) return end
+    SetFrameVisible(f, true, st.far and 0.45 or 1)
+
+    local cr, cg, cb = 0.5, 0.5, 0.5
+    local c = st.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[st.class]
+    if c and st.unit then cr, cg, cb = c.r, c.g, c.b end
+    local frac = (st.max or 0) > 0 and (st.hp or 0) / st.max or 0
+    f.name:SetText(st.name)
+    if st.none then
+        f.name:SetTextColor(1, 0.3, 0.3)
+        f.hp:SetText("")
+        frac = 0
+    else
+        f.name:SetTextColor(1, 1, 1)
+        if st.offline then
+            f.hp:SetText("Offline"); frac = 0
+        elseif st.dead then
+            f.hp:SetText("Dead"); frac = 0
+        elseif not st.unit then
+            f.hp:SetText(""); frac = 0     -- out of sight: health unknown
+        else
+            f.hp:SetText(ShortNumber(st.hp) .. " | " .. math.floor(frac * 100 + 0.5) .. "%")
         end
     end
-    return rows
+    f.health:SetStatusBarColor(cr, cg, cb)
+    f.health.bg:SetVertexColor(cr * 0.25, cg * 0.25, cb * 0.25, 1)
+    f.health:SetValue(frac)
+    f.frac = frac
+
+    local pfrac, pr, pg, pb = 0, 0.3, 0.3, 0.3
+    if st.unit and not st.dead and not st.offline then
+        local ptype, ptoken = UnitPowerType(st.unit)
+        local pmax = UnitPowerMax(st.unit) or 0
+        pfrac = pmax > 0 and (UnitPower(st.unit) or 0) / pmax or 0
+        local pc = ptoken and PowerBarColor and PowerBarColor[ptoken]
+        if type(pc) == "table" and pc.r then pr, pg, pb = pc.r, pc.g, pc.b
+        elseif POWER_COLORS[ptype] then pr, pg, pb = unpack(POWER_COLORS[ptype]) end
+    end
+    f.power:SetStatusBarColor(pr, pg, pb)
+    f.power.bg:SetVertexColor(pr * 0.25, pg * 0.25, pb * 0.25, 1)
+    f.power:SetValue(pfrac)
+
+    -- White border while they're your target
+    local t = (st.unit and UnitIsUnit(st.unit, "target")) and 1 or 0
+    f:SetBackdropBorderColor(t, t, t, 1)
+
+    local aura = f.aura
+    if st.charges or st.left then
+        aura.icon:SetDesaturated(false)
+        aura.count:SetText(st.charges and tostring(st.charges) or "")
+        aura.time:SetText(st.left and Tools().Clock(st.left) or "")
+        local start = st.left and (now + st.left - ES_DURATION) or nil
+        if start and math.abs((aura.cdStart or 0) - start) > 0.5 then
+            aura.cdStart = start
+            aura.cd:SetCooldown(start, ES_DURATION)
+        end
+    else
+        aura.icon:SetDesaturated(true)
+        aura.count:SetText("")
+        aura.time:SetText("")
+        if aura.cdStart then aura.cdStart = nil; aura.cd:SetCooldown(0, 0) end
+    end
 end
 
 function Shaman:CreateShieldFrame()
@@ -666,17 +902,15 @@ function Shaman:CreateShieldFrame()
     if not tools then return nil end
     self.shieldFrame = tools:CreateTrackerFrame({
         name = "WM_ShamanShields", title = "Shields", store = Store, posX = "shieldX", posY = "shieldY",
-        x = -260, y = -140, width = 210, rows = 2,
-        tip = { "Shields", "Your Water or Lightning Shield (charges, time left), and who has your Earth Shield:"
-            .. " their health, its charges and time left." },
+        x = -260, y = -140, width = 210, rows = 1,
+        tip = { "Shields", "Your Water or Lightning Shield: its charges and time left." },
     })
     return self.shieldFrame
 end
 
 function Shaman:UpdateShields(now)
-    local f = self.shieldFrame
-    if not f then return end
-    f:SetRows(self:ShieldRows(now))
+    if self.shieldFrame then self.shieldFrame:SetRows(self:ShieldRows(now)) end
+    self:UpdateEarthShield(now)
 end
 
 local shieldTicker = CreateFrame("Frame")
@@ -685,8 +919,12 @@ shieldTicker:SetScript("OnUpdate", function(_, elapsed)
     shieldSince = shieldSince + (elapsed or 0)
     if shieldSince < SHIELD_TICK then return end
     shieldSince = 0
-    if not Shaman.shieldFrame then return end
-    if not WM:IsModuleOn("ClassShaman") then Shaman.shieldFrame:Hide() return end
+    if not Shaman.shieldFrame and not Shaman.esFrame then return end
+    if not WM:IsModuleOn("ClassShaman") then
+        if Shaman.shieldFrame then Shaman.shieldFrame:Hide() end
+        if Shaman.esFrame then SetFrameVisible(Shaman.esFrame, false) end
+        return
+    end
     Shaman:UpdateShields()
 end)
 
@@ -729,7 +967,7 @@ function Shaman:RegisterFeatures()
     })
     tools:RegisterFeature(CLASS, {
         key = "earthShield", name = "Earth Shield: who has it, their health and charges",
-        desc = "Restoration (once you know Earth Shield): in the Shields frame, who your Earth Shield is on, their health, its charges and time left. In a group it turns red when it isn't on anyone.",
+        desc = "Restoration (once you know Earth Shield): a unit frame, like a party frame in ElvUI, for whoever has your Earth Shield: their class-coloured health and power bars, with its charges, time left and a cooldown swipe beside it. Click it to target them (click-casting addons such as Clique work on it), mouse over for their tooltip. It fades when they're out of range, and in a group says \"No Earth Shield\" when it isn't on anyone. Shift-drag to move (out of combat). A new target in combat becomes clickable once combat ends.",
         default = true,
         onToggle = shields,
     })
@@ -746,6 +984,7 @@ function Shaman:Initialize()
         WM:RegisterEvents(eventFrame, { "SPELLS_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_TOTEM_UPDATE",
             "COMBAT_LOG_EVENT_UNFILTERED" })
         self:CreateShieldFrame()
+        self:CreateEarthShieldFrame()
         totemsWereDown = self:AnyTotemDown() or false
         self:UpdateTimers()
         -- Spellbook isn't reliably populated the instant we initialise
@@ -784,6 +1023,7 @@ function Shaman:OnModuleOff()
     self:ClearMacro()
     if self.timers then self.timers:Hide() end
     if self.shieldFrame then self.shieldFrame:Hide() end
+    if self.esFrame then SetFrameVisible(self.esFrame, false) end
 end
 
 -- Empty the button's macro, so its key binding does nothing while off
