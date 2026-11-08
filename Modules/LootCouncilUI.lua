@@ -375,15 +375,26 @@ function LC:HideUI()
     if pane then pane:Hide() end
 end
 
+
 -- ============================================
 -- COMMANDS, SETUP
 -- ============================================
 
--- /wmachine council [history|players|import|<name>]
+-- /wmachine council [history|players|import|vote|test [n]|endtest|<name>]
 function LC:Command(arg)
     arg = strtrim(arg or "")
     local low = arg:lower()
-    if low == "" or low == "history" then
+    if low:match("^test") then
+        if LC.RC:StartTest(tonumber(low:match("^test%s+(%d+)"))) then
+            WM:ModulePrint("LootCouncil", "Local test session: answer in the response frame and vote in the voting frame."
+                .. " Nothing is sent to anyone. |cFFFFFF00/wmachine council endtest|r ends it.")
+            LC:ShowVoting()
+        end
+    elseif low == "endtest" then
+        LC.RC:EndTest()
+    elseif low == "vote" or low == "voting" then
+        LC:ShowVoting()
+    elseif low == "" or low == "history" then
         self.tab, self.player = "all", nil
         self:Toggle()
     elseif low == "players" then
@@ -407,8 +418,15 @@ function LC:SetupPage(L)
     L:Note("Keeps the guild's loot history: every item awarded, to whom, and how it was won (Need, Greed, Minor"
         .. " Upgrade, off-spec, soft reserve, disenchant).")
     L:Note("|cFFFFFFFFWhere it comes from:|r what Gargul and RCLootCouncil have already saved on this account is added"
-        .. " at login (only new awards; an award both recorded becomes one). Coming next: voting with RCLootCouncil"
-        .. " users, awarding as master looter, and roll-offs.")
+        .. " at login (only new awards; an award both recorded becomes one), and every award a master looter running"
+        .. " RCLootCouncil logs during a raid is added as it happens.")
+    L:Note("|cFFFFFFFFRaiding with RCLootCouncil:|r when the master looter (RCLootCouncil or Watching Machine) sends"
+        .. " loot, the response frame shows each item, the gear it would replace and the master looter's buttons"
+        .. " (Need, Greed, Minor Upgrade...) plus Pass, with a note. On the council, the voting frame shows everyone's"
+        .. " answer, item level, gear, votes and notes, and each candidate's |cFFFFFFFFlast loot|r; hover a candidate"
+        .. " for their loot of the last 30 days. |cFFFFFF00/wmachine council test|r runs a local test session"
+        .. " (nothing is sent). With RCLootCouncil itself enabled on this character, it does the answering and"
+        .. " voting, and we only record its awards.")
     L:Note("|cFFFFFFFFTwo views:|r |cFFFFFF00/wmachine council|r lists all loot ever awarded (search by item, player,"
         .. " how or boss; the Players tab shows each player's count and last loot). Click a player for all of their"
         .. " loot. In ArmorySnap's browser, a player's armory has their loot beside it, with the time since their last"
@@ -419,6 +437,15 @@ function LC:SetupPage(L)
     L:Checkbox({ label = "Show a player's loot beside their armory", get = function() return db.showInArmory end,
         set = function(v) db.showInArmory = v end,
         tooltip = { "Loot beside the armory", "In ArmorySnap's browser, a pane beside the paper doll lists the player's loot with the guild." } })
+    L:Checkbox({ label = "Take part in RCLootCouncil loot sessions", get = function() return db.rcTalk ~= false end,
+        set = function(v) db.rcTalk = v end,
+        tooltip = { "RCLootCouncil sessions", "Answer the master looter's loot and vote on the council, in RCLootCouncil's own messages. Off: only record awards." } })
+    L:Checkbox({ label = "Show the response frame for loot sent to the raid", indent = 16, get = function() return db.showResponse end,
+        set = function(v) db.showResponse = v end,
+        tooltip = { "Response frame", "Each item the master looter sends, with a button for each answer and a note." } })
+    L:Checkbox({ label = "Open the voting frame when I'm on the council", indent = 16, get = function() return db.openVoting end,
+        set = function(v) db.openVoting = v end,
+        tooltip = { "Voting frame", "Opens when a session starts and you're on the master looter's council. /wmachine council vote opens it any time." } })
     L:Slider({ label = "Recent loot covers (days)", min = 7, max = 90, step = 1, width = 220,
         get = function() return db.recentDays end, set = function(v) db.recentDays = v end,
         tooltip = { "Recent loot", "How far back tooltips list a player's loot (the roster, and later the voting frame)." } })

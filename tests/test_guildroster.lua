@@ -409,6 +409,22 @@ check("purge: one removal per click", P:RemoveNext() == true and #uninvited == 1
 P:RemoveNext(); P:RemoveNext()
 check("purge: the whole player removed over three clicks", #uninvited == 3 and P:Counts() == 0)
 check("purge: nothing more to remove", P:RemoveNext() == false and #uninvited == 3)
+-- Your own rank: nobody at it or above is listed
+env.GetGuildInfo = function() return "The Watchers", "Raider", 3 end
+g.members["Solo-SpineShatter"].rankIndex = 3
+local listedSolo = false
+for _, c in ipairs(GR:PurgeCandidates(30, 1)) do if c.lead.name == "Solo-SpineShatter" then listedSolo = true end end
+check("purge: your own rank isn't listed", not listedSolo)
+g.members["Solo-SpineShatter"].rankIndex = 4
+listedSolo = false
+for _, c in ipairs(GR:PurgeCandidates(30, 1)) do if c.lead.name == "Solo-SpineShatter" then listedSolo = true end end
+check("purge: a rank below yours is", listedSolo)
+env.GetGuildInfo = function() return "The Watchers", "Officer", 1 end
+-- A main with no alts can stop being one
+GR:SetMain("Solo")
+check("a main on their own", g.groups[g.members["Solo-SpineShatter"].group].main == "Solo-SpineShatter")
+check("no longer a main: their group goes", GR:UnsetMain("Solo") == true and g.members["Solo-SpineShatter"].group == nil)
+Sync:ClearQueue()
 -- Someone comes back between Find and the click
 P:Find(30, 1)
 for _, e in ipairs(P.list) do e.keep = e.lead.name ~= "Solo-SpineShatter" end

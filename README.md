@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.75 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.76 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1127,10 +1127,31 @@ works with RCLootCouncil and awards like Gargul. Open it with
 - **Each player's loot**: in ArmorySnap's browser, a pane beside a
   player's armory lists their loot with the guild and the time since their
   last award. Roster Manager's details show their last loot too
-- Coming next: voting with RCLootCouncil users (the voting frame shows each
-  candidate's last loot, and their last 30 days on hover), then awarding as
-  master looter with a test mode, then Gargul-style roll-offs
-- Commands: `/wmachine council players`, `import`, or a player's name
+- **Raiding with RCLootCouncil** (3.76): we speak RCLootCouncil's own
+  messages (our own code for its serializer, compression and message
+  splitting), so a master looter running RCLootCouncil sends us loot like
+  any RCLootCouncil user:
+  - **The response frame**: each item, its item level, the gear it would
+    replace and by how much, the master looter's buttons (Need, Greed,
+    Minor Upgrade, or theirs) plus Pass, a note, and their time limit
+  - **The voting frame** (on the master looter's council): every
+    candidate's answer, rank, item level, difference, the gear they'd
+    replace, votes, note and roll, as in RCLootCouncil, plus their **last
+    loot** (item and how long ago). Hover a candidate for their loot of the
+    last 30 days and who voted for them. Vote and Unvote as in RCLootCouncil
+  - **Live history**: every award the master looter logs is added to the
+    loot history as it happens (and removed if they re-award it)
+  - A master looter's version check lists us
+  - With RCLootCouncil itself enabled on this character, it does the
+    answering and voting; we only record its awards
+  - `/wmachine council test [n]` runs a **local test session** (nothing is
+    sent): test items, made-up answers from your group or recent winners,
+    and the response and voting frames to try
+- Coming next: awarding as master looter (with test loot sent to the
+  raid), then Gargul-style roll-offs, then sharing the loot history between
+  Watching Machine users
+- Commands: `/wmachine council players`, `import`, `vote`, `test [n]`,
+  `endtest`, or a player's name
 
 ## Global Theme System
 
@@ -1422,6 +1443,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.76
+- **Loot Council part 2**: raiding with RCLootCouncil. A response frame for the master looter's loot, and a voting frame for the council with each candidate's last loot and their last 30 days on hover; awards are recorded live. `/wmachine council test` runs a local test session
+- Fixed: Roster Manager's purge didn't know your own rank, so it could list players at or above it; un-setting a main with no alts failed; sync could read your rank as the lowest
 
 ### Version 3.75
 - **New module: Loot Council** (`/wmachine council`), part 1: the guild's loot history, imported from Gargul and RCLootCouncil, shown as all loot ever awarded and each player's loot beside their armory, with the time since their last award

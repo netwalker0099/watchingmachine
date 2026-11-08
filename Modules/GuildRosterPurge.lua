@@ -24,7 +24,8 @@ function GR:CanPurge()
 end
 
 local function MyRankIndex()
-    local _, _, idx = GetGuildInfo and GetGuildInfo("player")
+    local idx
+    if GetGuildInfo then idx = select(3, GetGuildInfo("player")) end
     return tonumber(idx) or 0
 end
 

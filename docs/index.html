@@ -645,9 +645,11 @@
     <li><b>All loot:</b> every item awarded, to whom and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve, disenchant). Search by item, player, how or boss; hover for votes, notes and rolls.</li>
     <li><b>Players:</b> everyone who's had loot, their count and last award. Click a player for all of their loot.</li>
     <li><b>Beside their armory:</b> in ArmorySnap's browser a pane lists the player's loot with the guild and the time since their last award. Roster Manager's details show their last loot.</li>
-    <li><b>From Gargul and RCLootCouncil:</b> what they've saved on your account is added at login, once each; <i>Import now</i> does it by hand.</li>
+    <li><b>From Gargul and RCLootCouncil:</b> what they've saved on your account is added at login, once each; <i>Import now</i> does it by hand. Awards a master looter logs during a raid are added as they happen.</li>
+    <li><b>Raiding with RCLootCouncil:</b> when the master looter sends loot, the response frame shows each item, the gear it would replace and their buttons (Need, Greed, Minor Upgrade) plus Pass. On the council, the voting frame shows every candidate's answer, item level, gear, votes and notes, and their <b>last loot</b>; hover a candidate for their last 30 days.</li>
+    <li><b>Try it:</b> <code>/wmachine council test</code> runs a local test session; nothing is sent.</li>
   </ul>
-  <div class="note"><b>Coming next:</b>voting with RCLootCouncil users (with each candidate's last loot and last 30 days), awarding as master looter with a test mode, and roll-offs.</div>
+  <div class="note"><b>Coming next:</b>awarding as master looter with test loot sent to the raid, roll-offs, and sharing the loot history between Watching Machine users.</div>
 </section>
 
 <section id="roster">
@@ -855,7 +857,7 @@
     <tr><td><code>swing</code> · <code>swing reset</code></td><td>Show or reset the swing timer</td></tr>
     <tr><td><code>manatick</code> · <code>manatick reset</code></td><td>Show the mana tick spark; reset its own bar</td></tr>
     <tr><td><code>soulstone</code> · <code>portals</code> · <code>totems</code></td><td>Warlock soulstones, mage portals, shaman totem sets</td></tr>
-    <tr><td><code>council</code> · <code>council players</code> · <code>council import</code> · <code>council &lt;name&gt;</code></td><td>Loot Council</td></tr>
+    <tr><td><code>council</code> · <code>council players</code> · <code>council import</code> · <code>council vote</code> · <code>council test</code> · <code>council &lt;name&gt;</code></td><td>Loot Council</td></tr>
     <tr><td><code>roster</code> · <code>roster log</code> · <code>roster sync</code> · <code>roster import</code> · <code>roster notes</code> · <code>roster purge</code></td><td>Roster Manager</td></tr>
     <tr><td><code>ginvite</code> · <code>recruit</code> · <code>pvp</code></td><td>Guild Invite, Recruiting Tool, PvP Enemy Tracker</td></tr>
     <tr><td><code>filter</code> · <code>keyword</code> · <code>services</code> · <code>wcl</code></td><td>Chat Filter, Keyword Monitor, Services Parser, Whisper Logs</td></tr>
@@ -885,7 +887,7 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.75 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+<footer>Watching Machine guide · written for version 3.76 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
   Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>

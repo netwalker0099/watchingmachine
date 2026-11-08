@@ -2,9 +2,40 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.75** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.76** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.76
+
+### Loot Council part 2: raiding with RCLootCouncil
+
+- Speaks RCLootCouncil's own messages (our own code for its serializer,
+  raw DEFLATE compression and message splitting), so a master looter
+  running RCLootCouncil sends us loot like any other RCLootCouncil user.
+- **Response frame**: each item with its item level, the gear it would
+  replace and the difference, the master looter's buttons (Need, Greed,
+  Minor Upgrade, or their own) plus Pass, a note, and their time limit.
+- **Voting frame** for the master looter's council: each candidate's
+  answer, rank, item level, difference, gear, votes, note and roll, plus
+  their **last loot** and how long ago. Hover a candidate for their loot of
+  the last 30 days. Vote and Unvote.
+- **Live history**: awards the master looter logs are added as they happen,
+  and removed when re-awarded.
+- Answers a master looter's version check.
+- With RCLootCouncil itself enabled on the character, it does the answering
+  and voting; Loot Council only records its awards.
+- `/wmachine council test [n]`: a local test session (nothing is sent).
+- Settings: take part in RCLootCouncil sessions, show the response frame,
+  open the voting frame when on the council.
+
+### Fixes
+
+- Roster Manager's purge didn't know your own rank, so it could list players
+  at or above it (the game refuses to remove them).
+- Un-setting a main who had no alts failed.
+- Roster sync could read your rank as the lowest when your own record was
+  missing.
 
 ## 3.75
 

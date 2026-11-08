@@ -764,7 +764,8 @@ end
 function GR:UnsetMain(name, epoch, remote)
     local g = self:Guild()
     name = FullName(name)
-    local grp, id, rec = g and GroupOf(g, name)
+    local grp, id, rec
+    if g then grp, id, rec = GroupOf(g, name) end
     if not grp or grp.main ~= name then return false end
     epoch = epoch or Now()
     if #grp.members == 1 then

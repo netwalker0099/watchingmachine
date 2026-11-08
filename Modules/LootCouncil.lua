@@ -27,6 +27,9 @@ local DEFAULTS = {
     autoImport = true,       -- read Gargul and RCLootCouncil history at login (new awards only)
     showInArmory = true,     -- the loot pane beside a player's armory
     recentDays = 30,         -- "recent loot" in tooltips
+    rcTalk = true,           -- take part in RCLootCouncil sessions (answer, vote)
+    showResponse = true,     -- the response frame when loot is sent for answers
+    openVoting = true,       -- the voting frame opens for council members
 }
 
 function LC.InitDB()
@@ -345,6 +348,29 @@ function LC.RealmTime(dateStr, timeStr)
     return localEpoch
 end
 
+-- One RCLootCouncil history entry (saved, or sent by a master looter)
+function LC.AddRCLC(name, h, index)
+    if type(h) ~= "table" or not h.lootWon or type(name) ~= "string" then return nil end
+    local c = type(h.color) == "table" and { h.color[1], h.color[2], h.color[3] } or nil
+    local how = h.response or "Awarded"
+    return LC.Add({
+        link = h.lootWon, to = name, t = LC.RealmTime(h.date, h.time) or Now(), how = how,
+        color = c or LC.HOW_COLORS[LC.Kind(how)], rid = h.responseID, reason = h.isAwardReason and true or nil, howFirm = true,
+        boss = h.boss, zone = h.instance, votes = tonumber(h.votes), note = h.note, class = h.class,
+        by = h.owner and LC.Key(h.owner), replaced = h.itemReplaced1,
+        src = { rc = h.id or (name .. ":" .. tostring(index)) }, srcKind = "rc",
+    })
+end
+
+-- An RCLootCouncil history entry was deleted (a re-award)
+function LC.DeleteRCLC(id)
+    local db = DB()
+    local entry = db.sources["rc:" .. tostring(id)]
+    entry = entry and db.history[entry]
+    if entry then entry.deleted = true; Changed() return true end
+    return false
+end
+
 function LC:ImportRCLC()
     local rdb = rawget(_G, "RCLootCouncilLootDB")
     if type(rdb) ~= "table" or type(rdb.factionrealm) ~= "table" then return 0 end
@@ -354,19 +380,8 @@ function LC:ImportRCLC()
             for name, list in pairs(players) do
                 if type(list) == "table" and type(name) == "string" and name:find("-", 1, true) then
                     for i, h in pairs(list) do
-                        if type(h) == "table" and h.lootWon then
-                            local c = type(h.color) == "table" and { h.color[1], h.color[2], h.color[3] } or nil
-                            local how = h.response or "Awarded"
-                            local reason = h.isAwardReason and true or nil
-                            local _, isNew = LC.Add({
-                                link = h.lootWon, to = name, t = LC.RealmTime(h.date, h.time) or 0, how = how,
-                                color = c or LC.HOW_COLORS[LC.Kind(how)], rid = h.responseID, reason = reason, howFirm = true,
-                                boss = h.boss, zone = h.instance, votes = tonumber(h.votes), note = h.note, class = h.class,
-                                by = h.owner and LC.Key(h.owner), replaced = h.itemReplaced1,
-                                src = { rc = h.id or (name .. ":" .. tostring(i)) }, srcKind = "rc",
-                            })
-                            if isNew then n = n + 1 end
-                        end
+                        local _, isNew = LC.AddRCLC(name, h, i)
+                        if isNew then n = n + 1 end
                     end
                 end
             end
@@ -397,10 +412,14 @@ function LC:Initialize()
         end)
     end
     if self.InitUI then self:InitUI() end
+    if self.RC then self.RC:Init() end
+    if self.InitFrames then self:InitFrames() end
 end
 
 function LC:OnModuleOff()
     if self.HideUI then self:HideUI() end
+    if self.HideFrames then self:HideFrames() end
+    if self.RC then self.RC:Stop() end
 end
 
 function LC:OnModuleOn()

@@ -63,7 +63,8 @@ Sync.NumRanks = NumRanks
 local function MyRank()
     local rec = GR:Find(GR.MyName())
     if rec and rec.rankIndex and rec.rankIndex ~= 99 then return rec.rankIndex end
-    local _, _, idx = GetGuildInfo and GetGuildInfo("player")
+    local idx
+    if GetGuildInfo then idx = select(3, GetGuildInfo("player")) end
     return tonumber(idx) or NumRanks()
 end
 Sync.MyRank = MyRank

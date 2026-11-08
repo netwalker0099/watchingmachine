@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.75"
+WM.version = "3.76"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -220,7 +220,8 @@ end
 
 -- Paced addon messages, shared by every module that talks to other players
 -- (one message every 0.15 s, so a burst never trips the server's throttle).
--- A prefix and body over 254 bytes together are refused.
+-- A body over 255 bytes (or a prefix over 16) is refused. urgent: goes ahead
+-- of the other waiting messages (loot council replies before armory sync).
 local commQueue, commSince, COMM_GAP = {}, 0, 0.15
 local commPacer = CreateFrame("Frame")
 commPacer:Hide()
@@ -234,9 +235,17 @@ commPacer:SetScript("OnUpdate", function(self, elapsed)
     if send then pcall(send, m[1], m[2], m[3], m[4]) end
 end)
 
-function WM:QueueAddonMessage(prefix, body, channel, target)
-    if type(body) ~= "string" or #prefix + #body > 254 then return false end
-    commQueue[#commQueue + 1] = { prefix, body, channel or "GUILD", target }
+function WM:QueueAddonMessage(prefix, body, channel, target, urgent)
+    if type(body) ~= "string" or #body > 255 or #prefix > 16 then return false end
+    local m = { prefix, body, channel or "GUILD", target, urgent }
+    if urgent then
+        -- After the other urgent ones, ahead of everything else
+        local at = 1
+        while commQueue[at] and commQueue[at][5] do at = at + 1 end
+        table.insert(commQueue, at, m)
+    else
+        commQueue[#commQueue + 1] = m
+    end
     commPacer:Show()
     return true
 end
@@ -1329,6 +1338,8 @@ local MODULE_INFO = {
             { text = "Loot history", desc = "Every award, newest first.", func = function() Call("LootCouncil", "Command", "history") end },
             { text = "Players", desc = "Each player's loot count and last award.", func = function() Call("LootCouncil", "Command", "players") end },
             { text = "Import from Gargul and RCLootCouncil", desc = "Add awards they've saved that aren't here yet.", func = function() Call("LootCouncil", "Command", "import") end },
+            { text = "Voting frame", desc = "The current loot session's candidates, answers and votes.", func = function() Call("LootCouncil", "Command", "vote") end },
+            { text = "Test session (local)", desc = "Three test items with made-up answers, to try the response and voting frames. Nothing is sent.", func = function() Call("LootCouncil", "Command", "test") end },
         },
     },
     LootBrowser = {
@@ -2328,7 +2339,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
-    print("|cFFFFFF00/wmachine council|r - Loot Council: loot history (council players / import / <player name>)")
+    print("|cFFFFFF00/wmachine council|r - Loot Council: loot history and voting (council players / import / vote / test / <player name>)")
     print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / purge / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
