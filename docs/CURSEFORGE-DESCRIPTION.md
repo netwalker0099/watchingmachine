@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.71 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.72 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -543,6 +543,10 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
     *Save guildmates*, *Share with guild*
   - In **Roster Manager**, a member's details list their armory for each
     spec, and *Show armory* opens it
+  - **From your snapshots** (3.72): every guild member in your saved
+    snapshots is added to the armory with the snapshot's date, where it's
+    newer than what the armory has. Once by itself; *From snapshots* in the
+    browser (or `/as armory import`) runs it again
 
 ### World Timers
 Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).

@@ -385,7 +385,7 @@
     <li><b>Browse:</b> pick a snapshot, pick a player, and see their gear laid out like the character sheet. Shift-click to link an item.</li>
     <li>GearScore for every member and the raid's average.</li>
     <li><code>/as snap [label]</code> takes one by hand. Scanning pauses in combat and carries on after.</li>
-    <li><b>The armory:</b> one saved armory for each character and spec (the talent tree with the most points). Pick <i>Armory</i> in the snapshot list, or <code>/as armory [name]</code>. Your own gear is saved whenever it or your talents change. A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap inspects them, under the spec their talents show. New scans are shared with guildmates running Watching Machine; the newest scan of each spec wins, and when you log in they send you everything scanned since you were last online.</li>
+    <li><b>The armory:</b> one saved armory for each character and spec (the talent tree with the most points). Pick <i>Armory</i> in the snapshot list, or <code>/as armory [name]</code>. Your own gear is saved whenever it or your talents change. A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap inspects them, under the spec their talents show. New scans are shared with guildmates running Watching Machine; the newest scan of each spec wins, and when you log in they send you everything scanned since you were last online. Guild members in the snapshots you already have are added too (<code>/as armory import</code> does it again).</li>
   </ul>
   <div class="note"><b>Already use the standalone ArmorySnap addon?</b>Watching Machine reads the same saved data. If both are enabled, the module stands aside and says so: disable one.</div>
 </section>
@@ -646,6 +646,7 @@
     <li><b>Former &amp; bans:</b> everyone who left, and the ban list. A banned player who rejoins gets a red warning. <i>Ban by name</i> bans someone outside the guild.</li>
     <li><b>Sync:</b> your edits go to guildmates running Guild Roster Manager or Watching Machine as you make them, and theirs come to you; the newest edit wins. Bans only between the ranks you allow. The Sync tab lists who you share with.</li>
     <li><b>Import</b> (Options, or <code>/wmachine roster import</code>) brings in what Guild Roster Manager has saved, when it's loaded. With Guild Roster Manager running on the same character, it does the syncing.</li>
+    <li><b>Purge</b> (officers and up): lists players whose main and alts have <i>all</i> been offline at least the days you enter, never protected ranks or your own characters. Untick anyone to keep, then click <i>Remove</i> once per character. Also <code>/wmachine roster purge</code>.</li>
     <li><b>Mains from guild notes:</b> notes like "Venhana alt" or "Main: Chojii" set that member as the main, once by itself and again with <i>Read alts from guild notes</i> in Options. An alt group with no main is listed under its highest-ranked character, marked <i>(no main set)</i>.</li>
     <li><b>Names as you type:</b> in <i>Add alt</i> and <i>Ban by name</i>, typing finishes a guild member's name and lists the matches under the box to click; Tab moves to the next match.</li>
     <li><b>Alts under their main:</b> a main has a <b>+</b> beside their name on the Roster tab; click it to list their alts underneath. A main sorts with the online players when any of their characters is on.</li>
@@ -839,7 +840,7 @@
     <tr><td><code>swing</code> · <code>swing reset</code></td><td>Show or reset the swing timer</td></tr>
     <tr><td><code>manatick</code> · <code>manatick reset</code></td><td>Show the mana tick spark; reset its own bar</td></tr>
     <tr><td><code>soulstone</code> · <code>portals</code> · <code>totems</code></td><td>Warlock soulstones, mage portals, shaman totem sets</td></tr>
-    <tr><td><code>roster</code> · <code>roster log</code> · <code>roster sync</code> · <code>roster import</code> · <code>roster notes</code></td><td>Roster Manager</td></tr>
+    <tr><td><code>roster</code> · <code>roster log</code> · <code>roster sync</code> · <code>roster import</code> · <code>roster notes</code> · <code>roster purge</code></td><td>Roster Manager</td></tr>
     <tr><td><code>ginvite</code> · <code>recruit</code> · <code>pvp</code></td><td>Guild Invite, Recruiting Tool, PvP Enemy Tracker</td></tr>
     <tr><td><code>filter</code> · <code>keyword</code> · <code>services</code> · <code>wcl</code></td><td>Chat Filter, Keyword Monitor, Services Parser, Whisper Logs</td></tr>
     <tr><td><code>logger</code> · <code>mail</code></td><td>Auto Logger, Mail &amp; Trade Logger</td></tr>
@@ -868,7 +869,7 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.71 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+<footer>Watching Machine guide · written for version 3.72 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
   Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>

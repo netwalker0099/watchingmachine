@@ -657,6 +657,9 @@ function GR:RefreshList()
         if t.key == self.tab then t:LockHighlight() else t:UnlockHighlight() end
     end
     self:RefreshDetails()
+    if panel.purgeButton then
+        if self.CanPurge and self:CanPurge() then panel.purgeButton:Enable() else panel.purgeButton:Disable() end
+    end
     local m, online, f = self:Counts()
     if panel.totalText then
         panel.totalText:SetText(string.format("%d members, %d online, %d former", m, online, f))
@@ -804,6 +807,8 @@ function GR:CreateUI()
 
     panel.totalText = panel:AddFooterText({ text = "" }, "LEFT")
     panel:AddFooterButton({ text = "Options", width = 80, onClick = function() GR:ToggleOptions() end }, "RIGHT")
+    panel.purgeButton = panel:AddFooterButton({ text = "Purge", width = 70, onClick = function() GR:TogglePurge() end,
+        tooltip = { "Purge inactive players", "Officers and up: list everyone whose main and alts have all been offline for a number of days, and remove them one click at a time." } }, "RIGHT")
     panel:AddFooterButton({ text = "Ban by name", width = 100, onClick = function() GR:AskBanByName() end,
         tooltip = { "Ban by name", "Add someone to the ban list who isn't in the guild (or has left). You're warned if they join." } }, "RIGHT")
     panel:AddFooterButton({ text = "Scan now", width = 80, onClick = function() GR.AskRoster() end,
@@ -837,6 +842,7 @@ end
 function GR:HideUI()
     if panel then panel:Hide() end
     if options then options:Hide() end
+    if GR.HidePurge then GR:HidePurge() end
 end
 
 -- ============================================
@@ -857,6 +863,8 @@ local function RankOptions(withEvery)
     end
     return out
 end
+
+GR.RankOptions = RankOptions
 
 local function Settings(L, inSetup)
     L:Checkbox({ label = "Show the log at login when something changed", get = function() return DB().showOnLogin end,
@@ -941,6 +949,15 @@ function GR:SetupPage(L)
     L:Note("|cFFFFFFFFArmory:|r with ArmorySnap on, a member's details list their saved armory for each spec, and"
         .. " |cFFFFFF00Show armory|r opens their gear and talents. Your own gear is saved automatically, guildmates"
         .. " are saved when ArmorySnap inspects them, and guildmates running Watching Machine share theirs.")
+    L:Note("|cFFFFFFFFPurge (officers and up):|r the |cFFFFFF00Purge|r button lists every player whose main and alts"
+        .. " have all been offline at least the days below, never anyone at the protected ranks, you or your alts."
+        .. " You untick anyone to keep and remove the rest one click at a time; each is checked again just before.")
+    L:Slider({ label = "Purge: offline at least (days)", min = 7, max = 365, step = 1, width = 220,
+        get = function() return DB().purgeDays end, set = function(v) DB().purgeDays = v end,
+        tooltip = { "Days offline", "Only players whose main and every alt have been offline at least this long are listed." } })
+    L:Dropdown({ label = "Purge never removes:", width = 170, options = function() return RankOptions(false) end,
+        get = function() return DB().purgeProtectRank end, set = function(v) DB().purgeProtectRank = v end,
+        tooltip = { "Protected ranks", "Players with any character at this rank or higher are never listed." } })
     L:Note("|cFFFFFFFFAlts from notes:|r the first scan reads public and officer notes like \"Venhana alt\" or"
         .. " \"Main: Chojii\" and sets those mains, so the Roster tab lists their alts under them. An alt group with"
         .. " no main yet is listed under its highest-ranked character, marked |cFFFF8844(no main set)|r.")
@@ -948,7 +965,7 @@ function GR:SetupPage(L)
     L:Note("Everything else is in its window: |cFFFFFF00/wmachine roster|r.")
 end
 
--- /wmachine roster [log|former|sync|scan|import|notes|options]
+-- /wmachine roster [log|former|sync|scan|import|notes|purge|options]
 function GR:Command(arg)
     arg = strtrim((arg or ""):lower())
     if arg == "log" or arg == "former" or arg == "sync" then self:ShowTab(arg)
@@ -963,6 +980,9 @@ function GR:Command(arg)
         WM:Print(n > 0 and string.format("Roster Manager: guild notes named the main of %d character%s.", n, n == 1 and "" or "s")
             or "Roster Manager: no new alts or mains in the guild notes.")
         self:RefreshUI()
+    elseif arg == "purge" then
+        if self:CanPurge() then self:TogglePurge()
+        else WM:Print("Roster Manager: this character can't remove guild members.") end
     elseif arg == "options" or arg == "config" then self:ToggleOptions()
     else self:Toggle() end
 end

@@ -2,9 +2,32 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.71** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.72** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.72
+
+### Roster Manager: purge inactive players
+
+- A *Purge* button (and `/wmachine roster purge`) for characters allowed to
+  remove guild members. Enter the days (30 by default) and click *Find*:
+  it lists every player whose main and alts have **all** been offline at
+  least that long, longest away first, each main with their alts.
+- Never listed: anyone with a character at the protected ranks (officers
+  and up by default), ranks at or above yours, you and your alts.
+- Untick anyone to keep, then click *Remove* once per character: the game
+  allows one removal per click. Each player is checked again just before,
+  and kept if one of their characters has been on since.
+- The days and protected ranks are also on the guided setup page.
+
+### ArmorySnap: the armory from your snapshots
+
+- Every guild member in your saved snapshots (on Roster Manager's roster,
+  or in your guild when the snapshot was taken) is added to their armory
+  under the snapshot's date and the spec their talents show, where it's
+  newer than what the armory has. Done once by itself; *From snapshots* in
+  the browser or `/as armory import` runs it again.
 
 ## 3.71
 

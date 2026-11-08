@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.71 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.72 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -264,6 +264,10 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
     *Save guildmates*, *Share with guild*
   - In **Roster Manager**, a member's details list their armory for each
     spec, and *Show armory* opens it
+  - **From your snapshots** (3.72): every guild member in your saved
+    snapshots is added to the armory with the snapshot's date, where it's
+    newer than what the armory has. Once by itself; *From snapshots* in the
+    browser (or `/as armory import`) runs it again
 
 ### 12. Aura Range
 Visual and audio alerts when you drift out of range of party auras and shaman totems.
@@ -1063,6 +1067,15 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   Roster Manager has saved for the guild, when it's installed and loaded
 - **Guild Roster Manager on the same character**: Roster Manager keeps the
   roster and log but leaves the syncing to it
+- **Purge inactive players** (3.72, for characters allowed to remove guild
+  members): the *Purge* button (or `/wmachine roster purge`) lists every
+  player whose main and alts have **all** been offline at least the days
+  you enter (30 by default). A main and their alts count as one player, so
+  an alt on yesterday keeps everyone. Players with any character at the
+  protected ranks (officers by default), ranks at or above yours, and you
+  and your alts are never listed. Untick anyone to keep, then click
+  *Remove* once per character (the game allows one removal per click);
+  each player is checked again just before
 - **Alts from guild notes** (3.71): public and officer notes like
   "Venhana alt", "Venitra's Alt [BS]375", "alt of Chojii" or "Main: Chojii"
   set that guild member as the main (in the alt group they share, or with
@@ -1085,7 +1098,7 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   their saved armory for each spec with its GearScore, and *Show armory*
   opens their gear and talents in ArmorySnap's browser (see ArmorySnap)
 - Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
-  `import`, `notes`, `options`
+  `import`, `notes`, `purge`, `options`
 
 ## Global Theme System
 
@@ -1376,6 +1389,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.72
+- **Roster Manager: Purge** removes players whose main and alts have all been offline for the days you choose, one click per character, for officers and up
+- **ArmorySnap**: guild members in your saved snapshots are added to the armory
 
 ### Version 3.71
 - **Roster Manager**: every alt group folds under someone. Mains are read from guild notes ("Venhana alt", "alt of Chojii", "Main: Chojii"), and a group with no main is listed under its highest-ranked character

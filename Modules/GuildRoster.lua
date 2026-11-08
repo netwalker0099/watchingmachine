@@ -34,6 +34,8 @@ local DEFAULTS = {
     showOnLogin = true,     -- open the log at login when something changed
     hoverDetails = true,    -- details when you hover the guild roster
     groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
+    purgeDays = 30,         -- purge: every character offline at least this many days
+    purgeProtectRank = 1,   -- purge: never ranks at or above this index (0 = guild master)
     sync = true,            -- share edits with guildmates (GRM and WM)
     syncBans = true,
     syncCustom = true,

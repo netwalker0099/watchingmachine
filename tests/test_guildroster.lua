@@ -44,7 +44,7 @@ local addons = {}
 env.C_AddOns = { IsAddOnLoaded = function(n) return addons[n] or false end }
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua",
-                     "Modules/GuildRosterUI.lua" }) do
+                     "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -356,6 +356,62 @@ check("no main: listed under the highest rank, marked", hr and hr.toggle == "+" 
 check("no main: the other character is under it", Find(lines, "Lowrank-SpineShatter") == nil)
 check("lead is the main when there is one", GR:GroupLead(g, g.groups[g.members["Alta-SpineShatter"].group]).name == "Mainy-SpineShatter")
 Sync:ClearQueue()
+-- Purge: whole players offline long enough, one removal per click
+local canRemove, uninvited = true, {}
+env.CanGuildRemove = function() return canRemove end
+env.GuildUninvite = function(n) uninvited[#uninvited + 1] = n end
+env.InCombatLockdown = function() return false end
+for _, r in pairs(g.members) do r.offlineHours = 0 end
+local function Off(n, days) g.members[n .. "-SpineShatter"].offlineHours = days * 24; g.members[n .. "-SpineShatter"].online = false end
+-- Mainy's group: all away 40+ days; Other's group: an alt on 2 days ago
+Off("Mainy", 45); Off("Alta", 60); Off("Altb", 41)
+Off("Other", 90); Off("Otheralt", 2); Off("Taken", 90)
+Off("Solo", 31)
+Off("Highrank", 100); Off("Lowrank", 100)
+g.members["Highrank-SpineShatter"].rankIndex = 1
+Off("Paira", 10); Off("Pairb", 50)
+local cands = GR:PurgeCandidates(30, 1)
+local byLead = {}
+for _, c in ipairs(cands) do byLead[c.lead.name] = c end
+check("purge: a player whose main and alts are all away is listed", byLead["Mainy-SpineShatter"] and #byLead["Mainy-SpineShatter"].recs == 3
+    and byLead["Mainy-SpineShatter"].days == 41)
+check("purge: an alt on recently keeps the whole player", byLead["Other-SpineShatter"] == nil)
+check("purge: an alt on within the days keeps the main", byLead["Pairb-SpineShatter"] == nil)
+check("purge: a single character away long enough", byLead["Solo-SpineShatter"] ~= nil)
+check("purge: a protected rank on any character keeps the player", byLead["Highrank-SpineShatter"] == nil)
+check("purge: ranks at or above yours aren't listed", (function()
+    for _, c in ipairs(cands) do for _, r in ipairs(c.recs) do if (r.rankIndex or 99) <= 1 then return false end end end
+    return true end)())
+check("purge: you're never listed", (function()
+    for _, c in ipairs(cands) do for _, r in ipairs(c.recs) do if r.name == GR.MyName() then return false end end end
+    return true end)())
+check("purge: the main is first", byLead["Mainy-SpineShatter"].recs[1].name == "Mainy-SpineShatter")
+check("purge: longest away first", cands[1].days >= cands[#cands].days)
+local P = GR.Purge
+P:Find(30, 1)
+for _, e in ipairs(P.list) do if e.lead.name ~= "Mainy-SpineShatter" then e.keep = true end end
+check("purge: counts what's ticked", select(2, P:Counts()) == 3)
+check("purge: one removal per click", P:RemoveNext() == true and #uninvited == 1 and uninvited[1] == "Mainy")
+P:RemoveNext(); P:RemoveNext()
+check("purge: the whole player removed over three clicks", #uninvited == 3 and P:Counts() == 0)
+check("purge: nothing more to remove", P:RemoveNext() == false and #uninvited == 3)
+-- Someone comes back between Find and the click
+P:Find(30, 1)
+for _, e in ipairs(P.list) do e.keep = e.lead.name ~= "Solo-SpineShatter" end
+g.members["Solo-SpineShatter"].online = true
+check("purge: a player who came back is kept", P:RemoveNext() == false and #uninvited == 3 and P.list[1].skipped ~= nil or (function()
+    for _, e in ipairs(P.list) do if e.lead.name == "Solo-SpineShatter" then return e.skipped end end end)())
+g.members["Solo-SpineShatter"].online = false
+canRemove = false
+P:Find(30, 1)
+check("purge: not allowed to remove: nothing removed", P:RemoveNext() == false and #uninvited == 3)
+check("purge: not allowed: Can say no", GR:CanPurge() == false)
+canRemove = true
+GR:TogglePurge()
+check("purge window opens", env.WM_GuildRosterPurge and env.WM_GuildRosterPurge:IsShown())
+GR:HidePurge()
+check("purge window closes", not env.WM_GuildRosterPurge:IsShown())
+
 -- Leave the roster as the scans expect it
 for _, n in ipairs({ "Mainy", "Alta", "Altb", "Solo", "Paira", "Pairb", "Grpa", "Grpb", "Taken", "Other", "Otheralt", "Lowrank", "Highrank" }) do
     local r = g.members[n .. "-SpineShatter"]

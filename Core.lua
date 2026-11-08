@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.71"
+WM.version = "3.72"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -2317,7 +2317,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
-    print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / options)")
+    print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / purge / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
     print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")

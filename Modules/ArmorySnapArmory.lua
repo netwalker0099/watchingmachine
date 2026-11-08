@@ -265,6 +265,64 @@ function Arm.ViewKey(name)
 end
 
 -- ============================================
+-- SNAPSHOTS ALREADY SAVED
+-- ============================================
+-- ArmorySnap's raid snapshots hold gear and talents for everyone it
+-- inspected. Each one of a guild member (on Roster Manager's roster, or in
+-- your guild by the snapshot) goes into their armory with the snapshot's
+-- date, unless their armory for that spec is newer. Runs once by itself;
+-- /as armory import (or the browser's button) runs it again.
+
+-- "2026-10-18 20:00" -> time, or nil
+local function SnapshotTime(snap, key)
+    local s = (snap and snap.timestamp) or key or ""
+    local y, m, d, H, M = tostring(s):match("^(%d%d%d%d)-(%d%d)-(%d%d) (%d%d):(%d%d)")
+    if not y then return nil end
+    return time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = tonumber(H), min = tonumber(M), sec = 0 })
+end
+Arm.SnapshotTime = SnapshotTime
+
+-- Is this snapshot member one of ours? Roster Manager's roster when it's on
+-- (members and former members), otherwise the guild the snapshot saw
+local function OnRoster(key, member)
+    local GR = WM:IsModuleOn("GuildRoster") and WM.modules.GuildRoster
+    if GR and GR.Find and GR.Guild and GR:Guild() then
+        if GR:Find(key) then return true end
+    end
+    local guild = GetGuildInfo and GetGuildInfo("player")
+    return guild ~= nil and member.guild == guild
+end
+
+-- Returns how many armories were added or updated
+function Arm:ImportSnapshots()
+    if not On() or AS.standaloneConflict then return 0 end
+    local snaps = {}
+    for key, snap in pairs(DB().snapshots or {}) do
+        local t = SnapshotTime(snap, key)
+        if t and type(snap.members) == "table" then snaps[#snaps + 1] = { t = t, snap = snap } end
+    end
+    -- Oldest first, so later snapshots of the same spec win
+    table.sort(snaps, function(a, b) return a.t < b.t end)
+    local me, added = MyKey(), 0
+    for _, s in ipairs(snaps) do
+        for _, m in pairs(s.snap.members) do
+            local key = type(m) == "table" and Arm.Key(m.name)
+            local n = 0
+            for _ in pairs(type(m) == "table" and m.gear or {}) do n = n + 1 end
+            if key and n >= 3 and OnRoster(key, m) then
+                local e = {}
+                for k, v in pairs(m) do e[k] = v end
+                e.spec = Total(e.talents) > 0 and Arm.SpecFor(key, e) or (key == me and Arm.NO_TALENTS or Arm.SpecFor(key, e))
+                e.time, e.by, e.own = s.t, me, (key == me) or nil
+                if Arm.Store(key, e) then added = added + 1 end
+            end
+        end
+    end
+    DB().armorySnapshotsRead = true
+    return added
+end
+
+-- ============================================
 -- SHARING
 -- ============================================
 
@@ -596,6 +654,14 @@ function Arm:Init()
     -- In case the module started after you entered the world
     ScheduleSelf(10)
     C_Timer.After(25, function() if On() then Arm:Greet() end end)
+    -- Once: the snapshots already saved (when the roster and guild are known)
+    if not db.armorySnapshotsRead then
+        C_Timer.After(40, function()
+            if not On() or DB().armorySnapshotsRead or not (IsInGuild and IsInGuild()) then return end
+            local n = Arm:ImportSnapshots()
+            if n > 0 then AS.Print("Added " .. n .. " guild member armor" .. (n == 1 and "y" or "ies") .. " from saved snapshots.") end
+        end)
+    end
 end
 
 -- Off: nothing waits to be sent or saved

@@ -931,6 +931,8 @@ function AS:SetupPage(L)
         .. " |cFFFFFF00Armory|r in the browser's snapshot list, or click |cFFFFFF00Show armory|r on a player in"
         .. " Roster Manager.")
     AS.ArmoryCheckboxes(function(spec) L:Checkbox(spec) end, options)
+    L:Note("Guild members in the snapshots you already have are added to the armory once by themselves, under"
+        .. " each snapshot's date (|cFFFFFF00/as armory import|r, or |cFFFFFF00From snapshots|r in the browser, does it again).")
     L:Note("Snapshots are shared by all your characters. Everything else is in the browser: |cFFFFFF00/as|r"
         .. " (|cFFFFFF00/as help|r lists the commands).")
 end
@@ -995,7 +997,11 @@ function AS.HandleSlash(msg)
 
     elseif cmd == "armory" then
         local name = rest and strtrim(rest) or ""
-        if name == "" then
+        if name:lower() == "import" then
+            local n = AS.Armory and AS.Armory:ImportSnapshots() or 0
+            Print(n > 0 and ("Added " .. n .. " armor" .. (n == 1 and "y" or "ies") .. " from saved snapshots.")
+                or "Nothing new in the saved snapshots for the armory.")
+        elseif name == "" then
             AS.ShowArmory()
         elseif AS.Armory and AS.Armory.Specs(name)[1] then
             AS.Armory:Query(name)
@@ -1071,6 +1077,7 @@ function AS.HandleSlash(msg)
         Print("  |cfffff000/as|r               – Open gear browser")
         Print("  |cfffff000/as snap [label]|r   – Manual snapshot")
         Print("  |cfffff000/as armory [name]|r  – The armory (one player's, with a name)")
+        Print("  |cfffff000/as armory import|r  – Add guild members from saved snapshots to the armory")
         Print("  |cfffff000/as list|r            – List saved snapshots")
         Print("  |cfffff000/as delete <n>|r   – Delete a snapshot")
         Print("  |cfffff000/as auto|r            – Toggle automatic scanning")
@@ -1426,6 +1433,9 @@ local function CreateBrowseFrame()
     row = L:Row(24)
     local cx = 0
     AS.ArmoryCheckboxes(function(spec) row:Checkbox(spec, cx); cx = cx + 135 end, options, "GameFontNormalSmall")
+    row:RightButton({ text = "From snapshots", width = 105, small = true, onClick = function() AS.HandleSlash("armory import") end,
+        tooltip = { "Armory from snapshots", "Adds every guild member in your saved snapshots to the armory, under the"
+            .. " snapshot's date, where it's newer than what the armory has. Done once by itself; this runs it again." } })
 
     local fill = L:Fill(CONTENT_H)
 

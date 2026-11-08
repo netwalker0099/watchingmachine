@@ -23,7 +23,8 @@ what still needs settling before it's built.
     demote tool (a button you click, since those need a key press), the
     inactivity rules, export, join-date note stamping and anniversaries
 15. ~~ArmorySnap armory per spec, linked to Roster Manager~~ (done, 3.68;
-    catch-up at login 3.69). Roster alts under their main (3.69)
+    catch-up at login 3.69, from saved snapshots 3.72). Roster alts under
+    their main (3.69), purge of inactive players (3.72)
 
 ---
 

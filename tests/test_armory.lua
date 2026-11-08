@@ -80,7 +80,7 @@ env.InCombatLockdown = function() return false end
 
 env.WatchingMachineDB = { theme = "Default" }
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/ArmorySnap.lua", "Modules/ArmorySnapArmory.lua",
-                     "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua", "Modules/GuildRosterUI.lua" }) do
+                     "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua", "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -316,6 +316,38 @@ check("filed under the spec their talents show", db.armory["Swapper-Testrealm"].
 units.target = "Tankier"
 inspected.trees = { { "Arms", "x", 0 }, { "Fury", "y", 0 }, { "Protection", "z", 0 } }
 Sent()
+
+-- ============ Snapshots already saved ============
+local function G(id) return { link = "|cffa335ee|Hitem:" .. id .. ":0|h[I]|h|r", icon = "i" } end
+db.snapshots["2026-10-01 20:00 - Karazhan"] = { timestamp = "2026-10-01 20:00", zone = "Karazhan", members = {
+    Raider = { name = "Raider", class = "ROGUE", race = "Orc", level = 70, guild = "Ninjas", gear = { G(1), G(2), G(3), G(4) },
+        talents = { trees = { { name = "Assassination", points = 20 }, { name = "Combat", points = 41 }, { name = "Subtlety", points = 0 } },
+            spec = "Combat", points = "20/41/0" } },
+    Pug = { name = "Pug", class = "MAGE", race = "Gnome", level = 70, guild = "Others", gear = { G(5), G(6), G(7) } },
+    Few = { name = "Few", class = "MAGE", race = "Gnome", level = 70, guild = "Ninjas", gear = { G(8) } },
+} }
+db.snapshots["2026-10-08 20:00 - Gruul's Lair"] = { timestamp = "2026-10-08 20:00", zone = "Gruul's Lair", members = {
+    Raider = { name = "Raider", class = "ROGUE", race = "Orc", level = 70, guild = "Ninjas", gear = { G(1), G(2), G(3), G(9) },
+        talents = { trees = { { name = "Assassination", points = 20 }, { name = "Combat", points = 41 }, { name = "Subtlety", points = 0 } },
+            spec = "Combat", points = "20/41/0" } },
+} }
+Sent()
+local added = Arm:ImportSnapshots()
+local raider = db.armory["Raider-Testrealm"]
+check("snapshots: a guild member added under the spec their talents show", raider and raider.Combat ~= nil)
+check("snapshots: the newest snapshot wins", raider.Combat.time == Arm.SnapshotTime(nil, "2026-10-08 20:00") and raider.Combat.gear[4].link:find("item:9:"))
+check("snapshots: not our guild, not added", db.armory["Pug-Testrealm"] == nil)
+check("snapshots: an empty capture isn't added", db.armory["Few-Testrealm"] == nil)
+check("snapshots: count of armories added", added == 2)
+check("snapshots: not sent to the guild in bulk", #Sent() == 0)
+check("snapshots: done once", db.armorySnapshotsRead == true)
+check("snapshots: nothing new the second time", Arm:ImportSnapshots() == 0)
+check("snapshots: a newer armory isn't replaced", (function()
+    raider.Combat.time = now
+    Arm:ImportSnapshots()
+    return raider.Combat.time == now end)())
+db.snapshots["2026-10-01 20:00 - Karazhan"] = nil
+db.snapshots["2026-10-08 20:00 - Gruul's Lair"] = nil
 
 -- ============ The browser ============
 local view = Arm.View()
