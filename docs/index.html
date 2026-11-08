@@ -386,7 +386,19 @@
     <li><b>Browse:</b> pick a snapshot, pick a player, and see their gear laid out like the character sheet. Shift-click to link an item.</li>
     <li>GearScore for every member and the raid's average.</li>
     <li><code>/as snap [label]</code> takes one by hand. Scanning pauses in combat and carries on after.</li>
-    <li><b>The armory:</b> one saved armory for each character and spec (the talent tree with the most points). Pick <i>Armory</i> in the snapshot list, or <code>/as armory [name]</code>. Your own gear is saved whenever it or your talents change. A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap inspects them, under the spec their talents show. New scans are shared with guildmates running Watching Machine; the newest scan of each spec wins, and when you log in they send you everything scanned since you were last online. Guild members in the snapshots you already have are added too (<code>/as armory import</code> does it again).</li>
+  </ul>
+  <h3>The armory</h3>
+  <p>One saved armory for each character and spec (the talent tree with the most points): pick <i>Armory</i> at the top of
+     the snapshot list, or type <code>/as armory [name]</code>.</p>
+  <ul>
+    <li><b>Your own gear</b> is saved whenever your gear, talents or level change, a separate armory for each spec.</li>
+    <li><b>Guildmates who don't run Watching Machine</b> are saved whenever ArmorySnap inspects them, under the spec their
+      talents show. Guild members in the snapshots you already have are added too (<i>From snapshots</i>, or
+      <code>/as armory import</code>, does it again).</li>
+    <li><b>Shared with the guild:</b> each new scan goes to guildmates running Watching Machine, and theirs come to you; the
+      newest scan of each spec wins. At login they send you everything scanned since you were last online.</li>
+    <li><b>With Loot Council on</b>, a pane beside the armory lists the player's loot with the guild and the time since their
+      last award. In Roster Manager, a member's details list their armory for each spec, and <i>Show armory</i> opens it.</li>
   </ul>
   <div class="note"><b>Already use the standalone ArmorySnap addon?</b>Watching Machine reads the same saved data. If both are enabled, the module stands aside and says so: disable one.</div>
 </section>
@@ -638,43 +650,143 @@
 
 <!-- ============================ GUILD & SOCIAL ============================ -->
 <section id="council">
-  <h2>Loot Council <span class="who">Raid · loot history</span></h2>
+  <h2>Loot Council <span class="who">Raid · works with RCLootCouncil and Gargul</span></h2>
   <p class="open">Open: <code>/wmachine council</code> (or <code>/wmachine lc</code>)</p>
-  <p>The guild's loot history, the first part of a loot council that works with RCLootCouncil and awards like Gargul.</p>
+  <p>A loot council that speaks RCLootCouncil's own messages, awards and rolls like Gargul, and keeps one loot history for the
+     guild. Players running RCLootCouncil and players running Watching Machine can be in the same raid: either side can be
+     the master looter, raiders answer in either, and the council votes in either.</p>
+
+  <h3>The loot history</h3>
   <ul>
-    <li><b>All loot:</b> every item awarded, to whom and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve, disenchant). Search by item, player, how or boss; hover for votes, notes and rolls.</li>
-    <li><b>Players:</b> everyone who's had loot, their count and last award. Click a player for all of their loot.</li>
-    <li><b>Beside their armory:</b> in ArmorySnap's browser a pane lists the player's loot with the guild and the time since their last award. Roster Manager's details show their last loot.</li>
-    <li><b>From Gargul and RCLootCouncil:</b> what they've saved on your account is added at login, once each; <i>Import now</i> does it by hand. Awards a master looter logs during a raid are added as they happen.</li>
-    <li><b>Raiding with RCLootCouncil:</b> when the master looter sends loot, the response frame shows each item, the gear it would replace and their buttons (Need, Greed, Minor Upgrade) plus Pass. On the council, the voting frame shows every candidate's answer, item level, gear, votes and notes, and their <b>last loot</b>; hover a candidate for their last 30 days.</li>
-    <li><b>Try it:</b> <code>/wmachine council test</code> runs a local test session; nothing is sent.</li>
-    <li><b>Items you can't use</b> aren't shown: they're passed on for you (the master looter sees Autopass).</li>
-    <li><b>As master looter:</b> items from the loot window (or Alt-click) go on the master looter panel; <i>Send for votes</i> sends them to the raid. In the voting frame, select a candidate and click <i>Award</i> or <i>Disenchant</i>: given from the loot window, or the trade opens with the winner and the item goes in by itself. Awards are announced and logged for everyone.</li>
-    <li><b>Test loot:</b> <code>/wmachine council sendtest</code> sends test items to your group for real answers and votes; nothing is given or logged.</li>
-    <li><b>Roll-offs:</b> <i>Roll</i> on the master looter panel announces the item with a countdown; every /roll is read (1-100 main spec, 1-99 off spec) and the roll window shows each roller's last loot. <i>Award</i> or <i>Disenchant</i> from there. Raiders running Watching Machine get roll buttons.</li>
-    <li><b>Disenchanter:</b> set on the master looter panel or <code>/wmachine council de &lt;name&gt;</code>.</li>
-    <li><b>Editing awards:</b> right-click an award in the loot history to change the winner or delete it; <code>/wmachine council undo</code> deletes your last award.</li>
+    <li><b>All loot:</b> every item ever awarded, newest first: who got it, who awarded it, when, the boss, and <b>how it was
+      won</b> (Need, Greed, Minor Upgrade, off spec, soft reserve, a roll, disenchant, banking). Search by item, player, how or
+      boss. Hover an award for its votes, note, rolls and the item it replaced.</li>
+    <li><b>Players:</b> everyone who's had loot, how many items and their last award. Click a player (or an award) for all of
+      their loot, with the time since their last award.</li>
+    <li><b>Beside their armory:</b> in ArmorySnap's browser, a pane next to a player's armory lists their loot with the guild.
+      Roster Manager's details show their last loot too.</li>
+    <li><b>Where it comes from:</b> what Gargul and RCLootCouncil have saved on your account is added at login, once each
+      (the same award recorded by both becomes one); <i>Import now</i> does it by hand. Awards made during a raid are added as
+      they happen.</li>
   </ul>
-  <div class="note"><b>Shared with the guild:</b>guildmates running Watching Machine keep the same loot history. New awards, edits and deletes go out as they happen, and at login you're sent whatever changed while you were away.</div>
+
+  <h3>As a raider</h3>
+  <ol class="steps">
+    <li>When the master looter sends loot, the <b>response frame</b> shows each item, its item level, the gear it would
+      replace and by how much.</li>
+    <li>Click the master looter's button (<i>Need</i>, <i>Greed</i>, <i>Minor Upgrade</i>, or theirs) or <i>Pass</i>. Add a
+      note first if you like; some buttons require one. Answer before the timer runs out.</li>
+    <li>Items your class <b>can't use</b> never appear: armor you can't wear, weapons you can't use, and tier tokens or class
+      items for other classes are passed on for you (the master looter sees <i>Autopass</i>).</li>
+    <li>In a <b>roll-off</b>, a small window offers <i>Roll MS</i>, <i>Roll OS</i> and <i>Pass</i>, or just type /roll.</li>
+  </ol>
+
+  <h3>On the council</h3>
+  <ol class="steps">
+    <li>The <b>voting frame</b> opens when a session starts (or <code>/wmachine council vote</code>). The icons on the left are
+      the items; click one to see its candidates.</li>
+    <li>Each candidate shows their answer, rank, item level and difference, the gear they'd replace, votes, note and roll,
+      as in RCLootCouncil, plus their <b>last loot</b> and how long ago.</li>
+    <li><b>Hover a candidate</b> for their loot of the last 30 days and who voted for them.</li>
+    <li>Click <i>Vote</i> (or <i>Unvote</i>). Everyone on the council sees the count.</li>
+  </ol>
+
+  <h3>As master looter</h3>
+  <ol class="steps">
+    <li>Open the boss's loot: its epics go on the <b>master looter panel</b> (<code>/wmachine council ml</code>). Alt-click
+      any item, or use <code>/wmachine council add &lt;item&gt;</code>, to add others.</li>
+    <li>Click <b>Send for votes</b>: everyone answers and your council votes. The council is the group members at your
+      council guild rank and above, plus any names you list, plus you.</li>
+    <li>In the voting frame, click a candidate, then <b>Award</b> (for their answer) or <b>Disenchant</b>. With the loot
+      window open the item goes straight to them; otherwise the trade opens with the winner and the item goes in by itself.
+      Awards still to trade wait on the panel with a <i>Trade</i> button.</li>
+    <li>Each award is announced to the raid ("[item] was awarded to Name for Mainspec/Need!") and logged for everyone,
+      RCLootCouncil users included. The session ends when everything's awarded.</li>
+  </ol>
+  <div class="tip"><b>Try it first</b><code>/wmachine council test</code> runs a session on your own screen with test items
+    and made-up answers; nothing is sent. <code>/wmachine council sendtest</code> sends test items to your group for real
+    answers and votes; test awards are announced as tests and never given or logged.</div>
+
+  <h3>Roll-offs</h3>
+  <ol class="steps">
+    <li>Click <b>Roll</b> beside an item on the master looter panel (or <code>/wmachine council roll &lt;item&gt;</code>). It's
+      announced with your note ("/roll for MS, /roll 99 for OS"), counted down, then "Stop your rolls!".</li>
+    <li>Every /roll in the group is read: 1-100 is main spec, 1-99 off spec (both are settings). A second roll of the same
+      kind is marked <i>(again)</i> and doesn't count.</li>
+    <li>The <b>roll window</b> lists main spec first, highest first, with each roller's last loot; hover for their last 30
+      days. Click a roller and <b>Award</b>, or <b>Disenchant</b>.</li>
+  </ol>
+
+  <h3>Disenchanting and fixing mistakes</h3>
+  <ul>
+    <li><b>The disenchanter:</b> set with <i>Disenchanter</i> on the master looter panel, or
+      <code>/wmachine council de &lt;name&gt;</code>. <i>Disenchant</i> sends the item to them, logged as a disenchant, not as
+      their loot.</li>
+    <li><b>Change or delete an award:</b> right-click it in the loot history for <i>Change winner</i> or <i>Delete award</i>.
+      <code>/wmachine council undo</code> deletes your last award (from the last 3 hours). When you made the award, the
+      raid's RCLootCouncil and Watching Machine users get the correction too.</li>
+  </ul>
+
+  <h3>Shared with the guild</h3>
+  <p>Guildmates running Watching Machine keep the same loot history. New awards, edits and deletes go to them as they happen,
+     and at login you're sent everything that changed while you were away (all of it the first time, in the background).
+     The same award is matched everywhere, so nothing doubles, and the latest change wins. The history window's footer shows
+     how many were shared and received.</p>
+  <div class="note"><b>RCLootCouncil on the same character</b>Where RCLootCouncil is enabled it runs the sessions and answers
+    for you; Loot Council only records its awards there. To answer, vote and award with Loot Council, disable RCLootCouncil on
+    that character. Gargul can stay: Loot Council only reads its saved history.</div>
 </section>
 
 <section id="roster">
   <h2>Roster Manager <span class="who">Officers · Guild Roster Manager-style</span></h2>
   <p class="open">Open: <code>/wmachine roster</code> (or <code>/wmachine grm</code>)</p>
-  <p>A record of every guild member and everyone who has left, a guild log, and the ban list, shared with guildmates running Guild Roster Manager.</p>
+  <p>A record of every guild member and everyone who has left, a guild log, and the ban list, shared with guildmates running
+     Guild Roster Manager or Watching Machine.</p>
+
+  <h3>The roster</h3>
   <ul>
-    <li><b>Roster scan</b> every 30 seconds: joins, rejoins, leaves and kicks, promotions and demotions (with who did it), level-ups, note changes, name changes and players back from a long absence go into the <b>Log</b> tab. <i>Options</i> picks which go to the log and which to your chat.</li>
-    <li><b>Click a member</b> for their details: join and promotion dates, alts and main, birthday, custom note, ban. The buttons edit them. Hover a name in the game's Guild window for the same details.</li>
-    <li><b>Former &amp; bans:</b> everyone who left, and the ban list. A banned player who rejoins gets a red warning. <i>Ban by name</i> bans someone outside the guild.</li>
-    <li><b>Sync:</b> your edits go to guildmates running Guild Roster Manager or Watching Machine as you make them, and theirs come to you; the newest edit wins. Bans only between the ranks you allow. The Sync tab lists who you share with.</li>
-    <li><b>Import</b> (Options, or <code>/wmachine roster import</code>) brings in what Guild Roster Manager has saved, when it's loaded. With Guild Roster Manager running on the same character, it does the syncing.</li>
-    <li><b>Whose alt:</b> log and chat lines about an alt end with their main, e.g. "Myalt reached level 12. -- Venitra's alt".</li>
-    <li><b>Purge</b> (officers and up): lists players whose main and alts have <i>all</i> been offline at least the days you enter, never protected ranks or your own characters. Untick anyone to keep, or click <i>Ignore</i> to never list them again (<i>Show ignored players</i> and <i>Allow</i> undo it), then click <i>Remove</i> once per character. Also <code>/wmachine roster purge</code>.</li>
-    <li><b>Mains from guild notes:</b> notes like "Venhana alt" or "Main: Chojii" set that member as the main, once by itself and again with <i>Read alts from guild notes</i> in Options. An alt group with no main is listed under its highest-ranked character, marked <i>(no main set)</i>.</li>
-    <li><b>Names as you type:</b> in <i>Add alt</i> and <i>Ban by name</i>, typing finishes a guild member's name and lists the matches under the box to click; Tab moves to the next match.</li>
-    <li><b>Alts under their main:</b> a main has a <b>+</b> beside their name on the Roster tab; click it to list their alts underneath. A main sorts with the online players when any of their characters is on.</li>
-    <li><b>Armory</b> (with ArmorySnap on): a member's details list their saved armory for each spec, and <i>Show armory</i> opens their gear and talents.</li>
+    <li><b>Mains and their alts:</b> a main has a <b>+</b> beside their name with how many alts they have; click it to list
+      the alts underneath (<b>-</b> hides them). A main sorts with the online players when any of their characters is on
+      ("on Altname"). Searching for an alt shows it under its main.</li>
+    <li><b>Click a member</b> for their details: join and promotion dates, alts and main, birthday, custom note, ban, last loot
+      and armory. The buttons edit them; <i>Show armory</i> opens their gear and talents for each spec (with ArmorySnap on).
+      Hover a name in the game's Guild window for the same details.</li>
+    <li><b>Adding alts:</b> in <i>Add alt</i>, typing finishes a guild member's name and lists the matches under the box to
+      click; Tab moves to the next match.</li>
+    <li><b>Mains from guild notes:</b> notes like "Venhana alt", "Venitra's Alt" or "Main: Chojii" set that member as the main,
+      once by itself and again with <i>Read alts from guild notes</i> in Options. An alt group with no main is listed under its
+      highest-ranked character, marked <i>(no main set)</i>; click <i>Set as main</i> on the right character to fix it.</li>
   </ul>
+
+  <h3>The guild log</h3>
+  <p>Every 30 seconds the roster is compared with the last scan: joins, rejoins, leaves and kicks, promotions and demotions
+     (with who did it), level-ups, note changes, name changes and players back from a long absence go into the <b>Log</b> tab.
+     Lines about an alt end with their main ("Myalt reached level 12. -- Venitra's alt"). <i>Options</i> picks which go to the
+     log and which also go to your chat.</p>
+
+  <h3>Former members and bans</h3>
+  <p>Everyone who left, with their alts at the time, and the ban list. A banned player who rejoins gets a red warning.
+     <i>Ban by name</i> bans someone outside the guild (names of members and former members finish as you type).</p>
+
+  <h3>Purge inactive players (officers and up)</h3>
+  <ol class="steps">
+    <li>Click <b>Purge</b> (or <code>/wmachine roster purge</code>), enter the days, and click <b>Find</b>.</li>
+    <li>It lists every player whose main and alts have <b>all</b> been offline at least that long; an alt on yesterday keeps
+      everyone. Protected ranks (officers by default), ranks at or above yours, and you and your alts are never listed.</li>
+    <li>Untick anyone to keep this time, or click <b>Ignore</b> to never list them again (<i>Show ignored players</i> and
+      <i>Allow</i> undo it).</li>
+    <li>Click <b>Remove</b> once per character (the game allows one removal per click). Each player is checked again just
+      before.</li>
+  </ol>
+
+  <h3>Sharing with Guild Roster Manager</h3>
+  <p>Join and promotion dates, alts and mains, custom notes, birthdays and bans you edit go to guildmates running Guild Roster
+     Manager or Watching Machine as you make them, and theirs come to you; the newest edit wins. Bans only go between the ranks
+     you allow. The Sync tab lists who you share with. <i>Import</i> (Options, or <code>/wmachine roster import</code>) brings
+     in what Guild Roster Manager has saved, when it's loaded.</p>
+  <div class="note"><b>Guild Roster Manager on the same character</b>It does the syncing there (it would take Roster Manager's
+    messages for its own); Roster Manager keeps the roster and log. Import while it's loaded, then turn it off on that
+    character to let Roster Manager sync.</div>
 </section>
 
 <section id="ginvite">
