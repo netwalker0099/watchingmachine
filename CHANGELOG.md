@@ -2,9 +2,19 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.69** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.70** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.70
+
+### Roster Manager: names as you type
+
+- In the *Add alt* box, typing finishes the name of a guild member (the
+  rest highlighted, so typing on replaces it). Up to 8 matches are listed
+  under the box, online players first, to click; Tab moves to the next.
+  Members already in that alt group aren't offered.
+- *Ban by name* does the same with members and former members.
 
 ## 3.69
 

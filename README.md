@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.69 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.70 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1063,6 +1063,10 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   Roster Manager has saved for the guild, when it's installed and loaded
 - **Guild Roster Manager on the same character**: Roster Manager keeps the
   roster and log but leaves the syncing to it
+- **Names finish as you type** (3.70) in *Add alt* (guild members not
+  already in the group) and *Ban by name* (members and former members): the
+  rest of the first match is filled in, up to 8 matches are listed under the
+  box to click, and Tab moves to the next match
 - **Alts under their main** (3.69): on the Roster tab a main has a **+**
   beside their name; click it to list their alts underneath (**-** hides
   them). A main counts as online, and sorts with the online players, when
@@ -1363,6 +1367,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.70
+- **Roster Manager**: names finish as you type in the *Add alt* and *Ban by name* boxes, with the matching guild members listed to click
 
 ### Version 3.69
 - **Roster Manager**: alts listed under their main, opened with a + beside the main's name

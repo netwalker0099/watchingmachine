@@ -292,6 +292,32 @@ lines = GR:TabLines()
 ni, nl = Find(lines, "Newbie-SpineShatter")
 check("grouping off: alts listed on their own", nl and nl.indent == 0 and not (select(2, Find(lines, "Healer-SpineShatter")) or {}).toggle)
 GR.DB().groupAlts = true
+
+-- Names finish as you type in the add-alt box
+local matches = GR:NameMatches("ne", "members")
+check("name matches by start of name", #matches == 1 and matches[1].name == "Newbie-SpineShatter")
+check("no text, no matches", #GR:NameMatches("", "members") == 0)
+check("former members only when asked", #GR:NameMatches("old", "members") == 0 and #GR:NameMatches("old", "all") == 1)
+local popup = env.CreateFrame("Frame")
+popup.which = "WM_GUILDROSTER_INPUT"
+popup.data = { complete = function(t) return GR:NameMatches(t, "members") end }
+local box = env.CreateFrame("EditBox", nil, popup)
+GR.HookCompletion(box)
+box:SetText("Ne")
+GR.CompleteName(box, true)
+check("typing fills in the rest of the name", box:GetText() == "Newbie")
+check("matches listed under the box", env.WM_GuildRosterSuggest and env.WM_GuildRosterSuggest:IsShown()
+    and env.WM_GuildRosterSuggest.rows[1].value == "Newbie")
+box:SetText("Ne")
+GR.CompleteName(box, true)
+check("deleting doesn't fill it back in", box:GetText() == "Ne")
+box:SetText("Zz")
+GR.CompleteName(box, true)
+check("nothing matches: list hidden", not env.WM_GuildRosterSuggest:IsShown())
+popup.data = { }
+box:SetText("Ne")
+GR.CompleteName(box, true)
+check("a box without completion is left alone", box:GetText() == "Ne")
 GR.tab = "log"
 check("log tab lists entries", #GR:TabLines() == #g.log)
 GR.tab = "sync"

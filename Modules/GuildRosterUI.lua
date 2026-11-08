@@ -42,7 +42,9 @@ StaticPopupDialogs["WM_GUILDROSTER_INPUT"] = {
     OnShow = function(self, data)
         local e = self.editBox or self.EditBox
         if e and data then e:SetText(data.value or ""); e:HighlightText() end
+        if e and GR.HookCompletion then GR.HookCompletion(e) end
     end,
+    OnHide = function() if GR.HideSuggestions then GR.HideSuggestions() end end,
     OnAccept = function(self, data)
         local e = self.editBox or self.EditBox
         if e and data and data.fn then data.fn(strtrim(e:GetText() or "")) end
@@ -57,12 +59,162 @@ StaticPopupDialogs["WM_GUILDROSTER_INPUT"] = {
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
 
-local function Ask(text, value, fn)
+-- complete (optional): text -> matching records, to finish names as you type
+local function Ask(text, value, fn, complete)
     if StaticPopup_Show then
-        StaticPopup_Show("WM_GUILDROSTER_INPUT", text, nil, { value = value, fn = fn })
+        StaticPopup_Show("WM_GUILDROSTER_INPUT", text, nil, { value = value, fn = fn, complete = complete })
     end
 end
 GR.Ask = Ask
+
+-- ============================================
+-- NAMES AS YOU TYPE
+-- ============================================
+-- In a name box, typing finishes the name of a matching guild member (the
+-- rest highlighted, so typing on replaces it), and up to 8 matches are
+-- listed under the box to click. Tab moves to the next match.
+
+local MAX_SUGGEST = 8
+
+-- Records whose name starts with the text (online first, then by name).
+-- from: "members", or "all" for members and former members; skip: names to leave out
+function GR:NameMatches(text, from, skip)
+    local g = self:Guild()
+    text = strtrim(text or ""):lower()
+    if not g or text == "" then return {} end
+    local out = {}
+    local function Scan(src)
+        for name, rec in pairs(src) do
+            if not (skip and skip[name]) and (GR.Short(name):lower():sub(1, #text) == text or name:lower():sub(1, #text) == text) then
+                out[#out + 1] = rec
+            end
+        end
+    end
+    Scan(g.members)
+    if from == "all" then Scan(g.former) end
+    table.sort(out, function(a, b)
+        if (a.online and true or false) ~= (b.online and true or false) then return a.online and true or false end
+        return a.name < b.name
+    end)
+    return out
+end
+
+local suggest
+local function Suggestions()
+    if suggest then return suggest end
+    suggest = CreateFrame("Frame", "WM_GuildRosterSuggest", UIParent, "BackdropTemplate")
+    suggest:SetFrameStrata("FULLSCREEN_DIALOG")
+    suggest:SetWidth(200)
+    if suggest.SetBackdrop then
+        suggest:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        suggest:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+        suggest:SetBackdropBorderColor(0.4, 0.8, 1, 0.8)
+    end
+    suggest.rows = {}
+    for i = 1, MAX_SUGGEST do
+        local b = CreateFrame("Button", nil, suggest)
+        b:SetHeight(16)
+        b:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 16)
+        b:SetPoint("RIGHT", suggest, "RIGHT", -4, 0)
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints(b)
+        hl:SetColorTexture(1, 1, 1, 0.12)
+        b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        b.text:SetPoint("LEFT", 2, 0)
+        b.text:SetJustifyH("LEFT")
+        b:SetScript("OnClick", function(self)
+            if suggest.editBox and self.value then
+                suggest.editBox:SetText(self.value)
+                suggest.editBox:SetCursorPosition(#self.value)
+                suggest.editBox:SetFocus()
+            end
+            suggest:Hide()
+        end)
+        suggest.rows[i] = b
+    end
+    suggest:Hide()
+    return suggest
+end
+
+function GR.HideSuggestions() if suggest then suggest:Hide() end end
+
+-- The name to put in the box for a record: just the name on your realm
+local function BoxName(rec)
+    local short = GR.Short(rec.name)
+    return GR.FullName(short) == rec.name and short or rec.name
+end
+
+local function ShowSuggestions(e, matches)
+    local s = Suggestions()
+    s.editBox = e
+    local n = math.min(#matches, MAX_SUGGEST)
+    if n == 0 then s:Hide() return end
+    for i, b in ipairs(s.rows) do
+        local rec = matches[i]
+        if i <= n then
+            b.value = BoxName(rec)
+            local hex = rec.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[rec.class]
+            hex = hex and type(hex.colorStr) == "string" and hex.colorStr or "ffffffff"
+            b.text:SetText("|c" .. hex .. b.value .. "|r  |cFF888888" .. (rec.level or "") .. " "
+                .. (rec.rankName or "") .. (rec.online and "  |cFF33FF33online|r" or "") .. "|r")
+            b:Show()
+        else
+            b.value = nil
+            b:Hide()
+        end
+    end
+    s:SetHeight(8 + n * 16)
+    s:ClearAllPoints()
+    s:SetPoint("TOPLEFT", e, "BOTTOMLEFT", -6, -4)
+    s:Show()
+end
+
+-- Finish the name being typed, and list the matches
+function GR.CompleteName(e, userInput)
+    local p = e:GetParent()
+    local data = p and p.which == "WM_GUILDROSTER_INPUT" and p.data
+    if not (data and data.complete) then GR.HideSuggestions() return end
+    local text = e:GetText() or ""
+    local grew = #text > (e.wmLastLen or 0)
+    e.wmLastLen = #text
+    if not userInput then return end
+    local matches = data.complete(text)
+    e.wmMatches, e.wmMatchIndex = matches, 1
+    ShowSuggestions(e, matches)
+    -- Typing forwards (not deleting): fill in the rest of the first match
+    if grew and matches[1] then
+        local full = BoxName(matches[1])
+        if #full > #text and full:lower():sub(1, #text) == text:lower() then
+            e:SetText(text .. full:sub(#text + 1))
+            e:HighlightText(#text, #full)
+            e:SetCursorPosition(#text)
+            e.wmLastLen = #text
+        end
+    end
+end
+
+-- Tab: the next match
+function GR.NextMatch(e)
+    local m = e.wmMatches
+    if not m or #m == 0 then return end
+    e.wmMatchIndex = (e.wmMatchIndex or 1) % #m + 1
+    local name = BoxName(m[e.wmMatchIndex])
+    e:SetText(name)
+    e:SetCursorPosition(#name)
+    e.wmLastLen = #name
+end
+
+function GR.HookCompletion(e)
+    e.wmLastLen = #(e:GetText() or "")
+    e.wmMatches = nil
+    if e.wmCompletionHooked then return end
+    e.wmCompletionHooked = true
+    e:HookScript("OnTextChanged", function(self, userInput) GR.CompleteName(self, userInput) end)
+    e:HookScript("OnTabPressed", function(self)
+        local p = self:GetParent()
+        if p and p.which == "WM_GUILDROSTER_INPUT" and p.data and p.data.complete then GR.NextMatch(self) end
+    end)
+end
 
 local function Refresh() if GR.RefreshUI then GR:RefreshUI() end end
 
@@ -114,11 +266,18 @@ end
 function GR:AskAddAlt(name)
     local rec = self:Find(name)
     if not rec then return end
-    Ask("Add an alt to " .. GR.Short(rec.name) .. " (their name; both must be in the guild):", "", function(t)
+    -- Names finish as you type, from guild members not already in this alt group
+    local function Complete(text)
+        local g, skip = self:Guild(), { [rec.name] = true }
+        local grp = g and rec.group and g.groups[rec.group]
+        for _, n in ipairs(grp and grp.members or {}) do skip[n] = true end
+        return self:NameMatches(text, "members", skip)
+    end
+    Ask("Add an alt to " .. GR.Short(rec.name) .. " (their name; both must be in the guild). Names finish as you type; Tab for the next match:", "", function(t)
         local alt = self:Find(t)
         if not alt or not GR:AddAlt(rec.name, alt.name) then WM:Print("Couldn't add " .. t .. " (not a guild member?).") end
         Refresh()
-    end)
+    end, Complete)
 end
 
 function GR:AskBan(name)
@@ -131,13 +290,13 @@ function GR:AskBan(name)
 end
 
 function GR:AskBanByName()
-    Ask("Ban someone by name (Name or Name-Realm), e.g. a player who isn't in the guild:", "", function(t)
+    Ask("Ban someone by name (Name or Name-Realm), e.g. a player who isn't in the guild. Members and former members finish as you type:", "", function(t)
         if t == "" then return end
         Ask("Reason for banning " .. t .. " (optional):", "", function(reason)
             GR:SetBan(t, true, reason)
             Refresh()
         end)
-    end)
+    end, function(text) return self:NameMatches(text, "all") end)
 end
 
 -- ============================================
