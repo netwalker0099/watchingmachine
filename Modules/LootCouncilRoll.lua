@@ -196,7 +196,7 @@ function Roll:Award(name, reason)
     counter = counter + 1
     local _, isNew = LC.Add({ link = cur.link, to = name, by = MyKey(), t = Now(), how = how, howFirm = true,
         color = LC.HOW_COLORS[reason and "de" or LC.Kind(how)], reason = reason and true or nil, rolls = rolls,
-        class = best and best.class, boss = cur.boss, src = { wm = "roll:" .. Now() .. ":" .. counter }, srcKind = "wm" })
+        class = best and best.class, boss = cur.boss, src = { wm = "roll:" .. Now() .. ":" .. counter }, srcKind = "wm", share = true })
     -- RCLootCouncil users record it too, in its history format
     if LC.RC and LC.RC.Send and GroupChannel() and LC.ML and LC.ML.HistoryEntry then
         local fake = { link = cur.link, boss = cur.boss, typeCode = "default" }

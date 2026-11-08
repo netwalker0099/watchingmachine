@@ -48,6 +48,7 @@ local DEFAULTS = {
     rollCountdown = 5,       -- count down the last seconds in raid chat
     rollWarning = true,      -- announce the start and end as a raid warning (leader or assistant)
     rollButtons = true,      -- raiders: Roll MS / Roll OS / Pass buttons when a roll-off starts
+    syncHistory = true,      -- share the loot history with guildmates running Watching Machine
 }
 
 function LC.InitDB()
@@ -247,30 +248,56 @@ local function Merge(o, e)
     for k, v in pairs(e.src or {}) do o.src[k] = v end
 end
 
+-- The same award on every install: RCLootCouncil's id, Gargul's checksum,
+-- or (an award made here) who made it and when
+function LC.GlobalId(e)
+    if e.gid then return e.gid end
+    local src = e.src or {}
+    if src.rc then e.gid = "rc:" .. tostring(src.rc)
+    elseif src.gl then e.gid = "gl:" .. tostring(src.gl)
+    else e.gid = "wm:" .. tostring(LC.Key(UnitName("player"))) .. ":" .. tostring(e.t or Now()) .. ":" .. tostring(e.id) end
+    DB().sources["g:" .. e.gid] = e.id
+    return e.gid
+end
+
+-- Awards made or changed here go to guildmates running Watching Machine
+-- (LootCouncilSync.lua sets LC.OnShare)
+local function Share(e)
+    if LC.OnShare then pcall(LC.OnShare, e) end
+end
+LC.Share = Share
+
 -- e: { link, itemID, to, by, t, how, color, rid, reason, boss, zone, votes, note, class, os, sr, rolls,
---      src = { rc = id } or { gl = checksum } or { wm = n }, srcKind = "rc" / "gl" / "wm", howFirm }
+--      src = { rc = id } or { gl = checksum } or { wm = n }, srcKind = "rc" / "gl" / "wm", howFirm,
+--      share (send it to guildmates: an award happening now, not an import) }
 -- Returns the entry id, and whether it was new
 function LC.Add(e)
     local db = DB()
+    local share = e.share
+    e.share = nil
     e.to = LC.Key(e.to)
     e.itemID = e.itemID or ItemId(e.link)
     if not e.to or not e.itemID then return nil end
     local srcId = e.srcKind and e.src and e.src[e.srcKind] and (e.srcKind .. ":" .. tostring(e.src[e.srcKind]))
     if srcId and db.sources[srcId] then return db.sources[srcId], false end
     local same = FindSame(e)
-    local id
+    local id, entry
     if same then
         Merge(same, e)
-        id = same.id
+        id, entry = same.id, same
     else
         id = db.nextId
         db.nextId = id + 1
         e.id = id
         e.srcKind = nil
+        e.mod = e.mod or e.t
         db.history[id] = e
+        entry = e
     end
     if srcId then db.sources[srcId] = id end
+    LC.GlobalId(entry)
     Changed()
+    if share then Share(entry) end
     return id, not same
 end
 
@@ -300,6 +327,9 @@ end
 function LC.DeleteEntry(e)
     if not e or e.deleted then return false end
     e.deleted = true
+    e.mod = Now()
+    LC.GlobalId(e)
+    Share(e)
     if Tell(e) and e.src and e.src.rc then LC.RC:Send("delete_history", { e.src.rc }) end
     Changed()
     return true
@@ -312,10 +342,13 @@ function LC.ChangeWinner(e, name)
     local tell = Tell(e)
     local oldRc = e.src and e.src.rc
     e.deleted = true
+    e.mod = Now()
+    LC.GlobalId(e)
+    Share(e)
     local copy = {}
     for k, v in pairs(e) do copy[k] = v end
-    copy.id, copy.deleted, copy.to, copy.class = nil, nil, to, nil
-    copy.edited = Now()
+    copy.id, copy.deleted, copy.to, copy.class, copy.gid = nil, nil, to, nil, nil
+    copy.edited, copy.mod, copy.share = Now(), Now(), true
     local rcId = Now() .. "-e" .. tostring(e.id)
     copy.src = { wm = "edit:" .. rcId, rc = tell and rcId or nil }
     copy.srcKind = "wm"
@@ -434,7 +467,7 @@ function LC.RealmTime(dateStr, timeStr)
 end
 
 -- One RCLootCouncil history entry (saved, or sent by a master looter)
-function LC.AddRCLC(name, h, index)
+function LC.AddRCLC(name, h, index, live)
     if type(h) ~= "table" or not h.lootWon or type(name) ~= "string" then return nil end
     local c = type(h.color) == "table" and { h.color[1], h.color[2], h.color[3] } or nil
     local how = h.response or "Awarded"
@@ -443,7 +476,7 @@ function LC.AddRCLC(name, h, index)
         color = c or LC.HOW_COLORS[LC.Kind(how)], rid = h.responseID, reason = h.isAwardReason and true or nil, howFirm = true,
         boss = h.boss, zone = h.instance, votes = tonumber(h.votes), note = h.note, class = h.class,
         by = h.owner and LC.Key(h.owner), replaced = h.itemReplaced1,
-        src = { rc = h.id or (name .. ":" .. tostring(index)) }, srcKind = "rc",
+        src = { rc = h.id or (name .. ":" .. tostring(index)) }, srcKind = "rc", share = live or nil,
     })
 end
 
@@ -452,7 +485,12 @@ function LC.DeleteRCLC(id)
     local db = DB()
     local entry = db.sources["rc:" .. tostring(id)]
     entry = entry and db.history[entry]
-    if entry then entry.deleted = true; Changed() return true end
+    if entry and not entry.deleted then
+        entry.deleted, entry.mod = true, Now()
+        Changed()
+        Share(entry)
+        return true
+    end
     return false
 end
 
@@ -500,6 +538,7 @@ function LC:Initialize()
     if self.RC then self.RC:Init() end
     if self.ML then self.ML:Init() end
     if self.Roll then self.Roll:Init() end
+    if self.Sync then self.Sync:Init() end
     if self.InitFrames then self:InitFrames() end
 end
 
@@ -509,6 +548,7 @@ function LC:OnModuleOff()
     if self.RC then self.RC:Stop() end
     if self.ML then self.ML:Stop() end
     if self.Roll then self.Roll:Stop_All() end
+    if self.Sync then self.Sync:Stop() end
 end
 
 function LC:OnModuleOn()

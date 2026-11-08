@@ -488,7 +488,7 @@ function RC:Handle(prefix, command, args, sender, dist)
     if command == "history" then
         if fromML or dist == "GUILD" then
             local winner, entry = args[1], args[2]
-            if type(entry) == "table" then LC.AddRCLC(Key(winner), entry) end
+            if type(entry) == "table" then LC.AddRCLC(Key(winner), entry, nil, true) end
         end
         return
     elseif command == "delete_history" then

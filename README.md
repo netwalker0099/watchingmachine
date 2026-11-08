@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.78 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.79 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1188,7 +1188,16 @@ works with RCLootCouncil and awards like Gargul. Open it with
   give it to someone else or delete it; `/wmachine council undo` deletes
   your last award. When you made the award, the raid's RCLootCouncil and
   Watching Machine users get the change too
-- Coming next: sharing the loot history between Watching Machine users
+- **Shared with the guild** (3.79): guildmates running Watching Machine
+  keep the same loot history. Awards made or recorded during a raid
+  (council and roll-off awards, awards an RCLootCouncil master looter
+  logs) and every edit or delete go to the guild as they happen. At login
+  you're sent everything changed since you were last online (all of it the
+  first time, one award at a time in the background; with several
+  guildmates online each award is sent about once). The same award is
+  matched by RCLootCouncil's id, Gargul's checksum, or who awarded it and
+  when, so nothing doubles; the latest change wins. The history window's
+  footer shows how many were shared and received. An option turns it off
 - Commands: `/wmachine council players`, `import`, `vote`, `test [n]`,
   `endtest`, `sendtest [n]`, `ml`, `add <item>`, `roll [item]`,
   `de <name>`, `undo`, or a player's name
@@ -1483,6 +1492,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.79
+- **Loot Council part 5**: the loot history shared between guildmates running Watching Machine: live awards, edits and deletes as they happen, and a catch-up at login
 
 ### Version 3.78
 - **Loot Council part 4**: Gargul-style roll-offs (announced and counted down, every /roll read as main or off spec, a roll window with each roller's last loot, roll buttons for Watching Machine raiders), a disenchanter, and editing or undoing awards from the loot history

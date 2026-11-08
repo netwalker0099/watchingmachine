@@ -272,7 +272,7 @@ function ML:Award(ses, winner, reason)
     if not test then
         local entry = self:HistoryEntry(item, winner, cand, reason)
         item.historyId = entry.id
-        LC.AddRCLC(winner, entry)
+        LC.AddRCLC(winner, entry, nil, true)
         RC:Send("history", { winner, entry })
     end
     -- Everything awarded: the session ends

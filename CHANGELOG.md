@@ -2,9 +2,29 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.78** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.79** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.79
+
+### Loot Council part 5: the loot history shared with the guild
+
+- Guildmates running Watching Machine keep the same loot history.
+- Awards made or recorded live (council and roll-off awards, awards an
+  RCLootCouncil master looter logs) and every edit or delete go to the
+  guild as they happen.
+- At login you're sent everything changed since you were last online (all
+  of it the first time), one award at a time in the background; with
+  several guildmates online, an award one of them already sent is skipped
+  by the others.
+- The same award is matched everywhere by RCLootCouncil's id, Gargul's
+  checksum, or who awarded it and when, so nothing is doubled; the latest
+  change wins, and a deleted award stays deleted.
+- Awards imported from Gargul's or RCLootCouncil's saved data aren't sent
+  one by one: guildmates catch up on them at login.
+- The history window's footer shows how many awards were shared and
+  received. *Share the loot history with my guild* turns it off.
 
 ## 3.78
 

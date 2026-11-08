@@ -244,7 +244,10 @@ function LC:CreateUI()
     panel.count = panel:AddFooterText({ text = function()
         local n = 0
         for _, e in pairs(DB().history) do if not e.deleted then n = n + 1 end end
-        return n .. " awards" .. (DB().lastImport and ("  |cff888888imported " .. LC.Ago(DB().lastImport) .. "|r") or "")
+        local S = LC.Sync
+        local sync = S and S.Enabled() and ("  |cff888888shared " .. (S.sent or 0) .. ", received " .. (S.received or 0)
+            .. ((S.CatchUpLength() > 0) and (", " .. S.CatchUpLength() .. " to send") or "") .. "|r") or ""
+        return n .. " awards" .. (DB().lastImport and ("  |cff888888imported " .. LC.Ago(DB().lastImport) .. "|r") or "") .. sync
     end }, "LEFT")
     panel:AddFooterButton({ text = "Import now", width = 100, onClick = function() LC:Command("import") end,
         tooltip = { "Import now", "Adds new awards from Gargul and RCLootCouncil (their saved history, when they're installed). Each award is added once; the same award recorded by both is merged." } }, "RIGHT")
@@ -512,6 +515,9 @@ function LC:SetupPage(L)
     L:Checkbox({ label = "Add new awards from Gargul and RCLootCouncil at login", get = function() return db.autoImport end,
         set = function(v) db.autoImport = v end,
         tooltip = { "Import at login", "Reads Gargul's and RCLootCouncil's saved loot history when you log in and adds any award not already here." } })
+    L:Checkbox({ label = "Share the loot history with my guild (Watching Machine users)", get = function() return db.syncHistory ~= false end,
+        set = function(v) db.syncHistory = v end,
+        tooltip = { "Share with the guild", "Awards made or recorded during a raid, and every edit or delete, go to guildmates running Watching Machine, and theirs come to you. At login they send you everything changed since you were last online (all of it the first time, in the background). The latest change of each award wins." } })
     L:Checkbox({ label = "Show a player's loot beside their armory", get = function() return db.showInArmory end,
         set = function(v) db.showInArmory = v end,
         tooltip = { "Loot beside the armory", "In ArmorySnap's browser, a pane beside the paper doll lists the player's loot with the guild." } })

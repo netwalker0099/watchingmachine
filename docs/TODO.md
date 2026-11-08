@@ -29,8 +29,8 @@ what still needs settling before it's built.
     part 1, the loot history and imports (3.75); part 2, the RCLootCouncil
     wire format and the council side (3.76); part 3, the master looter
     side and auto-pass (3.77); part 4, roll-offs, disenchanter, award edit
-    and undo (3.78). Next: part 5, the loot history shared between
-    Watching Machine users
+    and undo (3.78); part 5, the loot history shared between Watching
+    Machine users (3.79). Done
 
 ---
 
