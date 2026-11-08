@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.74 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.75 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1106,6 +1106,32 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
 - Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
   `import`, `notes`, `purge`, `options`
 
+### 33. Loot Council
+
+The guild's loot history (3.75), the first part of a loot council that
+works with RCLootCouncil and awards like Gargul. Open it with
+`/wmachine council` (also `/wmachine lc`).
+
+- **One loot history**: every item awarded, to whom, by whom, when, where
+  and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve,
+  roll, disenchant, banking), with votes, notes, rolls and the item it
+  replaced when the source recorded them
+- **From Gargul and RCLootCouncil**: what they have saved on your account
+  is added at login (only new awards; one award recorded by both becomes
+  one). *Import now* does it by hand. Compiled with the help of Gargul's
+  and RCLootCouncil's research; the code is our own
+- **All loot**: every award, newest first; search by item, player, how or
+  boss. Hover an award for its details, click it for that player's loot
+- **Players**: everyone who's had loot, how many items and their last
+  award
+- **Each player's loot**: in ArmorySnap's browser, a pane beside a
+  player's armory lists their loot with the guild and the time since their
+  last award. Roster Manager's details show their last loot too
+- Coming next: voting with RCLootCouncil users (the voting frame shows each
+  candidate's last loot, and their last 30 days on hover), then awarding as
+  master looter with a test mode, then Gargul-style roll-offs
+- Commands: `/wmachine council players`, `import`, or a player's name
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -1372,6 +1398,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WMCritsDB` - Crit Tracker records per character, and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
+- `WMLootDB` - Loot Council: the loot history (shared by your characters) and its options
 - `WMGuildRosterDB` - Roster Manager: each guild's members, former members, alt groups and log (shared by your characters), and this character's options
 - `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, options, and the layout shared by all characters
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
@@ -1395,6 +1422,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.75
+- **New module: Loot Council** (`/wmachine council`), part 1: the guild's loot history, imported from Gargul and RCLootCouncil, shown as all loot ever awarded and each player's loot beside their armory, with the time since their last award
 
 ### Version 3.74
 - **Roster Manager**: log and chat lines about an alt say whose alt it is ("Myalt reached level 12. -- Venitra's alt")

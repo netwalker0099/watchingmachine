@@ -328,6 +328,12 @@ function GR:DetailLines(rec)
     if rec.ban.on then
         Add("|cFFFF3333Banned|r", GR.Short(rec.ban.by) .. (rec.ban.reason ~= "" and (": " .. rec.ban.reason) or ""))
     end
+    -- Their last loot, with Loot Council on
+    local LC = WM:IsModuleOn("LootCouncil") and WM.LootCouncil
+    if LC and LC.LastLoot then
+        local last = LC.LastLoot(rec.name)
+        if last then Add("Last loot", LC.Ago(last.t) .. ": " .. LC.ItemText(last) .. " " .. LC.HowText(last)) end
+    end
     -- Their armory, with ArmorySnap on: each spec, its GearScore and age
     local Arm = GR.Armory()
     if Arm then

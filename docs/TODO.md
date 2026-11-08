@@ -25,6 +25,13 @@ what still needs settling before it's built.
 15. ~~ArmorySnap armory per spec, linked to Roster Manager~~ (done, 3.68;
     catch-up at login 3.69, from saved snapshots 3.72). Roster alts under
     their main (3.69), purge of inactive players (3.72)
+16. Loot Council (RCLootCouncil-compatible council + Gargul-style awarding):
+    part 1, the loot history and imports, done in 3.75. Next: part 2, the
+    RCLootCouncil wire format (AceSerializer, raw DEFLATE, AceComm
+    framing, our own code) and the council side (response frame, voting
+    frame with last loot and 30-day hover, live history); part 3, the
+    master looter side (sessions, awards by loot window or trade, test
+    mode); part 4, roll-offs, disenchanter, award edit and undo
 
 ---
 

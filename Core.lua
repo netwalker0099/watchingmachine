@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.74"
+WM.version = "3.75"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -21,7 +21,7 @@ local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
-    "Recruiter", "WhisperLogs", "GuildInvite", "GuildRoster", "BuffCheck", "ArmorySnap", "AuraRange",
+    "Recruiter", "WhisperLogs", "GuildInvite", "GuildRoster", "BuffCheck", "ArmorySnap", "LootCouncil", "AuraRange",
     "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ManaTick", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
 }
 
@@ -369,6 +369,7 @@ local MODULE_COLORS = {
     Recruiter = "FFD700",
     GuildInvite = "00FF00",
     GuildRoster = "66CCFF",
+    LootCouncil = "FFB347",
     DebuffTracker = "FFCC00",
     PvPTracker = "FF3333",
     BuffCheck = "33FF99",
@@ -1267,7 +1268,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "LootCouncil", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
     { title = "Guild & Social", modules = { "GuildRoster", "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
     { title = "Interface", modules = { "FrameMover" } },
@@ -1318,6 +1319,16 @@ local MODULE_INFO = {
         command = "timers", color = {0.4, 1, 0.8}, icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
         tools = {
             { text = "Print the timers", func = function() Call("WorldTimers", "Report") end },
+        },
+    },
+    LootCouncil = {
+        title = "Loot Council", desc = "Loot history, council voting, awarding",
+        about = "The guild's loot history: every item awarded, to whom and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve, disenchant), starting from what Gargul and RCLootCouncil have saved. All loot ever awarded, and each player's loot beside their armory with the time since their last award.",
+        command = "council", color = {1, 0.7, 0.28}, icon = "Interface\Icons\INV_Misc_Bag_10_Blue",
+        tools = {
+            { text = "Loot history", desc = "Every award, newest first.", func = function() Call("LootCouncil", "Command", "history") end },
+            { text = "Players", desc = "Each player's loot count and last award.", func = function() Call("LootCouncil", "Command", "players") end },
+            { text = "Import from Gargul and RCLootCouncil", desc = "Add awards they've saved that aren't here yet.", func = function() Call("LootCouncil", "Command", "import") end },
         },
     },
     LootBrowser = {
@@ -2317,6 +2328,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
+    print("|cFFFFFF00/wmachine council|r - Loot Council: loot history (council players / import / <player name>)")
     print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / purge / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
@@ -2542,6 +2554,13 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "gear" or cmd == "sets" or cmd == "itemrack" or cmd:match("^gear ") then
         local module = WM:UsableModule("GearSets")
         if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) end
+
+    elseif cmd == "council" or cmd == "lc" or cmd:match("^council ") or cmd:match("^lc ") then
+        local module = WM:UsableModule("LootCouncil")
+        if module and module.Command then
+            local raw = (msg or ""):match("^%s*%S+%s+(.+)$")
+            module:Command(raw or "")
+        end
 
     elseif cmd == "roster" or cmd == "grm" or cmd:match("^roster ") or cmd:match("^grm ") then
         local module = WM:UsableModule("GuildRoster")

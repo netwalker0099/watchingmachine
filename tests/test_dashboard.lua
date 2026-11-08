@@ -39,7 +39,7 @@ for _, name in ipairs({ "AutoLogger", "KeywordMonitor", "MailLogger", "ServicesP
     local info = WM.MODULE_INFO[name]
     check(name .. " card explains itself", info and info.about and #info.about > 20 and info.command)
 end
-check("no stray cards", total == 27)
+check("no stray cards", total == 28)
 
 -- ---- build the dashboard ----
 WM:CreateDashboard()

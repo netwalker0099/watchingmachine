@@ -1725,13 +1725,23 @@ function AS.ClearPaperDoll()
     for _, btn in pairs(slotButtons) do SetSlotItem(btn, nil) end
 end
 
+-- Others can show more about the selected player (Loot Council's loot pane):
+-- fn(playerKey or nil, browseFrame)
+AS.memberListeners = AS.memberListeners or {}
+function AS.OnMemberShown(fn) AS.memberListeners[#AS.memberListeners + 1] = fn end
+local function MemberShown(member)
+    local key = member and (member.armoryKey or (AS.Armory and AS.Armory.Key(member.name)))
+    for _, fn in ipairs(AS.memberListeners) do pcall(fn, key, browseFrame) end
+end
+
 function AS.RefreshPaperDoll()
     AS.ClearPaperDoll()
-    if not selectedSnapshotKey or not selectedMemberName then return end
+    if not selectedSnapshotKey or not selectedMemberName then MemberShown(nil) return end
     local snap = AS.ViewSnapshot(selectedSnapshotKey)
-    if not snap then return end
+    if not snap then MemberShown(nil) return end
     local member = snap.members[selectedMemberName]
-    if not member then return end
+    if not member then MemberShown(nil) return end
+    MemberShown(member)
 
     local cc = CLASS_COLORS[member.class] or { r=1, g=1, b=1 }
     charNameText:SetText(member.name)

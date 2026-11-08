@@ -249,7 +249,7 @@ function Arm.View(filter)
             for spec, e in pairs(specs) do
                 Arm.Resolve(e)
                 local label = (key:match("%-(.+)$") == Realm() and Short(key) or key) .. " · " .. Arm.SpecLabel(spec)
-                members[label] = setmetatable({ name = label, armoryNote = Arm.Note(e) }, { __index = e })
+                members[label] = setmetatable({ name = label, armoryNote = Arm.Note(e), armoryKey = key }, { __index = e })
             end
         end
     end

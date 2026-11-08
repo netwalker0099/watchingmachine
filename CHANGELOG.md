@@ -2,9 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.74** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.75** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.75
+
+### New module: Loot Council (part 1, the loot history)
+
+In the Raid group (`/wmachine council`).
+
+- **The guild's loot history**: every item awarded, to whom, by whom, when,
+  where and how it was won (Need, Greed, Minor Upgrade, off-spec, soft
+  reserve, roll, disenchant, banking), with votes, notes and rolls where
+  recorded.
+- **Imported from Gargul and RCLootCouncil** at login (new awards only;
+  the same award from both becomes one), or with *Import now*.
+- **All loot** (search by item, player, how or boss) and **Players** (each
+  player's count and last award).
+- **A player's loot beside their armory** in ArmorySnap's browser, with the
+  time since their last award; Roster Manager's details show their last
+  loot.
+- Its own page in the guided setup, and in the *Raiding* quick setup.
+- Next: voting with RCLootCouncil users, awarding as master looter (with a
+  test mode), Gargul-style roll-offs.
 
 ## 3.74
 

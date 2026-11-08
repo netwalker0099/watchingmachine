@@ -59,6 +59,7 @@ P.SCOPE = {
     WMGearSetsDB = { shared = { "chars" } },
     WMFrameMoverDB = { shared = { "layout" } },
     WMGuildRosterDB = { shared = { "guilds", "patchDay" } },
+    WMLootDB = { shared = { "history", "sources", "nextId", "lastImport" } },
 }
 
 local function DeepCopy(v)
@@ -208,7 +209,9 @@ WM.MODULE_LINKS = {
     GearSets = { AltTracker = "missing set items say when they're in your bank" },
     KeywordMonitor = { ChatFilter = "filtered spam never reaches your keywords" },
     ArmorySnap = { GearScore = "a GearScore for every raid member in a snapshot" },
-    GuildRoster = { ArmorySnap = "each member's armory for every spec, with a Show armory button" },
+    GuildRoster = { ArmorySnap = "each member's armory for every spec, with a Show armory button",
+        LootCouncil = "each member's last loot in their details" },
+    LootCouncil = { ArmorySnap = "a player's loot beside their armory" },
     DebuffTracker = { ArmorySnap = "the spell-reflect check waits while ArmorySnap inspects" },
     InstanceTracker = { MailLogger = "gold traded during a run, on the run's tooltip",
         AltTracker = "a button to Your Characters from the instance list" },
