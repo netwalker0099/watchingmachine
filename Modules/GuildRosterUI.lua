@@ -323,6 +323,7 @@ function GR:DetailLines(rec)
         if #alts > 0 then Add("Alts", table.concat(alts, ", ")) end
     end
     if (rec.timesInGuild or 1) > 1 then Add("Times in guild", tostring(rec.timesInGuild)) end
+    if self.IsPurgeIgnored and self:IsPurgeIgnored(rec.name) then Add("Purge", "|cFF888888never (ignored)|r") end
     if rec.custom.text ~= "" then Add("Custom note", rec.custom.text) end
     if rec.ban.on then
         Add("|cFFFF3333Banned|r", GR.Short(rec.ban.by) .. (rec.ban.reason ~= "" and (": " .. rec.ban.reason) or ""))
@@ -951,7 +952,8 @@ function GR:SetupPage(L)
         .. " are saved when ArmorySnap inspects them, and guildmates running Watching Machine share theirs.")
     L:Note("|cFFFFFFFFPurge (officers and up):|r the |cFFFFFF00Purge|r button lists every player whose main and alts"
         .. " have all been offline at least the days below, never anyone at the protected ranks, you or your alts."
-        .. " You untick anyone to keep and remove the rest one click at a time; each is checked again just before.")
+        .. " You untick anyone to keep and remove the rest one click at a time; each is checked again just before."
+        .. " |cFFFFFF00Ignore|r on a player tags them and all their characters so purges never list them again.")
     L:Slider({ label = "Purge: offline at least (days)", min = 7, max = 365, step = 1, width = 220,
         get = function() return DB().purgeDays end, set = function(v) DB().purgeDays = v end,
         tooltip = { "Days offline", "Only players whose main and every alt have been offline at least this long are listed." } })

@@ -407,6 +407,39 @@ P:Find(30, 1)
 check("purge: not allowed to remove: nothing removed", P:RemoveNext() == false and #uninvited == 3)
 check("purge: not allowed: Can say no", GR:CanPurge() == false)
 canRemove = true
+-- Ignore: tag a player never to be purged
+P:Find(30, 1)
+local soloEntry
+for _, e in ipairs(P.list) do if e.lead.name == "Solo-SpineShatter" then soloEntry = e end end
+check("ignore: Solo found first", soloEntry ~= nil)
+P:SetIgnored(soloEntry, true)
+check("ignore: tagged on the record", g.members["Solo-SpineShatter"].noPurge == true and GR:IsPurgeIgnored("Solo"))
+check("ignore: not removed from this list", (function()
+    for _, e in ipairs(P.list) do e.keep = e ~= soloEntry and true or false end
+    return P:Next() == nil end)())
+check("ignore: not listed by the next Find", (function()
+    for _, e in ipairs(P:Find(30, 1)) do if e.lead.name == "Solo-SpineShatter" then return false end end
+    return true end)())
+GR.DB().purgeShowIgnored = true
+local shown
+for _, e in ipairs(P:Find(30, 1)) do if e.lead.name == "Solo-SpineShatter" then shown = e end end
+check("ignore: listed greyed with Show ignored", shown and shown.ignored)
+check("ignore: a shown ignored player isn't removed", (function()
+    for _, e in ipairs(P.list) do e.keep = e ~= shown and true or false end
+    return P:Next() == nil end)())
+local detail
+for _, l in ipairs(GR:DetailLines(g.members["Solo-SpineShatter"])) do if l[1] == "Purge" then detail = l[2] end end
+check("ignore: shown in the player's details", detail and detail:find("never", 1, true))
+P:SetIgnored(shown, false)
+check("ignore: Allow clears it", not g.members["Solo-SpineShatter"].noPurge and not shown.ignored)
+GR.DB().purgeShowIgnored = false
+-- A tag on any of a player's characters covers the whole player
+GR:SetPurgeIgnored("Altb", true)
+check("ignore: tagging an alt tags all their characters", g.members["Mainy-SpineShatter"].noPurge and g.members["Alta-SpineShatter"].noPurge)
+check("ignore: the whole player is skipped", (function()
+    for _, e in ipairs(GR:PurgeCandidates(30, 1)) do if e.lead.name == "Mainy-SpineShatter" then return false end end
+    return true end)())
+GR:SetPurgeIgnored("Mainy", false)
 GR:TogglePurge()
 check("purge window opens", env.WM_GuildRosterPurge and env.WM_GuildRosterPurge:IsShown())
 GR:HidePurge()

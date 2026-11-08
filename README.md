@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.72 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.73 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1075,7 +1075,9 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   protected ranks (officers by default), ranks at or above yours, and you
   and your alts are never listed. Untick anyone to keep, then click
   *Remove* once per character (the game allows one removal per click);
-  each player is checked again just before
+  each player is checked again just before. *Ignore* on a found player
+  (3.73) tags them and all their characters so purges never list them
+  again; *Show ignored players* lists them greyed, with *Allow* to undo
 - **Alts from guild notes** (3.71): public and officer notes like
   "Venhana alt", "Venitra's Alt [BS]375", "alt of Chojii" or "Main: Chojii"
   set that guild member as the main (in the alt group they share, or with
@@ -1389,6 +1391,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.73
+- **Roster Manager: Purge** can tag players to ignore: *Ignore* on a found player keeps them (and all their characters) out of every future purge
 
 ### Version 3.72
 - **Roster Manager: Purge** removes players whose main and alts have all been offline for the days you choose, one click per character, for officers and up

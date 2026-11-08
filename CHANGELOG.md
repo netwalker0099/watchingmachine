@@ -2,9 +2,21 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.72** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.73** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.73
+
+### Roster Manager: players purges ignore
+
+- Each player *Find* lists has an *Ignore* button: it tags them and all
+  their characters so no purge lists them again. Tagging any one of a
+  player's characters covers the whole player.
+- *Show ignored players* lists them too, greyed out and never removed,
+  with *Allow* to undo the tag.
+- The tag is remembered for every character on your account, and shows in
+  the player's details ("Purge: never").
 
 ## 3.72
 

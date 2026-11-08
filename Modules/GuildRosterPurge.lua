@@ -40,9 +40,11 @@ end
 Purge.DaysOff = DaysOff
 
 -- Everyone eligible: { lead = record, recs = { every character in the guild },
--- days = days since any of them was on }, longest away first.
--- days: offline at least this long; protect: never ranks at or above this index
-function GR:PurgeCandidates(days, protect)
+-- days = days since any of them was on, ignored = tagged never to purge },
+-- longest away first.
+-- days: offline at least this long; protect: never ranks at or above this
+-- index; withIgnored: also list players tagged never to purge (not removed)
+function GR:PurgeCandidates(days, protect, withIgnored)
     local g = self:Guild()
     if not g then return {} end
     days = tonumber(days) or DB().purgeDays
@@ -72,14 +74,16 @@ function GR:PurgeCandidates(days, protect)
                 local ri = r.rankIndex or 99
                 if r.name == GR.MyName() or ri <= protect or ri <= myRank then keep = true end
             end
+            local ignored = false
+            for _, r in ipairs(recs) do if r.noPurge then ignored = true end end
             local off = DaysOff(recs)
-            if not keep and off >= days then
+            if not keep and off >= days and (withIgnored or not ignored) then
                 table.sort(recs, function(a, b)
                     if a.name == lead.name then return true end
                     if b.name == lead.name then return false end
                     return a.name < b.name
                 end)
-                out[#out + 1] = { lead = lead, recs = recs, days = off, keep = false, gone = {} }
+                out[#out + 1] = { lead = lead, recs = recs, days = off, keep = false, gone = {}, ignored = ignored }
             end
         end
     end
@@ -97,10 +101,53 @@ end
 Purge.list = {}      -- the candidates found, with keep = true for those unticked
 Purge.removed = 0
 
+-- Tag a player (all their characters) never to be purged, or clear it.
+-- Kept on Roster Manager's records, for every character of yours.
+function GR:SetPurgeIgnored(name, on)
+    local g = self:Guild()
+    local rec = g and self:Find(name)
+    if not rec then return false end
+    local recs = { rec }
+    local grp = rec.group and g.groups[rec.group]
+    if grp then
+        recs = {}
+        for _, n in ipairs(grp.members) do
+            local r = g.members[n] or g.former[n]
+            if r then recs[#recs + 1] = r end
+        end
+    end
+    for _, r in ipairs(recs) do r.noPurge = on and true or nil end
+    self:Log("info", GR.Short((grp and self:GroupLead(g, grp) or rec).name)
+        .. (on and " will never be purged." or " can be purged again."), g)
+    return true
+end
+
+-- Is this player (any of their characters) tagged never to purge?
+function GR:IsPurgeIgnored(name)
+    local g = self:Guild()
+    local rec = g and self:Find(name)
+    if not rec then return false end
+    if rec.noPurge then return true end
+    local grp = rec.group and g.groups[rec.group]
+    for _, n in ipairs(grp and grp.members or {}) do
+        local r = g.members[n] or g.former[n]
+        if r and r.noPurge then return true end
+    end
+    return false
+end
+
+-- From the list: tag or untag a found player
+function Purge:SetIgnored(e, on)
+    GR:SetPurgeIgnored(e.lead.name, on)
+    e.ignored = on and true or false
+    -- Untagged while ignored ones are hidden: it stays listed until the next Find
+    if self.Refresh then self:Refresh() end
+end
+
 -- The next character to remove: { rec, entry } or nil
 function Purge:Next()
     for _, e in ipairs(self.list) do
-        if not e.keep and not e.skipped then
+        if not e.keep and not e.skipped and not e.ignored then
             for _, r in ipairs(e.recs) do
                 if not e.gone[r.name] then return r, e end
             end
@@ -123,7 +170,7 @@ function Purge:RemoveNext()
     if not rec then return false end
     local g = GR:Guild()
     -- Someone came back, or was promoted out of reach: keep the whole player
-    local still = GR:PurgeCandidates(self.days, self.protect)
+    local still = GR:PurgeCandidates(self.days, self.protect, false)
     local stillIn = false
     for _, c in ipairs(still) do
         for _, r in ipairs(c.recs) do if r.name == rec.name then stillIn = true end end
@@ -151,7 +198,7 @@ end
 function Purge:Find(days, protect)
     self.days = tonumber(days) or DB().purgeDays
     self.protect = tonumber(protect) or DB().purgeProtectRank
-    self.list = GR:PurgeCandidates(self.days, self.protect)
+    self.list = GR:PurgeCandidates(self.days, self.protect, DB().purgeShowIgnored)
     self.removed = 0
     if self.Refresh then self:Refresh() end
     return self.list
@@ -160,7 +207,7 @@ end
 function Purge:Counts()
     local players, chars = 0, 0
     for _, e in ipairs(self.list) do
-        if not e.keep and not e.skipped then
+        if not e.keep and not e.skipped and not e.ignored then
             local left = 0
             for _, r in ipairs(e.recs) do if not e.gone[r.name] then left = left + 1 end end
             if left > 0 then players, chars = players + 1, chars + left end
@@ -192,6 +239,7 @@ local function RowText(e)
         .. "  |cFF888888" .. (lead.rankName or "") .. "|r"
     if #names > 0 then t = t .. "  |cFF888888+|r " .. table.concat(names, ", ") end
     if e.skipped then t = t .. "  |cFF33FF33(kept: came back)|r" end
+    if e.ignored then t = "|cFF888888" .. t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "  (never purged)|r" end
     return t
 end
 
@@ -225,7 +273,23 @@ function Purge:Refresh()
             row.check:SetScript("OnLeave", function() GameTooltip:Hide() end)
             row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             row.text:SetPoint("LEFT", 22, 0)
-            row.text:SetPoint("RIGHT", -60, 0)
+            row.text:SetPoint("RIGHT", -130, 0)
+            -- Never purge this player (remembered), or undo it
+            row.ignore = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            row.ignore:SetSize(80, 16)
+            row.ignore:SetPoint("RIGHT", -44, 0)
+            row.ignore:SetScript("OnClick", function()
+                local e = row.entry
+                if e then Purge:SetIgnored(e, not e.ignored) end
+            end)
+            row.ignore:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("Never purge", 1, 1, 1)
+                GameTooltip:AddLine("Tags this player and all their characters so purges never list them again"
+                    .. " (shown greyed with Show ignored players). Click again to undo.", nil, nil, nil, true)
+                GameTooltip:Show()
+            end)
+            row.ignore:SetScript("OnLeave", function() GameTooltip:Hide() end)
             row.text:SetJustifyH("LEFT")
             row.text:SetWordWrap(false)
             row.days = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -235,7 +299,9 @@ function Purge:Refresh()
         local e = i <= visible and self.list[i + list.offset]
         row.entry = e or nil
         if e then
-            row.check:SetChecked(not e.keep)
+            row.check:SetChecked(not e.keep and not e.ignored)
+            if e.ignored then row.check:Disable() else row.check:Enable() end
+            row.ignore:SetText(e.ignored and "Allow" or "Ignore")
             row.text:SetText(RowText(e))
             row.days:SetText(e.days .. "d")
             row:Show()
@@ -267,7 +333,8 @@ function GR:TogglePurge()
         local L = panel.layout
         L:Note("Lists players whose characters have |cFFFFFFFFall|r been offline at least this many days. A main and"
             .. " their alts count as one player: if any of them was on more recently, none of them is listed."
-            .. " Untick anyone to keep, then click Remove once per character (the game allows one removal per click).")
+            .. " Untick anyone to keep this time, or click |cFFFFFF00Ignore|r to never list them again. Then click"
+            .. " Remove once per character (the game allows one removal per click).")
         local row = L:Row(28)
         row:EditBox({ label = "Offline at least (days):", width = 50, numeric = true, maxLetters = 4,
             get = function() return tostring(DB().purgeDays) end,
@@ -280,6 +347,11 @@ function GR:TogglePurge()
         row = L:Row(26)
         row:Button({ text = "Find", width = 90, onClick = function() Purge:Find() end,
             tooltip = { "Find", "Lists who'd be removed, from the last roster scan (every 30 seconds)." } }, 0)
+        row:Checkbox({ label = "Show ignored players", font = "GameFontNormalSmall",
+            get = function() return DB().purgeShowIgnored end,
+            set = function(v) DB().purgeShowIgnored = v; Purge:Find() end,
+            tooltip = { "Show ignored players", "Also lists players tagged Never purge, greyed out and never removed,"
+                .. " so you can click Allow to let purges list them again." } }, 110)
         local fill = L:Fill(160)
         local list = CreateFrame("Frame", nil, fill)
         list:SetAllPoints(fill)

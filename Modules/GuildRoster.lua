@@ -36,6 +36,7 @@ local DEFAULTS = {
     groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
     purgeDays = 30,         -- purge: every character offline at least this many days
     purgeProtectRank = 1,   -- purge: never ranks at or above this index (0 = guild master)
+    purgeShowIgnored = false, -- purge: also list players tagged never to purge
     sync = true,            -- share edits with guildmates (GRM and WM)
     syncBans = true,
     syncCustom = true,
