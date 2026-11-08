@@ -2,9 +2,23 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.64** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.65** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.65
+
+### Minimap button: a module menu on right-click
+
+- **Right-click** the minimap button for a menu of every module, with its
+  icon; click one to open its window without opening the dashboard. An
+  off module is greyed and asks to be turned on first.
+- **Favorites** go at the top, under their own heading; every other module
+  follows, grouped as on the dashboard. Pick them in Settings, under the
+  new *Minimap menu favorites* section (or *Edit favorites...* in the menu).
+  Saved for every character.
+- *Settings* (what right-click used to open) is at the bottom of the menu.
+  Left-click still opens the dashboard.
 
 ## 3.64
 

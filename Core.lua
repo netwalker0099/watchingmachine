@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.64"
+WM.version = "3.65"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -941,7 +941,8 @@ local function CreateMinimapButton()
     button:SetScript("OnClick", function(self, btn)
         if isDragging then return end
         if btn == "RightButton" then
-            WM:ToggleSettings()
+            GameTooltip:Hide()
+            WM:ShowModuleMenu(self)
         elseif btn == "LeftButton" then
             WM:ToggleDashboard()
         end
@@ -953,7 +954,7 @@ local function CreateMinimapButton()
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Watching Machine", 1, 1, 1)
         GameTooltip:AddLine("Left-click: Dashboard", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Right-click: Settings (theme, minimap)", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Right-click: open a module (favorites first), settings", 0.7, 0.7, 0.7)
         GameTooltip:AddLine("Drag: Move button anywhere", 0.7, 0.7, 0.7)
         GameTooltip:AddLine(" ")
 
@@ -1508,6 +1509,120 @@ local function ShowToolsMenu(info, anchor)
 end
 WM.ShowToolsMenu = ShowToolsMenu
 
+-- Open a module's window, as the dashboard card's Open button does (an off
+-- module asks to be turned on first)
+function WM:OpenModule(name)
+    local info = MODULE_INFO[name] or { title = name }
+    local function Open()
+        local m = WM.modules[name]
+        if m and m.ToggleUI then m:ToggleUI()
+        elseif m and m.Toggle then m:Toggle()
+        else WM:Print(name .. " UI not available") end
+    end
+    if not WM:IsModuleOn(name) then
+        WM:Confirm(info.title .. " is off on this character. Turn it on?", function()
+            WM:SetModuleOn(name, true)
+            Open()
+        end)
+        return
+    end
+    Open()
+end
+
+-- ---- Minimap menu favorites ----
+-- Account-wide: WatchingMachineDB.menuFavorites[name] = true. Listed in the
+-- dashboard's order.
+function WM:IsMenuFavorite(name)
+    local f = WatchingMachineDB and WatchingMachineDB.menuFavorites
+    return type(f) == "table" and f[name] == true
+end
+
+function WM:SetMenuFavorite(name, v)
+    if not WatchingMachineDB then return end
+    if type(WatchingMachineDB.menuFavorites) ~= "table" then WatchingMachineDB.menuFavorites = {} end
+    WatchingMachineDB.menuFavorites[name] = v and true or nil
+end
+
+-- Every module the dashboard shows, in its order: { name, group title }
+local function MenuModules()
+    local out = {}
+    for _, group in ipairs(MODULE_GROUPS) do
+        for _, name in ipairs(group.modules) do
+            if WM.modules[name] and MODULE_INFO[name] then out[#out + 1] = { name = name, group = group.title } end
+        end
+    end
+    return out
+end
+
+function WM:MenuFavorites()
+    local out = {}
+    for _, e in ipairs(MenuModules()) do
+        if self:IsMenuFavorite(e.name) then out[#out + 1] = e.name end
+    end
+    return out
+end
+
+-- The minimap button's right-click menu: your favorites first, then every
+-- other module under its dashboard group. Click one to open its window.
+local moduleMenu
+function WM:ShowModuleMenu(anchor)
+    if not moduleMenu then
+        moduleMenu = CreateFrame("Frame", "WM_MinimapModuleMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+    UIDropDownMenu_Initialize(moduleMenu, function(_, level)
+        local function Title(text)
+            local item = UIDropDownMenu_CreateInfo()
+            item.text, item.isTitle, item.notCheckable = text, true, true
+            UIDropDownMenu_AddButton(item, level)
+        end
+        local function Module(name)
+            local info = MODULE_INFO[name]
+            local item = UIDropDownMenu_CreateInfo()
+            local on = WM:IsModuleOn(name)
+            item.text = on and info.title or ("|cFF808080" .. info.title .. " (off)|r")
+            item.notCheckable = true
+            item.icon = not info.classIcon and info.icon or nil
+            item.func = function() CloseDropDownMenus(); WM:OpenModule(name) end
+            item.tooltipTitle, item.tooltipOnButton = info.title, true
+            item.tooltipText = (info.desc or "") .. (on and "" or "\nOff on this character: click to turn it on.")
+            item.moduleName = name
+            UIDropDownMenu_AddButton(item, level)
+        end
+        local function Action(text, fn, tip)
+            local item = UIDropDownMenu_CreateInfo()
+            item.text, item.notCheckable = text, true
+            item.func = function() CloseDropDownMenus(); fn() end
+            if tip then item.tooltipTitle, item.tooltipText, item.tooltipOnButton = text, tip, true end
+            UIDropDownMenu_AddButton(item, level)
+        end
+
+        local favorites = WM:MenuFavorites()
+        if #favorites > 0 then
+            Title("|cFFFFD100Favorites|r")
+            for _, name in ipairs(favorites) do Module(name) end
+        end
+        local lastGroup
+        for _, e in ipairs(MenuModules()) do
+            if not WM:IsMenuFavorite(e.name) then
+                if e.group ~= lastGroup then Title(e.group); lastGroup = e.group end
+                Module(e.name)
+            end
+        end
+        Title(" ")
+        Action("Edit favorites...", function() WM:EditMenuFavorites() end,
+            "Pick the modules that go at the top of this menu.")
+        Action("Settings", function() WM:ToggleSettings() end, "Theme, minimap button and the other addon settings.")
+        Action(CANCEL or "Cancel", function() end)
+    end, "MENU")
+    ToggleDropDownMenu(1, nil, moduleMenu, anchor or "cursor", 0, 0)
+end
+
+-- The settings panel, opened at the favorites list
+function WM:EditMenuFavorites()
+    local panel = self:CreateSettingsPanel()
+    if panel.ShowSection then panel:ShowSection("menuFavorites") else panel:Show() end
+end
+
 local function ColorHex(c)
     return string.format("%02X%02X%02X", c[1] * 255, c[2] * 255, c[3] * 255)
 end
@@ -1712,23 +1827,7 @@ function WM:CreateModuleCards()
             openBtn:SetSize(55, 20)
             openBtn:SetPoint("RIGHT", -8, 0)
             openBtn:SetText("Open")
-            openBtn:SetScript("OnClick", function()
-                if not WM:IsModuleOn(moduleName) then
-                    WM:Confirm(info.title .. " is off on this character. Turn it on?", function()
-                        WM:SetModuleOn(moduleName, true)
-                        local m = WM.modules[moduleName]
-                        if m and (m.ToggleUI or m.Toggle) then (m.ToggleUI or m.Toggle)(m) end
-                    end)
-                    return
-                end
-                if module and module.ToggleUI then
-                    module:ToggleUI()
-                elseif module and module.Toggle then
-                    module:Toggle()
-                else
-                    WM:Print(moduleName .. " UI not available")
-                end
-            end)
+            openBtn:SetScript("OnClick", function() WM:OpenModule(moduleName) end)
             local leftmost = openBtn
 
             if info.tools then
@@ -1981,6 +2080,30 @@ function WM:CreateSettingsPanel()
         font = "GameFontNormalSmall",
         text = function() return "Active: |cFF00FF00" .. WM:GetThemeName() .. "|r" end,
     }, 12)
+    L:Section({
+        key = "menuFavorites", title = "Minimap menu favorites", collapsed = true,
+        tooltip = { "Minimap menu favorites", "Right-click the minimap button for a menu of every module:"
+            .. " click one to open its window without the dashboard. The modules ticked here go at the top,"
+            .. " under Favorites; the rest follow, grouped as on the dashboard. For every character." },
+    })
+    L:Note("Right-click the minimap button to open any module straight away. Ticked modules go at the top"
+        .. " of that menu; the rest are listed below them.")
+    for _, group in ipairs(MODULE_GROUPS) do
+        L:Header(group.title)
+        for _, name in ipairs(group.modules) do
+            local info = MODULE_INFO[name]
+            if info and self.modules[name] then
+                L:Checkbox({
+                    label = info.title, indent = 8,
+                    get = function() return WM:IsMenuFavorite(name) end,
+                    set = function(v) WM:SetMenuFavorite(name, v) end,
+                    tooltip = { info.title, (info.desc or "") .. ". Ticked: at the top of the minimap"
+                        .. " button's right-click menu." },
+                })
+            end
+        end
+    end
+    L:EndSection()
     if self.Setup and self.Setup.ForgetControls then self.Setup:ForgetControls(L, panel) end
 
     settingsFrame = panel:Finish()
@@ -2066,7 +2189,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine swing reset|r - Swing timer back to the default place and size")
     print("|cFFFFFF00/wmachine manatick|r - Show the mana tick spark for 10s (manatick reset: its own bar back in place)")
     print("|cFFFFFF00/wmachine whybuff|r - Show which buff checks your target's auras match")
-    print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme)")
+    print("|cFFFFFF00/wmachine settings|r - Open addon settings (theme, minimap menu favorites)")
     print("|cFFFFFF00/wmachine status|r - One-line status for every module")
     print("|cFFFFFF00/wmachine minimap|r - Toggle minimap button")
     print("|cFFFFFF00/wmachine resetminimap|r - Reset button position")

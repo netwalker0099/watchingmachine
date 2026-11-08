@@ -360,6 +360,9 @@ local function BuildIntro(L)
         .. " three groups. Each card has an on/off switch (for this character), an Open button for the module's"
         .. " window with all its settings, and a |cFFFFFFFF...|r menu (or right-click) with its tools. Hover a card"
         .. " to read what it does and how it's doing.")
+    L:Note("|cFFFFFFFFRight-click the minimap button|r for a menu of every module: click one to open its window"
+        .. " without the dashboard. Pick your favorites (they go at the top of that menu) in |cFFFFFF00/wmachine"
+        .. " settings|r, under Minimap menu favorites, or from the menu's Edit favorites.")
     L:Header("Commands")
     L:Note("|cFFFFFF00/wmachine help|r lists every command. Most modules have their own, e.g. |cFFFFFF00/wmachine"
         .. " loot|r for the Loot Browser; each page here tells you its command. |cFFFFFF00/wmachine setup|r brings this"
