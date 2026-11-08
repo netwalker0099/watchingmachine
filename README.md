@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.70 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.71 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1063,6 +1063,15 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   Roster Manager has saved for the guild, when it's installed and loaded
 - **Guild Roster Manager on the same character**: Roster Manager keeps the
   roster and log but leaves the syncing to it
+- **Alts from guild notes** (3.71): public and officer notes like
+  "Venhana alt", "Venitra's Alt [BS]375", "alt of Chojii" or "Main: Chojii"
+  set that guild member as the main (in the alt group they share, or with
+  the alt added to it). It runs once by itself; *Read alts from guild
+  notes* in *Options* (or `/wmachine roster notes`) runs it again. It never
+  moves anyone out of a group that has another main
+- **Alt groups with no main** (3.71) are listed under their highest-ranked
+  character (then highest level), marked *(no main set)*, so every
+  imported alt group folds under someone
 - **Names finish as you type** (3.70) in *Add alt* (guild members not
   already in the group) and *Ban by name* (members and former members): the
   rest of the first match is filled in, up to 8 matches are listed under the
@@ -1076,7 +1085,7 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   their saved armory for each spec with its GearScore, and *Show armory*
   opens their gear and talents in ArmorySnap's browser (see ArmorySnap)
 - Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
-  `import`, `options`
+  `import`, `notes`, `options`
 
 ## Global Theme System
 
@@ -1367,6 +1376,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.71
+- **Roster Manager**: every alt group folds under someone. Mains are read from guild notes ("Venhana alt", "alt of Chojii", "Main: Chojii"), and a group with no main is listed under its highest-ranked character
 
 ### Version 3.70
 - **Roster Manager**: names finish as you type in the *Add alt* and *Ban by name* boxes, with the matching guild members listed to click

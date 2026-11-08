@@ -453,6 +453,11 @@ function GR:Scan()
     end
     g.lastScan = now
     self.lastScan = now
+    -- Once per guild: alts and mains the guild notes already name
+    if not g.notesRead then
+        g.notesRead = true
+        self:AltsFromNotes()
+    end
     if self.OnScanned then self:OnScanned() end
 end
 
@@ -760,6 +765,93 @@ function GR:UnsetMain(name, epoch, remote)
     end
     Changed("alts")
     return true
+end
+
+-- ============================================
+-- ALTS FROM GUILD NOTES
+-- ============================================
+-- Public and officer notes often say whose alt a character is: "Venhana
+-- alt", "Venitra's Alt [BS]375", "alt of Chojii", "Main: Chojii". When the
+-- name is a guild member, they become that character's main: in the alt
+-- group they already share, or with the alt added to theirs. Nothing is
+-- changed where it would move someone out of a group that has another
+-- main, or join two groups.
+
+local NOTE_PATTERNS = {
+    "^%s*([^%s%p%d]+)'?s?%s+alt",        -- "Name alt", "Name's alt"
+    "alt%s+of%s+([^%s%p%d]+)",           -- "alt of Name"
+    "alt%s+to%s+([^%s%p%d]+)",           -- "alt to Name"
+    "alt%s*[:%-]%s*([^%s%p%d]+)",        -- "alt: Name", "alt - Name"
+    "main%s*[:%-]%s*([^%s%p%d]+)",       -- "main: Name"
+    "main%s+is%s+([^%s%p%d]+)",          -- "main is Name"
+}
+
+-- The guild member a note names as this character's main
+function GR:MainFromNote(note, byShort, self_name)
+    if type(note) ~= "string" or note == "" then return nil end
+    local low = note:lower()
+    for _, pat in ipairs(NOTE_PATTERNS) do
+        local who = low:match(pat)
+        local name = who and byShort[who]
+        if name and name ~= self_name then return name end
+    end
+    return nil
+end
+
+-- Reads every member's notes; returns how many characters were linked
+function GR:AltsFromNotes()
+    local g = self:Guild()
+    if not g then return 0 end
+    local byShort = {}
+    for name in pairs(g.members) do byShort[Short(name):lower()] = name end
+    local found = {}
+    for name, rec in pairs(g.members) do
+        local main = self:MainFromNote(rec.note, byShort, name) or self:MainFromNote(rec.onote, byShort, name)
+        if main then found[#found + 1] = { name, main } end
+    end
+    table.sort(found, function(a, b) return a[1] < b[1] end)
+    local linked = 0
+    for _, f in ipairs(found) do
+        local alt, main = f[1], f[2]
+        local ag, mg = GroupOf(g, alt), GroupOf(g, main)
+        local done = false
+        if ag and ag == mg then
+            if ag.main == "" then done = self:SetMain(main) end
+        elseif not ag and not mg then
+            done = self:AddAlt(main, alt) and self:SetMain(main)
+        elseif not ag and mg then
+            if mg.main == "" or mg.main == main then
+                done = self:AddAlt(main, alt)
+                if done and mg.main == "" then self:SetMain(main) end
+            end
+        elseif ag and not mg then
+            if ag.main == "" then done = self:AddAlt(alt, main) and self:SetMain(main) end
+        end
+        if done then linked = linked + 1 end
+    end
+    if linked > 0 then
+        self:Log("info", string.format("Guild notes named the main of %d character%s.", linked, linked == 1 and "" or "s"), g)
+    end
+    return linked
+end
+
+-- The character an alt group is listed under: its main while they're in the
+-- guild, otherwise the highest rank, then highest level, then the name.
+-- Second return: true when that's the group's main.
+function GR:GroupLead(g, grp)
+    if not grp then return nil end
+    if grp.main ~= "" and g.members[grp.main] then return g.members[grp.main], true end
+    local best
+    for _, n in ipairs(grp.members) do
+        local r = g.members[n]
+        if r and (not best
+            or (r.rankIndex or 99) < (best.rankIndex or 99)
+            or ((r.rankIndex or 99) == (best.rankIndex or 99) and ((r.level or 0) > (best.level or 0)
+                or ((r.level or 0) == (best.level or 0) and r.name < best.name)))) then
+            best = r
+        end
+    end
+    return best, false
 end
 
 -- A whole group as a guildmate sent it: exactly these members, this main

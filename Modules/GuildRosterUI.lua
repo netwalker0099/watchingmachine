@@ -430,10 +430,12 @@ GR.expanded = GR.expanded or {}
 function GR:GroupedLines(matched, q)
     local g, out = self:Guild(), {}
     local searching = q and q ~= ""
+    -- Each group is listed under its main, or (no main in the guild) under
+    -- its highest-ranked character
     local function MainOf(rec)
         local grp = rec.group and g.groups[rec.group]
-        local main = grp and grp.main ~= "" and grp.main ~= rec.name and g.members[grp.main]
-        return main or nil
+        local lead = grp and self:GroupLead(g, grp)
+        return lead and lead.name ~= rec.name and lead or nil
     end
     local isMatch, top, childMatches = {}, {}, {}
     for _, rec in ipairs(matched) do isMatch[rec.name] = true end
@@ -461,8 +463,10 @@ function GR:GroupedLines(matched, q)
     for _, rec in pairs(top) do
         list[#list + 1] = rec
         local grp = rec.group and g.groups[rec.group]
-        if grp and grp.main == rec.name then
+        local lead, isMain = self:GroupLead(g, grp)
+        if lead and lead.name == rec.name then
             altsOf[rec.name] = AltsOf(rec)
+            if not isMain then altsOf[rec.name].noMain = true end
             for _, a in ipairs(altsOf[rec.name]) do if a.online and not onAlt[rec.name] then onAlt[rec.name] = a end end
         end
     end
@@ -479,6 +483,7 @@ function GR:GroupedLines(matched, q)
             line.toggle = open and "-" or "+"
             line.main = rec.name
             line.text = line.text .. " |cFF888888[" .. #alts .. (#alts == 1 and " alt" or " alts") .. "]|r"
+                .. (alts.noMain and " |cFFFF8844(no main set)|r" or "")
             if not rec.online and onAlt[rec.name] then
                 line.right = "|cFF33FF33on " .. GR.Short(onAlt[rec.name].name) .. "|r"
             end
@@ -898,6 +903,9 @@ local function Settings(L, inSetup)
                 GR:RefreshUI()
             end,
             tooltip = { "Import", "Reads what Guild Roster Manager has saved for this guild (it must be installed and loaded): join and promotion dates, custom notes, birthdays, bans, alt groups and former members. Only newer data replaces what Roster Manager has." } } })
+        L:Buttons({ { text = "Read alts from guild notes", width = 230,
+            onClick = function() GR:Command("notes") end,
+            tooltip = { "Alts from notes", "Reads every public and officer note for whose alt a character is (\"Venhana alt\", \"Venitra's Alt\", \"alt of Chojii\", \"Main: Chojii\") and makes that guild member their main, in the alt group they share or with the alt added to it. Never moves anyone out of a group with another main. Runs once by itself; use this after notes change." } } })
         L:Header("The log")
         L:Note("Which changes go into the log, and which are also printed in your chat:")
         for _, k in ipairs(GR.KIND_ORDER) do
@@ -933,11 +941,14 @@ function GR:SetupPage(L)
     L:Note("|cFFFFFFFFArmory:|r with ArmorySnap on, a member's details list their saved armory for each spec, and"
         .. " |cFFFFFF00Show armory|r opens their gear and talents. Your own gear is saved automatically, guildmates"
         .. " are saved when ArmorySnap inspects them, and guildmates running Watching Machine share theirs.")
+    L:Note("|cFFFFFFFFAlts from notes:|r the first scan reads public and officer notes like \"Venhana alt\" or"
+        .. " \"Main: Chojii\" and sets those mains, so the Roster tab lists their alts under them. An alt group with"
+        .. " no main yet is listed under its highest-ranked character, marked |cFFFF8844(no main set)|r.")
     Settings(L, true)
     L:Note("Everything else is in its window: |cFFFFFF00/wmachine roster|r.")
 end
 
--- /wmachine roster [log|former|sync|scan|import|options]
+-- /wmachine roster [log|former|sync|scan|import|notes|options]
 function GR:Command(arg)
     arg = strtrim((arg or ""):lower())
     if arg == "log" or arg == "former" or arg == "sync" then self:ShowTab(arg)
@@ -947,6 +958,11 @@ function GR:Command(arg)
         local m, f, g = self.Sync:ImportFromGRM()
         if m then WM:Print(string.format("Imported %d members, %d former members and %d alt groups.", m, f, g))
         else WM:Print("Guild Roster Manager's data isn't loaded (it must be installed and enabled).") end
+    elseif arg == "notes" or arg == "alts" then
+        local n = self:AltsFromNotes()
+        WM:Print(n > 0 and string.format("Roster Manager: guild notes named the main of %d character%s.", n, n == 1 and "" or "s")
+            or "Roster Manager: no new alts or mains in the guild notes.")
+        self:RefreshUI()
     elseif arg == "options" or arg == "config" then self:ToggleOptions()
     else self:Toggle() end
 end

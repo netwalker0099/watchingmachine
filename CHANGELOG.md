@@ -2,9 +2,25 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.70** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.71** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.71
+
+### Roster Manager: every alt group under someone
+
+- **Mains from guild notes**: public and officer notes such as "Venhana
+  alt", "Venitra's Alt [BS]375", "alt of Chojii", "alt: Chojii", "Main:
+  Chojii" or "main is Chojii" make that guild member the main, in the alt
+  group they share or with the alt added to it. Runs once by itself after
+  the next scan; *Read alts from guild notes* (*Options*) or `/wmachine
+  roster notes` runs it again. It never moves anyone out of a group with
+  another main, or joins two groups. The mains it sets are shared like any
+  other edit.
+- **Alt groups with no main** (many imported from Guild Roster Manager have
+  none) are listed under their highest-ranked character, then highest
+  level, with a **+** and *(no main set)*.
 
 ## 3.70
 

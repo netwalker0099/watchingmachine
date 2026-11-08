@@ -318,6 +318,50 @@ popup.data = { }
 box:SetText("Ne")
 GR.CompleteName(box, true)
 check("a box without completion is left alone", box:GetText() == "Ne")
+
+-- Alts and mains from guild notes
+local function Add(name, note, onote, rank, level)
+    local r = GR.NewRecord(name .. "-SpineShatter")
+    r.note, r.onote, r.rankIndex, r.level = note or "", onote or "", rank or 3, level or 70
+    g.members[r.name] = r
+    return r
+end
+Add("Mainy"); Add("Alta", "Mainy alt"); Add("Altb", "", "alt of MAINY")
+Add("Solo", "Raid alt"); Add("Paira", "Pairb's Alt [BS]375"); Add("Pairb")
+Add("Grpa"); Add("Grpb", "Main: Grpa")
+GR:AddAlt("Grpa", "Grpb"); GR:UnsetMain("Grpa")
+Add("Taken", "Mainy alt")
+Add("Other"); Add("Otheralt"); GR:AddAlt("Other", "Otheralt"); GR:SetMain("Other")
+g.members["Taken-SpineShatter"].group = nil
+GR:AddAlt("Other", "Taken")
+local linked = GR:AltsFromNotes()
+local function MainOfName(n) local r = g.members[n .. "-SpineShatter"]; local gr = r.group and g.groups[r.group]; return gr and gr.main end
+check("notes: \"Name alt\" makes Name the main", MainOfName("Alta") == "Mainy-SpineShatter" and MainOfName("Mainy") == "Mainy-SpineShatter")
+check("notes: \"alt of NAME\" in the officer note, any case", MainOfName("Altb") == "Mainy-SpineShatter")
+check("notes: \"Name's Alt [..]\"", MainOfName("Paira") == "Pairb-SpineShatter")
+check("notes: a group with no main gets the one its note names", MainOfName("Grpb") == "Grpa-SpineShatter")
+check("notes: names that aren't members are ignored", g.members["Solo-SpineShatter"].group == nil)
+check("notes: nobody moved out of a group with another main", MainOfName("Taken") == "Other-SpineShatter")
+check("notes: count of characters linked", linked == 4)
+check("notes: nothing new the second time", GR:AltsFromNotes() == 0)
+Sync:ClearQueue()
+
+-- A group with no main is listed under its highest-ranked character
+Add("Lowrank", "", "", 4, 70); Add("Highrank", "", "", 2, 60)
+GR:AddAlt("Lowrank", "Highrank")
+GR:UnsetMain("Lowrank")
+lines = GR:TabLines()
+local _, hr = Find(lines, "Highrank-SpineShatter")
+check("no main: listed under the highest rank, marked", hr and hr.toggle == "+" and hr.text:find("no main set", 1, true))
+check("no main: the other character is under it", Find(lines, "Lowrank-SpineShatter") == nil)
+check("lead is the main when there is one", GR:GroupLead(g, g.groups[g.members["Alta-SpineShatter"].group]).name == "Mainy-SpineShatter")
+Sync:ClearQueue()
+-- Leave the roster as the scans expect it
+for _, n in ipairs({ "Mainy", "Alta", "Altb", "Solo", "Paira", "Pairb", "Grpa", "Grpb", "Taken", "Other", "Otheralt", "Lowrank", "Highrank" }) do
+    local r = g.members[n .. "-SpineShatter"]
+    if r and r.group then g.groups[r.group] = nil end
+    g.members[n .. "-SpineShatter"] = nil
+end
 GR.tab = "log"
 check("log tab lists entries", #GR:TabLines() == #g.log)
 GR.tab = "sync"
