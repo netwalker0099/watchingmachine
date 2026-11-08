@@ -262,6 +262,89 @@ function RC.AverageIlvl()
     return n > 0 and math.floor(sum / n * 100 + 0.5) / 100 or 0
 end
 
+-- ============================================
+-- CAN WE USE IT?
+-- ============================================
+-- What each class can equip in The Burning Crusade (armor and weapon
+-- subclasses), plus the "Classes:" line on tier tokens and class items.
+
+local ARMOR = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate", [6] = "shield",
+    [7] = "libram", [8] = "idol", [9] = "totem" }
+local CAN_WEAR = {
+    WARRIOR = { cloth = 1, leather = 1, mail = 1, plate = 1, shield = 1 },
+    PALADIN = { cloth = 1, leather = 1, mail = 1, plate = 1, shield = 1, libram = 1 },
+    HUNTER = { cloth = 1, leather = 1, mail = 1 },
+    ROGUE = { cloth = 1, leather = 1 },
+    PRIEST = { cloth = 1 }, MAGE = { cloth = 1 }, WARLOCK = { cloth = 1 },
+    SHAMAN = { cloth = 1, leather = 1, mail = 1, shield = 1, totem = 1 },
+    DRUID = { cloth = 1, leather = 1, idol = 1 },
+}
+-- Weapon subclasses: 0 1H axe, 1 2H axe, 2 bow, 3 gun, 4 1H mace, 5 2H mace, 6 polearm,
+-- 7 1H sword, 8 2H sword, 10 staff, 13 fist, 15 dagger, 16 thrown, 18 crossbow, 19 wand
+local CAN_WIELD = {
+    WARRIOR = { [0] = 1, [1] = 1, [2] = 1, [3] = 1, [4] = 1, [5] = 1, [6] = 1, [7] = 1, [8] = 1, [10] = 1, [13] = 1, [15] = 1, [16] = 1, [18] = 1 },
+    PALADIN = { [0] = 1, [1] = 1, [4] = 1, [5] = 1, [6] = 1, [7] = 1, [8] = 1 },
+    HUNTER = { [0] = 1, [1] = 1, [2] = 1, [3] = 1, [6] = 1, [7] = 1, [8] = 1, [10] = 1, [13] = 1, [15] = 1, [16] = 1, [18] = 1 },
+    ROGUE = { [2] = 1, [3] = 1, [4] = 1, [7] = 1, [13] = 1, [15] = 1, [16] = 1, [18] = 1 },
+    PRIEST = { [4] = 1, [10] = 1, [15] = 1, [19] = 1 },
+    MAGE = { [7] = 1, [10] = 1, [15] = 1, [19] = 1 },
+    WARLOCK = { [7] = 1, [10] = 1, [15] = 1, [19] = 1 },
+    SHAMAN = { [0] = 1, [1] = 1, [4] = 1, [5] = 1, [10] = 1, [13] = 1, [15] = 1 },
+    DRUID = { [4] = 1, [5] = 1, [10] = 1, [13] = 1, [15] = 1 },
+}
+RC.CAN_WEAR, RC.CAN_WIELD = CAN_WEAR, CAN_WIELD
+
+local scanTip
+-- The "Classes: ..." line of an item's tooltip, if it has one
+local function ClassesLine(link)
+    if type(link) ~= "string" then return nil end
+    if not scanTip then
+        scanTip = CreateFrame("GameTooltip", "WM_LootCouncilScanTip", nil, "GameTooltipTemplate")
+    end
+    if not scanTip.SetHyperlink then return nil end
+    scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scanTip:ClearLines()
+    if not pcall(scanTip.SetHyperlink, scanTip, link) then return nil end
+    local pattern = type(ITEM_CLASSES_ALLOWED) == "string" and ("^" .. ITEM_CLASSES_ALLOWED:gsub("%%s", "(.+)") .. "$") or "^Classes: (.+)$"
+    for i = 2, tonumber(scanTip.NumLines and scanTip:NumLines()) or 0 do
+        local fs = _G["WM_LootCouncilScanTipTextLeft" .. i]
+        local text = fs and fs.GetText and fs:GetText()
+        local classes = type(text) == "string" and text:match(pattern)
+        if classes then return classes end
+    end
+end
+RC.ClassesLine = ClassesLine
+
+-- Can this class use the item? (class nil: ours)
+function RC.CanUse(item, class)
+    if not class then class = select(2, UnitClass("player")) end
+    if not class or not CAN_WEAR[class] then return true end
+    local link = type(item) == "table" and (item.link or (item.string and ("item:" .. item.string))) or item
+    local f = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    if f and link then
+        local ok, _, _, _, equipLoc, _, classID, subclassID = pcall(f, link)
+        if ok then
+            if classID == 4 and ARMOR[subclassID] and equipLoc ~= "INVTYPE_CLOAK" then
+                if not CAN_WEAR[class][ARMOR[subclassID]] then return false end
+            elseif classID == 2 and subclassID then
+                if not CAN_WIELD[class][subclassID] then return false end
+            end
+        end
+    end
+    -- Tier tokens and class items: "Classes: Paladin, Rogue, Shaman"
+    local classes = RC.ClassesLine(link)
+    if classes then
+        local male = (type(LOCALIZED_CLASS_NAMES_MALE) == "table" and LOCALIZED_CLASS_NAMES_MALE[class]) or class
+        local female = (type(LOCALIZED_CLASS_NAMES_FEMALE) == "table" and LOCALIZED_CLASS_NAMES_FEMALE[class]) or male
+        for part in classes:gmatch("[^,]+") do
+            part = strtrim(part)
+            if part == male or part == female or part:upper() == class then return true end
+        end
+        return false
+    end
+    return true
+end
+
 local function StripItem(link)
     local s = link and link:match("item:([%-%d:]+)")
     return s and (s:gsub(":+$", "")) or nil
@@ -323,6 +406,8 @@ function RC:StartSession(ml, lt, add)
             local item = { session = ses, string = e.string, itemID = tonumber(e.string:match("^(%d+)")),
                 boss = e.boss, owner = e.owner, typeCode = e.typeCode or "default" }
             self:Resolve(item)
+            -- Something we can't use: we pass on it without being asked
+            if DB().autopass ~= false and not RC.CanUse(item) then item.autopass = true; item.answered = "AUTOPASS" end
             self.session.items[ses] = item
         end
     end
@@ -336,13 +421,20 @@ function RC:SendAck()
     local s = self.session
     if not s then return end
     local data = { gear1 = {}, gear2 = {}, diff = {}, response = {} }
+    local passed = {}
     for ses, item in pairs(s.items) do
         local g1, g2, diff = self:GearFor(item)
         data.gear1[ses] = StripItem(g1)
         data.gear2[ses] = StripItem(g2)
         data.diff[ses] = diff
+        if item.autopass and not item.autopassSent then
+            data.response[ses] = true
+            item.autopassSent = true
+            passed[#passed + 1] = ses
+        end
     end
     self:Send("lootAck", { 0, RC.AverageIlvl(), data })
+    for _, ses in ipairs(passed) do self:Send("response", { ses, { response = "AUTOPASS" } }) end
 end
 
 -- Answer for an item (button index, or "PASS" / "TIMEOUT")
@@ -464,9 +556,9 @@ function RC:Handle(prefix, command, args, sender, dist)
         local item = s and ses and s.items[ses]
         if item and winner then
             -- Awarded again: the earlier winner gets their answer back
-            local prev = item.awarded and s.candidates[ses][item.awarded]
+            local prev = item.shownWinner and item.shownWinner ~= winner and s.candidates[ses][item.shownWinner]
             if prev and prev.response == "AWARDED" then prev.response = prev.realResponse or "NOTHING" end
-            item.awarded = winner
+            item.awarded, item.shownWinner = winner, winner
             local c = Candidate(ses, winner)
             if c.response ~= "AWARDED" then c.realResponse = c.response end
             c.response = "AWARDED"

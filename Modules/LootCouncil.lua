@@ -29,7 +29,17 @@ local DEFAULTS = {
     recentDays = 30,         -- "recent loot" in tooltips
     rcTalk = true,           -- take part in RCLootCouncil sessions (answer, vote)
     showResponse = true,     -- the response frame when loot is sent for answers
+    autopass = true,         -- pass on items this character can't use (not shown)
     openVoting = true,       -- the voting frame opens for council members
+    -- As master looter
+    mlLootWindow = true,     -- items from the loot window go on the list to send
+    mlQuality = 4,           -- ...from this quality up (4 = epic)
+    mlAltClick = true,       -- Alt-click an item to add it
+    mlCouncilRank = 1,       -- the council: this guild rank index and above (0 = guild master)
+    mlCouncilNames = "",     -- ...plus these names
+    mlTimeout = 60,          -- seconds raiders have to answer
+    mlAnnounce = true,       -- awards announced to the raid
+    mlAutoTrade = true,      -- open the trade with a winner when the item can't be given from the loot window
 }
 
 function LC.InitDB()
@@ -413,6 +423,7 @@ function LC:Initialize()
     end
     if self.InitUI then self:InitUI() end
     if self.RC then self.RC:Init() end
+    if self.ML then self.ML:Init() end
     if self.InitFrames then self:InitFrames() end
 end
 
@@ -420,6 +431,7 @@ function LC:OnModuleOff()
     if self.HideUI then self:HideUI() end
     if self.HideFrames then self:HideFrames() end
     if self.RC then self.RC:Stop() end
+    if self.ML then self.ML:Stop() end
 end
 
 function LC:OnModuleOn()

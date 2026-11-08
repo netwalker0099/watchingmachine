@@ -2,9 +2,38 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.76** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.77** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.77
+
+### Loot Council part 3: the master looter
+
+- Runs the session as an RCLootCouncil master looter does, in its
+  messages: raiders running RCLootCouncil or Watching Machine answer, and
+  the council votes in either.
+- **Items**: from the loot window (epic and up by default), by Alt-clicking
+  any item, or `/wmachine council add <item>`. The master looter panel lists
+  them; *Send for votes* sends them.
+- **Council**: group members at your council guild rank and above, plus any
+  names you list, plus you.
+- **Awarding** (voting frame): select a candidate, then *Award* or
+  *Disenchant*. Given straight from the loot window when it's open;
+  otherwise the trade opens with the winner and the item goes in by itself
+  (Gargul-style), with awards still to trade listed on the panel.
+  Re-awarding removes the earlier award from everyone's history.
+- Awards are **announced** to the raid and **logged** in RCLootCouncil's
+  history format, so RCLootCouncil and Watching Machine users all record
+  them. The session ends when everything is awarded.
+- **Test loot**: `/wmachine council sendtest [n]` sends test items to your
+  group for real answers and votes; test awards are announced as tests and
+  never given or logged.
+- **Items you can't use aren't shown** in the response frame: armor your
+  class can't wear, weapons it can't use, and tokens or class items for
+  other classes are auto-passed (the master looter sees Autopass). An
+  option turns it off.
+- Settings for all of it in the guided setup.
 
 ## 3.76
 

@@ -60,7 +60,7 @@ env.C_ChatInfo = { RegisterAddonMessagePrefix = function() return true end,
 
 env.WatchingMachineDB = { theme = "Default" }
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/ArmorySnap.lua", "Modules/ArmorySnapArmory.lua",
-    "Modules/LootCouncil.lua", "Modules/LootCouncilCodec.lua", "Modules/LootCouncilRC.lua",
+    "Modules/LootCouncil.lua", "Modules/LootCouncilCodec.lua", "Modules/LootCouncilRC.lua", "Modules/LootCouncilML.lua",
     "Modules/LootCouncilUI.lua", "Modules/LootCouncilFrames.lua" }) do
     W.load(f)
 end

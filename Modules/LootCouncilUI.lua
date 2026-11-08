@@ -380,7 +380,7 @@ end
 -- COMMANDS, SETUP
 -- ============================================
 
--- /wmachine council [history|players|import|vote|test [n]|endtest|<name>]
+-- /wmachine council [history|players|import|vote|test [n]|endtest|sendtest [n]|ml|add <item>|<name>]
 function LC:Command(arg)
     arg = strtrim(arg or "")
     local low = arg:lower()
@@ -392,6 +392,24 @@ function LC:Command(arg)
         end
     elseif low == "endtest" then
         LC.RC:EndTest()
+    elseif low:match("^sendtest") then
+        -- Test loot sent to the group for answers and votes
+        if not (IsInGroup and IsInGroup()) then
+            WM:ModulePrint("LootCouncil", "You're not in a group: running a local test instead.")
+            return self:Command("test " .. (low:match("^sendtest%s+(%d+)") or ""))
+        end
+        local n = math.max(1, math.min(tonumber(low:match("^sendtest%s+(%d+)")) or 3, #LC.RC.TEST_ITEMS))
+        wipe(LC.ML.pending)
+        for i = 1, n do
+            local id = LC.RC.TEST_ITEMS[i]
+            local _, link = ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(id)
+            LC.ML:Add(link or ("|cffa335ee|Hitem:" .. id .. "|h[Item " .. id .. "]|h|r"), nil, "Test")
+        end
+        if LC.ML:Start(true) then WM:ModulePrint("LootCouncil", "Test loot sent to your group for answers and votes. Awards are announced as tests and aren't given or logged.") end
+    elseif low == "ml" or low == "master" then
+        LC:ShowML()
+    elseif low:match("^add ") then
+        if LC.ML:Add(arg:match("^%S+%s+(.+)$")) then LC:ShowML() else WM:ModulePrint("LootCouncil", "That isn't an item link.") end
     elseif low == "vote" or low == "voting" then
         LC:ShowVoting()
     elseif low == "" or low == "history" then
@@ -443,9 +461,51 @@ function LC:SetupPage(L)
     L:Checkbox({ label = "Show the response frame for loot sent to the raid", indent = 16, get = function() return db.showResponse end,
         set = function(v) db.showResponse = v end,
         tooltip = { "Response frame", "Each item the master looter sends, with a button for each answer and a note." } })
+    L:Checkbox({ label = "Pass on items I can't use (they aren't shown)", indent = 16, get = function() return db.autopass ~= false end,
+        set = function(v) db.autopass = v end,
+        tooltip = { "Pass on what I can't use", "Armor your class can't wear, weapons it can't use and tier tokens or class items for other classes are passed on for you (the master looter sees Autopass) and left out of the response frame." } })
     L:Checkbox({ label = "Open the voting frame when I'm on the council", indent = 16, get = function() return db.openVoting end,
         set = function(v) db.openVoting = v end,
         tooltip = { "Voting frame", "Opens when a session starts and you're on the master looter's council. /wmachine council vote opens it any time." } })
+    L:Header("As master looter")
+    L:Note("When you're the master looter (and RCLootCouncil isn't running on this character), you run the session:"
+        .. " items from the loot window or Alt-click go on a list, |cFFFFFF00Send for votes|r sends them to the raid,"
+        .. " and the voting frame's |cFFFFFF00Award|r gives the item from the loot window, or opens a trade with the"
+        .. " winner and puts it in (Gargul-style). Each award is announced and logged, and RCLootCouncil users record"
+        .. " it too. |cFFFFFF00/wmachine council sendtest|r sends test loot to your group to try it.")
+    L:Checkbox({ label = "Add epic loot from the loot window", get = function() return db.mlLootWindow end,
+        set = function(v) db.mlLootWindow = v end,
+        tooltip = { "Loot window", "When you open loot as master looter, its items of the quality below and up go on the list to send." } })
+    L:Dropdown({ label = "Lowest quality:", width = 120, indent = 16,
+        options = { { value = 2, text = "Uncommon" }, { value = 3, text = "Rare" }, { value = 4, text = "Epic" }, { value = 5, text = "Legendary" } },
+        get = function() return db.mlQuality end, set = function(v) db.mlQuality = v end,
+        tooltip = { "Lowest quality", "Loot window items below this aren't added." } })
+    L:Checkbox({ label = "Alt-click an item to add it", get = function() return db.mlAltClick end,
+        set = function(v) db.mlAltClick = v end,
+        tooltip = { "Alt-click", "As master looter (or group leader), Alt-click any item (bags, chat, loot) to add it to the list to send." } })
+    L:Dropdown({ label = "Council:", width = 170, options = function()
+            local out = {}
+            local n = tonumber(GuildControlGetNumRanks and GuildControlGetNumRanks()) or 0
+            for i = 1, math.max(n, 1) do
+                local name = GuildControlGetRankName and GuildControlGetRankName(i)
+                out[#out + 1] = { value = i - 1, text = (type(name) == "string" and name or ("Rank " .. i)) .. " and above" }
+            end
+            return out
+        end,
+        get = function() return db.mlCouncilRank end, set = function(v) db.mlCouncilRank = v end,
+        tooltip = { "Council", "Group members of this guild rank and above vote, with you and the names below." } })
+    L:EditBox({ label = "Also on the council:", width = 200, maxLetters = 200,
+        get = function() return db.mlCouncilNames or "" end, set = function(v) db.mlCouncilNames = v end,
+        tooltip = { "More council", "Names, separated by commas or spaces." } })
+    L:Slider({ label = "Time to answer (seconds)", min = 20, max = 180, step = 5, width = 220,
+        get = function() return db.mlTimeout end, set = function(v) db.mlTimeout = v end,
+        tooltip = { "Time to answer", "Raiders who haven't answered by then show as not responding." } })
+    L:Checkbox({ label = "Announce awards to the raid", get = function() return db.mlAnnounce end,
+        set = function(v) db.mlAnnounce = v end,
+        tooltip = { "Announce", "\"[item] was awarded to Name for Mainspec/Need!\" in raid chat." } })
+    L:Checkbox({ label = "Open a trade with the winner (when not given from the loot window)", get = function() return db.mlAutoTrade end,
+        set = function(v) db.mlAutoTrade = v end,
+        tooltip = { "Trade", "When the item is in your bags, the trade opens with the winner if they're close, and the item goes in by itself. The master looter panel lists awards still to trade." } })
     L:Slider({ label = "Recent loot covers (days)", min = 7, max = 90, step = 1, width = 220,
         get = function() return db.recentDays end, set = function(v) db.recentDays = v end,
         tooltip = { "Recent loot", "How far back tooltips list a player's loot (the roster, and later the voting frame)." } })

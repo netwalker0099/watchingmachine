@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.76 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.77 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1147,11 +1147,33 @@ works with RCLootCouncil and awards like Gargul. Open it with
   - `/wmachine council test [n]` runs a **local test session** (nothing is
     sent): test items, made-up answers from your group or recent winners,
     and the response and voting frames to try
-- Coming next: awarding as master looter (with test loot sent to the
-  raid), then Gargul-style roll-offs, then sharing the loot history between
-  Watching Machine users
+  - **Items you can't use aren't shown** (3.77): armor your class can't
+    wear, weapons it can't use, and tier tokens or class items for other
+    classes are passed on for you (the master looter sees Autopass)
+- **As master looter** (3.77), in RCLootCouncil's messages, so raiders
+  running RCLootCouncil or Watching Machine answer and the council votes in
+  either:
+  - **Items**: from the loot window (epic and up, or your choice), by
+    Alt-clicking any item, or `/wmachine council add <item>`; the master
+    looter panel lists them, and *Send for votes* sends them
+  - **The council**: group members at your council guild rank and above,
+    plus names you list, plus you
+  - **Awarding** from the voting frame: select a candidate, *Award* (for
+    their answer) or *Disenchant*. With the loot window open it's given
+    straight from it; otherwise a trade opens with the winner and the item
+    goes in by itself (Gargul-style), and the panel lists awards still to
+    trade. Re-awarding takes back the earlier award's history
+  - Each award is **announced** to the raid ("[item] was awarded to Name for
+    Mainspec/Need!") and **logged** in RCLootCouncil's history format, so
+    every RCLootCouncil and Watching Machine user records it; the session
+    ends when everything's awarded
+  - **Test loot**: `/wmachine council sendtest [n]` sends test items to your
+    group for real answers and votes; awards are announced as tests and
+    nothing is given or logged
+- Coming next: Gargul-style roll-offs, then sharing the loot history
+  between Watching Machine users
 - Commands: `/wmachine council players`, `import`, `vote`, `test [n]`,
-  `endtest`, or a player's name
+  `endtest`, `sendtest [n]`, `ml`, `add <item>`, or a player's name
 
 ## Global Theme System
 
@@ -1443,6 +1465,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.77
+- **Loot Council part 3**: running the session as master looter (items from the loot window or Alt-click, sent for votes, awarded from the loot window or by trade, announced and logged), `/wmachine council sendtest` sends test loot to your group, and items you can't use are passed on for you instead of shown
 
 ### Version 3.76
 - **Loot Council part 2**: raiding with RCLootCouncil. A response frame for the master looter's loot, and a voting frame for the council with each candidate's last loot and their last 30 days on hover; awards are recorded live. `/wmachine council test` runs a local test session

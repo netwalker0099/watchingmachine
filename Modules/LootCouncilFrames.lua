@@ -272,6 +272,13 @@ local function VoteRow(i)
         end
         x = x + col.w
     end
+    row.sel = row:CreateTexture(nil, "BACKGROUND")
+    row.sel:SetAllPoints(row)
+    row.sel:SetColorTexture(1, 0.82, 0, 0.15)
+    row.sel:Hide()
+    row:SetScript("OnClick", function(self)
+        if self.cand then LC.voteSelected = self.cand.name; LC:RefreshVoting() end
+    end)
     row:SetScript("OnEnter", function(self) if self.cand then CandidateTip(self, self.cand) end end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     vote.list.rows[i] = row
@@ -360,6 +367,7 @@ function LC:RefreshVoting()
             row.cells.roll:SetText(c.roll and tostring(c.roll) or "")
             local last = LC.LastLoot(c.name)
             row.cells.last:SetText(last and (LC.ItemText(last) .. " |cff888888" .. LC.Ago(last.t) .. "|r") or "|cff888888none|r")
+            row.sel:SetShown(c.name == LC.voteSelected)
             row:Show()
         elseif row then
             row.cand = nil
@@ -372,8 +380,42 @@ function LC:RefreshVoting()
     local nv = 0
     for _ in pairs(voted) do nv = nv + 1 end
     for _ in pairs(RC.council) do total = total + 1 end
-    LC.voteStatus = nv .. " of " .. math.max(total, nv) .. " council have voted" .. (RC.local_ and "   |cffffd100(local test)|r" or "")
+    local isML = s.ml == LC.Key(UnitName("player"))
+    local testing = RC.local_ or (LC.ML and LC.ML.test)
+    LC.voteStatus = nv .. " of " .. math.max(total, nv) .. " council have voted"
+        .. (testing and "   |cffffd100(test)|r" or "")
+        .. ((isML and LC.voteSelected) and ("   selected: " .. LC.Short(LC.voteSelected)) or "")
     if vote.status then vote.status:SetText(LC.voteStatus) end
+    -- The master looter's buttons
+    for _, b in ipairs({ vote.awardBtn, vote.deBtn, vote.endBtn }) do b:SetShown(isML) end
+    if isML then
+        local can = LC.voteSelected and s.candidates[LC.voteSession] and s.candidates[LC.voteSession][LC.voteSelected]
+        if can then vote.awardBtn:Enable(); vote.deBtn:Enable() else vote.awardBtn:Disable(); vote.deBtn:Disable() end
+    end
+end
+
+-- Ask before awarding
+StaticPopupDialogs["WM_LOOTCOUNCIL_AWARD"] = {
+    text = "%s",
+    button1 = YES or "Yes",
+    button2 = NO or "No",
+    OnAccept = function(self, data)
+        if data and LC.ML then LC.ML:Award(data.ses, data.winner, data.reason) end
+    end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+
+function LC:AskAward(reason)
+    local s = RC.session
+    local item = s and s.items[LC.voteSession]
+    local c = item and LC.voteSelected and s.candidates[LC.voteSession][LC.voteSelected]
+    if not c then return end
+    local how = reason or RC:Response(item.typeCode, c.realResponse or c.response).text
+    local text = "Award " .. (item.link or "?") .. " to " .. LC.Short(c.name) .. " (" .. tostring(how) .. ")?"
+    if item.awarded then text = text .. "\nIt was awarded to " .. LC.Short(item.awarded) .. "." end
+    if StaticPopup_Show then
+        StaticPopup_Show("WM_LOOTCOUNCIL_AWARD", text, nil, { ses = LC.voteSession, winner = c.name, reason = reason })
+    end
 end
 
 function LC:CreateVotingFrame()
@@ -412,8 +454,14 @@ function LC:CreateVotingFrame()
     end)
     vote.list.rows = {}
     vote.status = vote:AddFooterText({ text = function() return LC.voteStatus or "" end }, "LEFT")
-    vote:AddFooterButton({ text = "End test", width = 90, onClick = function() RC:EndTest() end,
-        tooltip = { "End test", "Ends a local test session (nothing was sent to anyone)." } }, "RIGHT")
+    vote.endBtn = vote:AddFooterButton({ text = "End session", width = 100, onClick = function()
+            if RC.local_ then RC:EndTest() elseif LC.ML then LC.ML:End() end
+        end,
+        tooltip = { "End session", "Ends the loot session for everyone (a local test only ends here)." } }, "RIGHT")
+    vote.deBtn = vote:AddFooterButton({ text = "Disenchant", width = 100, onClick = function() LC:AskAward("Disenchant") end,
+        tooltip = { "Disenchant", "Gives the item to the selected player to disenchant (logged as an award reason, not their loot)." } }, "RIGHT")
+    vote.awardBtn = vote:AddFooterButton({ text = "Award", width = 90, onClick = function() LC:AskAward() end,
+        tooltip = { "Award", "Awards this item to the selected candidate for their answer: from the loot window if it's open, otherwise the trade opens with them. Announced to the raid and logged." } }, "RIGHT")
     vote:Finish()
     return vote
 end
@@ -422,6 +470,105 @@ function LC:ShowVoting()
     local f = self:CreateVotingFrame()
     if not f:IsShown() then f:Show() end
     self:RefreshVoting()
+end
+
+-- ============================================
+-- THE MASTER LOOTER'S PANEL
+-- ============================================
+
+local mlPanel
+
+local function MLRow(i)
+    local row = mlPanel.list.rows[i]
+    if row then return row end
+    row = CreateFrame("Button", nil, mlPanel.list)
+    row:SetHeight(22)
+    row:SetPoint("TOPLEFT", 0, -(i - 1) * 22)
+    row:SetPoint("RIGHT", mlPanel.list, "RIGHT", 0, 0)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(18, 18)
+    row.icon:SetPoint("LEFT", 2, 0)
+    row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.text:SetPoint("LEFT", 24, 0)
+    row.text:SetPoint("RIGHT", -60, 0)
+    row.text:SetJustifyH("LEFT")
+    row.text:SetWordWrap(false)
+    row.btn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row.btn:SetSize(54, 18)
+    row.btn:SetPoint("RIGHT", -2, 0)
+    row:SetScript("OnEnter", function(self) ItemTip(self, self.link) end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    mlPanel.list.rows[i] = row
+    return row
+end
+
+-- Lines: the items to send, then the awards waiting for a trade
+function LC:MLLines()
+    local out = {}
+    local ML = LC.ML
+    for i, p in ipairs(ML.pending) do
+        out[#out + 1] = { link = p.link, text = p.link, button = "Remove", onClick = function() ML:Remove(i) end }
+    end
+    local waiting = {}
+    for _, t in ipairs(ML.toTrade) do if not t.done then waiting[#waiting + 1] = t end end
+    if #waiting > 0 then
+        out[#out + 1] = { text = "|cffffd100Waiting to trade|r" }
+        for _, t in ipairs(waiting) do
+            out[#out + 1] = { link = t.link, text = (t.link or "?") .. " to " .. LC.Short(t.winner), button = "Trade",
+                onClick = function() if not ML:TryTrade(t.winner) then WM:ModulePrint("LootCouncil", LC.Short(t.winner) .. " isn't close enough to trade.") end end }
+        end
+    end
+    return out
+end
+
+function LC:RefreshML()
+    if not mlPanel or not mlPanel:IsShown() then return end
+    local lines = self:MLLines()
+    for i = 1, math.max(#lines, #mlPanel.list.rows) do
+        local l = lines[i]
+        local row = l and MLRow(i) or mlPanel.list.rows[i]
+        if l then
+            row.link = l.link
+            row.text:SetText(l.text)
+            local tex = l.link and select(10, ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(l.link))
+            row.icon:SetTexture(tex or nil)
+            row.icon:SetShown(l.link ~= nil)
+            if l.button then
+                row.btn:SetText(l.button)
+                row.btn:SetScript("OnClick", l.onClick)
+                row.btn:Show()
+            else
+                row.btn:Hide()
+            end
+            row:Show()
+        elseif row then
+            row:Hide()
+        end
+    end
+    LC.mlStatus = #LC.ML.pending .. " to send" .. (LC.ML:IsML() and "" or "  |cffff8844(you're not the master looter)|r")
+    if mlPanel.status then mlPanel.status:SetText(LC.mlStatus) end
+end
+
+function LC:ShowML()
+    if not mlPanel then
+        mlPanel = WM.UI:CreatePanel({ name = "WM_LootMLFrame", title = "Loot Council: master looter", titleColor = "FFB347",
+            width = 440, height = 320, minHeight = 200, scroll = false, resizable = { 360, 200, 900, 900 },
+            onRefresh = function() LC:RefreshML() end, onResize = function() LC:RefreshML() end })
+        local L = mlPanel.layout
+        L:Note("Items for the council to vote on. They come from the loot window (your quality and up); Alt-click any"
+            .. " item to add it. Award from the voting frame.")
+        local fill = L:Fill(120)
+        mlPanel.list = CreateFrame("Frame", nil, fill)
+        mlPanel.list:SetAllPoints(fill)
+        mlPanel.list.rows = {}
+        mlPanel.status = mlPanel:AddFooterText({ text = function() return LC.mlStatus or "" end }, "LEFT")
+        mlPanel:AddFooterButton({ text = "Send for votes", width = 120, onClick = function() LC.ML:Start(false) end,
+            tooltip = { "Send for votes", "Sends these items to the raid: everyone answers (RCLootCouncil or Watching Machine) and the council votes." } }, "RIGHT")
+        mlPanel:AddFooterButton({ text = "Clear", width = 60, onClick = function() LC.ML:Clear() end }, "RIGHT")
+        mlPanel:Finish()
+    end
+    if not mlPanel:IsShown() then mlPanel:Show() end
+    self:RefreshML()
 end
 
 -- ============================================
@@ -448,4 +595,5 @@ end
 function LC:HideFrames()
     if resp then resp:Hide() end
     if vote then vote:Hide() end
+    if mlPanel then mlPanel:Hide() end
 end
