@@ -2,9 +2,20 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.73** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.74** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.74
+
+### Roster Manager: whose alt
+
+- Log and chat lines about an alt end with their main: "Myalt reached
+  level 12. -- Venitra's alt". Covers level-ups, promotions and demotions,
+  public and officer note changes, name changes, players back from a long
+  absence, and leaving or being removed.
+- *Say whose alt it is in log lines* in *Options* and the guided setup
+  turns it off.
 
 ## 3.73
 

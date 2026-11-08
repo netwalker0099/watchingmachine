@@ -34,6 +34,7 @@ local DEFAULTS = {
     showOnLogin = true,     -- open the log at login when something changed
     hoverDetails = true,    -- details when you hover the guild roster
     groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
+    nameMain = true,        -- log lines about an alt end with "-- Main's alt"
     purgeDays = 30,         -- purge: every character offline at least this many days
     purgeProtectRank = 1,   -- purge: never ranks at or above this index (0 = guild master)
     purgeShowIgnored = false, -- purge: also list players tagged never to purge
@@ -217,6 +218,17 @@ end
 -- THE LOG
 -- ============================================
 
+-- " -- Venitra's alt" for a character with a main (other than itself), so
+-- log lines about alts say whose they are
+function GR:AltSuffix(name, g)
+    g = g or self:Guild()
+    if not g or not DB().nameMain then return "" end
+    local rec = g.members[name] or g.former[name]
+    local grp = rec and rec.group and g.groups[rec.group]
+    if not grp or grp.main == "" or grp.main == name then return "" end
+    return " -- " .. Short(grp.main) .. "'s alt"
+end
+
 function GR:Log(kind, text, g)
     g = g or self:Guild()
     if not g then return end
@@ -353,7 +365,7 @@ function GR:Scan()
             g.members[row.name] = rec
             rec.name = row.name
             self:RenameInGroups(g, oldName, row.name)
-            self:Log("rename", Short(oldName) .. " is now " .. Short(row.name) .. ".", g)
+            self:Log("rename", Short(oldName) .. " is now " .. Short(row.name) .. "." .. self:AltSuffix(row.name, g), g)
         end
         if not rec then
             local fname = (row.guid and formerByGuid[row.guid]) or (g.former[row.name] and row.name)
@@ -400,23 +412,23 @@ function GR:Scan()
                 local who = self:WhoDid(up and "promote" or "demote", row.name)
                 self:Log(up and "promote" or "demote", Short(row.name) .. (up and " was promoted" or " was demoted")
                     .. " from " .. (rec.rankName ~= "" and rec.rankName or "?") .. " to " .. row.rankName
-                    .. (who and (" by " .. Short(who)) or "") .. ".", g)
+                    .. (who and (" by " .. Short(who)) or "") .. "." .. self:AltSuffix(row.name, g), g)
                 rec.promo = { date = today, epoch = now, verified = true }
                 table.insert(rec.ranks, 1, { rank = row.rankName, date = today })
                 while #rec.ranks > 30 do table.remove(rec.ranks) end
             end
             if row.level > (rec.level or 1) and row.level >= db.levelMin then
-                self:Log("level", Short(row.name) .. " reached level " .. row.level .. ".", g)
+                self:Log("level", Short(row.name) .. " reached level " .. row.level .. "." .. self:AltSuffix(row.name, g), g)
             end
             if (rec.note or "") ~= row.note and rec.note ~= nil then
-                self:Log("note", Short(row.name) .. "'s public note: " .. Quote(row.note) .. " (was " .. Quote(rec.note) .. ").", g)
+                self:Log("note", Short(row.name) .. "'s public note: " .. Quote(row.note) .. " (was " .. Quote(rec.note) .. ")." .. self:AltSuffix(row.name, g), g)
             end
             if rec.onote ~= nil and CanSeeOfficerNotes() and rec.onote ~= row.onote then
-                self:Log("onote", Short(row.name) .. "'s officer note: " .. Quote(row.onote) .. " (was " .. Quote(rec.onote) .. ").", g)
+                self:Log("onote", Short(row.name) .. "'s officer note: " .. Quote(row.onote) .. " (was " .. Quote(rec.onote) .. ")." .. self:AltSuffix(row.name, g), g)
             end
             local inactive = db.inactiveDays * 24
             if db.reportReturn and row.online and (rec.offlineHours or 0) >= inactive then
-                self:Log("back", Short(row.name) .. " is back after " .. math.floor(rec.offlineHours / 24) .. " days away.", g)
+                self:Log("back", Short(row.name) .. " is back after " .. math.floor(rec.offlineHours / 24) .. " days away." .. self:AltSuffix(row.name, g), g)
             end
             Fill(rec, row)
         end
@@ -427,14 +439,15 @@ function GR:Scan()
     for name, rec in pairs(g.members) do
         if not seen[name] then
             local kicker = self:WhoDid("remove", name)
+            local whose = self:AltSuffix(name, g)
             g.members[name] = nil
             self:MoveToFormer(g, rec, kicker)
             local alts = rec.altsAtLeaving and #rec.altsAtLeaving > 0
                 and (" Alts still here: " .. table.concat(rec.altsAtLeaving, ", ") .. ".") or ""
             if kicker then
-                self:Log("kick", Short(name) .. " was removed from the guild by " .. Short(kicker) .. "." .. alts, g)
+                self:Log("kick", Short(name) .. " was removed from the guild by " .. Short(kicker) .. "." .. alts .. whose, g)
             else
-                self:Log("left", Short(name) .. " left the guild." .. alts, g)
+                self:Log("left", Short(name) .. " left the guild." .. alts .. whose, g)
             end
         end
     end

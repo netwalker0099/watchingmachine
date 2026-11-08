@@ -877,6 +877,9 @@ local function Settings(L, inSetup)
     L:Checkbox({ label = "List alts under their main on the roster", get = function() return DB().groupAlts end,
         set = function(v) DB().groupAlts = v; GR:RefreshList() end,
         tooltip = { "Alts under their main", "On the Roster tab, a main shows a + beside their name: click it to list their alts underneath them. Off lists everyone on their own, alts tagged (alt)." } })
+    L:Checkbox({ label = "Say whose alt it is in log lines", get = function() return DB().nameMain end,
+        set = function(v) DB().nameMain = v end,
+        tooltip = { "Whose alt", "Log and chat lines about an alt end with their main, e.g. \"Myalt reached level 12. -- Venitra's alt\"." } })
     L:Checkbox({ label = "Report players back from a long absence", get = function() return DB().reportReturn end,
         set = function(v) DB().reportReturn = v end,
         tooltip = { "Back from inactive", "Logs a line when someone who'd been offline longer than the days below comes back online." } })

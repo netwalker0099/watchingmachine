@@ -293,6 +293,20 @@ ni, nl = Find(lines, "Newbie-SpineShatter")
 check("grouping off: alts listed on their own", nl and nl.indent == 0 and not (select(2, Find(lines, "Healer-SpineShatter")) or {}).toggle)
 GR.DB().groupAlts = true
 
+-- Log lines about an alt say whose alt it is
+for _, m in ipairs(roster) do if m.name == "Newbie-SpineShatter" then m.level = (m.level or 12) + 1 end end
+GR:Scan()
+check("an alt's level-up names their main", g.log[1].kind == "level" and g.log[1].text:find("%-%- Healer's alt$") ~= nil)
+for _, m in ipairs(roster) do if m.name == "Healer-SpineShatter" then m.level = 71 end end
+GR:Scan()
+check("a main's own lines don't", g.log[1].kind == "level" and not g.log[1].text:find("'s alt", 1, true))
+GR.DB().nameMain = false
+for _, m in ipairs(roster) do if m.name == "Newbie-SpineShatter" then m.level = m.level + 1 end end
+GR:Scan()
+check("option off: no main named", g.log[1].kind == "level" and not g.log[1].text:find("'s alt", 1, true))
+GR.DB().nameMain = true
+Sync:ClearQueue()
+
 -- Names finish as you type in the add-alt box
 local matches = GR:NameMatches("ne", "members")
 check("name matches by start of name", #matches == 1 and matches[1].name == "Newbie-SpineShatter")
