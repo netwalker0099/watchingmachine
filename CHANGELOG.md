@@ -2,9 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.67** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.68** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.68
+
+### ArmorySnap: the armory, linked to Roster Manager
+
+- **One armory per character and spec** (the talent tree with the most
+  points), kept with ArmorySnap's saved data. Pick *Armory* in the browser's
+  snapshot list, or `/as armory [name]`.
+- **Your own gear** is saved whenever your gear, talents or level change, a
+  separate armory for each spec.
+- **Guildmates who don't run Watching Machine** are saved whenever ArmorySnap
+  inspects them. The game hides an inspected player's talent points, so the
+  scan goes under the spec whose saved gear it matches, or *spec unknown*.
+- **Shared with the guild**: each new scan goes to guildmates running
+  Watching Machine and theirs come to you. The newest scan of each spec wins.
+  Opening someone's armory asks the guild for a newer one.
+- Switches in the browser and the guided setup: *Save my gear*, *Save
+  guildmates*, *Share with guild*.
+- **Roster Manager**: a member's details (and the Guild window hover) list
+  their armory for each spec with its GearScore; *Show armory* opens it.
+- Roster Manager and the armory send through one shared, paced queue.
 
 ## 3.67
 

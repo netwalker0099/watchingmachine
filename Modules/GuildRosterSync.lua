@@ -26,7 +26,6 @@ local PREFIX_USER, PREFIX_SYNC, PREFIX_VER = "GRMUSER", "GRM_SYNC", "GRMVER"
 Sync.DEFAULT_PATCHDAY = 1792119571     -- Guild Roster Manager R1.99423
 local MAX_BODY = 246                   -- 255 minus the prefix
 local NOTE_SPLIT = 99
-local SEND_GAP = 0.15                  -- seconds between our messages
 
 Sync.users = {}       -- [Name-Realm] = { patchDay, syncRank, banRank, inGroup, enabled, exportAll, ver, ok }
 local seenPatchDay = {}   -- [sender] = patch day they announced
@@ -86,34 +85,18 @@ end
 -- SENDING (paced)
 -- ============================================
 
-local queue = {}
-local pacer = CreateFrame("Frame")
-local since = 0
-pacer:Hide()
-pacer:SetScript("OnUpdate", function(self, elapsed)
-    since = since + (elapsed or 0)
-    if since < SEND_GAP then return end
-    since = 0
-    local m = table.remove(queue, 1)
-    if not m then self:Hide() return end
-    local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or rawget(_G, "SendAddonMessage")
-    if send then pcall(send, m[1], m[2], m[3], m[4]) end
-    Sync.sent = (Sync.sent or 0) + 1
-end)
+-- Through Watching Machine's shared, paced queue (Core)
+local OUR_PREFIXES = { [PREFIX_USER] = true, [PREFIX_SYNC] = true, [PREFIX_VER] = true }
 
 local function Send(prefix, body, channel, target)
     if #body > MAX_BODY then return false end
-    queue[#queue + 1] = { prefix, body, channel or "GUILD", target }
-    pacer:Show()
-    return true
+    return WM:QueueAddonMessage(prefix, body, channel or "GUILD", target)
 end
 Sync.Send = Send
-function Sync:QueueLength() return #queue end
+function Sync:QueueLength() return WM:AddonQueueLength(OUR_PREFIXES) end
 -- Send everything queued at once (tests)
-function Sync:FlushForTests()
-    while #queue > 0 do since = SEND_GAP; pacer:GetScript("OnUpdate")(pacer, 0) end
-end
-function Sync:ClearQueue() wipe(queue); pacer:Hide() end
+function Sync:FlushForTests() WM:FlushAddonQueue() end
+function Sync:ClearQueue() WM:ClearAddonQueue(OUR_PREFIXES) end
 
 -- ============================================
 -- PRESENCE (GRMUSER)

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.67 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.68 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -244,6 +244,22 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - **Auto-scan** checkbox (or `/as auto`) turns automatic raid scanning off without disabling the module; manual snapshots still work
 - **Migrates your existing archive**: uses the same `ArmorySnapDB` saved variable as the standalone addon; if the standalone addon is still enabled, the module stands down and tells you (disable one or the other)
 - Keeps the standalone `/as` slash commands; also `/wmachine armory`
+- **The armory** (3.68): one saved armory per character and spec, the spec
+  being the talent tree with the most points. Pick *Armory* in the browser's
+  snapshot list, or `/as armory [name]`
+  - Your own gear and talents are saved whenever they change (gear swaps,
+    respecs, level-ups), a separate armory for each spec
+  - A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap
+    inspects them. The game doesn't show an inspected player's talent points,
+    so the scan goes under the spec whose saved gear it matches (or *spec
+    unknown* until one does)
+  - Each new scan is sent to guildmates running Watching Machine and theirs
+    come to you; the newest scan of each spec wins on every install.
+    Opening someone's armory asks the guild for a newer one
+  - Three switches in the browser and the guided setup: *Save my gear*,
+    *Save guildmates*, *Share with guild*
+  - In **Roster Manager**, a member's details list their armory for each
+    spec, and *Show armory* opens it
 
 ### 12. Aura Range
 Visual and audio alerts when you drift out of range of party auras and shaman totems.
@@ -1043,6 +1059,9 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   Roster Manager has saved for the guild, when it's installed and loaded
 - **Guild Roster Manager on the same character**: Roster Manager keeps the
   roster and log but leaves the syncing to it
+- **Armory** (3.68, with ArmorySnap on): a member's details and hover list
+  their saved armory for each spec with its GearScore, and *Show armory*
+  opens their gear and talents in ArmorySnap's browser (see ArmorySnap)
 - Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
   `import`, `options`
 
@@ -1335,6 +1354,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.68
+- **ArmorySnap's armory**: a saved armory for each character and spec. Your own gear is saved automatically, guildmates are saved when ArmorySnap inspects them, and scans are shared with guildmates running Watching Machine (the newest wins). **Roster Manager** shows each member's armory and has a *Show armory* button
 
 ### Version 3.67
 - **New module: Roster Manager** (`/wmachine roster`): guild member records (join and promotion dates, alts and mains, birthdays, custom notes, bans), a guild log of joins, leaves, kicks, promotions and more, former members and the ban list. Shares its edits with guildmates running Guild Roster Manager or Watching Machine, and can import Guild Roster Manager's saved data

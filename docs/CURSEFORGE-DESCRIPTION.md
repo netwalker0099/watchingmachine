@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.67 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.68 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -523,6 +523,22 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - **Auto-scan** checkbox (or `/as auto`) turns automatic raid scanning off without disabling the module; manual snapshots still work
 - **Migrates your existing archive**: uses the same `ArmorySnapDB` saved variable as the standalone addon; if the standalone addon is still enabled, the module stands down and tells you (disable one or the other)
 - Keeps the standalone `/as` slash commands; also `/wmachine armory`
+- **The armory** (3.68): one saved armory per character and spec, the spec
+  being the talent tree with the most points. Pick *Armory* in the browser's
+  snapshot list, or `/as armory [name]`
+  - Your own gear and talents are saved whenever they change (gear swaps,
+    respecs, level-ups), a separate armory for each spec
+  - A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap
+    inspects them. The game doesn't show an inspected player's talent points,
+    so the scan goes under the spec whose saved gear it matches (or *spec
+    unknown* until one does)
+  - Each new scan is sent to guildmates running Watching Machine and theirs
+    come to you; the newest scan of each spec wins on every install.
+    Opening someone's armory asks the guild for a newer one
+  - Three switches in the browser and the guided setup: *Save my gear*,
+    *Save guildmates*, *Share with guild*
+  - In **Roster Manager**, a member's details list their armory for each
+    spec, and *Show armory* opens it
 
 ### World Timers
 Open-world timers for TBC, kept per layer (Raid group; `/wmachine timers`).

@@ -286,7 +286,7 @@ end
 
 -- Average GearScore of a snapshot's scored members: average, how many
 function AS.SnapshotScore(snapshotKey)
-    local snap = AS.db and AS.db.snapshots[snapshotKey]
+    local snap = AS.ViewSnapshot(snapshotKey)
     if not snap then return nil, 0 end
     local sum, n = 0, 0
     for _, m in pairs(snap.members) do
@@ -321,6 +321,9 @@ local function CaptureCharInfo(unit)
         talents = nil,
     }
 end
+
+-- The armory (ArmorySnapArmory.lua) captures with these too
+AS.CaptureCharInfo, AS.CaptureGear, AS.CaptureTalents = CaptureCharInfo, CaptureGear, CaptureTalents
 
 ----------------------------------------------------------------------
 -- Parse enchant / gem IDs from item link
@@ -450,6 +453,7 @@ local function OnInspectReady(guid)
     charInfo.gear     = CaptureGear(unit)
     charInfo.talents  = CaptureTalents(true)
     AS.ScoreMember(charInfo)
+    if AS.Armory then AS.Armory:FromInspect(charInfo, unit) end
 
     local totalPts = 0
     if charInfo.talents and charInfo.talents.trees then
@@ -696,6 +700,7 @@ function AS.TakeManualSnapshot(label)
                 ci.gear    = CaptureGear(unit)
                 ci.talents = CaptureTalents(true)
                 AS.ScoreMember(ci)
+                if AS.Armory then AS.Armory:FromInspect(ci, unit) end
                 snap.members[ci.name] = ci; captured = captured + 1
                 ClearInspectPlayer()
                 C_Timer.After(CHAIN_DELAY, DoNext)
@@ -725,8 +730,20 @@ function AS.GetSnapshotKeys()
     return keys
 end
 
+-- The armory shows in the browser as one more "snapshot": every saved
+-- character and spec (or one player's, opened from Roster Manager)
+AS.ARMORY_KEY = "\001armory"
+AS.armoryFilter = nil
+
+function AS.ViewSnapshot(key)
+    if key == AS.ARMORY_KEY then
+        return AS.Armory and AS.Armory.View and AS.Armory.View(AS.armoryFilter) or nil
+    end
+    return AS.db and AS.db.snapshots[key]
+end
+
 function AS.GetMemberNames(snapshotKey)
-    local snap = AS.db.snapshots[snapshotKey]
+    local snap = AS.ViewSnapshot(snapshotKey)
     if not snap then return {} end
     local names = {}
     for name in pairs(snap.members) do table.insert(names, name) end
@@ -804,6 +821,13 @@ function AS.InitDB()
     if AS.db.options.scanGroup     == nil then AS.db.options.scanGroup     = false end
     if AS.db.options.verbose       == nil then AS.db.options.verbose       = false end
     if AS.db.options.retentionDays == nil then AS.db.options.retentionDays = 30 end
+    -- The armory: one saved armory per character and spec, and who runs
+    -- Watching Machine (ArmorySnapArmory.lua)
+    if AS.db.armory == nil then AS.db.armory = {} end
+    if AS.db.armoryUsers == nil then AS.db.armoryUsers = {} end
+    for _, k in ipairs({ "armorySelf", "armoryInspect", "armoryShare" }) do
+        if AS.db.options[k] == nil then AS.db.options[k] = true end
+    end
     -- options.elvuiTheme is no longer read: the browser follows the global
     -- Watching Machine theme. It is left in place rather than cleared because
     -- ArmorySnapDB is shared with the standalone addon, which still uses it.
@@ -824,6 +848,7 @@ function AS:Initialize()
 
     CacheEmptyTextures()
     AS.PurgeOldSnapshots()
+    if AS.Armory then AS.Armory:Init() end
 
     eventFrame:RegisterEvent("INSPECT_READY")
     eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -862,7 +887,13 @@ function AS:OnModuleOff()
     if AS.session.inspecting then FinishInspect() end
     AS.ResetSession()
     lastZone = nil
+    if AS.Armory then AS.Armory:Stop() end
     if AS.HideBrowseFrame then AS.HideBrowseFrame() end
+end
+
+-- On again: the armory saves anything that changed meanwhile
+function AS:OnModuleOn()
+    if AS.Armory and not AS.standaloneConflict then AS.Armory:Start() end
 end
 
 function AS:SetupPage(L)
@@ -893,8 +924,38 @@ function AS:SetupPage(L)
         get = function() return options.retentionDays end,
         set = function(v) options.retentionDays = v end,
         tooltip = { "Keep snapshots", "Older snapshots are deleted the next time you log in or reload." } })
+    L:Note("|cFFFFFFFFThe armory:|r one saved armory for each character and spec (the talent tree with the most"
+        .. " points). Your own gear and talents are saved whenever they change. A guildmate who doesn't run"
+        .. " Watching Machine is saved whenever ArmorySnap inspects them; the game doesn't show their talent"
+        .. " points, so it goes under the spec whose saved gear it matches. Each scan is shared with guildmates"
+        .. " running Watching Machine, and the newest scan of each spec wins. Pick |cFFFFFF00Armory|r in the"
+        .. " browser's snapshot list, or click |cFFFFFF00Show armory|r on a player in Roster Manager.")
+    AS.ArmoryCheckboxes(function(spec) L:Checkbox(spec) end, options)
     L:Note("Snapshots are shared by all your characters. Everything else is in the browser: |cFFFFFF00/as|r"
         .. " (|cFFFFFF00/as help|r lists the commands).")
+end
+
+-- The armory's settings, for the setup page and the browser
+AS.ARMORY_SETTINGS = {
+    { key = "armorySelf", label = "Save my gear to the armory", short = "Save my gear",
+      tip = { "Save my gear", "Saves your gear and talents to the armory whenever they change, one armory for each spec." } },
+    { key = "armoryInspect", label = "Save guildmates ArmorySnap inspects", short = "Save guildmates",
+      tip = { "Save guildmates", "When ArmorySnap inspects a guildmate who doesn't run Watching Machine, their gear"
+          .. " updates their armory. Players running Watching Machine keep their own." } },
+    { key = "armoryShare", label = "Share the armory with my guild", short = "Share with guild",
+      tip = { "Share with guild", "Sends each new armory scan to guildmates running Watching Machine and takes"
+          .. " theirs, the newest scan of each spec winning. Opening someone's armory asks the guild for a newer one." } },
+}
+
+function AS.ArmoryCheckboxes(add, options, font)
+    for _, s in ipairs(AS.ARMORY_SETTINGS) do
+        add({ label = font and s.short or s.label, font = font, tooltip = s.tip,
+            get = function() return options[s.key] ~= false end,
+            set = function(v)
+                options[s.key] = v and true or false
+                if v and s.key == "armorySelf" and AS.Armory then AS.Armory.ScheduleSelf(1, true) end
+            end })
+    end
 end
 
 ----------------------------------------------------------------------
@@ -930,6 +991,18 @@ function AS.HandleSlash(msg)
         local label = rest and strtrim(rest)
         if label == "" then label = nil end
         AS.TakeManualSnapshot(label)
+
+    elseif cmd == "armory" then
+        local name = rest and strtrim(rest) or ""
+        if name == "" then
+            AS.ShowArmory()
+        elseif AS.Armory and AS.Armory.Specs(name)[1] then
+            AS.Armory:Query(name)
+            AS.ShowArmory(name, AS.Armory.ViewKey(name))
+        else
+            if AS.Armory then AS.Armory:Query(name) end
+            Print("No armory for " .. name .. " yet. Asked guildmates for one.")
+        end
 
     elseif cmd == "browse" or cmd == "view" or cmd == "open" or cmd == "" then
         AS.ToggleBrowseFrame()
@@ -996,6 +1069,7 @@ function AS.HandleSlash(msg)
         Print("Commands:")
         Print("  |cfffff000/as|r               – Open gear browser")
         Print("  |cfffff000/as snap [label]|r   – Manual snapshot")
+        Print("  |cfffff000/as armory [name]|r  – The armory (one player's, with a name)")
         Print("  |cfffff000/as list|r            – List saved snapshots")
         Print("  |cfffff000/as delete <n>|r   – Delete a snapshot")
         Print("  |cfffff000/as auto|r            – Toggle automatic scanning")
@@ -1348,6 +1422,10 @@ local function CreateBrowseFrame()
             .. " log in or reload the UI." },
     }, 2)
 
+    row = L:Row(24)
+    local cx = 0
+    AS.ArmoryCheckboxes(function(spec) row:Checkbox(spec, cx); cx = cx + 135 end, options, "GameFontNormalSmall")
+
     local fill = L:Fill(CONTENT_H)
 
     -- Left panel: snapshot dropdown + member list
@@ -1364,6 +1442,11 @@ local function CreateBrowseFrame()
         name = "WM_ASSnapDD", width = LIST_WIDTH - 30, placeholder = "Select snapshot …",
         options = function()
             local list = {}
+            if AS.Armory then
+                local n = 0
+                for _ in pairs(AS.db.armory) do n = n + 1 end
+                list[1] = { value = AS.ARMORY_KEY, text = "|cff66ccffArmory|r (" .. n .. " characters)" }
+            end
             for _, key in ipairs(AS.GetSnapshotKeys()) do
                 list[#list + 1] = { value = key, text = key }
             end
@@ -1373,10 +1456,11 @@ local function CreateBrowseFrame()
         set = function(key)
             selectedSnapshotKey = key
             selectedMemberName  = nil
+            AS.armoryFilter = nil
             AS.RefreshMemberList()
             AS.ClearPaperDoll()
         end,
-        disabled = function() return next(AS.db.snapshots) == nil end,
+        disabled = function() return next(AS.db.snapshots) == nil and not AS.Armory end,
     }))
     snapshotDropdown:SetPoint("TOPLEFT", snapLabel, "BOTTOMLEFT", 0, -2)
 
@@ -1527,11 +1611,11 @@ function AS.RefreshMemberList()
 
     if AS.membersLabel then
         local avg, n = AS.SnapshotScore(selectedSnapshotKey)
-        AS.membersLabel:SetText("Raid Members:" .. (avg and ("  |cff888888avg GS|r " .. ScoreText(avg)) or ""))
+        AS.membersLabel:SetText((selectedSnapshotKey == AS.ARMORY_KEY and "Characters:" or "Raid Members:") .. (avg and ("  |cff888888avg GS|r " .. ScoreText(avg)) or ""))
     end
     if not selectedSnapshotKey then return end
     local names = AS.GetMemberNames(selectedSnapshotKey)
-    local snap  = AS.db.snapshots[selectedSnapshotKey]
+    local snap  = AS.ViewSnapshot(selectedSnapshotKey)
     if not snap then return end
 
     local elv = IsElvTheme()
@@ -1633,7 +1717,7 @@ end
 function AS.RefreshPaperDoll()
     AS.ClearPaperDoll()
     if not selectedSnapshotKey or not selectedMemberName then return end
-    local snap = AS.db.snapshots[selectedSnapshotKey]
+    local snap = AS.ViewSnapshot(selectedSnapshotKey)
     if not snap then return end
     local member = snap.members[selectedMemberName]
     if not member then return end
@@ -1644,8 +1728,8 @@ function AS.RefreshPaperDoll()
     charDetailText:SetText("Level " .. (member.level or "?") .. " "
                            .. (member.race or "") .. " "
                            .. (member.class or ""))
-    charGuildText:SetText(member.guild ~= ""
-                          and ("<" .. member.guild .. ">") or "")
+    charGuildText:SetText(member.armoryNote or (member.guild ~= ""
+                          and ("<" .. member.guild .. ">") or ""))
 
     local enchants, gems, items = 0, 0, 0
     for sid, btn in pairs(slotButtons) do
@@ -1766,6 +1850,35 @@ end
 
 function AS.HideBrowseFrame()
     if browseFrame then browseFrame:Hide() end
+end
+
+-- Open the browser at a player's armory (their newest spec), or at the whole
+-- armory without a name
+function AS.ShowArmory(name, memberKey)
+    if not WM:UsableModule("ArmorySnap") then return end
+    if AS.standaloneConflict then
+        Print("Module disabled — standalone ArmorySnap addon is running.")
+        return
+    end
+    CreateBrowseFrame()
+    AS.WatchScores()
+    AS.armoryFilter = name and AS.Armory and AS.Armory.Key(name) or nil
+    selectedSnapshotKey = AS.ARMORY_KEY
+    selectedMemberName = memberKey or AS.GetMemberNames(AS.ARMORY_KEY)[1]
+    if not browseFrame:IsShown() then browseFrame:Show() end
+    snapshotDropdown:Refresh()
+    AS.RefreshMemberList()
+    AS.RefreshPaperDoll()
+end
+
+-- An armory changed: redraw if it's on show
+function AS.RefreshArmoryView(key)
+    if not browseFrame or not browseFrame:IsShown() or selectedSnapshotKey ~= AS.ARMORY_KEY then return end
+    if AS.armoryFilter and key and key ~= AS.armoryFilter then return end
+    if not selectedMemberName then selectedMemberName = AS.GetMemberNames(AS.ARMORY_KEY)[1] end
+    snapshotDropdown:Refresh()
+    AS.RefreshMemberList()
+    AS.RefreshPaperDoll()
 end
 
 function AS:Toggle()

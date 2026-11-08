@@ -106,7 +106,7 @@ for _, n in ipairs(env.UISpecialFrames) do if n == "WM_ArmorySnapFrame" then esc
 check("Escape registered exactly once", esc == 1)
 check("one frame across toggles", env.WM_ArmorySnapFrame == p)
 check("no more than 700 tall", p:GetHeight() <= 700)
-check("about the old 632", math.abs(p:GetHeight() - 632) <= 8)
+check("about 656 (632 plus the armory row)", math.abs(p:GetHeight() - 656) <= 8)
 
 -- Fill must hold the right column: name 18 + detail 12 + guild 12 with
 -- gaps (4+2+1+8), doll 8*39+36+16, talents 6+52, summary 6+12
@@ -114,7 +114,7 @@ local need = 4 + 18 + 2 + 12 + 1 + 12 + 8 + (8 * 39 + 36 + 16) + 6 + 52 + 6 + 12
 local fillTop = select(5, p.layout.fill.frame:GetPoint(1))
 local fillH = p:GetHeight() - 40 - 14 + fillTop
 check("fill gives the paper doll its room", fillH >= need)
-check("rows stack above the fill without overlap", -fillTop == 22 + 24 + 28)
+check("rows stack above the fill without overlap", -fillTop == 22 + 24 + 28 + 24)
 check("width fits list + gap + doll inside the body", p:GetWidth() - 24 >= 180 + 10 + 330)
 
 -- ============ Checkboxes ============

@@ -208,6 +208,7 @@ WM.MODULE_LINKS = {
     GearSets = { AltTracker = "missing set items say when they're in your bank" },
     KeywordMonitor = { ChatFilter = "filtered spam never reaches your keywords" },
     ArmorySnap = { GearScore = "a GearScore for every raid member in a snapshot" },
+    GuildRoster = { ArmorySnap = "each member's armory for every spec, with a Show armory button" },
     DebuffTracker = { ArmorySnap = "the spell-reflect check waits while ArmorySnap inspects" },
     InstanceTracker = { MailLogger = "gold traded during a run, on the run's tooltip",
         AltTracker = "a button to Your Characters from the instance list" },

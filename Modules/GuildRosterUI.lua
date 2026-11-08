@@ -168,7 +168,39 @@ function GR:DetailLines(rec)
     if rec.ban.on then
         Add("|cFFFF3333Banned|r", GR.Short(rec.ban.by) .. (rec.ban.reason ~= "" and (": " .. rec.ban.reason) or ""))
     end
+    -- Their armory, with ArmorySnap on: each spec, its GearScore and age
+    local Arm = GR.Armory()
+    if Arm then
+        for _, e in ipairs(Arm.Specs(rec.name)) do
+            local AS = WM.modules.ArmorySnap
+            local score = AS and AS.ScoreMember and AS.ScoreMember(e)
+            Add("Armory", Arm.SpecLabel(e.spec) .. (score and score > 0 and (" GS " .. score) or "")
+                .. " |cFF888888(" .. Arm.Age(e.time) .. ")|r")
+        end
+    end
     return out
+end
+
+-- ArmorySnap's armory, while ArmorySnap is on
+function GR.Armory()
+    local AS = WM:IsModuleOn("ArmorySnap") and WM.modules.ArmorySnap
+    return AS and not AS.standaloneConflict and AS.Armory or nil
+end
+
+-- Open a player's armory, asking the guild for a newer one
+function GR:ShowArmory(name)
+    local Arm = GR.Armory()
+    if not Arm then
+        WM:ModulePrint("GuildRoster", "The armory is part of ArmorySnap: turn ArmorySnap on to see it.")
+        return
+    end
+    Arm:Query(name)
+    if not Arm.Specs(name)[1] then
+        WM:ModulePrint("GuildRoster", "No armory for " .. GR.Short(name) .. " yet. Asked guildmates for one;"
+            .. " it's also saved when ArmorySnap inspects them, or when they run Watching Machine.")
+        return
+    end
+    WM.modules.ArmorySnap.ShowArmory(name, Arm.ViewKey(name))
 end
 
 -- ============================================
@@ -366,6 +398,9 @@ local DETAIL_BUTTONS = {
         Refresh()
     end },
     { "Ban", function(r) if r.ban.on then GR:SetBan(r.name, false); Refresh() else GR:AskBan(r.name) end end },
+    { "Show armory", function(r) GR:ShowArmory(r.name) end,
+      tip = { "Show armory", "Their saved gear and talents for each spec, in ArmorySnap's browser. Also asks the guild for a"
+          .. " newer scan. Needs ArmorySnap on." } },
 }
 
 function GR:RefreshDetails()
@@ -395,6 +430,7 @@ function GR:RefreshDetails()
         local usable = true
         if former and (i == 5 or i == 6 or i == 7) then usable = false end
         if i == 6 and not grp then usable = false end
+        if label == "Show armory" then usable = GR.Armory() ~= nil end
         if usable then b:Enable() else b:Disable() end
         b:Show()
     end
@@ -462,8 +498,22 @@ function GR:CreateUI()
         local b = CreateFrame("Button", nil, d, "UIPanelButtonTemplate")
         b:SetSize((DETAILS_W - 26) / 2, 20)
         local col, rowN = (i - 1) % 2, math.floor((i - 1) / 2)
+        if i > 8 then
+            -- Show armory: a full-width row above the edit buttons
+            b:SetWidth(DETAILS_W - 18)
+            col, rowN = 0, -1
+        end
         b:SetPoint("BOTTOMLEFT", 9 + col * ((DETAILS_W - 26) / 2 + 8), 10 + (3 - rowN) * 22)
         b:SetText(spec[1])
+        if spec.tip then
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(spec.tip[1], 1, 1, 1)
+                GameTooltip:AddLine(spec.tip[2], nil, nil, nil, true)
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
         b:SetScript("OnClick", function()
             local rec = GR.selected and GR:Find(GR.selected)
             if rec then spec[2](rec) end
@@ -602,6 +652,9 @@ function GR:SetupPage(L)
     L:Note("|cFFFFFFFFSharing:|r edits you make are shared with guildmates running Guild Roster Manager or Watching"
         .. " Machine, and theirs come to you, so officers see the same dates, alts and bans. If you already use Guild"
         .. " Roster Manager, Roster Manager can import what it knows.")
+    L:Note("|cFFFFFFFFArmory:|r with ArmorySnap on, a member's details list their saved armory for each spec, and"
+        .. " |cFFFFFF00Show armory|r opens their gear and talents. Your own gear is saved automatically, guildmates"
+        .. " are saved when ArmorySnap inspects them, and guildmates running Watching Machine share theirs.")
     Settings(L, true)
     L:Note("Everything else is in its window: |cFFFFFF00/wmachine roster|r.")
 end

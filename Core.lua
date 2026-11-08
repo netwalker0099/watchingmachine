@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.67"
+WM.version = "3.68"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -216,6 +216,50 @@ end
 function WM.ItemIcon(id)
     local f = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
     return f and f(id) or nil
+end
+
+-- Paced addon messages, shared by every module that talks to other players
+-- (one message every 0.15 s, so a burst never trips the server's throttle).
+-- A prefix and body over 254 bytes together are refused.
+local commQueue, commSince, COMM_GAP = {}, 0, 0.15
+local commPacer = CreateFrame("Frame")
+commPacer:Hide()
+commPacer:SetScript("OnUpdate", function(self, elapsed)
+    commSince = commSince + (elapsed or 0)
+    if commSince < COMM_GAP then return end
+    commSince = 0
+    local m = table.remove(commQueue, 1)
+    if not m then self:Hide() return end
+    local send = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or rawget(_G, "SendAddonMessage")
+    if send then pcall(send, m[1], m[2], m[3], m[4]) end
+end)
+
+function WM:QueueAddonMessage(prefix, body, channel, target)
+    if type(body) ~= "string" or #prefix + #body > 254 then return false end
+    commQueue[#commQueue + 1] = { prefix, body, channel or "GUILD", target }
+    commPacer:Show()
+    return true
+end
+
+-- Messages waiting (only those with one of these prefixes, if given)
+function WM:AddonQueueLength(prefixes)
+    if not prefixes then return #commQueue end
+    local n = 0
+    for _, m in ipairs(commQueue) do if prefixes[m[1]] then n = n + 1 end end
+    return n
+end
+
+-- Drop the waiting messages with these prefixes (a module turned off)
+function WM:ClearAddonQueue(prefixes)
+    for i = #commQueue, 1, -1 do
+        if not prefixes or prefixes[commQueue[i][1]] then table.remove(commQueue, i) end
+    end
+    if #commQueue == 0 then commPacer:Hide() end
+end
+
+-- Send everything waiting at once (tests)
+function WM:FlushAddonQueue()
+    while #commQueue > 0 do commSince = COMM_GAP; commPacer:GetScript("OnUpdate")(commPacer, 0) end
 end
 
 -- Battle and guardian elixirs. In TBC a flask fills both elixir slots, so
@@ -1417,9 +1461,13 @@ local MODULE_INFO = {
     },
     ArmorySnap = {
         title = "ArmorySnap", desc = "Raid gear & talent snapshots",
-        about = "Quietly records every raid member's gear, enchants, gems and talents, and lets you browse the snapshots later.",
+        about = "Quietly records every raid member's gear, enchants, gems and talents, and lets you browse the snapshots later. Keeps an armory of each guildmate's gear for every spec, shared with guildmates running Watching Machine.",
         command = "armory", color = {0.4, 0.67, 1}, icon = "Interface\\Icons\\INV_Chest_Chain_09",
         tools = {
+            { text = "Open the armory", desc = "Every saved character and spec: your own, guildmates ArmorySnap inspected, and those shared by the guild.",
+              func = function()
+                local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("armory") end
+              end },
             { text = "Take a snapshot now", func = function()
                 local AS = Mod("ArmorySnap"); if AS and AS.HandleSlash then AS.HandleSlash("snap") end
               end },
@@ -2276,6 +2324,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine recruit|r - Open Recruiting Tool")
     print("|cFFFFFF00/wmachine buffcheck|r - Open Buff Check settings")
     print("|cFFFFFF00/wmachine armory|r - Open ArmorySnap gear browser (also /as)")
+    print("|cFFFFFF00/as armory [name]|r - The armory: saved gear and talents for each guildmate's specs")
     print("|cFFFFFF00/as snap [label]|r, |cFFFFFF00list|r, |cFFFFFF00delete <name>|r, |cFFFFFF00group|r, |cFFFFFF00auto|r, |cFFFFFF00status|r, |cFFFFFF00reset|r - ArmorySnap snapshots and scanner")
     print("|cFFFFFF00/wmachine range|r - Open Aura Range alert settings")
     print("|cFFFFFF00/wmachine exclude|r - Stop the debuff tracker treating your target as a boss")
