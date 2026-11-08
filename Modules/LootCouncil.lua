@@ -17,6 +17,13 @@ WM:RegisterModule("LootCouncil", LC)
 WM.LootCouncil = LC
 
 local function On() return WM:IsModuleOn("LootCouncil") end
+
+-- The game's text for a word (PASS, NEED...), or ours when it has none
+function LC.GameText(name, default)
+    local v = rawget(_G, name)
+    return type(v) == "string" and v ~= "" and v or default
+end
+
 local function Now() return (GetServerTime and tonumber(GetServerTime())) or time() end
 
 -- ============================================

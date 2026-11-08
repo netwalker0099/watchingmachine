@@ -101,7 +101,7 @@ function LC:RefreshResponse()
             row.info:SetText((item.ilvl and ("ilvl " .. item.ilvl) or "") .. (diff and (" (" .. (diff >= 0 and "+" or "") .. diff .. ")") or "")
                 .. (item.boss and ("  |cff888888" .. item.boss .. "|r") or "") .. gear)
             local specs = RC:Buttons(item.typeCode)
-            specs[#specs + 1] = { text = PASS or "Pass", pass = true }
+            specs[#specs + 1] = { text = LC.GameText("PASS", "Pass"), pass = true }
             for b, spec in ipairs(specs) do
                 local btn = row.buttons[b]
                 if not btn then
@@ -398,8 +398,8 @@ end
 -- Ask before awarding
 StaticPopupDialogs["WM_LOOTCOUNCIL_AWARD"] = {
     text = "%s",
-    button1 = YES or "Yes",
-    button2 = NO or "No",
+    button1 = LC.GameText("YES", "Yes"),
+    button2 = LC.GameText("NO", "No"),
     OnAccept = function(self, data)
         if data and LC.ML then LC.ML:Award(data.ses, data.winner, data.reason) end
     end,
@@ -608,7 +608,7 @@ function LC.Disenchanter()
 end
 
 StaticPopupDialogs["WM_LOOTCOUNCIL_INPUT"] = {
-    text = "%s", button1 = OKAY or "OK", button2 = CANCEL or "Cancel", hasEditBox = true, maxLetters = 60,
+    text = "%s", button1 = LC.GameText("OKAY", "OK"), button2 = LC.GameText("CANCEL", "Cancel"), hasEditBox = true, maxLetters = 60,
     OnShow = function(self, data)
         local e = self.editBox or self.EditBox
         if e and data then e:SetText(data.value or ""); e:HighlightText() end
@@ -784,7 +784,7 @@ function LC:ShowRollPrompt()
         prompt.text:SetJustifyH("LEFT")
         prompt.text:SetWordWrap(false)
         local x = 54
-        for _, b in ipairs({ { "Roll MS", "MS" }, { "Roll OS", "OS" }, { PASS or "Pass", nil } }) do
+        for _, b in ipairs({ { "Roll MS", "MS" }, { "Roll OS", "OS" }, { LC.GameText("PASS", "Pass"), nil } }) do
             local btn = CreateFrame("Button", nil, prompt, "UIPanelButtonTemplate")
             btn:SetSize(80, 20)
             btn:SetPoint("BOTTOMLEFT", x, 10)

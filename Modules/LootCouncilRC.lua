@@ -133,7 +133,7 @@ RC.mldb = nil
 RC.council = {}        -- [name] = true
 RC.ranks = {}          -- [name] = guild rank (from pI)
 
-local DEFAULT_BUTTONS = { numButtons = 3, { text = NEED or "Need" }, { text = GREED or "Greed" }, { text = "Minor Upgrade" } }
+local DEFAULT_BUTTONS = { numButtons = 3, { text = LC.GameText("NEED", "Need") }, { text = LC.GameText("GREED", "Greed") }, { text = "Minor Upgrade" } }
 local DEFAULT_RESPONSES = {
     [1] = { text = "Mainspec/Need", color = { 0, 1, 0, 1 }, sort = 1 },
     [2] = { text = "Offspec/Greed", color = { 1, 0.5, 0, 1 }, sort = 2 },
@@ -149,7 +149,7 @@ RC.STATUS = {
     REMOVED = { text = "Candidate removed", color = { 0.8, 0.5, 0, 1 }, sort = 505 },
     NOTHING = { text = "Offline or RCLootCouncil not installed", color = { 0.5, 0.5, 0.5, 1 }, sort = 506 },
     NOTELIGIBLE = { text = "Not eligible", color = { 0.8, 0.5, 0, 1 }, sort = 507 },
-    PASS = { text = PASS or "Pass", color = { 0.7, 0.7, 0.7, 1 }, sort = 800 },
+    PASS = { text = LC.GameText("PASS", "Pass"), color = { 0.7, 0.7, 0.7, 1 }, sort = 800 },
     AUTOPASS = { text = "Autopass", color = { 0.7, 0.7, 0.7, 1 }, sort = 801 },
     DISABLED = { text = "Candidate has disabled RCLootCouncil", color = { 0.3, 0.35, 0.5, 1 }, sort = 802 },
     NOTINRAID = { text = "Candidate is not in the instance", color = { 0.7, 0.6, 0, 1 }, sort = 803 },

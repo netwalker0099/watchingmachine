@@ -2,11 +2,14 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.79** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.80** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
 
-## 3.79
+## 3.80
+
+(3.79 was never published: its release stopped at a test that failed on
+GitHub's runner. 3.80 is the same release with that fixed.)
 
 ### Loot Council part 5: the loot history shared with the guild
 
@@ -25,6 +28,12 @@ Current release: **3.79** — TBC Classic Anniversary patch 2.5.6 (Interface `20
   one by one: guildmates catch up on them at login.
 - The history window's footer shows how many awards were shared and
   received. *Share the loot history with my guild* turns it off.
+
+### Fixes
+
+- Loot Council reads the game's words (Pass, Need, Greed, Yes, No) only
+  when they're text, so a missing one can't break the voting frame.
+- The test runner shows each failing check on GitHub's run page.
 
 ## 3.78
 

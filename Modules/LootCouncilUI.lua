@@ -258,7 +258,7 @@ end
 -- Right-click an award: give it to someone else, or delete it
 local menu
 StaticPopupDialogs["WM_LOOTCOUNCIL_DELETE"] = {
-    text = "%s", button1 = YES or "Yes", button2 = NO or "No",
+    text = "%s", button1 = LC.GameText("YES", "Yes"), button2 = LC.GameText("NO", "No"),
     OnAccept = function(self, data) if data then LC.DeleteEntry(data) end end,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
@@ -283,7 +283,7 @@ function LC:EntryMenu(anchor, e)
                         .. ", " .. date("%d %b %Y", entry.t or 0) .. ") from the loot history?", nil, entry)
                 end
             end },
-            { CANCEL or "Cancel", function() end },
+            { LC.GameText("CANCEL", "Cancel"), function() end },
         }) do
             local b = CreateFrame("Button", nil, menu, "UIPanelButtonTemplate")
             b:SetSize(156, 20)

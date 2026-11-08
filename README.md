@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.79 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.80 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1188,7 +1188,7 @@ works with RCLootCouncil and awards like Gargul. Open it with
   give it to someone else or delete it; `/wmachine council undo` deletes
   your last award. When you made the award, the raid's RCLootCouncil and
   Watching Machine users get the change too
-- **Shared with the guild** (3.79): guildmates running Watching Machine
+- **Shared with the guild** (3.80): guildmates running Watching Machine
   keep the same loot history. Awards made or recorded during a raid
   (council and roll-off awards, awards an RCLootCouncil master looter
   logs) and every edit or delete go to the guild as they happen. At login
@@ -1493,7 +1493,7 @@ Copy-paste release announcements for Discord and CurseForge are in
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
 
-### Version 3.79
+### Version 3.80
 - **Loot Council part 5**: the loot history shared between guildmates running Watching Machine: live awards, edits and deletes as they happen, and a catch-up at login
 
 ### Version 3.78
