@@ -390,7 +390,8 @@ function LC:RefreshVoting()
     for _, b in ipairs({ vote.awardBtn, vote.deBtn, vote.endBtn }) do b:SetShown(isML) end
     if isML then
         local can = LC.voteSelected and s.candidates[LC.voteSession] and s.candidates[LC.voteSession][LC.voteSelected]
-        if can then vote.awardBtn:Enable(); vote.deBtn:Enable() else vote.awardBtn:Disable(); vote.deBtn:Disable() end
+        if can then vote.awardBtn:Enable() else vote.awardBtn:Disable() end
+        if can or LC.Disenchanter() then vote.deBtn:Enable() else vote.deBtn:Disable() end
     end
 end
 
@@ -408,7 +409,13 @@ StaticPopupDialogs["WM_LOOTCOUNCIL_AWARD"] = {
 function LC:AskAward(reason)
     local s = RC.session
     local item = s and s.items[LC.voteSession]
-    local c = item and LC.voteSelected and s.candidates[LC.voteSession][LC.voteSelected]
+    local name = LC.voteSelected
+    if reason == "Disenchant" and LC.Disenchanter() then name = LC.Disenchanter() end
+    local c = item and name and s.candidates[LC.voteSession][name]
+    if item and name and not c then
+        c = { name = name, response = "NOTHING", votes = 0, voters = {} }
+        s.candidates[LC.voteSession][name] = c
+    end
     if not c then return end
     local how = reason or RC:Response(item.typeCode, c.realResponse or c.response).text
     local text = "Award " .. (item.link or "?") .. " to " .. LC.Short(c.name) .. " (" .. tostring(how) .. ")?"
@@ -490,12 +497,15 @@ local function MLRow(i)
     row.icon:SetPoint("LEFT", 2, 0)
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.text:SetPoint("LEFT", 24, 0)
-    row.text:SetPoint("RIGHT", -60, 0)
+    row.text:SetPoint("RIGHT", -106, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetWordWrap(false)
     row.btn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row.btn:SetSize(54, 18)
     row.btn:SetPoint("RIGHT", -2, 0)
+    row.btn2 = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row.btn2:SetSize(44, 18)
+    row.btn2:SetPoint("RIGHT", row.btn, "LEFT", -2, 0)
     row:SetScript("OnEnter", function(self) ItemTip(self, self.link) end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     mlPanel.list.rows[i] = row
@@ -507,7 +517,10 @@ function LC:MLLines()
     local out = {}
     local ML = LC.ML
     for i, p in ipairs(ML.pending) do
-        out[#out + 1] = { link = p.link, text = p.link, button = "Remove", onClick = function() ML:Remove(i) end }
+        out[#out + 1] = { link = p.link, text = p.link, button = "Remove", onClick = function() ML:Remove(i) end,
+            button2 = "Roll", onClick2 = function()
+                if LC.Roll:Start(p.link) then LC.Roll.cur.boss, LC.Roll.cur.slot = p.boss, p.slot; ML:Remove(i) end
+            end }
     end
     local waiting = {}
     for _, t in ipairs(ML.toTrade) do if not t.done then waiting[#waiting + 1] = t end end
@@ -540,12 +553,21 @@ function LC:RefreshML()
             else
                 row.btn:Hide()
             end
+            if l.button2 then
+                row.btn2:SetText(l.button2)
+                row.btn2:SetScript("OnClick", l.onClick2)
+                row.btn2:Show()
+            else
+                row.btn2:Hide()
+            end
             row:Show()
         elseif row then
             row:Hide()
         end
     end
-    LC.mlStatus = #LC.ML.pending .. " to send" .. (LC.ML:IsML() and "" or "  |cffff8844(you're not the master looter)|r")
+    local de = DB().disenchanter
+    LC.mlStatus = #LC.ML.pending .. " to send" .. (de and de ~= "" and ("   disenchanter: " .. LC.Short(de)) or "")
+        .. (LC.ML:IsML() and "" or "  |cffff8844(you're not the master looter)|r")
     if mlPanel.status then mlPanel.status:SetText(LC.mlStatus) end
 end
 
@@ -555,8 +577,8 @@ function LC:ShowML()
             width = 440, height = 320, minHeight = 200, scroll = false, resizable = { 360, 200, 900, 900 },
             onRefresh = function() LC:RefreshML() end, onResize = function() LC:RefreshML() end })
         local L = mlPanel.layout
-        L:Note("Items for the council to vote on. They come from the loot window (your quality and up); Alt-click any"
-            .. " item to add it. Award from the voting frame.")
+        L:Note("Items for the council to vote on (|cFFFFFF00Send for votes|r) or to roll for (|cFFFFFF00Roll|r)."
+            .. " They come from the loot window (your quality and up); Alt-click any item to add it.")
         local fill = L:Fill(120)
         mlPanel.list = CreateFrame("Frame", nil, fill)
         mlPanel.list:SetAllPoints(fill)
@@ -565,11 +587,223 @@ function LC:ShowML()
         mlPanel:AddFooterButton({ text = "Send for votes", width = 120, onClick = function() LC.ML:Start(false) end,
             tooltip = { "Send for votes", "Sends these items to the raid: everyone answers (RCLootCouncil or Watching Machine) and the council votes." } }, "RIGHT")
         mlPanel:AddFooterButton({ text = "Clear", width = 60, onClick = function() LC.ML:Clear() end }, "RIGHT")
+        mlPanel:AddFooterButton({ text = "Disenchanter", width = 100, onClick = function() LC:AskDisenchanter() end,
+            tooltip = { "Disenchanter", "Who gets items sent to Disenchant (from the voting frame or a roll-off)." } }, "RIGHT")
         mlPanel:Finish()
     end
     if not mlPanel:IsShown() then mlPanel:Show() end
     self:RefreshML()
 end
+
+-- ============================================
+-- THE DISENCHANTER
+-- ============================================
+
+-- The disenchanter, when they're in the group (or set and we're alone)
+function LC.Disenchanter()
+    local de = DB().disenchanter
+    if not de or de == "" then return nil end
+    if IsInGroup and IsInGroup() and LC.ML and not LC.ML.GroupByName()[de] then return nil end
+    return de
+end
+
+StaticPopupDialogs["WM_LOOTCOUNCIL_INPUT"] = {
+    text = "%s", button1 = OKAY or "OK", button2 = CANCEL or "Cancel", hasEditBox = true, maxLetters = 60,
+    OnShow = function(self, data)
+        local e = self.editBox or self.EditBox
+        if e and data then e:SetText(data.value or ""); e:HighlightText() end
+    end,
+    OnAccept = function(self, data)
+        local e = self.editBox or self.EditBox
+        if e and data and data.fn then data.fn(strtrim(e:GetText() or "")) end
+    end,
+    EditBoxOnEnterPressed = function(self)
+        local p = self:GetParent()
+        if p and p.data and p.data.fn then p.data.fn(strtrim(self:GetText() or "")) end
+        if p then p:Hide() end
+    end,
+    EditBoxOnEscapePressed = function(self) local p = self:GetParent(); if p then p:Hide() end end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+local function Ask(text, value, fn)
+    if StaticPopup_Show then StaticPopup_Show("WM_LOOTCOUNCIL_INPUT", text, nil, { value = value, fn = fn }) end
+end
+LC.Ask = Ask
+
+function LC.SetDisenchanter(name)
+    DB().disenchanter = (name and name ~= "") and LC.Key(name) or nil
+    WM:ModulePrint("LootCouncil", DB().disenchanter and ("Disenchanter: " .. LC.Short(DB().disenchanter)) or "No disenchanter.")
+    if LC.RefreshML then LC:RefreshML() end
+    if LC.RefreshVoting then LC:RefreshVoting() end
+end
+
+function LC:AskDisenchanter()
+    Ask("Who disenchants? (empty: nobody)", DB().disenchanter and LC.Short(DB().disenchanter) or "", LC.SetDisenchanter)
+end
+
+-- ============================================
+-- THE ROLL WINDOW (master looter) AND ROLL BUTTONS (raiders)
+-- ============================================
+
+local rolls
+
+local function RollRow(i)
+    local row = rolls.list.rows[i]
+    if row then return row end
+    row = CreateFrame("Button", nil, rolls.list)
+    row:SetHeight(ROW_H)
+    row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
+    row:SetPoint("RIGHT", rolls.list, "RIGHT", 0, 0)
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(row)
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    row.sel = row:CreateTexture(nil, "BACKGROUND")
+    row.sel:SetAllPoints(row)
+    row.sel:SetColorTexture(1, 0.82, 0, 0.15)
+    row.cells = {}
+    local x = 4
+    for _, col in ipairs({ { "name", 110 }, { "roll", 50 }, { "kind", 50 }, { "last", 0 } }) do
+        local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", x, 0)
+        if col[2] > 0 then fs:SetWidth(col[2] - 4) else fs:SetPoint("RIGHT", -4, 0) end
+        fs:SetJustifyH("LEFT")
+        fs:SetWordWrap(false)
+        row.cells[col[1]] = fs
+        x = x + col[2]
+    end
+    row:SetScript("OnClick", function(self) if self.r then LC.rollSelected = self.r.name; LC:RefreshRolls() end end)
+    row:SetScript("OnEnter", function(self)
+        if not self.r then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("|c" .. ClassHex(self.r.class) .. LC.Short(self.r.name) .. "|r")
+        LC:AddLootTooltip(GameTooltip, self.r.name, DB().recentDays)
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rolls.list.rows[i] = row
+    return row
+end
+
+function LC:RefreshRolls()
+    if not rolls or not rolls:IsShown() then return end
+    local cur = LC.Roll.cur
+    local list = LC.Roll:Sorted()
+    if not LC.rollSelected and list[1] then LC.rollSelected = list[1].name end
+    if cur then
+        local left = cur.open and math.max(0, cur.ends - time()) or nil
+        LC.rollHead = (cur.link or "?") .. (left and ("   |cffffffff" .. left .. "s left|r") or (cur.awarded and
+            ("   |cff33ff33awarded to " .. LC.Short(cur.awarded) .. "|r") or "   |cff888888rolls closed|r"))
+    else
+        LC.rollHead = "|cff888888No roll-off.|r"
+    end
+    rolls.head:SetText(LC.rollHead)
+    local visible = math.max(1, math.floor((rolls.list:GetHeight() or 0) / ROW_H))
+    for i = 1, math.max(visible, #rolls.list.rows) do
+        local r = i <= visible and list[i]
+        local row = r and RollRow(i) or rolls.list.rows[i]
+        if r then
+            row.r = r
+            row.cells.name:SetText("|c" .. ClassHex(r.class) .. LC.Short(r.name) .. "|r")
+            row.cells.roll:SetText(tostring(r.roll) .. (r.repeat_ and " |cffff4444(again)|r" or ""))
+            row.cells.kind:SetText(r.kind)
+            local last = LC.LastLoot(r.name)
+            row.cells.last:SetText(last and (LC.ItemText(last) .. " |cff888888" .. LC.Ago(last.t) .. "|r") or "|cff888888no loot yet|r")
+            row.sel:SetShown(r.name == LC.rollSelected)
+            row:Show()
+        elseif row then
+            row.r = nil
+            row:Hide()
+        end
+    end
+    LC.rollStatus = #list .. " rolls" .. (LC.rollSelected and ("   selected: " .. LC.Short(LC.rollSelected)) or "")
+    if rolls.status then rolls.status:SetText(LC.rollStatus) end
+end
+
+function LC:ShowRolls()
+    if not rolls then
+        rolls = WM.UI:CreatePanel({ name = "WM_LootRollFrame", title = "Loot Council: roll-off", titleColor = "FFB347",
+            width = 460, height = 340, minHeight = 220, scroll = false, resizable = { 380, 220, 900, 900 },
+            onRefresh = function() LC:RefreshRolls() end, onResize = function() LC:RefreshRolls() end })
+        local L = rolls.layout
+        local row = L:Row(22)
+        rolls.head = row:Text({ text = function() return LC.rollHead or "" end, font = "GameFontNormal" }, 0)
+        row = L:Row(16)
+        row:Text({ text = "|cffffd100Player|r" }, 4)
+        row:Text({ text = "|cffffd100Roll|r" }, 114)
+        row:Text({ text = "|cffffd100Type|r" }, 164)
+        row:Text({ text = "|cffffd100Last loot|r" }, 214)
+        local fill = L:Fill(120)
+        rolls.list = CreateFrame("Frame", nil, fill)
+        rolls.list:SetAllPoints(fill)
+        rolls.list.rows = {}
+        rolls.status = rolls:AddFooterText({ text = function() return LC.rollStatus or "" end }, "LEFT")
+        rolls:AddFooterButton({ text = "Stop", width = 60, onClick = function() LC.Roll:Stop() end,
+            tooltip = { "Stop", "Ends the roll-off now (\"Stop your rolls!\")." } }, "RIGHT")
+        rolls:AddFooterButton({ text = "Disenchant", width = 90, onClick = function()
+                local de = LC.Disenchanter() or LC.rollSelected
+                if de then LC.Roll:Award(de, "Disenchant") end
+            end,
+            tooltip = { "Disenchant", "Sends the item to the disenchanter (or the selected player), logged as Disenchant." } }, "RIGHT")
+        rolls:AddFooterButton({ text = "Award", width = 70, onClick = function()
+                if LC.rollSelected then LC.Roll:Award(LC.rollSelected) end
+            end,
+            tooltip = { "Award", "Awards the item to the selected player for their roll: from the loot window, or by trade. Announced and logged with the rolls." } }, "RIGHT")
+        rolls:Finish()
+    end
+    LC.rollSelected = nil
+    if not rolls:IsShown() then rolls:Show() end
+    self:RefreshRolls()
+end
+
+local prompt
+
+function LC:ShowRollPrompt()
+    local p = LC.Roll.prompt
+    if not p then return end
+    if not prompt then
+        prompt = CreateFrame("Frame", "WM_LootRollPrompt", UIParent, "BackdropTemplate")
+        prompt:SetSize(330, 74)
+        prompt:SetPoint("TOP", 0, -220)
+        prompt:SetFrameStrata("DIALOG")
+        prompt:SetMovable(true)
+        prompt:EnableMouse(true)
+        prompt:RegisterForDrag("LeftButton")
+        prompt:SetScript("OnDragStart", prompt.StartMoving)
+        prompt:SetScript("OnDragStop", prompt.StopMovingOrSizing)
+        if WM.SkinCard then WM:SkinCard(prompt, { 1, 0.7, 0.28 }); WM:RegisterSkinnedCard(prompt, { 1, 0.7, 0.28 }) end
+        prompt.icon = CreateFrame("Button", nil, prompt)
+        prompt.icon:SetSize(36, 36)
+        prompt.icon:SetPoint("TOPLEFT", 10, -10)
+        prompt.icon.tex = prompt.icon:CreateTexture(nil, "ARTWORK")
+        prompt.icon.tex:SetAllPoints()
+        prompt.icon:SetScript("OnEnter", function(self) ItemTip(self, LC.Roll.prompt and LC.Roll.prompt.link) end)
+        prompt.icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        prompt.text = prompt:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        prompt.text:SetPoint("TOPLEFT", prompt.icon, "TOPRIGHT", 8, 0)
+        prompt.text:SetPoint("RIGHT", -10, 0)
+        prompt.text:SetJustifyH("LEFT")
+        prompt.text:SetWordWrap(false)
+        local x = 54
+        for _, b in ipairs({ { "Roll MS", "MS" }, { "Roll OS", "OS" }, { PASS or "Pass", nil } }) do
+            local btn = CreateFrame("Button", nil, prompt, "UIPanelButtonTemplate")
+            btn:SetSize(80, 20)
+            btn:SetPoint("BOTTOMLEFT", x, 10)
+            btn:SetText(b[1])
+            btn:SetScript("OnClick", function() LC.Roll:RollFor(b[2]) end)
+            x = x + 84
+        end
+        prompt:SetScript("OnUpdate", function(self)
+            local pr = LC.Roll.prompt
+            if not pr or time() > pr.ends + 2 then LC.Roll.prompt = nil; self:Hide() end
+        end)
+    end
+    local _, _, _, _, _, _, _, _, _, tex = ((C_Item and C_Item.GetItemInfo) or GetItemInfo)(p.link)
+    prompt.icon.tex:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
+    prompt.text:SetText(p.link .. (p.note and p.note ~= "" and ("  |cffaaaaaa" .. p.note .. "|r") or ""))
+    prompt:Show()
+end
+
+function LC:HideRollPrompt() if prompt then prompt:Hide() end end
 
 -- ============================================
 -- WIRING
@@ -596,4 +830,6 @@ function LC:HideFrames()
     if resp then resp:Hide() end
     if vote then vote:Hide() end
     if mlPanel then mlPanel:Hide() end
+    if rolls then rolls:Hide() end
+    if prompt then prompt:Hide() end
 end

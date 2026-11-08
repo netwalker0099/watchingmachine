@@ -190,20 +190,40 @@ end
 -- ============================================
 
 -- Hand an item over from the open loot window (master loot)
-function ML:GiveFromLoot(item, winner)
-    local p = self.sessionItems and self.sessionItems[item.session]
-    if not p or not p.slot or not GiveMasterLoot or not GetMasterLootCandidate then return false end
-    local link = GetLootSlotLink and GetLootSlotLink(p.slot)
-    if not link or ItemString(link) ~= p.string then return false end
+-- Give an item from the open loot window (master loot): the slot holding
+-- this item string (the hinted slot first)
+function ML:GiveFromLoot(itemString, winner, slotHint)
+    if not GiveMasterLoot or not GetMasterLootCandidate or not itemString then return false end
+    local slots = {}
+    if slotHint then slots[1] = slotHint end
+    for s = 1, tonumber(GetNumLootItems and GetNumLootItems()) or 0 do slots[#slots + 1] = s end
     local short = LC.Short(winner)
-    for i = 1, 40 do
-        local cand = GetMasterLootCandidate(p.slot, i)
-        if cand and (cand == short or LC.Key(cand) == winner) then
-            GiveMasterLoot(p.slot, i)
-            return true
+    for _, slot in ipairs(slots) do
+        local link = GetLootSlotLink and GetLootSlotLink(slot)
+        if link and ItemString(link) == itemString then
+            for i = 1, 40 do
+                local cand = GetMasterLootCandidate(slot, i)
+                if cand and (cand == short or LC.Key(cand) == winner) then
+                    GiveMasterLoot(slot, i)
+                    return true
+                end
+            end
+            return false
         end
     end
     return false
+end
+
+-- Hand an awarded item over: from the loot window when it's there,
+-- otherwise queued for a trade (opened now if the winner is close)
+function ML:HandOver(link, winner, slotHint)
+    local s = ItemString(link)
+    if self:GiveFromLoot(s, winner, slotHint) then return "loot" end
+    if winner == MyKey() then return "kept" end
+    self.toTrade[#self.toTrade + 1] = { winner = winner, itemID = s and tonumber(s:match("^(%d+)")), link = link, t = Now() }
+    self:TryTrade(winner)
+    if LC.RefreshML then LC:RefreshML() end
+    return "trade"
 end
 
 -- RCLootCouncil's history entry for an award
@@ -239,13 +259,9 @@ function ML:Award(ses, winner, reason)
     local cand = s.candidates[ses] and s.candidates[ses][winner]
     local test = self.test or RC.local_
     -- Give it: from the loot window, else by trade
-    local given = false
     if not test then
-        given = self:GiveFromLoot(item, winner)
-        if not given and winner ~= MyKey() then
-            self.toTrade[#self.toTrade + 1] = { winner = winner, itemID = item.itemID, link = item.link, t = Now() }
-            self:TryTrade(winner)
-        end
+        local p = self.sessionItems and self.sessionItems[ses]
+        self:HandOver(item.link, winner, p and p.slot)
     end
     -- Re-awarded: the earlier award's history goes
     if item.historyId and not test then RC:Send("delete_history", { item.historyId }) end

@@ -126,8 +126,11 @@ local function MakeRow(list, i)
         row.cols[c] = fs
         x = x + spec[1]
     end
-    row:SetScript("OnClick", function(self)
-        if self.player then
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function(self, button)
+        if button == "RightButton" and self.entry then
+            LC:EntryMenu(self, self.entry)
+        elseif self.player then
             LC:ShowPlayer(self.player)
         elseif self.entry and self.entry.to then
             LC:ShowPlayer(self.entry.to)
@@ -139,7 +142,7 @@ local function MakeRow(list, i)
         if e then
             if e.link then GameTooltip:SetHyperlink(e.link) else GameTooltip:AddLine(ItemText(e)) end
             LC:AddEntryLines(GameTooltip, e)
-            GameTooltip:AddLine("Click: this player's loot", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine("Click: this player's loot.  Right-click: change or delete", 0.5, 0.5, 0.5)
         elseif self.player then
             GameTooltip:AddLine(LC.Short(self.player))
             LC:AddLootTooltip(GameTooltip, self.player)
@@ -247,6 +250,50 @@ function LC:CreateUI()
         tooltip = { "Import now", "Adds new awards from Gargul and RCLootCouncil (their saved history, when they're installed). Each award is added once; the same award recorded by both is merged." } }, "RIGHT")
     panel:Finish()
     return panel
+end
+
+-- Right-click an award: give it to someone else, or delete it
+local menu
+StaticPopupDialogs["WM_LOOTCOUNCIL_DELETE"] = {
+    text = "%s", button1 = YES or "Yes", button2 = NO or "No",
+    OnAccept = function(self, data) if data then LC.DeleteEntry(data) end end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+function LC:EntryMenu(anchor, e)
+    if not menu then
+        menu = CreateFrame("Frame", "WM_LootEntryMenu", UIParent, "BackdropTemplate")
+        menu:SetSize(170, 74)
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        if WM.SkinCard then WM:SkinCard(menu, { 1, 0.7, 0.28 }) end
+        menu.buttons = {}
+        for i, spec in ipairs({
+            { "Change winner...", function(entry)
+                if LC.Ask then LC.Ask("Give " .. LC.ItemText(entry) .. " to:", "", function(name)
+                    if name ~= "" and LC.ChangeWinner(entry, name) then
+                        WM:ModulePrint("LootCouncil", LC.ItemText(entry) .. " is now " .. LC.Short(LC.Key(name)) .. "'s.")
+                    end
+                end) end
+            end },
+            { "Delete award", function(entry)
+                if StaticPopup_Show then
+                    StaticPopup_Show("WM_LOOTCOUNCIL_DELETE", "Delete " .. LC.ItemText(entry) .. " (" .. (entry.to and LC.Short(entry.to) or "disenchanted")
+                        .. ", " .. date("%d %b %Y", entry.t or 0) .. ") from the loot history?", nil, entry)
+                end
+            end },
+            { CANCEL or "Cancel", function() end },
+        }) do
+            local b = CreateFrame("Button", nil, menu, "UIPanelButtonTemplate")
+            b:SetSize(156, 20)
+            b:SetPoint("TOP", 0, -6 - (i - 1) * 22)
+            b:SetText(spec[1])
+            b:SetScript("OnClick", function() menu:Hide(); spec[2](menu.entry) end)
+            menu.buttons[i] = b
+        end
+    end
+    menu.entry = e
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", anchor, "CENTER", 0, 0)
+    menu:Show()
 end
 
 function LC:Toggle()
@@ -380,7 +427,7 @@ end
 -- COMMANDS, SETUP
 -- ============================================
 
--- /wmachine council [history|players|import|vote|test [n]|endtest|sendtest [n]|ml|add <item>|<name>]
+-- /wmachine council [history|players|import|vote|test [n]|endtest|sendtest [n]|ml|add <item>|roll [item]|de [name]|undo|<name>]
 function LC:Command(arg)
     arg = strtrim(arg or "")
     local low = arg:lower()
@@ -406,6 +453,19 @@ function LC:Command(arg)
             LC.ML:Add(link or ("|cffa335ee|Hitem:" .. id .. "|h[Item " .. id .. "]|h|r"), nil, "Test")
         end
         if LC.ML:Start(true) then WM:ModulePrint("LootCouncil", "Test loot sent to your group for answers and votes. Awards are announced as tests and aren't given or logged.") end
+    elseif low:match("^roll") then
+        local link = arg:match("^%S+%s+(.+)$")
+        if link then LC.Roll:Start(link) else LC:ShowRolls() end
+    elseif low:match("^de ") or low == "de" or low:match("^disenchanter") then
+        local name = arg:match("^%S+%s+(.+)$")
+        if name then LC.SetDisenchanter(name) else LC:AskDisenchanter() end
+    elseif low == "undo" then
+        local e = LC.LastOwnAward()
+        if e and LC.DeleteEntry(e) then
+            WM:ModulePrint("LootCouncil", "Deleted your last award: " .. LC.ItemText(e) .. " to " .. (e.to and LC.Short(e.to) or "the disenchanter") .. ".")
+        else
+            WM:ModulePrint("LootCouncil", "No award of yours in the last 3 hours.")
+        end
     elseif low == "ml" or low == "master" then
         LC:ShowML()
     elseif low:match("^add ") then
@@ -506,6 +566,31 @@ function LC:SetupPage(L)
     L:Checkbox({ label = "Open a trade with the winner (when not given from the loot window)", get = function() return db.mlAutoTrade end,
         set = function(v) db.mlAutoTrade = v end,
         tooltip = { "Trade", "When the item is in your bags, the trade opens with the winner if they're close, and the item goes in by itself. The master looter panel lists awards still to trade." } })
+    L:Header("Roll-offs")
+    L:Note("Instead of a council vote, an item can be rolled for (Gargul-style): |cFFFFFF00Roll|r on the master looter"
+        .. " panel, or |cFFFFFF00/wmachine council roll <item>|r. It's announced with a countdown, everyone's /roll is"
+        .. " read (main spec first, then off spec), and the roll window shows each roller's last loot. Award gives it"
+        .. " from the loot window or by trade; Disenchant sends it to your disenchanter. Raiders running Watching"
+        .. " Machine get Roll MS / Roll OS / Pass buttons.")
+    L:Slider({ label = "Seconds to roll", min = 5, max = 60, step = 1, width = 220,
+        get = function() return db.rollSeconds end, set = function(v) db.rollSeconds = v end })
+    L:EditBox({ label = "Announcement note:", width = 220, maxLetters = 80,
+        get = function() return db.rollNote or "" end, set = function(v) db.rollNote = v end,
+        tooltip = { "Note", "Added to the roll announcement." } })
+    L:Slider({ label = "Main spec rolls up to", min = 50, max = 1000, step = 1, width = 220,
+        get = function() return db.rollMS end, set = function(v) db.rollMS = v end,
+        tooltip = { "Main spec", "/roll 1-this counts as main spec (100 is a plain /roll)." } })
+    L:Slider({ label = "Off spec rolls up to", min = 50, max = 1000, step = 1, width = 220,
+        get = function() return db.rollOS end, set = function(v) db.rollOS = v end,
+        tooltip = { "Off spec", "/roll 1-this counts as off spec (99 by default)." } })
+    L:Checkbox({ label = "Start and end as a raid warning (when you're leader or assistant)", get = function() return db.rollWarning end,
+        set = function(v) db.rollWarning = v end })
+    L:Checkbox({ label = "Show Roll MS / Roll OS / Pass buttons when someone starts a roll-off", get = function() return db.rollButtons end,
+        set = function(v) db.rollButtons = v end,
+        tooltip = { "Roll buttons", "For raiders: a small window with the item and a button for each kind of roll." } })
+    L:Note("|cFFFFFFFFEditing awards:|r right-click an award in the loot history to give it to someone else or delete it;"
+        .. " |cFFFFFF00/wmachine council undo|r deletes your last award. When you made the award, the raid's"
+        .. " RCLootCouncil and Watching Machine users get the change too.")
     L:Slider({ label = "Recent loot covers (days)", min = 7, max = 90, step = 1, width = 220,
         get = function() return db.recentDays end, set = function(v) db.recentDays = v end,
         tooltip = { "Recent loot", "How far back tooltips list a player's loot (the roster, and later the voting frame)." } })

@@ -2,9 +2,33 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.77** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.78** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.78
+
+### Loot Council part 4: roll-offs, the disenchanter, editing awards
+
+- **Roll-offs** (Gargul-style): *Roll* on the master looter panel or
+  `/wmachine council roll <item>`. Announced with your note (a raid warning
+  when you're leader or assistant), counted down in the last seconds, then
+  "Stop your rolls!" (rolls in the next second still count).
+- Every /roll in the group is read: 1-100 main spec, 1-99 off spec (both
+  settings); a repeat roll of the same kind is marked and doesn't count.
+- **Roll window**: main spec first, highest first, with each roller's last
+  loot; hover for their last 30 days. *Award* gives it from the loot window
+  or by trade, announces "[item] was awarded to Name for MS roll (77)!",
+  and logs it with every roll (RCLootCouncil users record it too).
+- **Roll buttons** for raiders running Watching Machine: *Roll MS*, *Roll
+  OS*, *Pass*, when the master looter or a leader starts a roll-off.
+- **Disenchanter**: set on the master looter panel or with `/wmachine
+  council de <name>`. *Disenchant* in the voting frame or the roll window
+  sends items to them, logged as Disenchant.
+- **Editing awards**: right-click an award in the loot history to give it to
+  someone else or delete it; `/wmachine council undo` deletes your last
+  award. Your own awards are corrected in the raid's history too.
+- Awards with the same time now list newest first.
 
 ## 3.77
 

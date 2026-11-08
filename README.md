@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.77 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.78 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1170,10 +1170,28 @@ works with RCLootCouncil and awards like Gargul. Open it with
   - **Test loot**: `/wmachine council sendtest [n]` sends test items to your
     group for real answers and votes; awards are announced as tests and
     nothing is given or logged
-- Coming next: Gargul-style roll-offs, then sharing the loot history
-  between Watching Machine users
+- **Roll-offs** (3.78, Gargul-style): *Roll* on the master looter panel,
+  or `/wmachine council roll <item>`. Announced (as a raid warning when
+  you're leader or assistant) with your note, counted down in the last 5
+  seconds, then "Stop your rolls!". Every /roll in the group is read:
+  1-100 is main spec, 1-99 off spec (both settings); a second roll of the
+  same kind doesn't count. The roll window lists them main spec first,
+  highest first, each with the player's last loot (hover for their last
+  30 days). *Award* gives it from the loot window or by trade, announces
+  it with the roll and logs it with every roll; *Disenchant* sends it to
+  the disenchanter. Raiders running Watching Machine get *Roll MS / Roll
+  OS / Pass* buttons
+- **The disenchanter** (3.78): set on the master looter panel or with
+  `/wmachine council de <name>`; *Disenchant* in the voting frame or roll
+  window sends items to them, logged as Disenchant (not their loot)
+- **Editing awards** (3.78): right-click an award in the loot history to
+  give it to someone else or delete it; `/wmachine council undo` deletes
+  your last award. When you made the award, the raid's RCLootCouncil and
+  Watching Machine users get the change too
+- Coming next: sharing the loot history between Watching Machine users
 - Commands: `/wmachine council players`, `import`, `vote`, `test [n]`,
-  `endtest`, `sendtest [n]`, `ml`, `add <item>`, or a player's name
+  `endtest`, `sendtest [n]`, `ml`, `add <item>`, `roll [item]`,
+  `de <name>`, `undo`, or a player's name
 
 ## Global Theme System
 
@@ -1465,6 +1483,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.78
+- **Loot Council part 4**: Gargul-style roll-offs (announced and counted down, every /roll read as main or off spec, a roll window with each roller's last loot, roll buttons for Watching Machine raiders), a disenchanter, and editing or undoing awards from the loot history
 
 ### Version 3.77
 - **Loot Council part 3**: running the session as master looter (items from the loot window or Alt-click, sent for votes, awarded from the loot window or by trade, announced and logged), `/wmachine council sendtest` sends test loot to your group, and items you can't use are passed on for you instead of shown

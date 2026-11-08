@@ -28,9 +28,9 @@ what still needs settling before it's built.
 16. Loot Council (RCLootCouncil-compatible council + Gargul-style awarding):
     part 1, the loot history and imports (3.75); part 2, the RCLootCouncil
     wire format and the council side (3.76); part 3, the master looter
-    side and auto-pass (3.77). Next: part 4, roll-offs, disenchanter, award
-    edit and undo; part 5, the loot history shared between Watching Machine
-    users
+    side and auto-pass (3.77); part 4, roll-offs, disenchanter, award edit
+    and undo (3.78). Next: part 5, the loot history shared between
+    Watching Machine users
 
 ---
 

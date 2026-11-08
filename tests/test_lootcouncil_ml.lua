@@ -38,6 +38,7 @@ env.UnitGUID = function(u)
 end
 env.GetLootMethod = function() return "master", nil, 1 end          -- we're the loot master
 env.UnitIsGroupLeader = function(u) return u == "raid1" or u == "player" end
+env.UnitIsGroupAssistant = function() return false end
 env.GetGuildInfo = function() return "Socks and Sandals", "Officer", 1 end
 env.GetNumGuildMembers = function() return 3 end
 local guild = { { "Me-Nightslayer", "Officer", 1 }, { "Venhana-Nightslayer", "Officer", 1 }, { "Taslan-Nightslayer", "Raider", 3 } }
@@ -113,7 +114,7 @@ env.ERR_TRADE_COMPLETE = "Trade complete."
 
 env.WatchingMachineDB = { theme = "Default" }
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/LootCouncil.lua", "Modules/LootCouncilCodec.lua",
-    "Modules/LootCouncilRC.lua", "Modules/LootCouncilML.lua", "Modules/LootCouncilUI.lua", "Modules/LootCouncilFrames.lua" }) do
+    "Modules/LootCouncilRC.lua", "Modules/LootCouncilML.lua", "Modules/LootCouncilRoll.lua", "Modules/LootCouncilUI.lua", "Modules/LootCouncilFrames.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -273,6 +274,102 @@ check("test award: announced, not given, traded or logged", chat[#chat][1]:find(
 ML:End()
 Deliver()
 check("ended", RC.session == nil and not ML.test)
+
+-- ============ Roll-offs ============
+local Roll = LC.Roll
+env.RANDOM_ROLL_RESULT = "%s rolls %d (%d-%d)"
+chat, given, traded = {}, {}, {}
+loot = { "|cffa335ee|Hitem:30100::::::::70|h[Soul-Strider Boots]|h|r" }
+check("roll-off started", Roll:Start(loot[1], 20) == true and Roll.cur.open)
+check("announced with the note", chat[1] and chat[1][1]:find("You have 20 seconds to roll on", 1, true)
+    and chat[1][1]:find("/roll 99 for OS", 1, true) and chat[1][2] == "RAID_WARNING")
+WM:FlushAddonQueue()
+local prompted
+for _, m in ipairs(sent) do if m[1] == "WMLoot" and m[2]:find("^R%^30100") then prompted = true end end
+sent = {}
+check("raiders running Watching Machine told", prompted)
+check("the roll window opens", env.WM_LootRollFrame and env.WM_LootRollFrame:IsShown())
+check("a main spec roll", Roll:OnSystem("Taslan rolls 42 (1-100)") == true)
+Roll:OnSystem("Pug rolls 97 (1-99)")
+Roll:OnSystem("Venhana rolls 77 (1-100)")
+Roll:OnSystem("Taslan rolls 99 (1-100)")
+check("other ranges ignored", Roll:OnSystem("Venhana rolls 5 (1-50)") == false)
+check("not in the group: ignored", Roll:OnSystem("Stranger rolls 100 (1-100)") == false)
+local order = Roll:Sorted()
+check("main spec first, highest first, repeats last", order[1].name == "Venhana-Nightslayer" and order[2].name == "Taslan-Nightslayer"
+    and order[2].roll == 42 and order[3].name == "Pug-Nightslayer" and order[4].repeat_)
+-- The countdown and the end
+Roll.cur.ends = os.time() + 3
+Roll:Tick({})
+check("countdown said", chat[#chat][1] == "3")
+Roll.cur.ends = os.time() - 1
+Roll:Tick({})
+check("stopped", not Roll.cur.open and chat[#chat][1] == "Stop your rolls!")
+check("a roll in the second after the end still counts", Roll:OnSystem("Me rolls 12 (1-99)") == true)
+-- Award the roll
+local ok, where = Roll:Award("Venhana-Nightslayer")
+check("roll-off awarded from the loot window", ok and where == "loot" and given[1] and given[1][2] == "Venhana")
+check("roll-off award announced", chat[#chat][1]:find("was awarded to Venhana for MS roll (77)!", 1, true))
+local won = LC.LastLoot("Venhana")
+check("roll-off award logged with the rolls", won and won.itemID == 30100 and won.how == "Mainspec roll" and #won.rolls == 5)
+out = Deliver()
+check("RCLootCouncil users told", Find(out, "history") and Find(out, "history").args[2].response == "Mainspec roll")
+-- Raider side: the buttons
+Roll.prompt = nil
+local rolled = {}
+env.RandomRoll = function(lo, hi) rolled[#rolled + 1] = lo .. "-" .. hi end
+Roll:OnAddonMessage("WMLoot", "R^30027^20^/roll", "RAID", "Pug")
+check("not from a leader: no buttons", Roll.prompt == nil)
+Roll:OnAddonMessage("WMLoot", "R^30027^20^/roll for MS", "RAID", "Me")
+check("our own message: no buttons", Roll.prompt == nil)
+env.UnitIsGroupLeader = function(u) return u == "raid2" end
+Roll:OnAddonMessage("WMLoot", "R^30027^20^/roll for MS", "RAID", "Venhana")
+check("roll buttons from the leader", Roll.prompt and env.WM_LootRollPrompt and env.WM_LootRollPrompt:IsShown())
+Roll:RollFor("OS")
+check("Roll OS rolls 1-99", rolled[1] == "1-99" and not env.WM_LootRollPrompt:IsShown())
+Roll:OnAddonMessage("WMLoot", "R^30027^20^x", "RAID", "Venhana")
+Roll:OnAddonMessage("WMLoot", "S^30027", "RAID", "Venhana")
+check("stop closes the buttons", Roll.prompt == nil)
+env.UnitIsGroupLeader = function(u) return u == "raid1" or u == "player" end
+env.UnitIsGroupAssistant = function() return false end
+
+-- ============ The disenchanter ============
+LC.SetDisenchanter("Pug")
+check("disenchanter set", LC.Disenchanter() == "Pug-Nightslayer")
+loot = { "|cffa335ee|Hitem:30020::::::::70|h[Fire-Cord of the Magus]|h|r" }
+given = {}
+Roll:Start(loot[1], 20)
+Roll:Award(LC.Disenchanter(), "Disenchant")
+local de
+for _, e in ipairs(LC.ForPlayer("Pug")) do if e.itemID == 30020 then de = e end end
+check("disenchanted: given to the disenchanter, logged as a reason", given[1] and given[1][2] == "Pug" and de.how == "Disenchant" and de.reason)
+check("disenchanting isn't their last loot", LC.LastLoot("Pug") == nil or LC.LastLoot("Pug").itemID ~= 30020)
+Deliver()
+LC.SetDisenchanter("")
+check("disenchanter cleared", LC.Disenchanter() == nil)
+
+-- ============ Editing awards ============
+local award = LC.LastLoot("Venhana")
+sent = {}
+check("change winner", LC.ChangeWinner(award, "Taslan") ~= nil and award.deleted)
+check("the new owner has it", LC.LastLoot("Taslan").itemID == 30100 and LC.LastLoot("Taslan").how == "Mainspec roll")
+out = Deliver()
+check("the raid told: new history for them", Find(out, "history") and Find(out, "history").args[1] == "Taslan-Nightslayer")
+check("not duplicated when our message comes back", #LC.ForPlayer("Taslan") == 1 or LC.ForPlayer("Taslan")[2].itemID ~= 30100)
+local mine = LC.LastLoot("Taslan")
+check("delete", LC.DeleteEntry(mine) and LC.LastLoot("Taslan") == nil or LC.LastLoot("Taslan") ~= mine)
+check("undo: the last award we made", LC.LastOwnAward() ~= mine)
+LC:Command("undo")
+check("undo command deletes it", LC.LastOwnAward() == nil or LC.LastOwnAward().deleted == nil)
+-- Right-click menu on a history row
+LC:Command("history")
+local row = env.WM_LootCouncilFrame.list.rows[1]
+if row and row.entry then
+    row:GetScript("OnClick")(row, "RightButton")
+    check("right-click opens the edit menu", env.WM_LootEntryMenu and env.WM_LootEntryMenu:IsShown() and env.WM_LootEntryMenu.entry == row.entry)
+else
+    check("history has a row to right-click", false)
+end
 
 -- ============ Not the master looter ============
 env.GetLootMethod = function() return "master", nil, 2 end

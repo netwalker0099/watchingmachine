@@ -40,6 +40,14 @@ local DEFAULTS = {
     mlTimeout = 60,          -- seconds raiders have to answer
     mlAnnounce = true,       -- awards announced to the raid
     mlAutoTrade = true,      -- open the trade with a winner when the item can't be given from the loot window
+    -- Roll-offs
+    rollSeconds = 20,        -- how long to roll
+    rollNote = "/roll for MS, /roll 99 for OS",
+    rollMS = 100,            -- /roll 1-100 is main spec
+    rollOS = 99,             -- /roll 1-99 is off spec
+    rollCountdown = 5,       -- count down the last seconds in raid chat
+    rollWarning = true,      -- announce the start and end as a raid warning (leader or assistant)
+    rollButtons = true,      -- raiders: Roll MS / Roll OS / Pass buttons when a roll-off starts
 }
 
 function LC.InitDB()
@@ -112,7 +120,12 @@ local function Rebuild()
             list[#list + 1] = e
         end
     end
-    for _, list in pairs(byPlayer) do table.sort(list, function(a, b) return (a.t or 0) > (b.t or 0) end) end
+    for _, list in pairs(byPlayer) do
+        table.sort(list, function(a, b)
+            if (a.t or 0) ~= (b.t or 0) then return (a.t or 0) > (b.t or 0) end
+            return (a.id or 0) > (b.id or 0)
+        end)
+    end
 end
 
 local listeners = {}
@@ -259,6 +272,68 @@ function LC.Add(e)
     if srcId then db.sources[srcId] = id end
     Changed()
     return id, not same
+end
+
+-- ============================================
+-- EDITING AWARDS
+-- ============================================
+-- Deleting an award, or giving it to someone else. When we made the award
+-- and we're in a group, everyone's history follows (RCLootCouncil's
+-- delete_history and history messages).
+
+local function MyKey() return LC.Key(UnitName("player")) end
+
+-- An award in RCLootCouncil's history format
+function LC.ToRCLC(e, newId)
+    return { lootWon = e.link or ("item:" .. tostring(e.itemID)), date = date("%Y/%m/%d", e.t or Now()),
+        time = date("%H:%M:%S", e.t or Now()), response = e.how, responseID = e.rid or 1,
+        color = e.color and { e.color[1], e.color[2], e.color[3], 1 } or nil, class = e.class, boss = e.boss,
+        instance = e.zone, votes = e.votes, note = e.note, isAwardReason = e.reason and true or false,
+        owner = e.by, id = newId or (Now() .. "-e" .. tostring(e.id)) }
+end
+
+-- Do we tell the group? (we awarded it, and we're in one)
+local function Tell(e)
+    return e.by == MyKey() and IsInGroup and IsInGroup() and LC.RC and LC.RC.Send
+end
+
+function LC.DeleteEntry(e)
+    if not e or e.deleted then return false end
+    e.deleted = true
+    if Tell(e) and e.src and e.src.rc then LC.RC:Send("delete_history", { e.src.rc }) end
+    Changed()
+    return true
+end
+
+-- Give an award to someone else: a new award (same item, when and how) for them
+function LC.ChangeWinner(e, name)
+    local to = LC.Key(name)
+    if not e or e.deleted or not to or to == e.to then return nil end
+    local tell = Tell(e)
+    local oldRc = e.src and e.src.rc
+    e.deleted = true
+    local copy = {}
+    for k, v in pairs(e) do copy[k] = v end
+    copy.id, copy.deleted, copy.to, copy.class = nil, nil, to, nil
+    copy.edited = Now()
+    local rcId = Now() .. "-e" .. tostring(e.id)
+    copy.src = { wm = "edit:" .. rcId, rc = tell and rcId or nil }
+    copy.srcKind = "wm"
+    local id = LC.Add(copy)
+    if tell then
+        if oldRc then LC.RC:Send("delete_history", { oldRc }) end
+        local entry = LC.ToRCLC(copy, rcId)
+        LC.RC:Send("history", { to, entry })
+        DB().sources["rc:" .. rcId] = id
+    end
+    Changed()
+    return id
+end
+
+-- The last award we made in the last 3 hours
+function LC.LastOwnAward()
+    local me, cutoff = MyKey(), Now() - 3 * 3600
+    for _, e in ipairs(LC.All(function(x) return x.by == me and (x.t or 0) >= cutoff end)) do return e end
 end
 
 -- ============================================
@@ -424,6 +499,7 @@ function LC:Initialize()
     if self.InitUI then self:InitUI() end
     if self.RC then self.RC:Init() end
     if self.ML then self.ML:Init() end
+    if self.Roll then self.Roll:Init() end
     if self.InitFrames then self:InitFrames() end
 end
 
@@ -432,6 +508,7 @@ function LC:OnModuleOff()
     if self.HideFrames then self:HideFrames() end
     if self.RC then self.RC:Stop() end
     if self.ML then self.ML:Stop() end
+    if self.Roll then self.Roll:Stop_All() end
 end
 
 function LC:OnModuleOn()

@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.77"
+WM.version = "3.78"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -1342,6 +1342,8 @@ local MODULE_INFO = {
             { text = "Test session (local)", desc = "Three test items with made-up answers, to try the response and voting frames. Nothing is sent.", func = function() Call("LootCouncil", "Command", "test") end },
             { text = "Send test loot to my group", desc = "Test items sent to your group for real answers and votes (you must be master looter or leader). Nothing is given or logged.", func = function() Call("LootCouncil", "Command", "sendtest") end },
             { text = "Master looter panel", desc = "The items waiting to be sent for votes, and awards waiting to be traded.", func = function() Call("LootCouncil", "Command", "ml") end },
+            { text = "Roll-off window", desc = "The current roll-off's rolls; start one with Roll on the master looter panel.", func = function() Call("LootCouncil", "Command", "roll") end },
+            { text = "Undo my last award", desc = "Deletes your last award (the last 3 hours) from everyone's history.", func = function() Call("LootCouncil", "Command", "undo") end },
         },
     },
     LootBrowser = {
@@ -2341,7 +2343,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
-    print("|cFFFFFF00/wmachine council|r - Loot Council: loot history, voting, awarding (council players / import / vote / test / sendtest / ml / add <item> / <player name>)")
+    print("|cFFFFFF00/wmachine council|r - Loot Council: loot history, voting, awarding (council players / import / vote / test / sendtest / ml / add <item> / roll <item> / de <name> / undo / <player name>)")
     print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / purge / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
