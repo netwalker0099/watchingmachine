@@ -247,6 +247,102 @@ local function Matches(rec, q)
         or (rec.custom.text or ""):lower():find(q, 1, true) or (rec.rankName or ""):lower():find(q, 1, true)
 end
 
+local function RosterOrder(a, b)
+    if (a.online and true or false) ~= (b.online and true or false) then return a.online and true or false end
+    if a.rankIndex ~= b.rankIndex then return (a.rankIndex or 99) < (b.rankIndex or 99) end
+    return a.name < b.name
+end
+
+local function RosterLine(rec, g, indent)
+    local grp = rec.group and g.groups[rec.group]
+    local tag = grp and (grp.main == rec.name and " |cFFFFD100(main)|r" or (grp.main ~= "" and " |cFF888888(alt)|r" or "")) or ""
+    local ban = rec.ban.on and " |cFFFF3333(banned)|r" or ""
+    return { rec = rec, indent = indent,
+        text = Colored(rec) .. tag .. ban .. "  |cFF888888" .. (rec.level or "") .. " " .. (rec.rankName or "") .. "|r",
+        right = LastOnline(rec) }
+end
+
+-- Which mains have their alts shown (this session)
+GR.expanded = GR.expanded or {}
+
+-- The roster with each main's alts under it: a main in the guild lists its
+-- alts in the guild beneath it when expanded (+ / -). Searching for an alt
+-- shows its main, opened at the alts that match.
+function GR:GroupedLines(matched, q)
+    local g, out = self:Guild(), {}
+    local searching = q and q ~= ""
+    local function MainOf(rec)
+        local grp = rec.group and g.groups[rec.group]
+        local main = grp and grp.main ~= "" and grp.main ~= rec.name and g.members[grp.main]
+        return main or nil
+    end
+    local isMatch, top, childMatches = {}, {}, {}
+    for _, rec in ipairs(matched) do isMatch[rec.name] = true end
+    for _, rec in ipairs(matched) do
+        local main = MainOf(rec)
+        if main then
+            childMatches[main.name] = true
+            if not isMatch[main.name] and not top[main.name] then top[main.name] = main end
+        else
+            top[rec.name] = rec
+        end
+    end
+    -- A main counts as online when any of its characters is
+    local function AltsOf(main)
+        local grp = g.groups[main.group]
+        local alts = {}
+        for _, n in ipairs(grp and grp.members or {}) do
+            local r = g.members[n]
+            if r and n ~= main.name then alts[#alts + 1] = r end
+        end
+        table.sort(alts, RosterOrder)
+        return alts
+    end
+    local list, altsOf, onAlt = {}, {}, {}
+    for _, rec in pairs(top) do
+        list[#list + 1] = rec
+        local grp = rec.group and g.groups[rec.group]
+        if grp and grp.main == rec.name then
+            altsOf[rec.name] = AltsOf(rec)
+            for _, a in ipairs(altsOf[rec.name]) do if a.online and not onAlt[rec.name] then onAlt[rec.name] = a end end
+        end
+    end
+    table.sort(list, function(a, b)
+        local ao, bo = (a.online or onAlt[a.name]) and true or false, (b.online or onAlt[b.name]) and true or false
+        if ao ~= bo then return ao end
+        return RosterOrder(a, b)
+    end)
+    for _, rec in ipairs(list) do
+        local line = RosterLine(rec, g, 0)
+        local alts = altsOf[rec.name]
+        if alts and #alts > 0 then
+            local open = self.expanded[rec.name] or (searching and childMatches[rec.name])
+            line.toggle = open and "-" or "+"
+            line.main = rec.name
+            line.text = line.text .. " |cFF888888[" .. #alts .. (#alts == 1 and " alt" or " alts") .. "]|r"
+            if not rec.online and onAlt[rec.name] then
+                line.right = "|cFF33FF33on " .. GR.Short(onAlt[rec.name].name) .. "|r"
+            end
+            out[#out + 1] = line
+            if open then
+                for _, a in ipairs(alts) do
+                    if not searching or isMatch[a.name] or isMatch[rec.name] then out[#out + 1] = RosterLine(a, g, 1) end
+                end
+            end
+        else
+            out[#out + 1] = line
+        end
+    end
+    if #out == 0 then out[1] = { text = "|cFF888888Nobody here" .. (searching and " matching that" or "") .. ".|r" } end
+    return out
+end
+
+-- Show or hide a main's alts
+function GR:ToggleAlts(main)
+    self.expanded[main] = not self.expanded[main] or nil
+    self:RefreshList()
+end
+
 -- The lines the current tab lists: { text, right, rec?, color? }
 function GR:TabLines()
     local g, out, q = self:Guild(), {}, self.searchText
@@ -257,23 +353,14 @@ function GR:TabLines()
         for _, rec in pairs(src) do
             if Matches(rec, q) and (not self.bannedOnly or self.tab == "roster" or rec.ban.on) then list[#list + 1] = rec end
         end
-        if self.tab == "roster" then
-            table.sort(list, function(a, b)
-                if a.online ~= b.online then return a.online end
-                if a.rankIndex ~= b.rankIndex then return (a.rankIndex or 99) < (b.rankIndex or 99) end
-                return a.name < b.name
-            end)
+        if self.tab == "roster" and DB().groupAlts then
+            return self:GroupedLines(list, q)
+        elseif self.tab == "roster" then
+            table.sort(list, RosterOrder)
         else
             table.sort(list, function(a, b) return (a.leftAt or 0) > (b.leftAt or 0) end)
         end
-        for _, rec in ipairs(list) do
-            local grp = rec.group and g.groups[rec.group]
-            local tag = grp and (grp.main == rec.name and " |cFFFFD100(main)|r" or (grp.main ~= "" and " |cFF888888(alt)|r" or "")) or ""
-            local ban = rec.ban.on and " |cFFFF3333(banned)|r" or ""
-            out[#out + 1] = { rec = rec,
-                text = Colored(rec) .. tag .. ban .. "  |cFF888888" .. (rec.level or "") .. " " .. (rec.rankName or "") .. "|r",
-                right = LastOnline(rec) }
-        end
+        for _, rec in ipairs(list) do out[#out + 1] = RosterLine(rec, g, 0) end
         if #out == 0 then out[1] = { text = "|cFF888888Nobody here" .. (q and q ~= "" and " matching that" or "") .. ".|r" } end
     elseif self.tab == "log" then
         for _, e in ipairs(g.log) do
@@ -326,6 +413,24 @@ local function MakeRow(list, i)
     row.text:SetPoint("RIGHT", -70, 0)
     row.text:SetJustifyH("LEFT")
     row.text:SetWordWrap(false)
+    -- + / - beside a main: show or hide their alts
+    row.toggle = CreateFrame("Button", nil, row)
+    row.toggle:SetSize(14, 14)
+    row.toggle:SetPoint("LEFT", 2, 0)
+    row.toggle.label = row.toggle:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.toggle.label:SetPoint("CENTER", 0, 0)
+    row.toggle:SetScript("OnClick", function(self)
+        local r = self:GetParent()
+        if r.main then GR:ToggleAlts(r.main) end
+    end)
+    row.toggle:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Alts", 1, 1, 1)
+        GameTooltip:AddLine("Show or hide this main's alts underneath them.", nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    row.toggle:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.toggle:Hide()
     row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.right:SetPoint("RIGHT", -4, 0)
     row.right:SetJustifyH("RIGHT")
@@ -362,6 +467,17 @@ function GR:RefreshList()
         local e = i <= visible and lines[i + list.offset]
         if e then
             row.rec, row.full = e.rec, e.wrap and e.text or nil
+            row.main = e.main
+            row.text:ClearAllPoints()
+            if e.toggle then
+                row.toggle.label:SetText(e.toggle)
+                row.toggle:Show()
+                row.text:SetPoint("LEFT", 18, 0)
+            else
+                row.toggle:Hide()
+                row.text:SetPoint("LEFT", 4 + (e.indent or 0) * 18, 0)
+            end
+            row.text:SetPoint("RIGHT", -70, 0)
             row.text:SetText(e.text)
             local c = e.color
             if c then row.text:SetTextColor(c[1], c[2], c[3]) else row.text:SetTextColor(1, 1, 1) end
@@ -369,7 +485,7 @@ function GR:RefreshList()
             if e.rec and e.rec.name == GR.selected then row.sel:Show() else row.sel:Hide() end
             row:Show()
         else
-            row.rec, row.full = nil, nil
+            row.rec, row.full, row.main = nil, nil, nil
             row:Hide()
         end
     end
@@ -585,6 +701,9 @@ local function Settings(L, inSetup)
     L:Checkbox({ label = "Details when you hover the guild roster", get = function() return DB().hoverDetails end,
         set = function(v) DB().hoverDetails = v end,
         tooltip = { "Roster hover", "In the game's Guild window (O, Guild tab), hovering a member shows their join and promotion dates, alts, birthday, custom note and ban." } })
+    L:Checkbox({ label = "List alts under their main on the roster", get = function() return DB().groupAlts end,
+        set = function(v) DB().groupAlts = v; GR:RefreshList() end,
+        tooltip = { "Alts under their main", "On the Roster tab, a main shows a + beside their name: click it to list their alts underneath them. Off lists everyone on their own, alts tagged (alt)." } })
     L:Checkbox({ label = "Report players back from a long absence", get = function() return DB().reportReturn end,
         set = function(v) DB().reportReturn = v end,
         tooltip = { "Back from inactive", "Logs a line when someone who'd been offline longer than the days below comes back online." } })

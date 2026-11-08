@@ -33,6 +33,7 @@ local DEFAULTS = {
     levelMin = 10,          -- don't report level-ups below this
     showOnLogin = true,     -- open the log at login when something changed
     hoverDetails = true,    -- details when you hover the guild roster
+    groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
     sync = true,            -- share edits with guildmates (GRM and WM)
     syncBans = true,
     syncCustom = true,

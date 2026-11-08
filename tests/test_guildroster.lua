@@ -263,6 +263,35 @@ check("import: former member with their ban", imf == 1 and g.former["Oldie-Spine
 GR:ShowTab("roster")
 local lines = GR:TabLines()
 check("roster tab lists members", #lines >= 4 and lines[1].rec)
+-- Alts under their main
+if not (g.members["Newbie-SpineShatter"].group and g.members["Newbie-SpineShatter"].group == g.members["Healer-SpineShatter"].group) then
+    GR:AddAlt("Healer", "Newbie")
+end
+GR:SetMain("Healer")
+Sync:ClearQueue()
+local function Find(ls, name) for i, l in ipairs(ls) do if l.rec and l.rec.name == name then return i, l end end end
+lines = GR:TabLines()
+local hi, hl = Find(lines, "Healer-SpineShatter")
+check("main listed with a +", hl and hl.toggle == "+" and hl.main == "Healer-SpineShatter" and hl.text:find("1 alt", 1, true))
+check("closed: the alt isn't listed on its own", Find(lines, "Newbie-SpineShatter") == nil)
+GR:ToggleAlts("Healer-SpineShatter")
+lines = GR:TabLines()
+hi, hl = Find(lines, "Healer-SpineShatter")
+local ni, nl = Find(lines, "Newbie-SpineShatter")
+check("opened: a - and the alt right under its main, indented", hl.toggle == "-" and ni == hi + 1 and nl.indent == 1)
+GR:ToggleAlts("Healer-SpineShatter")
+check("closed again", Find(GR:TabLines(), "Newbie-SpineShatter") == nil)
+GR.searchText = "newb"
+lines = GR:TabLines()
+hi, hl = Find(lines, "Healer-SpineShatter")
+ni = Find(lines, "Newbie-SpineShatter")
+check("searching for an alt shows its main, opened", hl and hl.toggle == "-" and ni == hi + 1)
+GR.searchText = nil
+GR.DB().groupAlts = false
+lines = GR:TabLines()
+ni, nl = Find(lines, "Newbie-SpineShatter")
+check("grouping off: alts listed on their own", nl and nl.indent == 0 and not (select(2, Find(lines, "Healer-SpineShatter")) or {}).toggle)
+GR.DB().groupAlts = true
 GR.tab = "log"
 check("log tab lists entries", #GR:TabLines() == #g.log)
 GR.tab = "sync"

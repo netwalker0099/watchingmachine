@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.68 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.69 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -515,7 +515,7 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - **Fast event-chained scanning**: the next inspect fires the moment the previous one resolves; a full 25-man with everyone in range captures in roughly 15–20 seconds
 - Out-of-range members retried every 15 seconds; new joiners picked up within 10 seconds
 - **Paper-doll browser**: pick a snapshot, pick a member, see their gear laid out like the character frame with native tooltips; Shift-click to link items
-- Talent tree capture (full detail for yourself; tree names/icons for inspected players — the Anniversary API doesn't expose inspected point counts to any addon)
+- Talent tree capture: the points in each tree, for yourself and for inspected players
 - Enchant/gem count summary per character
 - **GearScore** (3.38): every captured member's score, from the GearScore module's formula. It shows in the member list ("GS 1650"), with average item level on the paper doll, and the snapshot's raid average next to *Raid Members*. Scores are saved with the snapshot once every item is known, and older snapshots are scored when you open them
 - Zone-aware sessions labeled timestamp + zone; snapshots retained 1/7/14/30 days (dropdown)
@@ -529,12 +529,16 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
   - Your own gear and talents are saved whenever they change (gear swaps,
     respecs, level-ups), a separate armory for each spec
   - A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap
-    inspects them. The game doesn't show an inspected player's talent points,
-    so the scan goes under the spec whose saved gear it matches (or *spec
-    unknown* until one does)
+    inspects them, under the spec their talents show. (An inspect that comes
+    back without talent points goes under the spec whose saved gear it
+    matches, or *spec unknown*)
   - Each new scan is sent to guildmates running Watching Machine and theirs
     come to you; the newest scan of each spec wins on every install.
     Opening someone's armory asks the guild for a newer one
+  - **Catch-up at login** (3.69): guildmates send you every armory scanned
+    since you were last online (everything, the first time), one at a time
+    in the background. With several of them online, each armory is sent
+    about once
   - Three switches in the browser and the guided setup: *Save my gear*,
     *Save guildmates*, *Share with guild*
   - In **Roster Manager**, a member's details list their armory for each

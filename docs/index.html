@@ -385,7 +385,7 @@
     <li><b>Browse:</b> pick a snapshot, pick a player, and see their gear laid out like the character sheet. Shift-click to link an item.</li>
     <li>GearScore for every member and the raid's average.</li>
     <li><code>/as snap [label]</code> takes one by hand. Scanning pauses in combat and carries on after.</li>
-    <li><b>The armory:</b> one saved armory for each character and spec (the talent tree with the most points). Pick <i>Armory</i> in the snapshot list, or <code>/as armory [name]</code>. Your own gear is saved whenever it or your talents change. A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap inspects them, under the spec whose saved gear it matches (the game hides their talent points). New scans are shared with guildmates running Watching Machine; the newest scan of each spec wins.</li>
+    <li><b>The armory:</b> one saved armory for each character and spec (the talent tree with the most points). Pick <i>Armory</i> in the snapshot list, or <code>/as armory [name]</code>. Your own gear is saved whenever it or your talents change. A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap inspects them, under the spec their talents show. New scans are shared with guildmates running Watching Machine; the newest scan of each spec wins, and when you log in they send you everything scanned since you were last online.</li>
   </ul>
   <div class="note"><b>Already use the standalone ArmorySnap addon?</b>Watching Machine reads the same saved data. If both are enabled, the module stands aside and says so: disable one.</div>
 </section>
@@ -646,6 +646,7 @@
     <li><b>Former &amp; bans:</b> everyone who left, and the ban list. A banned player who rejoins gets a red warning. <i>Ban by name</i> bans someone outside the guild.</li>
     <li><b>Sync:</b> your edits go to guildmates running Guild Roster Manager or Watching Machine as you make them, and theirs come to you; the newest edit wins. Bans only between the ranks you allow. The Sync tab lists who you share with.</li>
     <li><b>Import</b> (Options, or <code>/wmachine roster import</code>) brings in what Guild Roster Manager has saved, when it's loaded. With Guild Roster Manager running on the same character, it does the syncing.</li>
+    <li><b>Alts under their main:</b> a main has a <b>+</b> beside their name on the Roster tab; click it to list their alts underneath. A main sorts with the online players when any of their characters is on.</li>
     <li><b>Armory</b> (with ArmorySnap on): a member's details list their saved armory for each spec, and <i>Show armory</i> opens their gear and talents.</li>
   </ul>
 </section>
@@ -865,7 +866,7 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.68 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+<footer>Watching Machine guide · written for version 3.69 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
   Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>

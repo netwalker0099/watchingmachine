@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.68 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.69 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -236,7 +236,7 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
 - **Fast event-chained scanning**: the next inspect fires the moment the previous one resolves; a full 25-man with everyone in range captures in roughly 15–20 seconds
 - Out-of-range members retried every 15 seconds; new joiners picked up within 10 seconds
 - **Paper-doll browser**: pick a snapshot, pick a member, see their gear laid out like the character frame with native tooltips; Shift-click to link items
-- Talent tree capture (full detail for yourself; tree names/icons for inspected players — the Anniversary API doesn't expose inspected point counts to any addon)
+- Talent tree capture: the points in each tree, for yourself and for inspected players
 - Enchant/gem count summary per character
 - **GearScore** (3.38): every captured member's score, from the GearScore module's formula. It shows in the member list ("GS 1650"), with average item level on the paper doll, and the snapshot's raid average next to *Raid Members*. Scores are saved with the snapshot once every item is known, and older snapshots are scored when you open them
 - Zone-aware sessions labeled timestamp + zone; snapshots retained 1/7/14/30 days (dropdown)
@@ -250,12 +250,16 @@ Passive raid gear & talent archive (integrated from the standalone ArmorySnap ad
   - Your own gear and talents are saved whenever they change (gear swaps,
     respecs, level-ups), a separate armory for each spec
   - A guildmate who doesn't run Watching Machine is saved whenever ArmorySnap
-    inspects them. The game doesn't show an inspected player's talent points,
-    so the scan goes under the spec whose saved gear it matches (or *spec
-    unknown* until one does)
+    inspects them, under the spec their talents show. (An inspect that comes
+    back without talent points goes under the spec whose saved gear it
+    matches, or *spec unknown*)
   - Each new scan is sent to guildmates running Watching Machine and theirs
     come to you; the newest scan of each spec wins on every install.
     Opening someone's armory asks the guild for a newer one
+  - **Catch-up at login** (3.69): guildmates send you every armory scanned
+    since you were last online (everything, the first time), one at a time
+    in the background. With several of them online, each armory is sent
+    about once
   - Three switches in the browser and the guided setup: *Save my gear*,
     *Save guildmates*, *Share with guild*
   - In **Roster Manager**, a member's details list their armory for each
@@ -1059,6 +1063,11 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
   Roster Manager has saved for the guild, when it's installed and loaded
 - **Guild Roster Manager on the same character**: Roster Manager keeps the
   roster and log but leaves the syncing to it
+- **Alts under their main** (3.69): on the Roster tab a main has a **+**
+  beside their name; click it to list their alts underneath (**-** hides
+  them). A main counts as online, and sorts with the online players, when
+  any of their characters is ("on Altname"). Searching for an alt shows it
+  under its main. *Options* turns it off
 - **Armory** (3.68, with ArmorySnap on): a member's details and hover list
   their saved armory for each spec with its GearScore, and *Show armory*
   opens their gear and talents in ArmorySnap's browser (see ArmorySnap)
@@ -1354,6 +1363,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.69
+- **Roster Manager**: alts listed under their main, opened with a + beside the main's name
+- **ArmorySnap's armory catches up at login**: guildmates send everything scanned since you were last online. Inspected guildmates are filed by the spec their talents show
 
 ### Version 3.68
 - **ArmorySnap's armory**: a saved armory for each character and spec. Your own gear is saved automatically, guildmates are saved when ArmorySnap inspects them, and scans are shared with guildmates running Watching Machine (the newest wins). **Roster Manager** shows each member's armory and has a *Show armory* button

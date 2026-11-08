@@ -22,9 +22,8 @@ what still needs settling before it's built.
     both leader and follower roles). After that: the kick / promote /
     demote tool (a button you click, since those need a key press), the
     inactivity rules, export, join-date note stamping and anniversaries
-15. ~~ArmorySnap armory per spec, linked to Roster Manager~~ (done, 3.68).
-    Possible next: a guild-wide catch-up of the armory at login (today it
-    shares new scans live and answers when someone opens an armory)
+15. ~~ArmorySnap armory per spec, linked to Roster Manager~~ (done, 3.68;
+    catch-up at login 3.69). Roster alts under their main (3.69)
 
 ---
 

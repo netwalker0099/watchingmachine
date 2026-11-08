@@ -462,10 +462,9 @@ local function OnInspectReady(guid)
         end
     end
 
-    -- Note: TBC Anniversary API does not return talent point allocations
-    -- for inspected targets (confirmed limitation, affects all addons).
-    -- Tree names and icons are available; pointsSpent is always 0.
-    -- Self-inspection works correctly.
+    -- Talents are read while the inspect is still open, so the points
+    -- each tree shows are the inspected player's. Should a client ever send
+    -- none, the paper doll says so and the armory files the scan by gear.
 
     local charName = charInfo.name
     snap.members[charName] = charInfo
@@ -926,10 +925,11 @@ function AS:SetupPage(L)
         tooltip = { "Keep snapshots", "Older snapshots are deleted the next time you log in or reload." } })
     L:Note("|cFFFFFFFFThe armory:|r one saved armory for each character and spec (the talent tree with the most"
         .. " points). Your own gear and talents are saved whenever they change. A guildmate who doesn't run"
-        .. " Watching Machine is saved whenever ArmorySnap inspects them; the game doesn't show their talent"
-        .. " points, so it goes under the spec whose saved gear it matches. Each scan is shared with guildmates"
-        .. " running Watching Machine, and the newest scan of each spec wins. Pick |cFFFFFF00Armory|r in the"
-        .. " browser's snapshot list, or click |cFFFFFF00Show armory|r on a player in Roster Manager.")
+        .. " Watching Machine is saved whenever ArmorySnap inspects them, under the spec their talents show."
+        .. " Each scan is shared with guildmates running Watching Machine, and the newest scan of each spec wins."
+        .. " When you log in, guildmates send you everything scanned since you were last online. Pick"
+        .. " |cFFFFFF00Armory|r in the browser's snapshot list, or click |cFFFFFF00Show armory|r on a player in"
+        .. " Roster Manager.")
     AS.ArmoryCheckboxes(function(spec) L:Checkbox(spec) end, options)
     L:Note("Snapshots are shared by all your characters. Everything else is in the browser: |cFFFFFF00/as|r"
         .. " (|cFFFFFF00/as help|r lists the commands).")
@@ -944,7 +944,8 @@ AS.ARMORY_SETTINGS = {
           .. " updates their armory. Players running Watching Machine keep their own." } },
     { key = "armoryShare", label = "Share the armory with my guild", short = "Share with guild",
       tip = { "Share with guild", "Sends each new armory scan to guildmates running Watching Machine and takes"
-          .. " theirs, the newest scan of each spec winning. Opening someone's armory asks the guild for a newer one." } },
+          .. " theirs, the newest scan of each spec winning. Opening someone's armory asks the guild for a newer one,"
+          .. " and logging in catches up on everything scanned since you were last online." } },
 }
 
 function AS.ArmoryCheckboxes(add, options, font)

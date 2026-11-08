@@ -17,7 +17,7 @@ local function NewTimer(_, fn)
 end
 env.C_Timer = { After = NewTimer, NewTimer = NewTimer, NewTicker = function() return { Cancel = function() end } end }
 local function RunTimers()
-    for _ = 1, 5 do
+    for _ = 1, 200 do
         local list = timers; timers = {}
         if #list == 0 then return end
         for _, t in ipairs(list) do if not t.cancelled then t.fn() end end
@@ -244,6 +244,78 @@ check("they have it already: no answer", #Bodies("WMArmory") == 0)
 Arm:OnMessage("WMArmory", "Q^Me-Testrealm^", "GUILD", "Asker4")
 RunTimers()
 check("asked about us: both specs sent", #Bodies("WMArmory") == 2)
+
+-- Something we shared ourselves earlier is still sent to someone asking later
+Arm:ResetForTests()
+now = now + 50
+gear[13] = "|cffa335ee|Hitem:28784:0:0:0:0:0:0:0|h[Other Trinket]|h|r"
+Arm:RecordSelf()
+Sent()
+Arm:OnMessage("WMArmory", "Q^Me-Testrealm^Frost=1,Fire=1", "GUILD", "LateComer")
+RunTimers()
+check("our own earlier share doesn't stop a later answer", #Bodies("WMArmory") == 2)
+
+-- ============ Catching up ============
+Arm:ResetForTests()
+db.armoryLastOnline = nil
+Arm:Greet()
+local greet = Bodies("WMArmory")
+check("greeting says hello", greet[1] and greet[1]:find("^H%^") ~= nil)
+check("first time: catch up on everything", greet[2] == "C^0")
+check("last online noted", db.armoryLastOnline == now)
+Arm:ResetForTests()
+now = now + 7200
+Arm:Greet()
+greet = Bodies("WMArmory")
+check("next time: since an hour before last online", greet[2] == "C^" .. (now - 7200 - 3600))
+RunTimers(); Sent()
+
+-- Someone asks to catch up: our guild's armories go out one at a time, newest first
+local otherGuild = {}
+for k, v in pairs(healer) do otherGuild[k] = v end
+otherGuild.guild, otherGuild.time = "Other Guild", now - 30
+Arm.Store("Outsider-Testrealm", otherGuild)
+Arm:ResetForTests()
+local since = db.armory["Holy-Testrealm"].Holy.time - 1
+Arm:OnMessage("WMArmory", "C^" .. since, "GUILD", "Returner")
+local queued = Arm.CatchUpLength()
+local expect = 0
+for key, specs in pairs(db.armory) do for _, e in pairs(specs) do
+    if e.time > since and e.guild == "Ninjas" then expect = expect + 1 end
+end end
+check("catch-up: our guild's armories since then queued", queued == expect and queued >= 3)
+check("catch-up: waits a moment before starting", #Bodies("WMArmory") == 0)
+-- Someone else sends the Holy armory first: we skip it
+Deliver("Faster", "Holy-Testrealm", db.armory["Holy-Testrealm"].Holy)
+RunTimers()
+local out, holy, outsider = Bodies("WMArmory"), false, false
+for _, b in ipairs(out) do
+    if b:find("Holy%-Testrealm") then holy = true end
+    if b:find("Outsider") then outsider = true end
+end
+check("catch-up: sent the rest", #out >= expect - 1 and #out > 0)
+check("catch-up: skipped what someone else sent", not holy)
+check("catch-up: other guilds' armories not sent", not outsider)
+check("catch-up: nothing left", Arm.CatchUpLength() == 0)
+Arm:OnMessage("WMArmory", "C^" .. (now + 10), "GUILD", "UpToDate")
+check("catch-up: nothing newer, nothing queued", Arm.CatchUpLength() == 0)
+Arm:OnMessage("WMArmory", "C^0", "GUILD", "Returner")
+Arm:Stop()
+RunTimers()
+check("stopped: the catch-up is dropped", Arm.CatchUpLength() == 0 and #Bodies("WMArmory") == 0)
+db.armory["Outsider-Testrealm"] = nil
+
+-- An inspect that brings talent points goes under that spec
+Arm:ResetForTests()
+units.target = "Swapper"
+inspected.trees = { { "Arms", "x", 41 }, { "Fury", "y", 20 }, { "Protection", "z", 0 } }
+now = now + 10
+check("inspected talents saved", Inspect("target") == true)
+check("filed under the spec their talents show", db.armory["Swapper-Testrealm"].Arms ~= nil
+    and db.armory["Swapper-Testrealm"].Arms.talents.points == "41/20/0")
+units.target = "Tankier"
+inspected.trees = { { "Arms", "x", 0 }, { "Fury", "y", 0 }, { "Protection", "z", 0 } }
+Sent()
 
 -- ============ The browser ============
 local view = Arm.View()

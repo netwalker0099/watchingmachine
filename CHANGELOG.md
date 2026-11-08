@@ -2,9 +2,34 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.68** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.69** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.69
+
+### Roster Manager: alts under their main
+
+- On the Roster tab, a main has a **+** beside their name with how many
+  alts they have; click it to list their alts underneath, **-** to hide
+  them.
+- A main sorts with the online players when any of their characters is
+  online, showing which ("on Altname").
+- Searching for an alt shows its main, opened at that alt.
+- *Options* (and the guided setup): *List alts under their main on the
+  roster*.
+
+### ArmorySnap: armory catch-up at login
+
+- When you log in, guildmates running Watching Machine send every armory
+  scanned since you were last online (everything, the first time), one at a
+  time in the background. With several of them online, an armory one of
+  them has already sent is skipped by the others.
+- Inspected guildmates are filed under the spec their talents show; only an
+  inspect that comes back without talent points is matched by gear. (3.68's
+  notes said the game hides inspected talents: it doesn't.)
+- Fixed: a scan you had shared earlier wasn't sent again to someone asking
+  for it later.
 
 ## 3.68
 
@@ -16,8 +41,7 @@ Current release: **3.68** — TBC Classic Anniversary patch 2.5.6 (Interface `20
 - **Your own gear** is saved whenever your gear, talents or level change, a
   separate armory for each spec.
 - **Guildmates who don't run Watching Machine** are saved whenever ArmorySnap
-  inspects them. The game hides an inspected player's talent points, so the
-  scan goes under the spec whose saved gear it matches, or *spec unknown*.
+  inspects them, under the spec their talents show.
 - **Shared with the guild**: each new scan goes to guildmates running
   Watching Machine and theirs come to you. The newest scan of each spec wins.
   Opening someone's armory asks the guild for a newer one.

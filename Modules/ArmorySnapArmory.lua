@@ -4,17 +4,23 @@
 -- Machine:
 --   * Your own gear and talents are saved whenever they change.
 --   * A guildmate who doesn't run Watching Machine is saved whenever
---     ArmorySnap inspects them (the game doesn't show an inspected player's
---     talent points, so their spec is the one whose saved gear matches best).
+--     ArmorySnap inspects them, under the spec their talents show (an inspect
+--     that comes back without talent points goes under the spec whose saved
+--     gear it matches).
 --   * Each new scan goes to the guild; the newest scan of each spec wins on
 --     every install. Opening someone's armory asks the guild for anything
---     newer.
+--     newer, and logging in catches up on everything scanned since you were
+--     last online.
 -- Roster Manager shows it from its details pane ("Show armory").
 --
 -- Messages (prefix WMArmory, guild channel):
 --   H^version                        I run Watching Machine
 --   P^id^part^parts^data             one armory, split in parts
 --   Q^Name-Realm^spec=time,...       anything newer than these?
+--   C^time                           catch me up: every armory scanned since
+--                                    then. Everyone with one sends it, one
+--                                    at a time, skipping any someone else
+--                                    has already sent.
 
 local AddonName, WM = ...
 local AS = WM.modules.ArmorySnap
@@ -27,6 +33,8 @@ local QUERY_GAP = 60             -- seconds before asking about the same player 
 local USER_DAYS = 30             -- a player heard from within this many days runs Watching Machine
 local KEEP_DAYS = 365            -- armories not updated for this long are dropped
 local MATCH = 0.6                -- share of items in common to call it the same spec
+local DRIP = 0.6                 -- seconds between armories sent for a catch-up
+local MARGIN = 3600              -- a catch-up starts this long before you were last online
 Arm.UNKNOWN = "?"                -- spec of an inspect that matches nothing saved
 
 local function On() return WM:IsModuleOn("ArmorySnap") end
@@ -372,6 +380,7 @@ function Arm:Share(key, e)
     for i = 1, parts do
         Send("P^" .. id .. "^" .. i .. "^" .. parts .. "^" .. data:sub((i - 1) * PART + 1, i * PART))
     end
+    if Arm.MarkHeard then Arm.MarkHeard(key, e.spec, e.time or 0) end
     return true
 end
 
@@ -394,12 +403,75 @@ end
 
 local partial = {}        -- [sender .. id] = { parts, got, n, t }
 local answers = {}        -- [key .. "^" .. spec] = timer of our pending answer
-local heard = {}          -- [key .. "^" .. spec] = newest time heard on the channel
+local heard = {}          -- [key .. "^" .. spec] = { t = newest scan time, seq = when } heard or sent
+local seq = 0             -- counts what's heard, so a request knows what came after it
 
 local function Heard(key, spec, t)
     local k = key .. "^" .. spec
-    if (heard[k] or 0) < t then heard[k] = t end
+    seq = seq + 1
+    local h = heard[k]
+    if not h or h.t < t then heard[k] = { t = t, seq = seq }
+    elseif h.t == t then h.seq = seq end
 end
+
+-- Has this scan (or a newer one) gone out since a request came in?
+local function SentSince(id, t, since)
+    local h = heard[id]
+    return h ~= nil and h.t >= t and h.seq > since
+end
+Arm.MarkHeard = Heard
+
+-- ============================================
+-- CATCHING UP
+-- ============================================
+-- Asked to catch someone up: our armories scanned since then, about players
+-- of this guild, go out one at a time. Before each, anything someone else
+-- already sent is skipped, so with several of us answering each armory goes
+-- out about once. Whoever's wait ends first leads.
+
+local drip, dripSet, dripTimer = {}, {}, nil
+
+local function MyGuild() return GetGuildInfo and GetGuildInfo("player") end
+
+local function DripNext()
+    dripTimer = nil
+    if not Sharing() then return end
+    while #drip > 0 do
+        local item = table.remove(drip, 1)
+        dripSet[item[1] .. "^" .. item[2]] = nil
+        local e = (Arm.All()[item[1]] or {})[item[2]]
+        if e and not SentSince(item[1] .. "^" .. item[2], e.time or 0, item[4]) then
+            Arm:Share(item[1], e)
+            if #drip > 0 then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
+            return
+        end
+    end
+end
+
+function Arm:OnCatchUp(since)
+    if not Sharing() then return end
+    local guild = MyGuild()
+    local new = {}
+    for key, specs in pairs(Arm.All()) do
+        for spec, e in pairs(specs) do
+            local id = key .. "^" .. spec
+            if (e.time or 0) > since and e.guild == guild then
+                if dripSet[id] then
+                    dripSet[id][4] = seq        -- asked again: what went out before doesn't count
+                else
+                    dripSet[id] = { key, spec, e.time or 0, seq }
+                    new[#new + 1] = dripSet[id]
+                end
+            end
+        end
+    end
+    if #new == 0 then return end
+    table.sort(new, function(a, b) return a[3] > b[3] end)
+    for _, item in ipairs(new) do drip[#drip + 1] = item end
+    if not dripTimer then dripTimer = C_Timer.NewTimer(2 + math.random() * 6, DripNext) end
+end
+
+function Arm.CatchUpLength() return #drip end
 
 local function OnArmory(sender, data)
     local key, e = Arm.Deserialize(data)
@@ -425,11 +497,12 @@ local function OnQuery(sender, key, list)
         local id = key .. "^" .. spec
         if (e.time or 0) > (theirs[Clean(spec)] or 0) and not answers[id] then
             local delay = (key == me) and 0.2 or (1 + math.random() * 3)
+            local asked = seq
             answers[id] = C_Timer.NewTimer(delay, function()
                 answers[id] = nil
                 if not Sharing() then return end
                 local current = (Arm.All()[key] or {})[spec]
-                if current and (heard[id] or 0) < (current.time or 0) then Arm:Share(key, current) end
+                if current and not SentSince(id, current.time or 0, asked) then Arm:Share(key, current) end
             end)
         end
     end
@@ -456,6 +529,9 @@ function Arm:OnMessage(prefix, body, channel, sender)
     elseif kind == "Q^" then
         local key, list = body:match("^Q%^([^%^]+)%^(.*)$")
         if key then OnQuery(sender, Arm.Key(key), list) end
+    elseif kind == "C^" then
+        local since = tonumber(body:match("^C%^(%d+)$"))
+        if since then Arm:OnCatchUp(since) end
     end
 end
 
@@ -481,13 +557,20 @@ function Arm:Greet()
     if greeted or not Sharing() then return end
     greeted = true
     Send("H^" .. tostring(WM.version or "?"))
+    -- Catch up on what the guild scanned while we were away (everything, the
+    -- first time)
+    local last = tonumber(DB().armoryLastOnline) or 0
+    Send("C^" .. math.max(0, last > 0 and (last - MARGIN) or 0))
     for _, e in pairs(Arm.All()[MyKey()] or {}) do self:Share(MyKey(), e) end
+    DB().armoryLastOnline = Now()
 end
 
 events:SetScript("OnEvent", function(_, event, ...)
     if not On() or AS.standaloneConflict then return end
     if event == "CHAT_MSG_ADDON" then
         Arm:OnMessage(...)
+    elseif event == "PLAYER_LOGOUT" then
+        DB().armoryLastOnline = Now()
     elseif event == "PLAYER_ENTERING_WORLD" then
         ScheduleSelf(8)
         C_Timer.After(20, function() if On() then Arm:Greet() end end)
@@ -508,7 +591,7 @@ function Arm:Init()
         if not next(specs) then db.armory[key] = nil end
     end
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX) end
-    WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED",
+    WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "PLAYER_LOGOUT", "PLAYER_EQUIPMENT_CHANGED",
         "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE", "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_LEVEL_UP" })
     -- In case the module started after you entered the world
     ScheduleSelf(10)
@@ -520,6 +603,8 @@ function Arm:Stop()
     if selfTimer then selfTimer:Cancel(); selfTimer = nil end
     for id, t in pairs(answers) do t:Cancel(); answers[id] = nil end
     wipe(partial)
+    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
+    wipe(drip); wipe(dripSet)
     WM:ClearAddonQueue({ [PREFIX] = true })
 end
 
@@ -534,6 +619,8 @@ end
 function Arm:ResetForTests()
     wipe(partial); wipe(heard); wipe(asked)
     for id, t in pairs(answers) do t:Cancel(); answers[id] = nil end
+    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
+    wipe(drip); wipe(dripSet)
     greeted = nil
 end
 Arm.PREFIX = PREFIX
