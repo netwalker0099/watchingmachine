@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.80"
+WM.version = "3.81"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -2276,6 +2276,21 @@ function WM:CreateSettingsPanel()
         text = function() return "Active: |cFF00FF00" .. WM:GetThemeName() .. "|r" end,
     }, 12)
     L:Section({
+        key = "conflicts", title = "Other addons", collapsed = true,
+        tooltip = { "Other addons", "When a module you have on has another addon doing the same job enabled with it." },
+    })
+    L:Checkbox({
+        label = "Warn at login when another addon does a module's job",
+        get = function() return WatchingMachineDB.conflictWarn ~= false end,
+        set = function(v) WatchingMachineDB.conflictWarn = v end,
+        tooltip = { "Addons doing the same job", "For example GTFO with Hazard Alerts, or RCLootCouncil with Loot Council:"
+            .. " a window lists them, and for each you can turn the module off, disable the other addon, or keep both"
+            .. " (not asked again on this character)." },
+    })
+    L:Buttons({ { text = "Check now", width = 120, onClick = function() if WM.Conflicts then WM.Conflicts:Command() end end,
+        tooltip = { "Check now", "Lists every module with another addon doing its job, including pairs you chose to keep." } } })
+    L:EndSection()
+    L:Section({
         key = "menuFavorites", title = "Minimap menu favorites", collapsed = true,
         tooltip = { "Minimap menu favorites", "Right-click the minimap button for a menu of every module:"
             .. " click one to open its window without the dashboard. The modules ticked here go at the top,"
@@ -2343,6 +2358,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
+    print("|cFFFFFF00/wmachine conflicts|r - Other addons doing a module's job (turn the module off, disable the addon, or keep both)")
     print("|cFFFFFF00/wmachine council|r - Loot Council: loot history, voting, awarding (council players / import / vote / test / sendtest / ml / add <item> / roll <item> / de <name> / undo / <player name>)")
     print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / notes / purge / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
@@ -2569,6 +2585,9 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "gear" or cmd == "sets" or cmd == "itemrack" or cmd:match("^gear ") then
         local module = WM:UsableModule("GearSets")
         if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) end
+
+    elseif cmd == "conflicts" or cmd == "conflict" then
+        if WM.Conflicts then WM.Conflicts:Command() end
 
     elseif cmd == "council" or cmd == "lc" or cmd:match("^council ") or cmd:match("^lc ") then
         local module = WM:UsableModule("LootCouncil")
@@ -2823,6 +2842,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         end
         
         -- Request guild roster for modules that need it
+        -- Other addons doing a module's job: a warning once the modules have started
+        RunAfter(8, function() if WM.Conflicts then WM.Conflicts:CheckAtLogin() end end)
+
         if IsInGuild() then
             if C_GuildInfo and C_GuildInfo.GuildRoster then
                 C_GuildInfo.GuildRoster()

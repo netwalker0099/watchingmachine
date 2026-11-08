@@ -2,9 +2,24 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.80** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.81** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.81
+
+### Addons doing the same job
+
+- At login, if a module you have on has another addon doing the same job
+  enabled (for example Hazard Alerts and GTFO, Loot Council and
+  RCLootCouncil, Frame Mover and BlizzMove), a window lists each pair and
+  what clashes.
+- For each: *Turn off* the module (this character), *Disable* the addon
+  (this character, then *Reload now*), or *Keep both* (not asked again for
+  that pair on this character).
+- `/wmachine conflicts`, or *Check now* under *Other addons* in the
+  settings, lists them any time; that section also turns the warning off.
+- It knows 21 addons across 14 modules.
 
 ## 3.80
 

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.80 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1202,6 +1202,26 @@ works with RCLootCouncil and awards like Gargul. Open it with
   `endtest`, `sendtest [n]`, `ml`, `add <item>`, `roll [item]`,
   `de <name>`, `undo`, or a player's name
 
+## Other Addons Doing a Module's Job
+
+At login (3.81), if a module you have on has another addon doing the same
+job enabled too, a window lists each pair and what clashes (two alarms, two
+announcements, windows fighting over where they go), with three buttons:
+*Turn off* the module for this character, *Disable* the other addon for
+this character (then *Reload now*), or *Keep both* (not asked again for
+that pair on this character). `/wmachine conflicts`, or *Check now* under
+*Other addons* in the settings, lists them any time, kept pairs included;
+the same section turns the login warning off.
+
+Pairs it knows: ArmorySnap and the standalone ArmorySnap, Roster Manager
+and Guild Roster Manager, Loot Council and RCLootCouncil or Gargul,
+GearScore and GearScoreTBCClassic or TacoTip, Gear Sets and ItemRack or
+Outfitter, Frame Mover and BlizzMove or MoveAnything, Hazard Alerts and
+GTFO, Attunements and Attune, World Timers and NovaWorldBuffs, Instance
+Tracker and NovaInstanceTracker, Ogri'la Helper and Ogri'Lazy, Crits and
+CritMatic, Guild Invite and GuildRaidInvite, Loot Browser and AtlasLoot,
+Auto Logger and LoggerHead or AutoCombatLogger.
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -1492,6 +1512,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.81
+- **Addons doing the same job**: at login, a window lists modules that have another addon doing their job enabled (GTFO, RCLootCouncil, BlizzMove, ItemRack...), with buttons to turn the module off, disable the addon, or keep both. `/wmachine conflicts` any time
 
 ### Version 3.80
 - **Loot Council part 5**: the loot history shared between guildmates running Watching Machine: live awards, edits and deletes as they happen, and a catch-up at login
