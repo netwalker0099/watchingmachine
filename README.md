@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.65 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.66 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1231,8 +1231,11 @@ opens the dashboard. Everything the addon does can be reached from it.
   window without the dashboard (an off module asks to be turned on).
   Your **favorites** come first, then the rest under their dashboard
   groups, then *Edit favorites...* and *Settings*
-- **Favorites**: tick them in Settings under *Minimap menu favorites* (or
-  the menu's *Edit favorites...*). For every character
+- **Favorites**: right-click a module in the menu to add or remove it
+  (3.66), or tick them in Settings under *Minimap menu favorites* (or the
+  menu's *Edit favorites...*). For every character
+- The menu closes on Escape, a click elsewhere or another right-click of
+  the button, and splits into columns when it's taller than the screen
 - **Hover**: every module's status, in dashboard order
 - **Drag**: Move button anywhere on screen
 
@@ -1291,6 +1294,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.66
+- **Fix: the minimap button's right-click menu didn't open.** It's now a menu of its own instead of the game's dropdown, splits into columns on a short screen, and right-clicking a module in it adds or removes a favorite
 
 ### Version 3.65
 - **Minimap button right-click menu:** every module, to open it without the dashboard. Your favorites go at the top (pick them in Settings, *Minimap menu favorites*), the rest follow by group. Left-click still opens the dashboard; Settings is at the bottom of the menu

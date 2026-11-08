@@ -22,24 +22,31 @@ local function check(name, cond)
     if cond then pass = pass + 1 else fail = fail + 1; io.write("FAIL: ", name, "\n") end
 end
 
-local anchored
-env.ToggleDropDownMenu = function(_, _, dd, anchor) anchored = { dd, anchor } end
+local anchor = W.NewFrame("WatchingMachineMinimapButton")
 local function Menu()
-    WM:ShowModuleMenu("button")
-    return W.openMenu(env.WM_MinimapModuleMenu)
+    local m = env.WM_MinimapModuleMenu
+    if m and m:IsShown() then m:Hide() end
+    WM:ShowModuleMenu(anchor)
+    return env.WM_MinimapModuleMenu.entries
+end
+local function Row(name)
+    for i, r in ipairs(env.WM_MinimapModuleMenu.rows) do
+        if r.entry and r.entry.module == name then return r, i end
+    end
 end
 local function Find(items, name)
-    for i, it in ipairs(items) do if it.moduleName == name then return it, i end end
+    for i, it in ipairs(items) do if it.module == name then return it, i end end
 end
 local function TitleIndex(items, text)
-    for i, it in ipairs(items) do if it.isTitle and it.text and it.text:find(text, 1, true) then return i end end
+    for i, it in ipairs(items) do if it.title and it.title:find(text, 1, true) then return i end end
 end
 
 -- ---- no favorites: every module, under its group ----
 local items = Menu()
-check("opens at the minimap button", anchored and anchored[1] == env.WM_MinimapModuleMenu and anchored[2] == "button")
+local menu = env.WM_MinimapModuleMenu
+check("our own frame, shown", menu:IsShown() and menu._template:find("BackdropTemplate", 1, true))
 local count = 0
-for _, it in ipairs(items) do if it.moduleName then count = count + 1 end end
+for _, it in ipairs(items) do if it.module then count = count + 1 end end
 local total = 0
 for _, g in ipairs(WM.MODULE_GROUPS) do total = total + #g.modules end
 check("every module listed once", count == total)
@@ -48,34 +55,44 @@ local _, iBuff = Find(items, "BuffCheck")
 local _, iLog = Find(items, "AutoLogger")
 check("grouped as on the dashboard", TitleIndex(items, "Raid") < iBuff and iBuff < TitleIndex(items, "Logging")
     and TitleIndex(items, "Logging") < iLog)
-check("module lines have the module's icon and description",
-    Find(items, "LootBrowser").icon == WM.MODULE_INFO.LootBrowser.icon
-    and Find(items, "LootBrowser").tooltipText:find(WM.MODULE_INFO.LootBrowser.desc, 1, true))
-check("settings and favorites at the bottom", items[#items - 2].text == "Edit favorites..."
-    and items[#items - 1].text == "Settings")
+check("module rows have the module's icon and title", Row("LootBrowser").icon._texture == WM.MODULE_INFO.LootBrowser.icon
+    and Row("LootBrowser").text:GetText() == WM.MODULE_INFO.LootBrowser.title)
+check("settings and favorites at the bottom", items[#items - 1].action == "Edit favorites..."
+    and items[#items].action == "Settings")
+WM:ShowModuleMenu(anchor)
+check("a second right-click closes it", not menu:IsShown())
+-- A short screen: columns
+local h = env.UIParent:GetHeight()
+env.UIParent:SetHeight(300)
+Menu()
+check("too tall for the screen: split into columns", menu:GetWidth() > 2 * 190)
+env.UIParent:SetHeight(h)
 
 -- ---- clicking opens the module ----
 local opened
 WM.modules.LootBrowser.ToggleUI = function() opened = "LootBrowser" end
 WM:SetModuleOn("LootBrowser", true)
-Find(items, "LootBrowser").func()
-check("click opens its window", opened == "LootBrowser")
+Menu()
+W.click(Row("LootBrowser"), "LeftButton")
+check("click opens its window and closes the menu", opened == "LootBrowser" and not menu:IsShown())
 opened = nil
 WM:SetModuleOn("LootBrowser", false)
-items = Menu()
-check("an off module is greyed and says so", Find(items, "LootBrowser").text:find("(off)", 1, true))
+Menu()
+check("an off module is greyed and says so", Row("LootBrowser").text:GetText():find("(off)", 1, true))
 local asked
 env.StaticPopup_Show = function(_, _, _, fn) asked = fn end
-Find(items, "LootBrowser").func()
+W.click(Row("LootBrowser"), "LeftButton")
 check("an off module asks to be turned on first", opened == nil and asked ~= nil)
 asked()
 check("yes: turned on and opened", WM:IsModuleOn("LootBrowser") and opened == "LootBrowser")
 
 -- ---- favorites ----
 WM:SetMenuFavorite("GearSets", true)
-WM:SetMenuFavorite("AutoLogger", true)
+Menu()
+W.click(Row("AutoLogger"), "RightButton")
+check("right-click a module: a favorite, menu stays open", WM:IsMenuFavorite("AutoLogger") and menu:IsShown())
 check("saved account-wide", env.WatchingMachineDB.menuFavorites.GearSets == true)
-items = Menu()
+items = menu.entries
 local fav = TitleIndex(items, "Favorites")
 local _, iGear = Find(items, "GearSets")
 local _, iAuto = Find(items, "AutoLogger")
@@ -83,10 +100,12 @@ check("Favorites heading first", fav == 1)
 check("favorites at the top, in dashboard order", iGear == 2 and iAuto == 3)
 check("the rest follow", TitleIndex(items, "Raid") > iAuto)
 local n = 0
-for _, it in ipairs(items) do if it.moduleName == "GearSets" then n = n + 1 end end
+for _, it in ipairs(items) do if it.module == "GearSets" then n = n + 1 end end
 check("a favorite isn't listed twice", n == 1)
-WM:SetMenuFavorite("GearSets", false)
-check("unticked: gone from favorites", #WM:MenuFavorites() == 1 and WM:MenuFavorites()[1] == "AutoLogger")
+W.click(Row("GearSets"), "RightButton")
+check("right-click again: off the favorites", not WM:IsMenuFavorite("GearSets")
+    and #WM:MenuFavorites() == 1 and WM:MenuFavorites()[1] == "AutoLogger")
+menu:Hide()
 
 -- ---- the settings panel's favorites list ----
 local panel = WM:CreateSettingsPanel()
@@ -106,7 +125,7 @@ check("Edit favorites opens settings at the list", panel:IsShown()
 
 -- ---- the minimap button: right-click is the menu, left-click the dashboard ----
 local src = io.open(REPO .. "/Core.lua"):read("*a")
-check("right-click opens the module menu", src:find('btn == "RightButton" then%s+GameTooltip:Hide%(%)%s+WM:ShowModuleMenu%(self%)') ~= nil)
+check("right-click opens the module menu", src:find('btn == "RightButton" then%s+GameTooltip:Hide%(%)%s+local ok, err = pcall%(WM.ShowModuleMenu, WM, self%)') ~= nil)
 check("left-click still opens the dashboard", src:find('elseif btn == "LeftButton" then%s+WM:ToggleDashboard%(%)') ~= nil)
 
 print(("%d passed, %d failed"):format(pass, fail))

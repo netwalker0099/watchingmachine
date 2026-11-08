@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.65"
+WM.version = "3.66"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -942,7 +942,8 @@ local function CreateMinimapButton()
         if isDragging then return end
         if btn == "RightButton" then
             GameTooltip:Hide()
-            WM:ShowModuleMenu(self)
+            local ok, err = pcall(WM.ShowModuleMenu, WM, self)
+            if not ok then WM:Print("|cFFFF6666The module menu failed:|r " .. tostring(err)) end
         elseif btn == "LeftButton" then
             WM:ToggleDashboard()
         end
@@ -1563,58 +1564,165 @@ function WM:MenuFavorites()
 end
 
 -- The minimap button's right-click menu: your favorites first, then every
--- other module under its dashboard group. Click one to open its window.
+-- other module under its dashboard group. Click one to open its window;
+-- right-click one to add it to or take it off your favorites. Our own
+-- frame, not the game's dropdown menu: it splits into columns when it's
+-- taller than the screen, and closes on Escape, on a click elsewhere or
+-- on another right-click of the button.
+local MENU_ROW_H, MENU_COL_W, MENU_PAD = 18, 190, 6
 local moduleMenu
-function WM:ShowModuleMenu(anchor)
-    if not moduleMenu then
-        moduleMenu = CreateFrame("Frame", "WM_MinimapModuleMenu", UIParent, "UIDropDownMenuTemplate")
-    end
-    UIDropDownMenu_Initialize(moduleMenu, function(_, level)
-        local function Title(text)
-            local item = UIDropDownMenu_CreateInfo()
-            item.text, item.isTitle, item.notCheckable = text, true, true
-            UIDropDownMenu_AddButton(item, level)
-        end
-        local function Module(name)
-            local info = MODULE_INFO[name]
-            local item = UIDropDownMenu_CreateInfo()
-            local on = WM:IsModuleOn(name)
-            item.text = on and info.title or ("|cFF808080" .. info.title .. " (off)|r")
-            item.notCheckable = true
-            item.icon = not info.classIcon and info.icon or nil
-            item.func = function() CloseDropDownMenus(); WM:OpenModule(name) end
-            item.tooltipTitle, item.tooltipOnButton = info.title, true
-            item.tooltipText = (info.desc or "") .. (on and "" or "\nOff on this character: click to turn it on.")
-            item.moduleName = name
-            UIDropDownMenu_AddButton(item, level)
-        end
-        local function Action(text, fn, tip)
-            local item = UIDropDownMenu_CreateInfo()
-            item.text, item.notCheckable = text, true
-            item.func = function() CloseDropDownMenus(); fn() end
-            if tip then item.tooltipTitle, item.tooltipText, item.tooltipOnButton = text, tip, true end
-            UIDropDownMenu_AddButton(item, level)
-        end
 
-        local favorites = WM:MenuFavorites()
-        if #favorites > 0 then
-            Title("|cFFFFD100Favorites|r")
-            for _, name in ipairs(favorites) do Module(name) end
+local function MenuEntries()
+    local list = {}
+    local favorites = WM:MenuFavorites()
+    if #favorites > 0 then
+        list[#list + 1] = { title = "|cFFFFD100Favorites|r" }
+        for _, name in ipairs(favorites) do list[#list + 1] = { module = name } end
+    end
+    local lastGroup
+    for _, e in ipairs(MenuModules()) do
+        if not WM:IsMenuFavorite(e.name) then
+            if e.group ~= lastGroup then list[#list + 1] = { title = e.group }; lastGroup = e.group end
+            list[#list + 1] = { module = e.name }
         end
-        local lastGroup
-        for _, e in ipairs(MenuModules()) do
-            if not WM:IsMenuFavorite(e.name) then
-                if e.group ~= lastGroup then Title(e.group); lastGroup = e.group end
-                Module(e.name)
+    end
+    list[#list + 1] = { title = " " }
+    list[#list + 1] = { action = "Edit favorites...", tip = "Pick the modules that go at the top of this menu.",
+        fn = function() WM:EditMenuFavorites() end }
+    list[#list + 1] = { action = "Settings", tip = "Theme, minimap button and the other addon settings.",
+        fn = function() WM:ToggleSettings() end }
+    return list
+end
+
+local function MenuRow(menu, i)
+    local row = menu.rows[i]
+    if row then return row end
+    row = CreateFrame("Button", nil, menu)
+    row:SetSize(MENU_COL_W, MENU_ROW_H)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
+    row.highlight:SetAllPoints(row)
+    row.highlight:SetColorTexture(1, 1, 1, 0.12)
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(14, 14)
+    row.icon:SetPoint("LEFT", 4, 0)
+    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.text:SetPoint("LEFT", row.icon, "RIGHT", 5, 0)
+    row.text:SetPoint("RIGHT", -4, 0)
+    row.text:SetJustifyH("LEFT")
+    row:SetScript("OnClick", function(self, btn)
+        local e = self.entry
+        if not e then return end
+        if e.module and btn == "RightButton" then
+            WM:SetMenuFavorite(e.module, not WM:IsMenuFavorite(e.module))
+            WM:ShowModuleMenu(menu.anchor, true)    -- redrawn, staying open
+            return
+        end
+        menu:Hide()
+        if e.module then WM:OpenModule(e.module) elseif e.fn then e.fn() end
+    end)
+    row:SetScript("OnEnter", function(self)
+        local e = self.entry
+        if not e or e.title then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if e.module then
+            local info = MODULE_INFO[e.module]
+            GameTooltip:AddLine(info.title, 1, 1, 1)
+            if info.desc then GameTooltip:AddLine(info.desc, 0.9, 0.9, 0.9, true) end
+            if not WM:IsModuleOn(e.module) then
+                GameTooltip:AddLine("Off on this character: click to turn it on.", 1, 0.5, 0.5, true)
             end
+            GameTooltip:AddLine(WM:IsMenuFavorite(e.module) and "Right-click: take off your favorites"
+                or "Right-click: add to your favorites", 0.6, 0.8, 1)
+        else
+            GameTooltip:AddLine(e.action, 1, 1, 1)
+            if e.tip then GameTooltip:AddLine(e.tip, 0.9, 0.9, 0.9, true) end
         end
-        Title(" ")
-        Action("Edit favorites...", function() WM:EditMenuFavorites() end,
-            "Pick the modules that go at the top of this menu.")
-        Action("Settings", function() WM:ToggleSettings() end, "Theme, minimap button and the other addon settings.")
-        Action(CANCEL or "Cancel", function() end)
-    end, "MENU")
-    ToggleDropDownMenu(1, nil, moduleMenu, anchor or "cursor", 0, 0)
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    menu.rows[i] = row
+    return row
+end
+
+local function CreateModuleMenu()
+    local menu = CreateFrame("Frame", "WM_MinimapModuleMenu", UIParent, "BackdropTemplate")
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+    menu:SetClampedToScreen(true)
+    menu:EnableMouse(true)
+    menu.rows = {}
+    WM:SkinPanel(menu)
+    WM:RegisterSkinnedPanel(menu)          -- themed, and closes on Escape
+    -- A click anywhere else closes it (GLOBAL_MOUSE_DOWN isn't on every client)
+    pcall(menu.RegisterEvent, menu, "GLOBAL_MOUSE_DOWN")
+    menu:SetScript("OnEvent", function(self)
+        if not self:IsShown() then return end
+        if self:IsMouseOver() or (self.anchor and self.anchor.IsMouseOver and self.anchor:IsMouseOver()) then return end
+        self:Hide()
+    end)
+    menu:Hide()
+    return menu
+end
+
+function WM:ShowModuleMenu(anchor, keepOpen)
+    moduleMenu = moduleMenu or CreateModuleMenu()
+    local menu = moduleMenu
+    if menu:IsShown() and not keepOpen then menu:Hide() return end
+    menu.anchor = anchor
+
+    local list = MenuEntries()
+    local screenH = (UIParent and UIParent:GetHeight() or 0)
+    if screenH <= 0 then screenH = 768 end
+    local perCol = math.max(8, math.floor((screenH * 0.85 - 2 * MENU_PAD) / MENU_ROW_H))
+    local cols = math.ceil(#list / perCol)
+    local rowsInCol = math.ceil(#list / cols)
+
+    for i, e in ipairs(list) do
+        local row = MenuRow(menu, i)
+        row.entry = e
+        local col, r = math.floor((i - 1) / rowsInCol), (i - 1) % rowsInCol
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", MENU_PAD + col * MENU_COL_W, -MENU_PAD - r * MENU_ROW_H)
+        if e.title then
+            row.icon:Hide()
+            row.text:SetText(e.title)
+            row.text:SetTextColor(1, 0.82, 0)
+            row:EnableMouse(false)
+        elseif e.module then
+            local info = MODULE_INFO[e.module]
+            local on = WM:IsModuleOn(e.module)
+            if info.classIcon then WM:SetCardIcon(row.icon, info) else row.icon:SetTexture(info.icon) end
+            row.icon:Show()
+            row.text:SetText(on and info.title or (info.title .. " (off)"))
+            if on then row.text:SetTextColor(1, 1, 1) else row.text:SetTextColor(0.5, 0.5, 0.5) end
+            row:EnableMouse(true)
+        else
+            row.icon:Hide()
+            row.text:SetText(e.action)
+            row.text:SetTextColor(0.6, 0.8, 1)
+            row:EnableMouse(true)
+        end
+        row:Show()
+    end
+    for i = #list + 1, #menu.rows do menu.rows[i].entry = nil; menu.rows[i]:Hide() end
+    menu.entries = list
+
+    menu:SetSize(cols * MENU_COL_W + 2 * MENU_PAD, rowsInCol * MENU_ROW_H + 2 * MENU_PAD)
+    menu:ClearAllPoints()
+    local x = anchor and anchor.GetCenter and anchor:GetCenter()
+    if x and anchor ~= UIParent then
+        -- Opens away from the screen edge the button is nearest
+        if x > (UIParent:GetWidth() or 0) / 2 then
+            menu:SetPoint("TOPRIGHT", anchor, "BOTTOMLEFT", 0, 0)
+        else
+            menu:SetPoint("TOPLEFT", anchor, "BOTTOMRIGHT", 0, 0)
+        end
+    else
+        menu:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    end
+    menu:Show()
+    return menu
 end
 
 -- The settings panel, opened at the favorites list

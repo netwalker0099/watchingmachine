@@ -2,9 +2,21 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.65** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.66** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.66
+
+### Fix: the minimap button's module menu
+
+- Right-clicking the minimap button didn't open the module menu. The menu is
+  now Watching Machine's own frame rather than the game's dropdown: themed
+  like the other windows, closed by Escape, a click elsewhere or another
+  right-click, and split into columns when it's taller than the screen.
+- **Right-click a module in the menu** to add it to or take it off your
+  favorites; the menu stays open and redraws.
+- If opening the menu ever fails, the error is printed in chat.
 
 ## 3.65
 

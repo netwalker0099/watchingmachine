@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.65 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.66 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1170,8 +1170,11 @@ opens the dashboard. Everything the addon does can be reached from it.
   window without the dashboard (an off module asks to be turned on).
   Your **favorites** come first, then the rest under their dashboard
   groups, then *Edit favorites...* and *Settings*
-- **Favorites**: tick them in Settings under *Minimap menu favorites* (or
-  the menu's *Edit favorites...*). For every character
+- **Favorites**: right-click a module in the menu to add or remove it
+  (3.66), or tick them in Settings under *Minimap menu favorites* (or the
+  menu's *Edit favorites...*). For every character
+- The menu closes on Escape, a click elsewhere or another right-click of
+  the button, and splits into columns when it's taller than the screen
 - **Hover**: every module's status, in dashboard order
 - **Drag**: Move button anywhere on screen
 
