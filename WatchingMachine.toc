@@ -4,9 +4,9 @@
 ## Title: Watching Machine
 ## Notes: Comprehensive monitoring suite - Keywords, Chat Filter, Logging, Mail/Trade, Services, Recruiting, WCL Lookup, Guild Invite, Debuff Tracker, PvP Enemy Tracker, Buff Check, ArmorySnap, Aura Range, Class Tools
 ## Author: Robert
-## Version: 3.66
+## Version: 3.67
 ## X-Curse-Project-ID: 1475405
-## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB, ManaTickDB, InstanceTrackerDB, AltTrackerDB, PvPLogDB, WorldTimersDB, LootBrowserDB, WMGearScoreDB, AttunementsDB, HazardsDB, WMCritsDB, OgrilaDB, WMGearSetsDB, WMFrameMoverDB
+## SavedVariables: WatchingMachineDB, AutoLoggerDB, KeywordMonitorDB, ChatFilterDB, MailLoggerDB, ServicesParserDB, RecruitingToolDB, WhisperLogsDB, GuildInviteDB, DebuffTrackerDB, PvPTrackerDB, BuffCheckDB, ArmorySnapDB, AuraRangeDB, ClassToolsDB, GeneralChecksDB, MageToolsDB, WarlockToolsDB, ShamanToolsDB, SwingTimerDB, ManaTickDB, InstanceTrackerDB, AltTrackerDB, PvPLogDB, WorldTimersDB, LootBrowserDB, WMGearScoreDB, AttunementsDB, HazardsDB, WMCritsDB, OgrilaDB, WMGearSetsDB, WMFrameMoverDB, WMGuildRosterDB
 
 Core.lua
 Profiles.lua
@@ -23,6 +23,9 @@ Modules/ServicesParser.lua
 Modules/Recruiter.lua
 Modules/WhisperLogs.lua
 Modules/GuildInvite.lua
+Modules/GuildRoster.lua
+Modules/GuildRosterSync.lua
+Modules/GuildRosterUI.lua
 Modules/DebuffTracker.lua
 Modules/PvPTracker.lua
 Modules/BuffCheck.lua

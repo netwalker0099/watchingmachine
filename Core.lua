@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.66"
+WM.version = "3.67"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -21,7 +21,7 @@ local WM_ERROR_PATTERNS = {
     "WatchingMachine", "watchingmachine", "WM_",
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
-    "Recruiter", "WhisperLogs", "GuildInvite", "BuffCheck", "ArmorySnap", "AuraRange",
+    "Recruiter", "WhisperLogs", "GuildInvite", "GuildRoster", "BuffCheck", "ArmorySnap", "AuraRange",
     "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ManaTick", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
 }
 
@@ -324,6 +324,7 @@ local MODULE_COLORS = {
     WhisperLogs = "CC80FF",
     Recruiter = "FFD700",
     GuildInvite = "00FF00",
+    GuildRoster = "66CCFF",
     DebuffTracker = "FFCC00",
     PvPTracker = "FF3333",
     BuffCheck = "33FF99",
@@ -1223,7 +1224,7 @@ end
 
 local MODULE_GROUPS = {
     { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
-    { title = "Guild & Social", modules = { "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
+    { title = "Guild & Social", modules = { "GuildRoster", "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
     { title = "Interface", modules = { "FrameMover" } },
 }
@@ -1347,6 +1348,18 @@ local MODULE_INFO = {
         title = "WarcraftLogs Lookup", desc = "WCL links for whispers & group",
         about = "Lists the players who whisper you and your group members, each with a Warcraft Logs link on their own realm. Click a name to copy the link.",
         command = "wcl", color = {0.8, 0.5, 1}, icon = "Interface\\Icons\\INV_Misc_Note_01",
+    },
+    GuildRoster = {
+        title = "Roster Manager", desc = "Guild roster records, log and ban list",
+        about = "Keeps a record of every guild member and everyone who has left: join and promotion dates, alts and their main, birthdays, a custom note and the ban list. Logs joins, leaves and kicks, promotions, level-ups, note changes and name changes, and shares edits with guildmates running Guild Roster Manager or Watching Machine.",
+        command = "roster", color = {0.4, 0.8, 1}, icon = "Interface\\Icons\\INV_Misc_Note_02",
+        tools = {
+            { text = "Guild log", desc = "Open the window at the guild log.", func = function() Call("GuildRoster", "ShowTab", "log") end },
+            { text = "Former members and bans", desc = "Who has left, and the ban list.", func = function() Call("GuildRoster", "ShowTab", "former") end },
+            { text = "Scan the roster now", desc = "Ask the server for the roster now.", func = function() if WM.GuildRoster then WM.GuildRoster.AskRoster() end end },
+            { text = "Import from Guild Roster Manager", desc = "Bring in what Guild Roster Manager has saved for this guild (it must be loaded).",
+              func = function() Call("GuildRoster", "Command", "import") end },
+        },
     },
     GuildInvite = {
         title = "Guild Invite", desc = "Auto-invite on 'inv' trigger",
@@ -2256,6 +2269,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine mail|r - Open Mail & Trade Logger")
     print("|cFFFFFF00/wmachine services|r - Open Services Parser")
     print("|cFFFFFF00/wmachine wcl|r - Open Whisper Logs (WCL Lookup)")
+    print("|cFFFFFF00/wmachine roster|r - Roster Manager: guild records, log, bans (roster log / former / sync / scan / import / options)")
     print("|cFFFFFF00/wmachine ginvite|r - Open Guild Invite")
     print("|cFFFFFF00/wmachine debuff|r - Open Debuff Tracker settings")
     print("|cFFFFFF00/wmachine pvp|r - Open PvP Enemy Tracker")
@@ -2479,6 +2493,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "gear" or cmd == "sets" or cmd == "itemrack" or cmd:match("^gear ") then
         local module = WM:UsableModule("GearSets")
         if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) end
+
+    elseif cmd == "roster" or cmd == "grm" or cmd:match("^roster ") or cmd:match("^grm ") then
+        local module = WM:UsableModule("GuildRoster")
+        if module and module.Command then module:Command(cmd:match("^roster (.+)$") or cmd:match("^grm (.+)$")) end
 
     elseif cmd == "ogri" or cmd == "relic" or cmd == "ogrila" or cmd:match("^ogri ") then
         local module = WM:UsableModule("Ogrila")

@@ -58,6 +58,7 @@ P.SCOPE = {
     OgrilaDB = {},
     WMGearSetsDB = { shared = { "chars" } },
     WMFrameMoverDB = { shared = { "layout" } },
+    WMGuildRosterDB = { shared = { "guilds", "patchDay" } },
 }
 
 local function DeepCopy(v)

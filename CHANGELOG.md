@@ -2,9 +2,35 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.66** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.67** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.67
+
+### New module: Roster Manager
+
+A rebuild of Guild Roster Manager's core, in our own code, in the Guild &
+Social group (`/wmachine roster`).
+
+- **Roster scan** every 30 seconds, matching members by character ID:
+  joins and rejoins, leaves and kicks, promotions and demotions, level-ups,
+  public and officer note changes, name changes, renamed ranks and players
+  back after a long absence go into the guild log, with who invited,
+  kicked, promoted or demoted from the game's guild event log.
+- **Member records**: join and promotion dates, rank history, alts and
+  mains, a birthday per alt group, a 150-character custom note and bans.
+  Edit them in the window's details pane; hover the game's Guild window
+  roster to see them.
+- **Former members and the ban list**, with a warning when a banned player
+  rejoins, and *Ban by name* for players outside the guild.
+- **Sync with Guild Roster Manager users** (and other Watching Machine
+  users): live edits both ways, in Guild Roster Manager's own message
+  format, with its rank rules (bans only between officers by default). It
+  follows the Guild Roster Manager release your guild announces.
+  Guild Roster Manager's full catch-up sync is planned next.
+- **Import** from Guild Roster Manager's saved data when it's loaded.
+- Its own page in the guided setup, and in the *Guild officer* quick setup.
 
 ## 3.66
 

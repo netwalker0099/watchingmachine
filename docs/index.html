@@ -143,6 +143,7 @@
     <a href="#shaman">Shaman</a>
     <a href="#paladin">Paladin</a>
     <h4>Guild &amp; social</h4>
+    <a href="#roster">Roster Manager</a>
     <a href="#ginvite">Guild Invite</a>
     <a href="#recruit">Recruiting Tool</a>
     <a href="#pvp">PvP Enemy Tracker</a>
@@ -634,6 +635,19 @@
 </section>
 
 <!-- ============================ GUILD & SOCIAL ============================ -->
+<section id="roster">
+  <h2>Roster Manager <span class="who">Officers · Guild Roster Manager-style</span></h2>
+  <p class="open">Open: <code>/wmachine roster</code> (or <code>/wmachine grm</code>)</p>
+  <p>A record of every guild member and everyone who has left, a guild log, and the ban list, shared with guildmates running Guild Roster Manager.</p>
+  <ul>
+    <li><b>Roster scan</b> every 30 seconds: joins, rejoins, leaves and kicks, promotions and demotions (with who did it), level-ups, note changes, name changes and players back from a long absence go into the <b>Log</b> tab. <i>Options</i> picks which go to the log and which to your chat.</li>
+    <li><b>Click a member</b> for their details: join and promotion dates, alts and main, birthday, custom note, ban. The buttons edit them. Hover a name in the game's Guild window for the same details.</li>
+    <li><b>Former &amp; bans:</b> everyone who left, and the ban list. A banned player who rejoins gets a red warning. <i>Ban by name</i> bans someone outside the guild.</li>
+    <li><b>Sync:</b> your edits go to guildmates running Guild Roster Manager or Watching Machine as you make them, and theirs come to you; the newest edit wins. Bans only between the ranks you allow. The Sync tab lists who you share with.</li>
+    <li><b>Import</b> (Options, or <code>/wmachine roster import</code>) brings in what Guild Roster Manager has saved, when it's loaded. With Guild Roster Manager running on the same character, it does the syncing.</li>
+  </ul>
+</section>
+
 <section id="ginvite">
   <h2>Guild Invite <span class="who">Group leaders</span></h2>
   <p class="open">Open: <code>/wmachine ginvite</code></p>
@@ -820,6 +834,7 @@
     <tr><td><code>swing</code> · <code>swing reset</code></td><td>Show or reset the swing timer</td></tr>
     <tr><td><code>manatick</code> · <code>manatick reset</code></td><td>Show the mana tick spark; reset its own bar</td></tr>
     <tr><td><code>soulstone</code> · <code>portals</code> · <code>totems</code></td><td>Warlock soulstones, mage portals, shaman totem sets</td></tr>
+    <tr><td><code>roster</code> · <code>roster log</code> · <code>roster sync</code> · <code>roster import</code></td><td>Roster Manager</td></tr>
     <tr><td><code>ginvite</code> · <code>recruit</code> · <code>pvp</code></td><td>Guild Invite, Recruiting Tool, PvP Enemy Tracker</td></tr>
     <tr><td><code>filter</code> · <code>keyword</code> · <code>services</code> · <code>wcl</code></td><td>Chat Filter, Keyword Monitor, Services Parser, Whisper Logs</td></tr>
     <tr><td><code>logger</code> · <code>mail</code></td><td>Auto Logger, Mail &amp; Trade Logger</td></tr>
@@ -848,7 +863,7 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.66 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+<footer>Watching Machine guide · written for version 3.67 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
   Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>

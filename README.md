@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.66 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.67 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1006,6 +1006,46 @@ research; the code is our own.
 - **Turned off,** every window goes back to the game's place, size and
   mouse settings; your layout stays saved for when you turn it on again
 
+### 32. Roster Manager
+
+Guild records, the guild log and the ban list, sharing its edits with
+guildmates running **Guild Roster Manager** or Watching Machine (3.67).
+Open it with `/wmachine roster` (also `/wmachine grm`).
+
+- **Roster scan** every 30 seconds (and whenever the game updates the
+  roster), comparing each member by their character ID so name changes are
+  followed. A partial roster from the server (half the guild gone at once)
+  is ignored
+- **The guild log** (Log tab): joins and rejoins (with who invited), leaves
+  and kicks (with who kicked), promotions and demotions (with who did it),
+  level-ups from a level you choose, public and officer note changes, name
+  changes, renamed ranks, players back after a long absence, and every edit
+  below. Each kind can go to the log, your chat, both or neither
+  (*Options*). The game's guild event log supplies the "who"
+- **Each member's record**: join and promotion dates (verified or not),
+  rank history, alts and their main, a birthday (shared by the alt group),
+  a custom note of up to 150 characters, and the ban list. Click a member
+  for the details pane and its buttons; hover a name in the game's Guild
+  window for the same details
+- **Former members** (Former & bans tab): everyone who left, with their
+  alts at the time. A rejoining player's history comes back; a banned one
+  gets a red warning. *Ban by name* bans someone who isn't in the guild
+- **Sync with Guild Roster Manager**: join and promotion dates, alts and
+  mains, custom notes, birthdays and bans are sent to guildmates the moment
+  you edit them, in Guild Roster Manager's own format, and theirs come to
+  you. The newest edit wins. Bans go only to the ranks you allow (officers
+  by default). Guild Roster Manager only talks to a client on its exact
+  release, so Roster Manager uses the release your guildmates announce.
+  The Sync tab lists who you share with
+  - Not yet: Guild Roster Manager's full catch-up sync (for edits made
+    while you were offline). Planned next
+- **Import** (*Options*, or `/wmachine roster import`): reads what Guild
+  Roster Manager has saved for the guild, when it's installed and loaded
+- **Guild Roster Manager on the same character**: Roster Manager keeps the
+  roster and log but leaves the syncing to it
+- Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
+  `import`, `options`
+
 ## Global Theme System
 
 Addon-wide theme support accessible via `/wmachine settings` or the Settings button on the dashboard.
@@ -1272,6 +1312,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `WMCritsDB` - Crit Tracker records per character, and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
+- `WMGuildRosterDB` - Roster Manager: each guild's members, former members, alt groups and log (shared by your characters), and this character's options
 - `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, options, and the layout shared by all characters
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
 
@@ -1294,6 +1335,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.67
+- **New module: Roster Manager** (`/wmachine roster`): guild member records (join and promotion dates, alts and mains, birthdays, custom notes, bans), a guild log of joins, leaves, kicks, promotions and more, former members and the ban list. Shares its edits with guildmates running Guild Roster Manager or Watching Machine, and can import Guild Roster Manager's saved data
 
 ### Version 3.66
 - **Fix: the minimap button's right-click menu didn't open.** It's now a menu of its own instead of the game's dropdown, splits into columns on a short screen, and right-clicking a module in it adds or removes a favorite

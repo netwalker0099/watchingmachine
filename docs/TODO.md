@@ -16,6 +16,12 @@ what still needs settling before it's built.
 11. ~~Alt tracking: "Your Characters"~~ (done, 3.27)
 12. ~~PvP instance log: battleground and arena stats~~ (done, 3.27)
 13. ~~World buff timers, Songflowers and Darkmoon Faire~~ (done, 3.28)
+14. Roster Manager (Guild Roster Manager rebuild): core and live-edit sync
+    done in 3.67. Next: Guild Roster Manager's full catch-up sync (leader
+    election, hashes, per-name edit lists, sequence numbers and resends;
+    both leader and follower roles). After that: the kick / promote /
+    demote tool (a button you click, since those need a key press), the
+    inactivity rules, export, join-date note stamping and anniversaries
 
 ---
 

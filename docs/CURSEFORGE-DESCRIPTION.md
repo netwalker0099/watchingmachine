@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.66 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.67 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1254,5 +1254,6 @@ Built-in error capture system for debugging.
 - `WMCritsDB` - Crit Tracker records per character, and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
+- `WMGuildRosterDB` - Roster Manager: each guild's members, former members, alt groups and log (shared by your characters), and this character's options
 - `WMFrameMoverDB` - Frame Mover: each character's window positions and sizes, windows left alone, options, and the layout shared by all characters
 - `ShamanToolsDB` - Totem sets, the set in use, and the totem button's position and direction
