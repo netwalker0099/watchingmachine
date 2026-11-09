@@ -2,9 +2,22 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.82** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.83** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.83
+
+### Fixes
+
+- The Damage Meter's menus (left-click a window's title for what it shows,
+  right-click for the fight, and the report menu) didn't appear where you
+  clicked with ElvUI and other UI packs: the game's dropdown menu places
+  itself from the cursor divided by the UI scale, so it landed far away or
+  off the screen. They're now Watching Machine's own menu, opened at the
+  cursor; a click elsewhere or Escape closes it.
+- The same for Crits' share menu and the Loot Browser's right-click menu
+  (which stays open while you tick lists and BiS specs).
 
 ## 3.82
 

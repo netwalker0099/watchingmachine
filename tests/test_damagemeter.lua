@@ -273,17 +273,22 @@ check("window bars", w1.bars[1]:IsShown() and w1.bars[1].left:GetText() == "1. M
 check("window title", w1.title.text:GetText():find("Damage - Overall", 1, true) ~= nil)
 check("one player, one bar", not (w1.bars[2] and w1.bars[2]:IsShown()))
 -- Display menu
-local items = W.openMenu(DM:OpenMenu("display", 1))
+local items = DM:OpenMenu("display", 1)
+check("left-click opens our own menu", env.WM_PopupMenu and env.WM_PopupMenu:IsShown())
+w1.title._scripts.OnClick(w1.title, "LeftButton")
+check("title left-click: the display menu", env.WM_PopupMenu.rows[1].text:GetText() == "What this window shows")
+w1.title._scripts.OnClick(w1.title, "RightButton")
+check("title right-click: the fight menu", env.WM_PopupMenu.rows[1].text:GetText() == "Which fight")
 local heal
 for _, it in ipairs(items) do if it.text == "Healing Done" then heal = it end end
 check("display menu lists the displays", heal ~= nil and #items >= 12)
 heal.func()
 check("choosing a display", env.WMDamageMeterDB.windows[1].display == "heal" and w1.bars[1].left:GetText() == "1. Healer")
-local segItems = W.openMenu(DM:OpenMenu("segment", 1))
+local segItems = DM:OpenMenu("segment", 1)
 check("fight menu", segItems[2].text:find("Current fight", 1, true) and segItems[3].text == "Overall" and #segItems == 5)
 segItems[2].func()
 check("choosing a fight", env.WMDamageMeterDB.windows[1].segment == "current")
-local repItems = W.openMenu(DM:OpenMenu("report", 1))
+local repItems = DM:OpenMenu("report", 1)
 check("report menu", repItems[2].text == "Say" and #repItems == 8)
 -- Bar tooltip and breakdown
 DM:SetWindowSegment(1, "overall")

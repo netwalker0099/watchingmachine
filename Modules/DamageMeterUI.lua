@@ -501,21 +501,20 @@ end
 -- ============================================
 
 local function Item(text, func, checked, opts)
-    local info = UIDropDownMenu_CreateInfo()
-    info.text, info.func = text, func
-    if checked ~= nil then info.checked = checked else info.notCheckable = true end
+    local info = { text = text, func = func, checked = checked }
     if opts then for k, v in pairs(opts) do info[k] = v end end
     return info
 end
 
--- kind: "display", "segment" or "report", for window i. Returns the menu
--- frame (the items are built when it opens).
+-- kind: "display", "segment" or "report", for window i. Opens Watching
+-- Machine's own menu at the cursor (the game's dropdown menu didn't open
+-- for some players) and returns its items.
 function DM:OpenMenu(kind, i)
-    if not self.menu then self.menu = CreateFrame("Frame", "WM_DamageMeterMenu", UIParent, "UIDropDownMenuTemplate") end
     local cfg = DB().windows[i]
-    if not cfg then return self.menu end
-    UIDropDownMenu_Initialize(self.menu, function(_, level)
-        local add = function(info) UIDropDownMenu_AddButton(info, level) end
+    if not cfg then return {} end
+    local items = {}
+    do
+        local add = function(info) items[#items + 1] = info end
         if kind == "display" then
             add(Item("What this window shows", nil, nil, { isTitle = true }))
             for _, d in ipairs(DM.DISPLAYS) do
@@ -553,9 +552,9 @@ function DM:OpenMenu(kind, i)
                 end
             end))
         end
-    end, "MENU")
-    if ToggleDropDownMenu then ToggleDropDownMenu(1, nil, self.menu, "cursor", 0, 0) end
-    return self.menu
+    end
+    if WM.UI and WM.UI.ShowMenu then WM.UI:ShowMenu(items) end
+    return items
 end
 
 -- ============================================
@@ -713,5 +712,5 @@ function DM:HideAllFrames()
     for _, f in pairs(frames) do f:Hide() end
     if self.breakdown then self.breakdown:Hide() end
     if self.options then self.options:Hide() end
-    if self.menu and CloseDropDownMenus then CloseDropDownMenus() end
+    if WM.UI and WM.UI.HideMenu then WM.UI:HideMenu() end
 end

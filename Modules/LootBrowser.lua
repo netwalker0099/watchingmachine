@@ -1173,31 +1173,23 @@ end
 -- Right-click: which of your lists it's in, and which specs it's BiS for
 function LB:OpenItemMenu(id)
     if not id then return end
-    if not self.menu then
-        self.menu = CreateFrame("Frame", "WM_LootItemMenu", UIParent, "UIDropDownMenuTemplate")
-    end
-    local menu = self.menu
-    UIDropDownMenu_Initialize(menu, function(_, level)
-        local title = UIDropDownMenu_CreateInfo()
-        title.text, title.isTitle, title.notCheckable = ItemInfo(id) or ("Item " .. id), true, true
-        UIDropDownMenu_AddButton(title, level)
+    -- Watching Machine's own menu at the cursor; it stays open while you tick
+    local function Build()
+        local items = { { text = ItemInfo(id) or ("Item " .. id), isTitle = true } }
         for _, name in ipairs(DB().listOrder) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text, info.isNotRadio, info.keepShownOnClick = name, true, true
-            info.checked = LB:InList(name, id)
-            info.func = function() LB:ToggleList(name, id); LB:RefreshList() end
-            UIDropDownMenu_AddButton(info, level)
+            items[#items + 1] = { text = name, checked = LB:InList(name, id), keepOpen = true,
+                func = function() LB:ToggleList(name, id); LB:RefreshList() end }
         end
         for _, spec in ipairs(LB.MySpecs()) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text, info.isNotRadio, info.keepShownOnClick = "BiS: " .. spec, true, true
-            info.checked = LB:IsBiS(spec, id)
-            info.func = function() LB:ToggleBiS(spec, id); LB:RefreshList() end
-            UIDropDownMenu_AddButton(info, level)
+            items[#items + 1] = { text = "BiS: " .. spec, checked = LB:IsBiS(spec, id), keepOpen = true,
+                func = function() LB:ToggleBiS(spec, id); LB:RefreshList() end }
         end
-    end, "MENU")
-    if ToggleDropDownMenu then ToggleDropDownMenu(1, nil, menu, "cursor", 0, 0) end
-    return menu
+        return items
+    end
+    local items = Build()
+    self.menuItems = items
+    if WM.UI and WM.UI.ShowMenu then WM.UI:ShowMenu(items, Build) end
+    return items
 end
 
 -- Left-click links / tries on; Alt-click adds to (or takes out of) your

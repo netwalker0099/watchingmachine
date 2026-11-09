@@ -1027,3 +1027,102 @@ function UI:ShowCopyText(title, text, note)
     copyPanel.box:HighlightText()
     return copyPanel
 end
+
+-- ============================================
+-- A SMALL MENU AT THE CURSOR
+-- ============================================
+-- UI:ShowMenu(items, rebuild): our own menu frame. The game's dropdown
+-- menus open "at the cursor" from a position divided by the UI scale, so
+-- with ElvUI and other UI packs they land far from the click (often off the
+-- screen). items: { text, func, checked (true / false / nil for no tick),
+-- isTitle, disabled, keepOpen }. Closes on a choice, a click elsewhere, or
+-- Escape; a keepOpen item stays open and the menu is redrawn from
+-- rebuild() (ticks that change with each click).
+
+local menu
+
+function UI:HideMenu() if menu then menu:Hide() end end
+
+function UI:ShowMenu(items, rebuild, stay)
+    if not menu then
+        menu = CreateFrame("Frame", "WM_PopupMenu", UIParent, "BackdropTemplate")
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu:SetClampedToScreen(true)
+        menu:EnableMouse(true)
+        if menu.SetBackdrop then
+            menu:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8", edgeFile = "Interface\Buttons\WHITE8X8", edgeSize = 1 })
+            menu:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+            menu:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+        end
+        menu.rows = {}
+        -- Escape closes it
+        if type(UISpecialFrames) == "table" then
+            local found = false
+            for _, n in ipairs(UISpecialFrames) do if n == "WM_PopupMenu" then found = true end end
+            if not found then table.insert(UISpecialFrames, "WM_PopupMenu") end
+        end
+        -- A click anywhere else closes it
+        menu:SetScript("OnEvent", function(self)
+            if self:IsShown() and not (self.IsMouseOver and self:IsMouseOver()) then self:Hide() end
+        end)
+        menu:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+        menu:SetScript("OnHide", function(self) pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+    end
+    local ROW, width = 16, 140
+    for i, it in ipairs(items) do
+        local row = menu.rows[i]
+        if not row then
+            row = CreateFrame("Button", nil, menu)
+            row:SetHeight(ROW)
+            row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * ROW)
+            row:SetPoint("RIGHT", menu, "RIGHT", -4, 0)
+            row.hl = row:CreateTexture(nil, "HIGHLIGHT")
+            row.hl:SetAllPoints(row)
+            row.hl:SetColorTexture(1, 1, 1, 0.12)
+            row.check = row:CreateTexture(nil, "ARTWORK")
+            row.check:SetSize(12, 12)
+            row.check:SetPoint("LEFT", 2, 0)
+            row.check:SetTexture("Interface\Buttons\UI-CheckBox-Check")
+            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.text:SetPoint("LEFT", 18, 0)
+            row.text:SetJustifyH("LEFT")
+            row:SetScript("OnClick", function(self)
+                local fn = self.func
+                if self.keepOpen and menu.rebuild then
+                    if fn then fn() end
+                    UI:ShowMenu(menu.rebuild(), menu.rebuild, true)
+                    return
+                end
+                menu:Hide()
+                if fn then fn() end
+            end)
+            menu.rows[i] = row
+        end
+        row.func = (not it.isTitle and not it.disabled) and it.func or nil
+        row.keepOpen = it.keepOpen
+        row.text:SetText(it.text or "")
+        if it.isTitle then row.text:SetTextColor(1, 0.82, 0)
+        elseif it.disabled then row.text:SetTextColor(0.5, 0.5, 0.5)
+        else row.text:SetTextColor(1, 1, 1) end
+        row.check:SetShown(it.checked == true)
+        if it.isTitle or it.disabled then row:Disable(); row.hl:Hide() else row:Enable(); row.hl:Show() end
+        row:Show()
+        local w = (row.text.GetStringWidth and tonumber(row.text:GetStringWidth()) or 0) + 30
+        if w > width then width = w end
+    end
+    for i = #items + 1, #menu.rows do menu.rows[i]:Hide() end
+    menu:SetSize(math.min(width, 360), 8 + #items * ROW)
+    menu.rebuild = rebuild
+    menu.items = items
+    if stay and menu:IsShown() then return menu end
+    local x, y = 0, 0
+    if GetCursorPosition then
+        local cx, cy = GetCursorPosition()
+        local scale = (UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()) or 1
+        x, y = (tonumber(cx) or 0) / scale, (tonumber(cy) or 0) / scale
+    end
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    menu:Show()
+    return menu
+end

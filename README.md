@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.83 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1590,6 +1590,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.83
+- Fixed: the Damage Meter's menus (click a window's title for what it shows, right-click for the fight), Crits' share menu and the Loot Browser's right-click menu opened far from the click (often off the screen) with ElvUI and other UI packs; they're now Watching Machine's own menu, at the cursor
 
 ### Version 3.82
 - **Roster Manager**: sort and filters, Promote / Demote, promotion suggestions, export, join dates stamped into notes, anniversaries and birthdays, and the full catch-up sync with Guild Roster Manager's leader and Watching Machine users

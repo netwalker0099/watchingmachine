@@ -306,18 +306,14 @@ local function Row(child, rows, i)
     return r
 end
 
+-- Watching Machine's own menu at the cursor; returns its items
 function CR:OpenShareMenu(rec)
-    if not self.menu then self.menu = CreateFrame("Frame", "WM_CritsShareMenu", UIParent, "UIDropDownMenuTemplate") end
-    UIDropDownMenu_Initialize(self.menu, function(_, level)
-        for _, ch in ipairs({ { "SAY", "Say" }, { "PARTY", "Party" }, { "RAID", "Raid" }, { "GUILD", "Guild" } }) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text, info.notCheckable = "Share in " .. ch[2], true
-            info.func = function() CR:Share(rec, ch[1]) end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end, "MENU")
-    if ToggleDropDownMenu then ToggleDropDownMenu(1, nil, self.menu, "cursor", 0, 0) end
-    return self.menu
+    local items = {}
+    for _, ch in ipairs({ { "SAY", "Say" }, { "PARTY", "Party" }, { "RAID", "Raid" }, { "GUILD", "Guild" } }) do
+        items[#items + 1] = { text = "Share in " .. ch[2], func = function() CR:Share(rec, ch[1]) end }
+    end
+    if WM.UI and WM.UI.ShowMenu then WM.UI:ShowMenu(items) end
+    return items
 end
 
 local function SpellIcon(id)

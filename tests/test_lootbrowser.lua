@@ -382,11 +382,14 @@ second._scripts.OnClick(second, "LeftButton")
 altDown = false
 check("Alt-click adds to your list", LB:InList("Favourites", second.itemID) and p.itemButtons[2].star:IsShown())
 p.itemButtons[2]._scripts.OnClick(p.itemButtons[2], "RightButton")
-local menuItems = W.openMenu(LB.menu)
+local menuItems = LB.menuItems
 check("right-click menu: title, lists, BiS per spec", #menuItems == 5 and menuItems[1].isTitle and menuItems[2].text == "Favourites"
     and menuItems[2].checked and menuItems[4].text == "BiS: Fire" and not menuItems[4].checked)
-menuItems[4].func()
-check("menu: marks BiS", LB:IsBiS("Fire", p.itemButtons[2].itemID) and p.itemButtons[2].bis:IsShown())
+local pm = env.WM_PopupMenu
+check("our own menu opens", pm and pm:IsShown() and pm.rows[2].text:GetText() == "Favourites")
+pm.rows[4]._scripts.OnClick(pm.rows[4])
+check("menu: marks BiS, stays open with the tick", LB:IsBiS("Fire", p.itemButtons[2].itemID) and p.itemButtons[2].bis:IsShown()
+    and pm:IsShown() and pm.items[4].checked == true and pm.rows[4].check:IsShown())
 p.catBox.buttons[6]:_fire("OnClick")
 check("My Lists page", env.LootBrowserDB.category == "mine" and p.status:GetText():find("Favourites", 1, true)
     and p.listBar:IsShown() and not p.diffBar:IsShown())

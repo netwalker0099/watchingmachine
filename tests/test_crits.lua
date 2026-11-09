@@ -117,8 +117,7 @@ check("looking at an unknown alt adds nothing", CR:BestLine("Alt-Spineshatter") 
 local fb = CR:List(nil, "spell")[1]
 CR:Share(fb, "GUILD")
 check("share", sent[#sent][2] == "GUILD" and sent[#sent][1]:find("My best crit Fireball: 4,700 on Attumen", 1, true))
-local menu = CR:OpenShareMenu(fb)
-local items = W.openMenu(menu)
+local items = CR:OpenShareMenu(fb)
 check("share menu", #items == 4 and items[4].text == "Share in Guild")
 
 -- ---- Window ----
