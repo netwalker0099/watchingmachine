@@ -130,6 +130,21 @@ for _, part in ipairs(Codec.Frame(Codec.Serialize("E", { g = "wm:x:1:1", i = 1, 
 end
 check("only the guild channel", #LC.ForPlayer("Bad") == 0)
 
+-- ============ Attendance ============
+env.IsInRaid = function() return true end
+env.GetRaidRosterInfo = function(i) return ({ "Me", "Taslan" })[i] end
+env.GetRealZoneText = function() return "Karazhan" end
+LC:RecordKill("Prince Malchezaar")
+out = Out()
+check("a boss kill goes to the guild", out[1] and out[1].kind == "A" and out[1].payload.b == "Prince Malchezaar" and #out[1].payload.m == 2)
+From("Venhana", "A", { t = now, z = "Karazhan", b = "Prince Malchezaar", m = { "Venhana-Nightslayer", "Taslan-Nightslayer" } })
+local kara = LC.DB().raids[LC.RaidKey(now, "Karazhan", "Prince Malchezaar")]
+check("a guildmate's view of the same kill adds who we missed", kara and #kara.members == 3)
+From("Venhana", "A", { t = now - 86400, z = "Karazhan", b = "Nightbane", m = { "Venhana-Nightslayer" } })
+check("a kill we weren't at", LC.DB().raids[LC.RaidKey(now - 86400, "Karazhan", "Nightbane")] ~= nil)
+check("not sent on again", #Out() == 0)
+env.IsInRaid = function() return false end
+
 -- ============ Catching up ============
 Sync:ResetForTests()
 WM.LootCouncil.DB().syncLastOnline = nil
@@ -146,7 +161,7 @@ check("next login: since an hour before", out[1] and out[1].payload == now - 720
 Sync:ResetForTests()
 From("Returner", "C", now - 7200 - 3600)
 local queued = Sync.CatchUpLength()
-check("catch-up queued", queued >= 2)
+check("catch-up queued (awards and raids)", queued >= 3)
 check("catch-up waits a moment", #Out() == 0)
 -- Someone else sends one first: we skip it
 local skipGid = "gl:chk1"
@@ -154,7 +169,7 @@ From("Faster", "E", { g = skipGid, a = { gl = "chk1" }, i = 30242, o = "Pug-Nigh
 RunTimers()
 out = Out()
 local gids = {}
-for _, m in ipairs(out) do gids[m.payload.g] = true end
+for _, m in ipairs(out) do if m.payload.g then gids[m.payload.g] = true end end
 check("catch-up sent the rest", #out >= 1 and #out == queued - 1)
 check("skipped what someone else sent", not gids[skipGid])
 check("nothing left", Sync.CatchUpLength() == 0)

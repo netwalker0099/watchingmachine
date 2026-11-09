@@ -100,6 +100,13 @@ local function Send(kind, payload, urgent)
     end
 end
 
+function Sync:ShareRaid(r, key)
+    if not Sync.Enabled() or not r then return false end
+    Send("A", { t = r.t, z = r.zone, b = r.boss, m = r.members })
+    Heard("raid:" .. key, r.t or 0)
+    return true
+end
+
 function Sync:Share(e)
     if not Sync.Enabled() or not e then return false end
     local w = Sync.Pack(e)
@@ -171,7 +178,16 @@ function Sync:OnMessage(prefix, msg, dist, sender)
     if not whole then return end
     local ok, kind, payload = Codec.Deserialize(whole)
     if not ok then return end
-    if kind == "E" then
+    if kind == "A" then
+        -- A boss kill and who was there
+        if type(payload) == "table" and tonumber(payload.t) and payload.z and type(payload.m) == "table" then
+            local members = {}
+            for _, n in ipairs(payload.m) do if type(n) == "string" then members[#members + 1] = n end end
+            local key = LC.RaidKey(tonumber(payload.t), payload.z, payload.b)
+            Heard("raid:" .. key, tonumber(payload.t))
+            LC.AddRaid({ t = tonumber(payload.t), zone = payload.z, boss = payload.b, members = members }, false)
+        end
+    elseif kind == "E" then
         local e = Sync.Unpack(payload)
         if e then
             Heard(e.gid, e.mod or 0)
@@ -194,11 +210,20 @@ local function DripNext()
     while #drip > 0 do
         local item = table.remove(drip, 1)
         dripSet[item.gid] = nil
-        local e = DB().history[item.id]
-        if e and not SentSince(item.gid, e.mod or e.t or 0, item.seq) then
-            Sync:Share(e)
-            if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
-            return
+        if item.raid then
+            local r = DB().raids[item.raid]
+            if r and not SentSince(item.gid, r.t or 0, item.seq) then
+                Sync:ShareRaid(r, item.raid)
+                if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
+                return
+            end
+        else
+            local e = DB().history[item.id]
+            if e and not SentSince(item.gid, e.mod or e.t or 0, item.seq) then
+                Sync:Share(e)
+                if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
+                return
+            end
         end
     end
 end
@@ -214,6 +239,17 @@ function Sync:OnCatchUp(since)
                 dripSet[gid].seq = seq
             else
                 dripSet[gid] = { id = id, gid = gid, mod = e.mod or e.t or 0, seq = seq }
+                new[#new + 1] = dripSet[gid]
+            end
+        end
+    end
+    for key, r in pairs(DB().raids or {}) do
+        if (r.t or 0) > since then
+            local gid = "raid:" .. key
+            if dripSet[gid] then
+                dripSet[gid].seq = seq
+            else
+                dripSet[gid] = { raid = key, gid = gid, mod = r.t or 0, seq = seq }
                 new[#new + 1] = dripSet[gid]
             end
         end
@@ -252,6 +288,7 @@ function Sync:Init()
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX) end
     WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "PLAYER_LOGOUT" })
     LC.OnShare = function(e) Sync:Share(e) end
+    LC.OnShareRaid = function(r, key) Sync:ShareRaid(r, key) end
     -- After the imports at login, ask for what we missed
     if C_Timer then C_Timer.After(30, function() if On() then Sync:Hello() end end) end
 end

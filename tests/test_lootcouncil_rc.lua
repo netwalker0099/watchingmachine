@@ -173,6 +173,34 @@ local tt = { AddLine = function(_, t) lines[#lines + 1] = tostring(t) end,
 LC:AddLootTooltip(tt, "Taslan-Nightslayer", 30)
 check("hover: their last 30 days", table.concat(lines, "\n"):find("Last 30 days: 1 item", 1, true))
 
+-- Attendance, GearScore and where it drops
+env.GetRaidRosterInfo = function(i) return raid[i] and raid[i][1] end
+env.GetRealZoneText = function() return "Serpentshrine Cavern" end
+check("a boss kill records the raid", LC:RecordKill("Lady Vashj") == true)
+check("the same kill again adds nothing", LC:RecordKill("Lady Vashj") == false)
+LC.AddRaid({ t = now - 3 * 86400, zone = "Tempest Keep", boss = "Al'ar", members = { "Taslan-Nightslayer" } })
+LC.AddRaid({ t = now - 40 * 86400, zone = "Tempest Keep", boss = "Void Reaver", members = { "Venhana-Nightslayer" } })
+local a, t = LC.Attendance("Taslan", 30)
+check("attendance: raid nights in the last 30 days", a == 2 and t == 2)
+a, t = LC.Attendance("Venhana", 30)
+check("attendance: a night missed, an old night not counted", a == 1 and t == 2)
+check("attendance text", LC.AttendanceText("Venhana", 30) == "50% (1/2)")
+LC:RefreshVoting()
+local att
+for _, row in ipairs(env.WM_LootVotingFrame.list.rows) do
+    if row.cand and row.cand.name == "Taslan-Nightslayer" then att = row.cells.att:GetText() end
+end
+check("voting frame: attendance column", att and att:find("100%%"))
+check("no GearScore module: no score", LC.GearScoreText("Taslan") == nil)
+check("no Loot Browser: no source", LC.ItemSource(30100) == nil)
+WM.modules.LootBrowser = { SourceShort = function(_, id) return id == 30100 and "Lady Vashj (Serpentshrine Cavern)" or nil end }
+WM.modules.GearScore = { Known = function(_, unit) return unit == "raid3" and { score = 1650 } or nil end, ColorText = function(sc) return "GS" .. sc end }
+check("Loot Browser on: where it drops", LC.ItemSource(30100) == "Lady Vashj (Serpentshrine Cavern)")
+check("GearScore on: their score", LC.GearScoreText("Taslan") == "GS1650")
+LC:RefreshVoting()
+check("the item's source under its name", env.WM_LootVotingFrame.sub:GetText():find("Lady Vashj (Serpentshrine Cavern)", 1, true))
+WM.modules.LootBrowser, WM.modules.GearScore = nil, nil
+
 -- Award and history, live
 From("Venhana", "awarded", { 2, "Taslan-Nightslayer", nil })
 check("awarded shown", RC.session.items[2].awarded == "Taslan-Nightslayer"

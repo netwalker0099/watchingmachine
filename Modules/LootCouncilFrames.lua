@@ -194,6 +194,7 @@ local COLS = {
     { key = "name", title = "Name", w = 110 }, { key = "rank", title = "Rank", w = 80 },
     { key = "response", title = "Response", w = 130 }, { key = "ilvl", title = "ilvl", w = 40 },
     { key = "diff", title = "Diff", w = 38 }, { key = "gear", title = "Gear", w = 44 },
+    { key = "gs", title = "GS", w = 40 }, { key = "att", title = "Att.", w = 40 },
     { key = "votes", title = "Votes", w = 40 }, { key = "vote", title = "", w = 62 },
     { key = "note", title = "Note", w = 34 }, { key = "roll", title = "Roll", w = 34 },
     { key = "last", title = "Last loot", w = 0 },
@@ -232,8 +233,30 @@ local function CandidateTip(owner, c)
     local voters = {}
     for v in pairs(c.voters or {}) do voters[#voters + 1] = LC.Short(v) end
     if #voters > 0 then GameTooltip:AddLine("Voted for by: " .. table.concat(voters, ", "), 0.8, 0.8, 0.8, true) end
+    local att = LC.AttendanceText(c.name, DB().recentDays)
+    if att then GameTooltip:AddDoubleLine("Attendance (" .. DB().recentDays .. " days)", att, 1, 0.82, 0, 1, 1, 1) end
+    local gs = LC.GearScoreText(c.name)
+    if gs then GameTooltip:AddDoubleLine("GearScore", gs, 1, 0.82, 0, 1, 1, 1) end
     LC:AddLootTooltip(GameTooltip, c.name, DB().recentDays)
     GameTooltip:Show()
+end
+
+-- A candidate's GearScore, coloured (GearScore module on, and they've been seen)
+function LC.GearScoreText(name)
+    local GS = WM:IsModuleOn("GearScore") and WM.modules.GearScore
+    if not GS or not GS.Known then return nil end
+    local unit = LC.ML and LC.ML.GroupByName()[LC.Key(name)]
+    local e = unit and GS:Known(unit)
+    if not e or not e.score then return nil end
+    return GS.ColorText and GS.ColorText(e.score) or tostring(e.score)
+end
+
+-- Where an item drops (Loot Browser on): "Lady Vashj (Serpentshrine Cavern)"
+function LC.ItemSource(itemID)
+    local LB = WM:IsModuleOn("LootBrowser") and WM.modules.LootBrowser
+    if not LB or not LB.SourceShort or not itemID then return nil end
+    local ok, s = pcall(LB.SourceShort, LB, itemID)
+    return ok and s or nil
 end
 
 local function VoteRow(i)
@@ -334,7 +357,8 @@ function LC:RefreshVoting()
     for i = #sesList + 1, #vote.sessions do vote.sessions[i]:Hide() end
     local item = s.items[LC.voteSession]
     vote.head:SetText((item.link or "?") .. (item.ilvl and ("  |cffffffffilvl " .. item.ilvl .. "|r") or ""))
-    vote.sub:SetText((item.boss and (item.boss .. "   ") or "") .. "Master looter: " .. LC.Short(s.ml)
+    local src = LC.ItemSource(item.itemID)
+    vote.sub:SetText((src and ("|cffffb366" .. src .. "|r   ") or (item.boss and (item.boss .. "   ") or "")) .. "Master looter: " .. LC.Short(s.ml)
         .. (item.awarded and ("   |cff33ff33Awarded to " .. LC.Short(item.awarded) .. "|r") or ""))
     local rows = self:VoteRows(LC.voteSession)
     local visible = math.max(1, math.floor((vote.list:GetHeight() or 0) / ROW_H))
@@ -360,6 +384,10 @@ function LC:RefreshVoting()
                 g.tex:SetTexture(tex or (link and "Interface\\Icons\\INV_Misc_QuestionMark") or nil)
                 g:SetShown(link ~= nil)
             end
+            row.cells.gs:SetText(LC.GearScoreText(c.name) or "")
+            local att, share = LC.AttendanceText(c.name, DB().recentDays)
+            row.cells.att:SetText(att and (((share or 0) >= 0.75 and "|cff33ff33" or (share or 0) >= 0.5 and "|cffffff00" or "|cffff6644")
+                .. math.floor((share or 0) * 100 + 0.5) .. "%|r") or "")
             row.cells.votes:SetText(tostring(c.votes or 0))
             row.voteBtn:SetText(c.voters[me] and "Unvote" or "Vote")
             row.voteBtn:SetShown(council)

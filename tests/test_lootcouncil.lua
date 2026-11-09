@@ -137,6 +137,22 @@ LC:AddLootTooltip(tt, "Hydarnes", 30)
 local text = table.concat(lines, "\n")
 check("tooltip: last loot and the last 30 days", text:find("Last loot | 2 days ago", 1, true) and text:find("Last 30 days: 1 item", 1, true))
 
+-- ============ Export ============
+local csv, count = LC.ExportCSV()
+local lines = {}
+for l in csv:gmatch("[^\n]+") do lines[#lines + 1] = l end
+check("export: header and one line per award", lines[1]:find("^Date,Time,Player,Class,Item,ItemID,How") and #lines == count + 1 and count == 5)
+check("export: a note with a comma is quoted", csv:find('"bis phase 2"', 1, true) == nil and csv:find("bis phase 2", 1, true) ~= nil)
+check("export: item names without link codes", csv:find("Helm of the Vanquished Champion", 1, true) and not csv:find("|H", 1, true))
+LC.Add({ link = HELM, to = "Comma", t = now, how = "Need", note = 'one, "two"', src = { wm = "x" }, srcKind = "wm" })
+csv = LC.ExportCSV()
+check("export: commas and quotes escaped", csv:find('"one, ""two"""', 1, true) ~= nil)
+LC:ShowPlayer("Taslan")
+LC:Command("export")
+check("export: the window shows what's listed", env.WM_CopyTextFrame and env.WM_CopyTextFrame:IsShown()
+    and env.WM_CopyTextBox:GetText():find("Taslan", 1, true) and not env.WM_CopyTextBox:GetText():find("Hydarnes", 1, true))
+LC.DeleteEntry(LC.LastLoot("Comma"))
+
 -- ============ The loot pane beside an armory ============
 local AS = WM.modules.ArmorySnap
 local frame = env.CreateFrame("Frame")

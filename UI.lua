@@ -980,3 +980,50 @@ function UI:CreatePanel(opts)
 
     return frame
 end
+
+-- ============================================
+-- A WINDOW OF TEXT TO COPY (exports)
+-- ============================================
+-- UI:ShowCopyText(title, text, note): the text selected in a scrolling box,
+-- ready for Ctrl+C. One window, reused.
+
+local copyPanel
+
+function UI:ShowCopyText(title, text, note)
+    if not copyPanel then
+        copyPanel = self:CreatePanel({ name = "WM_CopyTextFrame", title = "Copy", width = 620, height = 420,
+            minHeight = 220, scroll = false, resizable = { 400, 220, 1400, 1200 } })
+        local L = copyPanel.layout
+        copyPanel.noteRow = L:Row(18)
+        copyPanel.note = copyPanel.noteRow:Text({ text = function() return copyPanel.noteText or "" end }, 0)
+        local fill = L:Fill(160)
+        local sf = CreateFrame("ScrollFrame", "WM_CopyTextScroll", fill, "UIPanelScrollFrameTemplate")
+        sf:SetPoint("TOPLEFT", 0, 0)
+        sf:SetPoint("BOTTOMRIGHT", -24, 0)
+        local box = CreateFrame("EditBox", "WM_CopyTextBox", sf)
+        box:SetMultiLine(true)
+        box:SetAutoFocus(false)
+        box:SetFontObject(ChatFontNormal or GameFontHighlightSmall)
+        box:SetWidth(560)
+        box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        box:SetScript("OnTextChanged", function(self, user)
+            -- Read-only: typing puts the text back
+            if user and copyPanel.text then self:SetText(copyPanel.text); self:HighlightText() end
+        end)
+        sf:SetScrollChild(box)
+        sf:SetScript("OnSizeChanged", function(self, w) if w and w > 0 then box:SetWidth(w) end end)
+        copyPanel.box = box
+        copyPanel:AddFooterButton({ text = "Select all", width = 90, onClick = function()
+            copyPanel.box:SetFocus(); copyPanel.box:HighlightText() end }, "RIGHT")
+        copyPanel:Finish()
+    end
+    copyPanel.text = text or ""
+    copyPanel.noteText = note or "Press Ctrl+C to copy, then paste it into a spreadsheet or text file."
+    if copyPanel.titleText then copyPanel.titleText:SetText(title or "Copy") end
+    copyPanel.note:SetText(copyPanel.noteText)
+    copyPanel.box:SetText(copyPanel.text)
+    if not copyPanel:IsShown() then copyPanel:Show() end
+    copyPanel.box:SetFocus()
+    copyPanel.box:HighlightText()
+    return copyPanel
+end

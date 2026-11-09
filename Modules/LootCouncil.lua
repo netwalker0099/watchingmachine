@@ -56,6 +56,7 @@ local DEFAULTS = {
     rollWarning = true,      -- announce the start and end as a raid warning (leader or assistant)
     rollButtons = true,      -- raiders: Roll MS / Roll OS / Pass buttons when a roll-off starts
     syncHistory = true,      -- share the loot history with guildmates running Watching Machine
+    attendance = true,       -- record who was in the raid at each boss kill
 }
 
 function LC.InitDB()
@@ -64,6 +65,7 @@ function LC.InitDB()
     db.history = db.history or {}     -- [id] = entry (all characters' shared)
     db.sources = db.sources or {}     -- ["rc:<id>" / "gl:<checksum>"] = entry id, so imports run once each
     db.nextId = db.nextId or 1
+    db.raids = db.raids or {}         -- [date|zone|boss] = { t, zone, boss, members } (boss kills, for attendance)
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     return db
 end
@@ -309,6 +311,107 @@ function LC.Add(e)
 end
 
 -- ============================================
+-- ATTENDANCE
+-- ============================================
+-- Every boss killed in a raid is saved with who was in the raid. A raid
+-- night is a date and instance; a player's attendance is the share of raid
+-- nights in the last N days where they were there for at least one kill.
+
+function LC.RaidKey(t, zone, boss)
+    return date("%Y-%m-%d", t) .. "|" .. tostring(zone) .. "|" .. tostring(boss)
+end
+
+-- A kill (ours, or a guildmate's): kept once per date, instance and boss
+function LC.AddRaid(r, share)
+    if type(r) ~= "table" or not r.t or not r.zone or type(r.members) ~= "table" then return false end
+    local key = LC.RaidKey(r.t, r.zone, r.boss)
+    local raids = DB().raids
+    local have = raids[key]
+    if have then
+        -- Someone else saw the same kill: the raid is everyone either saw
+        local seen, added = {}, false
+        for _, n in ipairs(have.members) do seen[n] = true end
+        for _, n in ipairs(r.members) do if not seen[n] then have.members[#have.members + 1] = n; added = true end end
+        if not added then return false end
+    else
+        raids[key] = { t = r.t, zone = r.zone, boss = r.boss, members = r.members, mod = r.t }
+    end
+    Changed()
+    if share and LC.OnShareRaid then pcall(LC.OnShareRaid, raids[key], key) end
+    return true
+end
+
+-- A boss died: save the raid's members
+function LC:RecordKill(boss)
+    if not (IsInRaid and IsInRaid()) then return false end
+    local zone = GetRealZoneText and GetRealZoneText() or "?"
+    local members = {}
+    for i = 1, 40 do
+        local name = GetRaidRosterInfo and GetRaidRosterInfo(i)
+        if name then members[#members + 1] = LC.Key(name) end
+    end
+    if #members == 0 then return false end
+    return LC.AddRaid({ t = Now(), zone = zone, boss = boss or "?", members = members }, true)
+end
+
+-- attended, total raid nights in the last `days` days
+function LC.Attendance(name, days)
+    local key = LC.Key(name)
+    local cutoff = Now() - (days or DB().recentDays or 30) * 86400
+    local nights, went = {}, {}
+    for _, r in pairs(DB().raids) do
+        if (r.t or 0) >= cutoff then
+            local night = date("%Y-%m-%d", r.t) .. "|" .. r.zone
+            nights[night] = true
+            for _, n in ipairs(r.members) do if n == key then went[night] = true end end
+        end
+    end
+    local total, attended = 0, 0
+    for _ in pairs(nights) do total = total + 1 end
+    for _ in pairs(went) do attended = attended + 1 end
+    return attended, total
+end
+
+-- "80% (8/10)" or nil when no raids are known
+function LC.AttendanceText(name, days)
+    local a, t = LC.Attendance(name, days)
+    if t == 0 then return nil end
+    return math.floor(a / t * 100 + 0.5) .. "% (" .. a .. "/" .. t .. ")", a / t
+end
+
+-- ============================================
+-- EXPORT (CSV for spreadsheets and websites)
+-- ============================================
+
+local CSV_COLUMNS = { "Date", "Time", "Player", "Class", "Item", "ItemID", "How", "Boss", "Instance",
+    "Votes", "Note", "AwardedBy" }
+
+local function CsvField(v)
+    v = tostring(v == nil and "" or v)
+    v = v:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
+    return v
+end
+
+-- The awards as CSV, newest first (entries: a list, or every award)
+function LC.ExportCSV(entries)
+    entries = entries or LC.All()
+    local lines = { table.concat(CSV_COLUMNS, ",") }
+    for _, e in ipairs(entries) do
+        local name = e.link and e.link:match("%[(.-)%]") or (e.itemID and WM.ItemName and WM.ItemName(e.itemID)) or ""
+        local row = {
+            date("%Y-%m-%d", e.t or 0), date("%H:%M", e.t or 0),
+            e.to and LC.Short(e.to) or (e.de and "Disenchanted" or ""), e.class or "",
+            name, e.itemID or "", e.how or "", e.boss or "", e.zone or "", e.votes or "", e.note or "",
+            e.by and LC.Short(e.by) or "",
+        }
+        for i, v in ipairs(row) do row[i] = CsvField(v) end
+        lines[#lines + 1] = table.concat(row, ",")
+    end
+    return table.concat(lines, "\n"), #entries
+end
+
+-- ============================================
 -- EDITING AWARDS
 -- ============================================
 -- Deleting an award, or giving it to someone else. When we made the award
@@ -542,6 +645,7 @@ function LC:Initialize()
         end)
     end
     if self.InitUI then self:InitUI() end
+    self:InitAttendance()
     if self.RC then self.RC:Init() end
     if self.ML then self.ML:Init() end
     if self.Roll then self.Roll:Init() end
@@ -560,6 +664,22 @@ end
 
 function LC:OnModuleOn()
     DB()
+end
+
+-- Boss kills, for attendance
+local killEvents = CreateFrame("Frame")
+killEvents:SetScript("OnEvent", function(_, event, a1, a2, a3, a4, a5)
+    if not On() or DB().attendance == false then return end
+    if event == "ENCOUNTER_END" then
+        if a5 == 1 then LC:RecordKill(a2) end
+    elseif event == "BOSS_KILL" then
+        LC:RecordKill(a2)
+    end
+end)
+function LC:InitAttendance()
+    if self.attendanceStarted then return end
+    self.attendanceStarted = true
+    WM:RegisterEvents(killEvents, { "ENCOUNTER_END", "BOSS_KILL" })
 end
 
 function LC:GetQuickStatus()

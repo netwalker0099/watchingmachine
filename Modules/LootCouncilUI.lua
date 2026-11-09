@@ -249,6 +249,8 @@ function LC:CreateUI()
             .. ((S.CatchUpLength() > 0) and (", " .. S.CatchUpLength() .. " to send") or "") .. "|r") or ""
         return n .. " awards" .. (DB().lastImport and ("  |cff888888imported " .. LC.Ago(DB().lastImport) .. "|r") or "") .. sync
     end }, "LEFT")
+    panel:AddFooterButton({ text = "Export", width = 70, onClick = function() LC:Command("export") end,
+        tooltip = { "Export", "The awards shown (all, one player's, or your search) as CSV, to copy into a spreadsheet or a website." } }, "RIGHT")
     panel:AddFooterButton({ text = "Import now", width = 100, onClick = function() LC:Command("import") end,
         tooltip = { "Import now", "Adds new awards from Gargul and RCLootCouncil (their saved history, when they're installed). Each award is added once; the same award recorded by both is merged." } }, "RIGHT")
     panel:Finish()
@@ -430,7 +432,7 @@ end
 -- COMMANDS, SETUP
 -- ============================================
 
--- /wmachine council [history|players|import|vote|test [n]|endtest|sendtest [n]|ml|add <item>|roll [item]|de [name]|undo|<name>]
+-- /wmachine council [history|players|import|export|vote|test [n]|endtest|sendtest [n]|ml|add <item>|roll [item]|de [name]|undo|<name>]
 function LC:Command(arg)
     arg = strtrim(arg or "")
     local low = arg:lower()
@@ -440,6 +442,16 @@ function LC:Command(arg)
                 .. " Nothing is sent to anyone. |cFFFFFF00/wmachine council endtest|r ends it.")
             LC:ShowVoting()
         end
+    elseif low == "export" then
+        -- What the history window shows: everything, one player's, or a search
+        local entries = {}
+        if self.tab ~= "players" then
+            for _, r in ipairs(self:Rows()) do if r.entry then entries[#entries + 1] = r.entry end end
+        else
+            entries = nil
+        end
+        local csv, n = LC.ExportCSV(entries)
+        WM.UI:ShowCopyText("Loot history: " .. n .. " awards", csv)
     elseif low == "endtest" then
         LC.RC:EndTest()
     elseif low:match("^sendtest") then
@@ -518,6 +530,9 @@ function LC:SetupPage(L)
     L:Checkbox({ label = "Share the loot history with my guild (Watching Machine users)", get = function() return db.syncHistory ~= false end,
         set = function(v) db.syncHistory = v end,
         tooltip = { "Share with the guild", "Awards made or recorded during a raid, and every edit or delete, go to guildmates running Watching Machine, and theirs come to you. At login they send you everything changed since you were last online (all of it the first time, in the background). The latest change of each award wins." } })
+    L:Checkbox({ label = "Record raid attendance (who was there at each boss kill)", get = function() return db.attendance ~= false end,
+        set = function(v) db.attendance = v end,
+        tooltip = { "Attendance", "Each boss killed in a raid is saved with who was in the raid (and shared with guildmates running Watching Machine). The voting frame shows each candidate's attendance: the raid nights of the recent days below where they were there." } })
     L:Checkbox({ label = "Show a player's loot beside their armory", get = function() return db.showInArmory end,
         set = function(v) db.showInArmory = v end,
         tooltip = { "Loot beside the armory", "In ArmorySnap's browser, a pane beside the paper doll lists the player's loot with the guild." } })
