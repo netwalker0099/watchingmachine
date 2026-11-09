@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1558,7 +1558,7 @@ Copy-paste release announcements for Discord and CurseForge are in
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
 
-### Version 3.82
+### Unreleased: Damage meter
 - **Damage Meter** (new module, Details-style): bar windows for damage and healing done, DPS and HPS, overhealing, damage taken, enemy damage taken, friendly fire, interrupts, dispels, deaths with a death log, and live threat. Any number of windows, each with its own display; the current fight, overall and past fights; spell tooltips, a breakdown window and reports to chat. `/wmachine meter`
 
 ### Version 3.81

@@ -31,7 +31,7 @@ what still needs settling before it's built.
     side and auto-pass (3.77); part 4, roll-offs, disenchanter, award edit
     and undo (3.78); part 5, the loot history shared between Watching
     Machine users (3.80). Done
-17. Damage Meter (Details-style): first release in 3.82. Next: CC breaks,
+17. Damage Meter (Details-style): first release (unreleased). Next: CC breaks,
     resurrects, cooldowns, buff and debuff uptime, healing taken, enemy
     healing, window snapping, and a guild-shared meter.
 
@@ -767,7 +767,7 @@ the window list compiled with BlizzMove's research).
       (`/wmachine diag`).
 - [x] **Alt-drag pop-outs, a layout shared by all characters** (3.50).
 
-## 26. Damage Meter (Details-style) — first release in 3.82
+## 26. Damage Meter (Details-style) — first release (unreleased)
 
 Built as `Modules/DamageMeter.lua` (combat log, fights, displays, reports)
 and `Modules/DamageMeterUI.lua` (bar windows, menus, breakdown, options);

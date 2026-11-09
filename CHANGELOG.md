@@ -2,11 +2,11 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.82** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.81** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
 
-## 3.82
+## Unreleased: Damage meter
 
 ### Damage Meter (new module)
 

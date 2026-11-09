@@ -5,14 +5,14 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
 **How to use every feature: [the Watching Machine guide](https://netwalker0099.github.io/watchingmachine/)**
 (`docs/index.html`, served by GitHub Pages).
 
-Watching Machine is one addon made of 26 modules for raiding, guilds,
+Watching Machine is one addon made of 27 modules for raiding, guilds,
 logging and the game's interface, built for The Burning Crusade Classic Anniversary Edition (patch
 2.5.6). Everything is reached from one dashboard (`/wmachine`). Each module
 switches on and off **per character**, keeps its own settings for each
