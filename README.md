@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1106,8 +1106,32 @@ Open it with `/wmachine roster` (also `/wmachine grm`).
 - **Armory** (3.68, with ArmorySnap on): a member's details and hover list
   their saved armory for each spec with its GearScore, and *Show armory*
   opens their gear and talents in ArmorySnap's browser (see ArmorySnap)
+- **Sort and Show** (3.82): sort the Roster tab online-then-rank, by name,
+  class, level, last online or join date; show everyone, who's online,
+  the inactive, members with no public note, mains, characters in no alt
+  group, or those ready to promote
+- **Promote / Demote** (3.82) in a member's details, one click each (the
+  game's permission, ranks below yours)
+- **Promotion suggestions** (3.82): days at each rank before the next
+  (Options); the log says once when someone is ready ("Bob has been
+  Initiate for 30 days: ready for Member"), and *Ready to promote* lists
+  them
+- **Export** (3.82): the roster, or former members, as CSV to copy
+- **Join dates in notes** (3.82): "Joined 15 Jan 26" added to officer or
+  public notes, for everyone at once or by itself when someone joins
+- **Anniversaries and birthdays** (3.82) in the log on the day, and
+  optionally in guild chat
+- **Full catch-up sync** (3.82): a minute after login, edits made while
+  you were offline arrive. With Guild Roster Manager users online,
+  Roster Manager takes part in its full sync as a follower, in its own
+  messages (we never stand for its leader): your newer join and promotion
+  dates, alts, custom notes, bans and birthdays go to its leader, and its
+  newer ones come to you, with its sequence numbers and resends. Between
+  Watching Machine users, a catch-up of every record changed since you
+  were last online. The Sync tab shows it; `/wmachine roster fullsync`
+  starts it now
 - Commands: `/wmachine roster log`, `former`, `bans`, `sync`, `scan`,
-  `import`, `notes`, `purge`, `options`
+  `import`, `notes`, `purge`, `export`, `stamp`, `fullsync`, `options`
 
 ### 33. Loot Council
 
@@ -1201,7 +1225,16 @@ works with RCLootCouncil and awards like Gargul. Open it with
   matched by RCLootCouncil's id, Gargul's checksum, or who awarded it and
   when, so nothing doubles; the latest change wins. The history window's
   footer shows how many were shared and received. An option turns it off
-- Commands: `/wmachine council players`, `import`, `vote`, `test [n]`,
+- **Export** (3.82): the loot history (all, one player's, or your search)
+  as CSV, to copy into a spreadsheet or website (`/wmachine council export`)
+- **Attendance** (3.82): every boss kill in a raid saves who was there,
+  shared with guildmates; the voting frame's *Att.* column shows each
+  candidate's share of raid nights in the last 30 days (also in their
+  tooltip)
+- **GearScore and where it drops** (3.82): a *GS* column in the voting
+  frame (GearScore module on), and the item's source under its name (Loot
+  Browser on)
+- Commands: `/wmachine council players`, `import`, `export`, `vote`, `test [n]`,
   `endtest`, `sendtest [n]`, `ml`, `add <item>`, `roll [item]`,
   `de <name>`, `undo`, or a player's name
 
@@ -1558,7 +1591,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
 
-### Unreleased: Damage meter
+### Version 3.82
+- **Roster Manager**: sort and filters, Promote / Demote, promotion suggestions, export, join dates stamped into notes, anniversaries and birthdays, and the full catch-up sync with Guild Roster Manager's leader and Watching Machine users
+- **Loot Council**: CSV export of the loot history; attendance, GearScore and where the item drops in the voting frame
 - **Damage Meter** (new module, Details-style): bar windows for damage and healing done, DPS and HPS, overhealing, damage taken, enemy damage taken, friendly fire, interrupts, dispels, deaths with a death log, and live threat. Any number of windows, each with its own display; the current fight, overall and past fights; spell tooltips, a breakdown window and reports to chat. `/wmachine meter`
 
 ### Version 3.81

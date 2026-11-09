@@ -2,11 +2,47 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.81** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.82** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
 
-## Unreleased: Damage meter
+## 3.82
+
+### Roster Manager: officer tools and the full catch-up sync
+
+- **Sort and Show** on the Roster tab: online then rank, name, class, level,
+  last online or join date; everyone, online, inactive, no public note,
+  mains, not in an alt group, or ready to promote.
+- **Promote / Demote** buttons in a member's details (the game's
+  permission, ranks below yours; one click each).
+- **Promotion suggestions**: days at each rank before the next (Options).
+  The log says once when someone is ready, and the *Ready to promote*
+  filter lists them.
+- **Export** the roster or former members as CSV.
+- **Join dates in notes**: "Joined 15 Jan 26" added to officer or public
+  notes, for everyone (a few a second) or by itself when someone joins.
+- **Anniversaries and birthdays** in the log on the day, and optionally in
+  guild chat.
+- **Full catch-up sync** a minute after login (and `/wmachine roster
+  fullsync`): with Guild Roster Manager users online, Roster Manager takes
+  part in Guild Roster Manager's full sync as a follower, in its own
+  messages: election (we never stand), its lists of who changed what and
+  when, our newer join and promotion dates, alt groups, custom notes, bans
+  and birthdays sent with sequence numbers and resends, and its newer ones
+  taken. Ban records are never split. Between Watching Machine users, a
+  catch-up of every record changed since you were last online. The Sync
+  tab shows how it went.
+
+### Loot Council
+
+- **Export** the loot history as CSV (what the window shows: all, one
+  player's, or a search), through a new copy window.
+- **Attendance**: every boss kill in a raid saves who was there, shared
+  with guildmates; the voting frame's *Att.* column shows each candidate's
+  raid nights in the last 30 days.
+- **GearScore** (*GS* column) and **where the item drops** (from the Loot
+  Browser) in the voting frame.
+
 
 ### Damage Meter (new module)
 

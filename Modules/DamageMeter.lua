@@ -16,7 +16,7 @@ local DM = {}
 WM:RegisterModule("DamageMeter", DM)
 WM.DamageMeter = DM
 
-DM.version = "3.81"
+DM.version = "3.82"
 
 local DEFAULTS = {
     hideOutOfCombat = false,  -- windows show only during a fight
