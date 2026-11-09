@@ -59,6 +59,7 @@ P.SCOPE = {
     WMGearSetsDB = { shared = { "chars" } },
     WMFrameMoverDB = { shared = { "layout" } },
     WMGuildRosterDB = { shared = { "guilds", "patchDay" } },
+    WMDamageMeterDB = {},
     WMLootDB = { shared = { "history", "sources", "nextId", "lastImport" } },
 }
 

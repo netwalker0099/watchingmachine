@@ -2,14 +2,14 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
 **How to use every feature: [the Watching Machine guide](https://netwalker0099.github.io/watchingmachine/)**
 (`docs/index.html`, served by GitHub Pages).
 
-Watching Machine is one addon made of 26 modules for raiding, guilds,
+Watching Machine is one addon made of 27 modules for raiding, guilds,
 logging and the game's interface, built for The Burning Crusade Classic Anniversary Edition (patch
 2.5.6). Everything is reached from one dashboard (`/wmachine`). Each module
 switches on and off **per character**, keeps its own settings for each
@@ -34,6 +34,9 @@ in.
 - **World Timers**: layers, Terokkar towers, dailies, world buffs and the
   Darkmoon Faire, with map pins.
 - **Hazard Alerts** (GTFO-style): a sound when you stand in the bad.
+- **Damage Meter** (Details-style): bar windows for damage, healing,
+  damage taken, interrupts, dispels, deaths and live threat, fight by
+  fight, as many windows as you like.
 - **Gear Sets** (ItemRack-style): save and swap sets, a **dressing room**,
   a slot menu on the character sheet, automatic swaps on **spec change**,
   mount or battleground, and missing-item alerts.
@@ -1202,6 +1205,45 @@ works with RCLootCouncil and awards like Gargul. Open it with
   `endtest`, `sendtest [n]`, `ml`, `add <item>`, `roll [item]`,
   `de <name>`, `undo`, or a player's name
 
+### 34. Damage Meter
+Damage, healing, threat and deaths for you and your group, in bar windows
+(Raid group; `/wmachine meter`). Compiled with the help of Details! Damage
+Meter's research; the code is our own.
+
+- **Displays:** Damage Done, DPS, Healing Done, HPS, Overhealing, Damage
+  Taken, Enemy Damage Taken, Friendly Fire, Interrupts, Dispels, Deaths and
+  live Threat
+- **Windows:** as many as you like (up to 8), each with its own display and
+  fight. Click the title for the display, right-click it (or the clock
+  button) for the fight; drag to move, the corner to resize, the mouse wheel
+  to scroll. Class-coloured bars sized against the top one, "1. Name" on
+  the left and "total (per second, share)" on the right
+- **Fights:** a fight starts when your group hits something (or a boss is
+  pulled) and ends when everyone is out of combat, or with the encounter.
+  The current fight, the overall total and the last 12 fights (you choose
+  how many). Boss fights are named after the boss, others after the enemy
+  hurt most; fights under 5 seconds in a dungeon or raid aren't kept.
+  Entering a different dungeon or raid starts afresh (an option)
+- **Counting, as the big meters do:** damage includes what shields soaked
+  up and leaves out overkill in instances; effective healing is the heal
+  less overhealing, and a shield's absorbs count as its caster's healing;
+  Earth Shield and Prayer of Mending heals go to whoever cast the buff;
+  pets, totems and their summons (Fire Elemental Totem's elemental) count
+  for their owner as "Spell (Pet)"; friendly fire is kept apart. DPS is over
+  the whole fight, or over each player's active time
+- **Bars:** hover for the top spells (Shift for all); click for the full
+  breakdown (hits, crit rate, average, biggest, overhealing); Shift-click to
+  report. A death shows its last 10 seconds: each hit and heal, its source,
+  crits and the player's health
+- **Threat:** read live from the game on your target (or focus), as a
+  percent of what pulls aggro, green to red, with the tank marked
+- **Report** to say, party, raid, guild, officer, a whisper to your target,
+  or just your own chat frame (5 lines, or as many as you set)
+- **Options:** only in combat, lock, pets for their owners, only your group,
+  active time, start afresh, rank numbers, class icons, bar height, fights
+  kept, report lines. `/wmachine meter new / reset / report [channel] /
+  lock / unlock / options`
+
 ## Other Addons Doing a Module's Job
 
 At login (3.81), if a module you have on has another addon doing the same
@@ -1220,7 +1262,8 @@ Outfitter, Frame Mover and BlizzMove or MoveAnything, Hazard Alerts and
 GTFO, Attunements and Attune, World Timers and NovaWorldBuffs, Instance
 Tracker and NovaInstanceTracker, Ogri'la Helper and Ogri'Lazy, Crits and
 CritMatic, Guild Invite and GuildRaidInvite, Loot Browser and AtlasLoot,
-Auto Logger and LoggerHead or AutoCombatLogger.
+Auto Logger and LoggerHead or AutoCombatLogger, Damage Meter and Details,
+Recount or Skada.
 
 ## Global Theme System
 
@@ -1412,6 +1455,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
 - `/wmachine gtfo` - Hazard Alerts (`gtfo test`, `gtfo mute <spell ID>`, `gtfo unmute <spell ID>`)
 - `/wmachine crits` - Crit Tracker
+- `/wmachine meter` - Damage Meter: show or hide its windows (`meter new`, `meter reset`, `meter report [say|party|raid|guild]`, `meter lock`, `meter unlock`, `meter options`; also `/wmachine dmg`)
 - `/wmachine gear` - Gear Sets (`gear equip <name>`, `gear undo`, `gear list`; also `/wmachine sets`)
 - `/wmachine ogri` - Ogri'la Helper for the Apexis Relics (`ogri options`, `ogri clear`; also `/wmachine relic`)
 - `/wmachine move` - Frame Mover: move and resize the game's windows (`move reset` puts every window back; also `/wmachine frames`)
@@ -1486,6 +1530,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `AttunementsDB` - Attunement progress per character, guild survey answers
 - `HazardsDB` - Hazard Alerts options, sounds and muted spells
 - `WMCritsDB` - Crit Tracker records per character, and options
+- `WMDamageMeterDB` - Damage Meter: this character's windows, fights (current, past and overall) and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
 - `WMLootDB` - Loot Council: the loot history (shared by your characters) and its options
@@ -1512,6 +1557,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.82
+- **Damage Meter** (new module, Details-style): bar windows for damage and healing done, DPS and HPS, overhealing, damage taken, enemy damage taken, friendly fire, interrupts, dispels, deaths with a death log, and live threat. Any number of windows, each with its own display; the current fight, overall and past fights; spell tooltips, a breakdown window and reports to chat. `/wmachine meter`
 
 ### Version 3.81
 - **Addons doing the same job**: at login, a window lists modules that have another addon doing their job enabled (GTFO, RCLootCouncil, BlizzMove, ItemRack...), with buttons to turn the module off, disable the addon, or keep both. `/wmachine conflicts` any time

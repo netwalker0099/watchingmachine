@@ -5,7 +5,7 @@ Please include your full LUA error output.
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.81 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.82 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -37,6 +37,9 @@ in.
 - **World Timers**: layers, Terokkar towers, dailies, world buffs and the
   Darkmoon Faire, with map pins.
 - **Hazard Alerts** (GTFO-style): a sound when you stand in the bad.
+- **Damage Meter** (Details-style): bar windows for damage, healing,
+  damage taken, interrupts, dispels, deaths and live threat, fight by
+  fight, as many windows as you like.
 - **Gear Sets** (ItemRack-style): save and swap sets, a **dressing room**,
   a slot menu on the character sheet, automatic swaps on **spec change**,
   mount or battleground, and missing-item alerts.
@@ -1159,6 +1162,7 @@ opens the dashboard. Everything the addon does can be reached from it.
 - `/wmachine loot` - Loot Browser (also `/wmachine atlas`)
 - `/wmachine gtfo` - Hazard Alerts (`gtfo test`, `gtfo mute <spell ID>`, `gtfo unmute <spell ID>`)
 - `/wmachine crits` - Crit Tracker
+- `/wmachine meter` - Damage Meter: show or hide its windows (`meter new`, `meter reset`, `meter report [say|party|raid|guild]`, `meter lock`, `meter unlock`, `meter options`; also `/wmachine dmg`)
 - `/wmachine gear` - Gear Sets (`gear equip <name>`, `gear undo`, `gear list`; also `/wmachine sets`)
 - `/wmachine ogri` - Ogri'la Helper for the Apexis Relics (`ogri options`, `ogri clear`; also `/wmachine relic`)
 - `/wmachine move` - Frame Mover: move and resize the game's windows (`move reset` puts every window back; also `/wmachine frames`)
@@ -1276,6 +1280,7 @@ Built-in error capture system for debugging.
 - `AttunementsDB` - Attunement progress per character, guild survey answers
 - `HazardsDB` - Hazard Alerts options, sounds and muted spells
 - `WMCritsDB` - Crit Tracker records per character, and options
+- `WMDamageMeterDB` - Damage Meter: this character's windows, fights (current, past and overall) and options
 - `WMGearSetsDB` - Gear Sets: each character's sets, last set and options
 - `OgrilaDB` - Ogri'la Helper options, keys, position, relics played and longest sequences
 - `WMLootDB` - Loot Council: the loot history (shared by your characters) and its options

@@ -31,6 +31,9 @@ what still needs settling before it's built.
     side and auto-pass (3.77); part 4, roll-offs, disenchanter, award edit
     and undo (3.78); part 5, the loot history shared between Watching
     Machine users (3.80). Done
+17. Damage Meter (Details-style): first release in 3.82. Next: CC breaks,
+    resurrects, cooldowns, buff and debuff uptime, healing taken, enemy
+    healing, window snapping, and a guild-shared meter.
 
 ---
 
@@ -763,3 +766,23 @@ the window list compiled with BlizzMove's research).
       house) stay on your spot, and that nothing is blocked in combat
       (`/wmachine diag`).
 - [x] **Alt-drag pop-outs, a layout shared by all characters** (3.50).
+
+## 26. Damage Meter (Details-style) — first release in 3.82
+
+Built as `Modules/DamageMeter.lua` (combat log, fights, displays, reports)
+and `Modules/DamageMeterUI.lua` (bar windows, menus, breakdown, options);
+our own code, the counting rules compiled with the help of Details' research.
+
+- [x] Damage / DPS, healing / HPS, overhealing, damage taken, enemy damage
+      taken, friendly fire, interrupts, dispels, deaths with a death log,
+      live threat.
+- [x] Any number of windows (up to 8), each with its own display and fight.
+- [x] Fights: start, end, boss names, the overall total, past fights,
+      short instance fights dropped, start afresh in a new instance.
+- [ ] **Still to confirm in game:** that `SPELL_ABSORBED` fires on 2.5.6
+      with the argument layout used, that `ENCOUNTER_START`/`END` fire for
+      TBC bosses, and the numbers against Details in a raid.
+- [ ] **Later:** CC breaks, resurrects, cooldowns, buff and debuff uptime,
+      healing taken, enemy healing, mana and rage gained; window snapping;
+      overall only for fights over 10 seconds in instances; a bigger
+      breakdown (targets, per-target spells).

@@ -2,9 +2,39 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.81** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.82** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.82
+
+### Damage Meter (new module)
+
+A damage meter in the style of Details!, built as our own code (facts such
+as how fights start and end, how shields, pets and overkill are counted, and
+the death log, compiled with the help of Details' research).
+
+- Bar windows for **Damage Done**, **DPS**, **Healing Done**, **HPS**,
+  **Overhealing**, **Damage Taken**, **Enemy Damage Taken**, **Friendly
+  Fire**, **Interrupts**, **Dispels**, **Deaths** and live **Threat**.
+- **As many windows as you like** (up to 8): the + button opens another,
+  and each shows its own display and fight. Click the title for the
+  display, right-click it for the fight: the current one, the overall
+  total, or one of the last 12.
+- Fights start when your group hits something or a boss is pulled, and
+  end when everyone is out of combat (boss fights with the encounter).
+  Boss fights are named after the boss, others after the enemy hurt most.
+- Counted like the big meters: shields' absorbs are their caster's
+  healing, absorbed damage is damage done, overkill is left out in
+  instances, Earth Shield and Prayer of Mending heals go to the buff's
+  caster, and pets, totems and their summons count for their owner.
+- Hover a bar for the top spells; click for the full breakdown; Shift-click
+  to report. Deaths show the last 10 seconds before them.
+- Threat on your target, green to red as it nears pulling aggro.
+- Options in the guided setup and `/wmachine meter options`: only in
+  combat, lock, pets, only your group, active time, start afresh in a new
+  instance, bar height, fights kept, report lines.
+- Addons doing the same job now include Details, Recount and Skada.
 
 ## 3.81
 

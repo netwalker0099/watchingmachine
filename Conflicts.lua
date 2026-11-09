@@ -37,6 +37,11 @@ Conflicts.LIST = {
     WorldTimers = { { "NovaWorldBuffs", "Both time world buffs, Songflowers and the Darkmoon Faire and announce them." } },
     InstanceTracker = { { "NovaInstanceTracker", "Both count your instances per hour and per day and log your runs." } },
     Ogrila = { { "Ogri'Lazy", "Both track the Ogri'la relic and Apexis tools." } },
+    DamageMeter = {
+        { "Details", "Both count damage, healing and threat from the combat log: two meters do the same work in every fight." },
+        { "Recount", "Both count damage and healing from the combat log: two meters do the same work in every fight." },
+        { "Skada", "Both count damage and healing from the combat log: two meters do the same work in every fight." },
+    },
     Crits = { { "CritMatic", "Both record your biggest hits and heals and announce new ones." } },
     GuildInvite = { { "GuildRaidInvite", "Both invite guildmates to the group when they ask." } },
     LootBrowser = { { "AtlasLootClassic", "Both browse boss loot, and both add where an item drops to tooltips." } },

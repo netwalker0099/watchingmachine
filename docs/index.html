@@ -125,6 +125,7 @@
     <a href="#encounters">Encounter callouts</a>
     <a href="#aurarange">Aura Range</a>
     <a href="#hazards">Hazard Alerts</a>
+    <a href="#meter">Damage Meter</a>
     <a href="#gearscore">GearScore</a>
     <a href="#armorysnap">ArmorySnap</a>
     <a href="#gearsets">Gear Sets</a>
@@ -357,6 +358,38 @@
     <li><b>Tanks</b> (Righteous Fury, Bear Form, Defensive Stance, or marked main tank) hear the tank version, or nothing where standing in it is the job.</li>
     <li>Tiny hits and old content far below your level stay quiet.</li>
     <li>Pick a sound per alert and the channel, with <b>Test</b> buttons. <code>/wmachine gtfo mute &lt;spell ID&gt;</code> silences one hazard you don't care about (<code>unmute</code> to undo). The window lists your recent alerts.</li>
+  </ul>
+</section>
+
+<section id="meter">
+  <h2>Damage Meter <span class="who">Raid · Details-style</span></h2>
+  <p class="open">Open: <code>/wmachine meter</code> · options: <code>/wmachine meter options</code></p>
+  <p>Bar windows that count, for you and your group, the damage and healing done, damage taken, interrupts, dispels and
+     deaths, fight by fight, plus live threat. Open as many windows as you like, each showing its own display.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Display</th><th>Shows</th></tr>
+    <tr><td><b>Damage Done</b> · <b>DPS</b></td><td>Each player's damage (pets and totems included), per second, and share of the total.</td></tr>
+    <tr><td><b>Healing Done</b> · <b>HPS</b> · <b>Overhealing</b></td><td>Effective healing (shields such as Power Word: Shield count for their caster), per second, and what was wasted.</td></tr>
+    <tr><td><b>Damage Taken</b> · <b>Enemy Damage Taken</b></td><td>What hit your group, and how much each enemy took.</td></tr>
+    <tr><td><b>Friendly Fire</b></td><td>Damage your group did to itself (not counted as damage done).</td></tr>
+    <tr><td><b>Interrupts</b> · <b>Dispels</b></td><td>How many, and of which spells.</td></tr>
+    <tr><td><b>Deaths</b></td><td>Who died and when; hover for their last 10 seconds: every hit and heal, its source and their health.</td></tr>
+    <tr><td><b>Threat</b></td><td>Live threat on your target (or focus), as a percent of what pulls aggro: green is safe, red is about to pull.</td></tr>
+  </table></div>
+  <div class="table-wrap"><table>
+    <tr><th>Do this</th><th>To</th></tr>
+    <tr><td><b>Click</b> the title</td><td>Choose what the window shows</td></tr>
+    <tr><td><b>Right-click</b> the title, or the clock button</td><td>Choose the fight: the current one, the overall total, or an earlier one</td></tr>
+    <tr><td><b>Hover</b> a bar</td><td>That player's top spells (hold <kbd>Shift</kbd> for all)</td></tr>
+    <tr><td><b>Click</b> a bar</td><td>The full breakdown: every spell with hits, crit rate, average and biggest</td></tr>
+    <tr><td><kbd>Shift</kbd>-click a bar, or the report button</td><td>Send the window's top lines to chat</td></tr>
+    <tr><td><b>+</b> button</td><td>Open another window (up to 8)</td></tr>
+    <tr><td>Drag the title / the corner / the mouse wheel</td><td>Move / resize / scroll the window</td></tr>
+  </table></div>
+  <ul>
+    <li><b>Fights:</b> one starts when your group hits something or a boss is pulled, and ends when everyone is out of combat. Boss fights are named after the boss, others after the enemy hurt most. Short fights (under 5 seconds) in dungeons and raids aren't kept.</li>
+    <li><b>Options:</b> show the windows only in combat, lock them, count pets for their owners, count only your group, DPS over each player's active time, start afresh in a new dungeon or raid, bar height, fights kept and report length.</li>
+    <li><code>/wmachine meter new</code>, <code>reset</code>, <code>report [say|party|raid|guild]</code>, <code>lock</code>, <code>unlock</code>.</li>
   </ul>
 </section>
 
@@ -964,6 +997,7 @@
     <tr><td><code>shear</code> · <code>srcheck</code> · <code>srraid</code></td><td>Black Temple: Shear tallies, SR gear checks</td></tr>
     <tr><td><code>range</code></td><td>Aura Range</td></tr>
     <tr><td><code>gtfo</code> · <code>gtfo mute &lt;id&gt;</code> · <code>gtfo test</code></td><td>Hazard Alerts</td></tr>
+    <tr><td><code>meter</code> · <code>meter new</code> · <code>meter reset</code> · <code>meter report [channel]</code> · <code>meter lock</code> / <code>unlock</code> · <code>meter options</code></td><td>Damage Meter</td></tr>
     <tr><td><code>gs</code> · <code>gs report</code> · <code>gs unlock</code> / <code>lock</code></td><td>GearScore</td></tr>
     <tr><td><code>armory</code> (or <code>/as</code>, <code>/as snap</code>, <code>/as armory [name]</code>)</td><td>ArmorySnap</td></tr>
     <tr><td><code>gear</code> · <code>gear equip &lt;name&gt;</code> · <code>gear undo</code> · <code>gear list</code></td><td>Gear Sets</td></tr>
@@ -1007,8 +1041,8 @@
      <a href="https://www.curseforge.com/wow/addons/watching-machine">CurseForge page</a>, with the output of <code>/wmachine errors</code>.</p>
 </section>
 
-<footer>Watching Machine guide · written for version 3.81 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
-  Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic); the code is Watching Machine's own.
+<footer>Watching Machine guide · written for version 3.82 · World of Warcraft: The Burning Crusade Classic Anniversary (2.5.6).
+  Some features were built with the help of other addons' research (BlizzMove, GTFO, Attune, AtlasLoot, Ogri'Lazy, GearScoreTBCClassic, Details!); the code is Watching Machine's own.
   World of Warcraft © Blizzard Entertainment.</footer>
 </main>
 </div>

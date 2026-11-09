@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.81"
+WM.version = "3.82"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -22,7 +22,7 @@ local WM_ERROR_PATTERNS = {
     "PvPTracker", "DebuffTracker", "AutoLogger",
     "KeywordMonitor", "ChatFilter", "MailLogger", "ServicesParser",
     "Recruiter", "WhisperLogs", "GuildInvite", "GuildRoster", "BuffCheck", "ArmorySnap", "LootCouncil", "AuraRange",
-    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ManaTick", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover",
+    "ClassTools", "ClassGeneral", "ClassWarlock", "ClassMage", "ClassShaman", "SwingTimer", "ManaTick", "ClassPaladin", "InstanceTracker", "AltTracker", "PvPLog", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Crits", "Ogrila", "GearSets", "FrameMover", "DamageMeter",
 }
 
 local origErrorHandler = geterrorhandler()
@@ -404,6 +404,7 @@ local MODULE_COLORS = {
     Ogrila = "99E666",
     GearSets = "CCB366",
     FrameMover = "99CCFF",
+    DamageMeter = "FF5533",
 }
 
 function WM:ModulePrint(moduleName, msg)
@@ -1277,7 +1278,7 @@ function WM:Confirm(text, fn)
 end
 
 local MODULE_GROUPS = {
-    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "LootCouncil", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets" } },
+    { title = "Raid", modules = { "BuffCheck", "DebuffTracker", "ClassTools", "AuraRange", "ArmorySnap", "LootCouncil", "WorldTimers", "LootBrowser", "GearScore", "Attunements", "Hazards", "Ogrila", "GearSets", "DamageMeter" } },
     { title = "Guild & Social", modules = { "GuildRoster", "GuildInvite", "Recruiter", "PvPTracker", "ChatFilter", "KeywordMonitor", "ServicesParser", "WhisperLogs" } },
     { title = "Logging", modules = { "AutoLogger", "MailLogger", "InstanceTracker", "PvPLog", "AltTracker", "Crits" } },
     { title = "Interface", modules = { "FrameMover" } },
@@ -1394,6 +1395,16 @@ local MODULE_INFO = {
         command = "move", color = {0.6, 0.8, 1}, icon = "Interface\\Icons\\INV_Misc_Map_01",
         tools = {
             { text = "Reset every window", func = function() Call("FrameMover", "Command", "reset") end },
+        },
+    },
+    DamageMeter = {
+        title = "Damage Meter", desc = "Damage, healing, threat and deaths (Details-style)",
+        about = "Bar windows for damage and healing done, DPS and HPS, damage taken, friendly fire, interrupts, dispels, deaths and live threat, for you and your group. Open as many windows as you like, each with its own display, and pick the current fight, the overall total or an earlier one. Hover for spells, click for the full breakdown, report to chat.",
+        command = "meter", color = {1, 0.33, 0.2}, icon = "Interface\\Icons\\Ability_Warrior_Rampage",
+        tools = {
+            { text = "New meter window", func = function() Call("DamageMeter", "NewWindow") end },
+            { text = "Options", func = function() Call("DamageMeter", "ToggleOptions") end },
+            { text = "Reset every fight", func = function() Call("DamageMeter", "Command", "reset") end },
         },
     },
     Ogrila = {
@@ -2394,6 +2405,7 @@ function WM:ShowHelp()
     print("|cFFFFFF00/wmachine gear|r - Gear Sets (gear equip <name> / undo / list)")
     print("|cFFFFFF00/wmachine ogri|r - Ogri'la Helper: remembers the Apexis Relic sequence (ogri options / clear)")
     print("|cFFFFFF00/wmachine move|r - Frame Mover: move and resize the game's windows (move reset puts them all back)")
+    print("|cFFFFFF00/wmachine meter|r - Damage Meter: show or hide its windows (meter new / reset / report [say|party|raid|guild] / lock / unlock / options)")
     print("|cFFFFFF00/wmachine crits|r - Crit Tracker: your best hits, crits and heals")
     print("|cFFFFFF00/wmachine attune|r - Attunements: raid attunements and keys for each character")
     print("|cFFFFFF00/wmachine gs|r - GearScore for your group (gs unlock / lock / reset / report)")
@@ -2607,6 +2619,10 @@ SlashCmdList["WATCHINGMACHINE"] = function(msg)
     elseif cmd == "move" or cmd == "mover" or cmd == "frames" or cmd:match("^move ") then
         local module = WM:UsableModule("FrameMover")
         if module and module.Command then module:Command(cmd:match("^move (.+)$")) end
+
+    elseif cmd == "meter" or cmd == "dmg" or cmd == "damage" or cmd == "dm" or cmd:match("^meter ") then
+        local module = WM:UsableModule("DamageMeter")
+        if module and module.Command then module:Command(strtrim(msg):match("^%S+%s+(.+)$")) end
 
     elseif cmd == "crits" or cmd == "crit" or cmd == "ct" then
         local module = WM:UsableModule("Crits")
