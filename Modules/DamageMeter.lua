@@ -16,7 +16,7 @@ local DM = {}
 WM:RegisterModule("DamageMeter", DM)
 WM.DamageMeter = DM
 
-DM.version = "3.83"
+DM.version = "3.84"
 
 local DEFAULTS = {
     hideOutOfCombat = false,  -- windows show only during a fight
@@ -937,9 +937,9 @@ function DM:SettingsControls(L)
     L:Slider({ label = "Fights kept", min = 3, max = 30, step = 1, get = function() return DB().keepSegments end,
         set = function(v) DB().keepSegments = v end,
         tooltip = { "Fights kept", "How many past fights the fight menu offers. The overall total covers every fight." } })
-    L:Slider({ label = "Lines in a report", min = 3, max = 15, step = 1, get = function() return DB().reportLines end,
+    L:Slider({ label = "Lines in a report", min = 3, max = 25, step = 1, get = function() return DB().reportLines end,
         set = function(v) DB().reportLines = v end,
-        tooltip = { "Report", "How many players a report to chat lists." } })
+        tooltip = { "Report", "How many players a report to chat lists. The Report button's menu changes it too." } })
 end
 
 -- The module's page in the guided setup
@@ -956,6 +956,8 @@ function DM:SetupPage(L)
         .. " fight. Boss fights are named after the boss.")
     L:Note("|cFFFFFFFFBars:|r hover over one for that player's top spells (a death shows its last 10 seconds)."
         .. " Click for the full breakdown, Shift-click to report the window to chat, right-click to change the display.")
+    L:Note("|cFFFFFFFFReport:|r the window's report button opens a menu: tick how many lines to send (top 3 to"
+        .. " 25), then pick where: say, party, raid, guild, officer, just you, or a whisper to your target.")
     self:SettingsControls(L)
     L:Note("Show or hide the windows with |cFFFFFF00/wmachine meter|r; |cFFFFFF00/wmachine meter options|r for these"
         .. " settings later.")

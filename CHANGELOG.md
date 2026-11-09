@@ -2,9 +2,27 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.83** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.84** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.84
+
+### Changes
+
+- **Damage Meter report menu:** the window's report button opens one menu
+  with how many lines to send (top 3, 5, 10, 15 or 25; the menu stays open
+  while you tick) and where to send them. The *Lines in a report* setting
+  now goes up to 25.
+
+### Fixes
+
+- Watching Machine's menus (the Damage Meter's, Crits' share menu, the Loot
+  Browser's right-click menu) blended into what was behind them: their
+  background texture path was mistyped, so no background was drawn. They now
+  have a solid dark background and a lighter border, and their tick marks
+  show.
+- The Loot Council icon on the dashboard had the same mistyped path.
 
 ## 3.83
 

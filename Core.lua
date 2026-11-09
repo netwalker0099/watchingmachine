@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.83"
+WM.version = "3.84"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -1334,7 +1334,7 @@ local MODULE_INFO = {
     LootCouncil = {
         title = "Loot Council", desc = "Loot history, council voting, awarding",
         about = "The guild's loot history: every item awarded, to whom and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve, disenchant), starting from what Gargul and RCLootCouncil have saved. All loot ever awarded, and each player's loot beside their armory with the time since their last award.",
-        command = "council", color = {1, 0.7, 0.28}, icon = "Interface\Icons\INV_Misc_Bag_10_Blue",
+        command = "council", color = {1, 0.7, 0.28}, icon = "Interface\\Icons\\INV_Misc_Bag_10_Blue",
         tools = {
             { text = "Loot history", desc = "Every award, newest first.", func = function() Call("LootCouncil", "Command", "history") end },
             { text = "Players", desc = "Each player's loot count and last award.", func = function() Call("LootCouncil", "Command", "players") end },

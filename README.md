@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.83 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.84 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1270,8 +1270,10 @@ Meter's research; the code is our own.
   crits and the player's health
 - **Threat:** read live from the game on your target (or focus), as a
   percent of what pulls aggro, green to red, with the tank marked
-- **Report** to say, party, raid, guild, officer, a whisper to your target,
-  or just your own chat frame (5 lines, or as many as you set)
+- **Report:** the report button opens one menu: tick how many lines (top
+  3, 5, 10, 15 or 25), then pick where: say, party, raid, guild, officer, a
+  whisper to your target, or just your own chat frame. Shift-click a bar to
+  send it with the last choice of lines
 - **Options:** only in combat, lock, pets for their owners, only your group,
   active time, start afresh, rank numbers, class icons, bar height, fights
   kept, report lines. `/wmachine meter new / reset / report [channel] /
@@ -1590,6 +1592,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.84
+- Watching Machine's menus now have a solid dark background (it wasn't being drawn, so they blended into what was behind them), and their tick marks show
+- Damage Meter: the report button's menu picks how many lines to send as well as where
+- Fixed: the Loot Council icon on the dashboard
 
 ### Version 3.83
 - Fixed: the Damage Meter's menus (click a window's title for what it shows, right-click for the fight), Crits' share menu and the Loot Browser's right-click menu opened far from the click (often off the screen) with ElvUI and other UI packs; they're now Watching Machine's own menu, at the cursor

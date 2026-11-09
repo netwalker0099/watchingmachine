@@ -289,7 +289,17 @@ check("fight menu", segItems[2].text:find("Current fight", 1, true) and segItems
 segItems[2].func()
 check("choosing a fight", env.WMDamageMeterDB.windows[1].segment == "current")
 local repItems = DM:OpenMenu("report", 1)
-check("report menu", repItems[2].text == "Say" and #repItems == 8)
+check("report menu: lines then where", repItems[1].text == "Lines to send" and repItems[2].text == "Top 3"
+    and repItems[7].text == "Send to" and repItems[8].text == "Say" and #repItems == 14)
+check("report menu: current line count ticked", repItems[3].checked == true and repItems[3].keepOpen == true)
+-- Ticking "Top 10" keeps the menu open and redraws its ticks
+env.WM_PopupMenu.rows[4]._scripts.OnClick(env.WM_PopupMenu.rows[4])
+check("report menu: choosing lines", env.WMDamageMeterDB.reportLines == 10 and env.WM_PopupMenu:IsShown()
+    and env.WM_PopupMenu.items[4].checked == true and env.WM_PopupMenu.items[3].checked == false)
+sent = {}
+env.WM_PopupMenu.rows[11]._scripts.OnClick(env.WM_PopupMenu.rows[11])
+check("report menu: sending closes it", #sent >= 1 and sent[1][2] == "GUILD" and not env.WM_PopupMenu:IsShown())
+env.WMDamageMeterDB.reportLines = 5
 -- Bar tooltip and breakdown
 DM:SetWindowSegment(1, "overall")
 DM:SetWindowDisplay(1, "damage")

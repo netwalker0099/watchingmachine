@@ -171,7 +171,7 @@ function DM:CreateWindowFrame(i)
         function() DM:CloseWindow(f.index) end)
     btns[2] = SmallButton(f, "Interface\\Buttons\\UI-PlusButton-Up", { "New window", "Open another window with its own display." },
         function() DM:NewWindow() end)
-    btns[3] = SmallButton(f, "Interface\\Buttons\\UI-GuildButton-MOTD-Up", { "Report", "Send this window's top lines to chat." },
+    btns[3] = SmallButton(f, "Interface\\Buttons\\UI-GuildButton-MOTD-Up", { "Report", "Choose how many lines and where to send this window's top players." },
         function() DM:OpenMenu("report", f.index) end)
     btns[4] = SmallButton(f, "Interface\\Buttons\\UI-RotationLeft-Button-Up", { "Reset", "Clear every fight (asks first)." },
         function() WM:Confirm("Clear every fight in the damage meter?", function() DM:Reset() end) end)
@@ -509,7 +509,9 @@ end
 -- kind: "display", "segment" or "report", for window i. Opens Watching
 -- Machine's own menu at the cursor (the game's dropdown menu didn't open
 -- for some players) and returns its items.
-function DM:OpenMenu(kind, i)
+DM.REPORT_LINE_CHOICES = { 3, 5, 10, 15, 25 }
+
+function DM:OpenMenu(kind, i, rebuilding)
     local cfg = DB().windows[i]
     if not cfg then return {} end
     local items = {}
@@ -538,7 +540,13 @@ function DM:OpenMenu(kind, i)
                     function() DM:SetWindowSegment(i, n) end, cfg.segment == n))
             end
         elseif kind == "report" then
-            add(Item("Report " .. DB().reportLines .. " lines to", nil, nil, { isTitle = true }))
+            -- How many lines (ticks, the menu stays open), then where to
+            add(Item("Lines to send", nil, nil, { isTitle = true }))
+            for _, n in ipairs(DM.REPORT_LINE_CHOICES) do
+                add(Item("Top " .. n, function() DB().reportLines = n end, DB().reportLines == n,
+                    { keepOpen = true }))
+            end
+            add(Item("Send to", nil, nil, { isTitle = true }))
             for _, ch in ipairs({ { "SAY", "Say" }, { "PARTY", "Party" }, { "RAID", "Raid" }, { "GUILD", "Guild" },
                 { "OFFICER", "Officer" }, { "SELF", "Just me (chat frame)" } }) do
                 add(Item(ch[2], function() DM:Report(cfg.display, cfg.segment, ch[1]) end))
@@ -553,7 +561,10 @@ function DM:OpenMenu(kind, i)
             end))
         end
     end
-    if WM.UI and WM.UI.ShowMenu then WM.UI:ShowMenu(items) end
+    -- rebuilding: the menu redraws itself after a tick, so just the items
+    if not rebuilding and WM.UI and WM.UI.ShowMenu then
+        WM.UI:ShowMenu(items, kind == "report" and function() return DM:OpenMenu("report", i, true) end or nil)
+    end
     return items
 end
 
