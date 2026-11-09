@@ -29,6 +29,7 @@ Modules/GuildRosterSync.lua
 Modules/GuildRosterUI.lua
 Modules/GuildRosterPurge.lua
 Modules/GuildRosterTools.lua
+Modules/GuildRosterFullSync.lua
 Modules/DebuffTracker.lua
 Modules/PvPTracker.lua
 Modules/BuffCheck.lua
