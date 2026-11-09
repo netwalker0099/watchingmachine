@@ -607,6 +607,14 @@ function GR:TabLines()
         Line("Sync: " .. (DB().sync and "|cFF33FF33on|r" or "|cFFFF4444off|r") .. "   Ban list: "
             .. (DB().syncBans and "on" or "off") .. "   Custom notes: " .. (DB().syncCustom and "on" or "off"))
         Line("Guild Roster Manager release (patch day) in use: " .. S:PatchDay())
+        local F = S.Full
+        if F then
+            local last = DB().lastFullSync
+            Line("Full catch-up with Guild Roster Manager's leader: " .. (F:Active() and ("|cFF33FF33syncing with " .. GR.Short(F.partner) .. "|r")
+                or (last and (date("%d %b %H:%M", last)) or "not yet")) .. (F.leader and ("   leader: " .. GR.Short(F.leader)) or ""))
+            Line("Catch-up with Watching Machine users: sent " .. (F.wmSent or 0) .. ", received " .. (F.wmReceived or 0)
+                .. (F.CatchUpLength() > 0 and (", " .. F.CatchUpLength() .. " to send") or ""))
+        end
         Line("Edits sent: " .. (S.sent or 0) .. ", received: " .. (S.received or 0))
         Line(" ")
         Line("|cFFFFD100Guildmates sharing roster edits|r")
@@ -1005,6 +1013,9 @@ local function Settings(L, inSetup)
         get = function() return DB().sync end,
         set = function(v) DB().sync = v; if v and GR.Sync then GR.Sync:Hello() end end,
         tooltip = { "Sync", "Join and promotion dates, alts and mains, custom notes, birthdays and bans you edit are sent to guildmates running Guild Roster Manager or Watching Machine, and theirs come to you. The newest edit wins." } })
+    L:Checkbox({ label = "Catch up after login (full sync)", indent = 16, get = function() return DB().fullSync end,
+        set = function(v) DB().fullSync = v end,
+        tooltip = { "Full sync", "A minute after you log in, catch up on edits made while you were offline: Watching Machine users send theirs, and Guild Roster Manager's elected leader syncs with you in its own way (you send your newer records and take its). Watching Machine never stands for Guild Roster Manager's leader. /wmachine roster fullsync starts it now." } })
     L:Checkbox({ label = "Share the ban list", indent = 16, get = function() return DB().syncBans end,
         set = function(v) DB().syncBans = v end,
         tooltip = { "Ban list sync", "Bans are only sent to, and taken from, the ranks below." } })
@@ -1087,7 +1098,7 @@ function GR:SetupPage(L)
     L:Note("Everything else is in its window: |cFFFFFF00/wmachine roster|r.")
 end
 
--- /wmachine roster [log|former|sync|scan|import|notes|purge|export|stamp|options]
+-- /wmachine roster [log|former|sync|scan|import|notes|purge|export|stamp|fullsync|options]
 function GR:Command(arg)
     arg = strtrim((arg or ""):lower())
     if arg == "log" or arg == "former" or arg == "sync" then self:ShowTab(arg)
@@ -1102,6 +1113,12 @@ function GR:Command(arg)
         WM:Print(n > 0 and string.format("Roster Manager: guild notes named the main of %d character%s.", n, n == 1 and "" or "s")
             or "Roster Manager: no new alts or mains in the guild notes.")
         self:RefreshUI()
+    elseif arg == "fullsync" or arg == "sync now" then
+        local F = self.Sync.Full
+        F.greeted = nil
+        F:HelloWM()
+        if F:Begin() then WM:Print("Roster Manager: catching up with Guild Roster Manager's leader and Watching Machine users.")
+        else WM:Print("Roster Manager: can't start a full sync now (in a group, sync off, or one already running).") end
     elseif arg == "export" then
         local former = self.tab == "former"
         local csv, n = self:ExportCSV(former)

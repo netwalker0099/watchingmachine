@@ -38,6 +38,7 @@ local DEFAULTS = {
     autoStamp = false,      -- stamp a new member's join date by itself
     anniversaries = true,   -- guild anniversaries and birthdays in the log on the day
     anniversaryGuild = false, -- ...and in guild chat
+    fullSync = true,        -- catch up with Guild Roster Manager's leader after login
     groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
     nameMain = true,        -- log lines about an alt end with "-- Main's alt"
     purgeDays = 30,         -- purge: every character offline at least this many days

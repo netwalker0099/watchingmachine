@@ -197,7 +197,14 @@ end
 
 function Sync:OnSyncMessage(body, sender)
     local tag, rest = tostring(body):match("^([^?]+)%?(.*)$")
-    if not tag or not (LIVE[tag] or NOTES[tag] or BANS[tag]) then return end
+    if not tag then tag, rest = tostring(body), "" end
+    -- Full sync (GuildRosterFullSync.lua)
+    if self.Full and self.Full.Handles(tag) then
+        local r, payload = rest:match("^(%-?%d+)%?(.*)$")
+        if r and tonumber(r) < MyRank() then return end
+        return self.Full:OnMessage(tag, payload or rest, sender, tonumber(r))
+    end
+    if not (LIVE[tag] or NOTES[tag] or BANS[tag]) then return end
     local R, payload = rest:match("^(%-?%d+)%?(.*)$")
     R = tonumber(R)
     if not R or not self:Accepts(tag, R, sender) then return end
@@ -563,6 +570,7 @@ function Sync:Initialize()
     end
     WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "GROUP_ROSTER_UPDATE" })
     WM.RunAfter(5, function() Sync:Hello() end)
+    if self.Full then self.Full:Init() end
 end
 
 -- Say who we are and ask who's there
@@ -598,5 +606,8 @@ events:SetScript("OnEvent", function(_, event, prefix, body, channel, sender)
     if not ok then geterrorhandler()(err) end
 end)
 
-function Sync:OnModuleOff() self:ClearQueue() end
+function Sync:OnModuleOff()
+    self:ClearQueue()
+    if self.Full then self.Full:Stop() end
+end
 function Sync:OnModuleOn() WM.RunAfter(2, function() Sync:Hello() end) end
