@@ -323,6 +323,10 @@ function GR:DetailLines(rec)
         if #alts > 0 then Add("Alts", table.concat(alts, ", ")) end
     end
     if (rec.timesInGuild or 1) > 1 then Add("Times in guild", tostring(rec.timesInGuild)) end
+    if self.ReadyFor then
+        local nextRank, days = self:ReadyFor(rec)
+        if nextRank then Add("|cFFFFD100Ready to promote|r", days .. " days at rank: " .. GR.Tools.RankName(g, nextRank)) end
+    end
     if self.IsPurgeIgnored and self:IsPurgeIgnored(rec.name) then Add("Purge", "|cFF888888never (ignored)|r") end
     if rec.custom.text ~= "" then Add("Custom note", rec.custom.text) end
     if rec.ban.on then
@@ -413,10 +417,57 @@ local function Matches(rec, q)
         or (rec.custom.text or ""):lower():find(q, 1, true) or (rec.rankName or ""):lower():find(q, 1, true)
 end
 
+-- How the roster tab sorts and what it shows (Sort / Show above the list)
+GR.SORTS = {
+    { value = "rank", text = "Online, then rank" }, { value = "name", text = "Name" },
+    { value = "class", text = "Class" }, { value = "level", text = "Level" },
+    { value = "lastonline", text = "Last online" }, { value = "joined", text = "Join date" },
+}
+GR.FILTERS = {
+    { value = "all", text = "Everyone" }, { value = "online", text = "Online" },
+    { value = "inactive", text = "Inactive" }, { value = "nonote", text = "No public note" },
+    { value = "mains", text = "Mains" }, { value = "noalts", text = "Not in an alt group" },
+    { value = "ready", text = "Ready to promote" },
+}
+
+local function SortBy() return DB().rosterSort or "rank" end
+local function Hours(r) return r.online and 0 or (r.offlineHours or 0) end
+
 local function RosterOrder(a, b)
-    if (a.online and true or false) ~= (b.online and true or false) then return a.online and true or false end
+    local by = SortBy()
+    if by == "name" then return a.name < b.name end
+    if by == "class" then
+        if (a.class or "") ~= (b.class or "") then return (a.class or "") < (b.class or "") end
+    elseif by == "level" then
+        if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) > (b.level or 0) end
+    elseif by == "lastonline" then
+        if Hours(a) ~= Hours(b) then return Hours(a) < Hours(b) end
+    elseif by == "joined" then
+        local ja, jb = a.join and a.join.date or "", b.join and b.join.date or ""
+        if ja ~= jb then
+            if ja == "" then return false end
+            if jb == "" then return true end
+            return ja < jb
+        end
+    else
+        if (a.online and true or false) ~= (b.online and true or false) then return a.online and true or false end
+    end
     if a.rankIndex ~= b.rankIndex then return (a.rankIndex or 99) < (b.rankIndex or 99) end
     return a.name < b.name
+end
+GR.RosterOrder = RosterOrder
+
+-- Does a member pass the Show filter?
+function GR:PassesFilter(rec, g)
+    local f = DB().rosterFilter or "all"
+    if f == "online" then return rec.online and true or false end
+    if f == "inactive" then return Hours(rec) >= (DB().inactiveDays or 14) * 24 end
+    if f == "nonote" then return (rec.note or "") == "" end
+    local grp = rec.group and g and g.groups[rec.group]
+    if f == "mains" then return grp ~= nil and grp.main == rec.name end
+    if f == "noalts" then return grp == nil end
+    if f == "ready" then return self.ReadyFor and self:ReadyFor(rec) ~= nil end
+    return true
 end
 
 local function RosterLine(rec, g, indent)
@@ -478,8 +529,10 @@ function GR:GroupedLines(matched, q)
         end
     end
     table.sort(list, function(a, b)
-        local ao, bo = (a.online or onAlt[a.name]) and true or false, (b.online or onAlt[b.name]) and true or false
-        if ao ~= bo then return ao end
+        if SortBy() == "rank" then
+            local ao, bo = (a.online or onAlt[a.name]) and true or false, (b.online or onAlt[b.name]) and true or false
+            if ao ~= bo then return ao end
+        end
         return RosterOrder(a, b)
     end)
     for _, rec in ipairs(list) do
@@ -522,7 +575,10 @@ function GR:TabLines()
         local list = {}
         local src = self.tab == "roster" and g.members or g.former
         for _, rec in pairs(src) do
-            if Matches(rec, q) and (not self.bannedOnly or self.tab == "roster" or rec.ban.on) then list[#list + 1] = rec end
+            if Matches(rec, q) and (not self.bannedOnly or self.tab == "roster" or rec.ban.on)
+               and (self.tab ~= "roster" or self:PassesFilter(rec, g)) then
+                list[#list + 1] = rec
+            end
         end
         if self.tab == "roster" and DB().groupAlts then
             return self:GroupedLines(list, q)
@@ -688,6 +744,10 @@ local DETAIL_BUTTONS = {
         Refresh()
     end },
     { "Ban", function(r) if r.ban.on then GR:SetBan(r.name, false); Refresh() else GR:AskBan(r.name) end end },
+    { "Promote", function(r) if GR:Promote(r.name) then Refresh() end end,
+      tip = { "Promote", "Up one rank (needs the game's permission to promote, and a rank below yours)." } },
+    { "Demote", function(r) if GR:Demote(r.name) then Refresh() end end,
+      tip = { "Demote", "Down one rank (needs the game's permission to demote)." } },
     { "Show armory", function(r) GR:ShowArmory(r.name) end,
       tip = { "Show armory", "Their saved gear and talents for each spec, in ArmorySnap's browser. Also asks the guild for a"
           .. " newer scan. Needs ArmorySnap on." } },
@@ -721,6 +781,8 @@ function GR:RefreshDetails()
         if former and (i == 5 or i == 6 or i == 7) then usable = false end
         if i == 6 and not grp then usable = false end
         if label == "Show armory" then usable = GR.Armory() ~= nil end
+        if label == "Promote" then usable = not former and GR.CanPromote and GR:CanPromote(rec) or false end
+        if label == "Demote" then usable = not former and GR.CanDemote and GR:CanDemote(rec) or false end
         if usable then b:Enable() else b:Disable() end
         b:Show()
     end
@@ -757,6 +819,15 @@ function GR:CreateUI()
         if panel.list then panel.list.offset = 0 end
         GR:RefreshList()
     end)
+    local view = L:Row(26)
+    view:Dropdown({ label = "Sort:", width = 130, options = GR.SORTS,
+        get = function() return DB().rosterSort or "rank" end,
+        set = function(v) DB().rosterSort = v; if panel.list then panel.list.offset = 0 end; GR:RefreshList() end,
+        tooltip = { "Sort the roster", "Online first then by rank, or by name, class, level, last online (most recent first) or join date (longest in the guild first)." } }, 8)
+    view:Dropdown({ label = "Show:", width = 140, options = GR.FILTERS,
+        get = function() return DB().rosterFilter or "all" end,
+        set = function(v) DB().rosterFilter = v; if panel.list then panel.list.offset = 0 end; GR:RefreshList() end,
+        tooltip = { "Show", "Everyone; only who's online; inactive (offline longer than Options' inactive days); no public note; mains; or characters in no alt group." } }, 250)
     local fill = L:Fill(200)
     local list = CreateFrame("Frame", nil, fill)
     list:SetPoint("TOPLEFT", 0, -2)
@@ -788,10 +859,13 @@ function GR:CreateUI()
         local b = CreateFrame("Button", nil, d, "UIPanelButtonTemplate")
         b:SetSize((DETAILS_W - 26) / 2, 20)
         local col, rowN = (i - 1) % 2, math.floor((i - 1) / 2)
-        if i > 8 then
-            -- Show armory: a full-width row above the edit buttons
+        if i == 9 or i == 10 then
+            -- Promote / Demote: a row above the edit buttons
+            col, rowN = i - 9, -1
+        elseif i > 10 then
+            -- Show armory: a full-width row above those
             b:SetWidth(DETAILS_W - 18)
-            col, rowN = 0, -1
+            col, rowN = 0, -2
         end
         b:SetPoint("BOTTOMLEFT", 9 + col * ((DETAILS_W - 26) / 2 + 8), 10 + (3 - rowN) * 22)
         b:SetText(spec[1])
@@ -816,6 +890,8 @@ function GR:CreateUI()
     panel:AddFooterButton({ text = "Options", width = 80, onClick = function() GR:ToggleOptions() end }, "RIGHT")
     panel.purgeButton = panel:AddFooterButton({ text = "Purge", width = 70, onClick = function() GR:TogglePurge() end,
         tooltip = { "Purge inactive players", "Officers and up: list everyone whose main and alts have all been offline for a number of days, and remove them one click at a time." } }, "RIGHT")
+    panel:AddFooterButton({ text = "Export", width = 64, onClick = function() GR:Command("export") end,
+        tooltip = { "Export", "The roster (or, on Former & bans, former members) as CSV, to copy into a spreadsheet." } }, "RIGHT")
     panel:AddFooterButton({ text = "Ban by name", width = 100, onClick = function() GR:AskBanByName() end,
         tooltip = { "Ban by name", "Add someone to the ban list who isn't in the guild (or has left). You're warned if they join." } }, "RIGHT")
     panel:AddFooterButton({ text = "Scan now", width = 80, onClick = function() GR.AskRoster() end,
@@ -894,6 +970,36 @@ local function Settings(L, inSetup)
     L:Slider({ label = "Report level-ups from level", min = 1, max = 70, step = 1, width = 220,
         get = function() return DB().levelMin end, set = function(v) DB().levelMin = v end,
         tooltip = { "Level-ups", "Level-ups below this level aren't logged." } })
+    L:Header("Promotions")
+    L:Note("Days at a rank before the log (and the roster's |cFFFFFF00Ready to promote|r filter) suggests the next rank up."
+        .. " 0 or empty: never. Counted from their last promotion, or when they joined.")
+    local nRanks = tonumber(GuildControlGetNumRanks and GuildControlGetNumRanks()) or 0
+    for idx = math.max(nRanks - 1, 1), 2, -1 do
+        local rankIndex = idx
+        L:EditBox({ label = function() return (GR.Tools and GR.Tools.RankName(GR:Guild(), rankIndex) or ("Rank " .. rankIndex)) .. ":" end,
+            width = 50, numeric = true, maxLetters = 4, indent = 16,
+            get = function() return tostring(DB().promoDays[rankIndex] or "") end,
+            set = function(v) DB().promoDays[rankIndex] = tonumber(v) and tonumber(v) > 0 and tonumber(v) or nil end,
+            tooltip = { "Days before a promotion", "After this many days at this rank, they're suggested for the next rank up." } })
+    end
+    L:Header("Join dates in notes")
+    L:Dropdown({ label = "Stamp join dates into:", width = 140,
+        options = { { value = "officer", text = "Officer notes" }, { value = "public", text = "Public notes" } },
+        get = function() return DB().stampNote or "officer" end, set = function(v) DB().stampNote = v end,
+        tooltip = { "Join date stamps", "\"Joined 15 Jan 26\" is added to the end of the note (when it fits in 31 characters and isn't there yet)." } })
+    L:Checkbox({ label = "Stamp a new member's join date by itself", get = function() return DB().autoStamp end,
+        set = function(v) DB().autoStamp = v end,
+        tooltip = { "Stamp on join", "When someone joins, their join date goes into the note above (needs permission to edit those notes)." } })
+    if not inSetup then
+        L:Buttons({ { text = "Stamp everyone's join date now", width = 230, onClick = function() GR:Command("stamp") end,
+            tooltip = { "Stamp now", "Every member with a known join date and no stamp yet gets one, a few a second." } } })
+    end
+    L:Header("Anniversaries and birthdays")
+    L:Checkbox({ label = "Say guild anniversaries and birthdays on the day", get = function() return DB().anniversaries end,
+        set = function(v) DB().anniversaries = v end,
+        tooltip = { "Anniversaries", "\"Today is Bob's 2-year anniversary in the guild!\" and \"Happy birthday, Bob!\" in the log and your chat, once on the day (birthdays come from the member's details)." } })
+    L:Checkbox({ label = "Also say them in guild chat", indent = 16, get = function() return DB().anniversaryGuild end,
+        set = function(v) DB().anniversaryGuild = v end })
     L:Header("Sharing with your guild")
     L:Checkbox({ label = "Share edits with guildmates (Guild Roster Manager and Watching Machine)",
         get = function() return DB().sync end,
@@ -969,6 +1075,11 @@ function GR:SetupPage(L)
     L:Dropdown({ label = "Purge never removes:", width = 170, options = function() return RankOptions(false) end,
         get = function() return DB().purgeProtectRank end, set = function(v) DB().purgeProtectRank = v end,
         tooltip = { "Protected ranks", "Players with any character at this rank or higher are never listed." } })
+    L:Note("|cFFFFFFFFOfficer tools:|r |cFFFFFF00Promote|r and |cFFFFFF00Demote|r in a member's details (one click each),"
+        .. " promotion suggestions after the days you set per rank (the roster's |cFFFFFF00Ready to promote|r filter lists"
+        .. " them), |cFFFFFF00Export|r of the roster as CSV, join dates stamped into notes, and anniversaries and birthdays"
+        .. " said on the day. The roster sorts by rank, name, class, level, last online or join date, and filters to who's"
+        .. " online, inactive, without a note, mains, or ready to promote.")
     L:Note("|cFFFFFFFFAlts from notes:|r the first scan reads public and officer notes like \"Venhana alt\" or"
         .. " \"Main: Chojii\" and sets those mains, so the Roster tab lists their alts under them. An alt group with"
         .. " no main yet is listed under its highest-ranked character, marked |cFFFF8844(no main set)|r.")
@@ -976,7 +1087,7 @@ function GR:SetupPage(L)
     L:Note("Everything else is in its window: |cFFFFFF00/wmachine roster|r.")
 end
 
--- /wmachine roster [log|former|sync|scan|import|notes|purge|options]
+-- /wmachine roster [log|former|sync|scan|import|notes|purge|export|stamp|options]
 function GR:Command(arg)
     arg = strtrim((arg or ""):lower())
     if arg == "log" or arg == "former" or arg == "sync" then self:ShowTab(arg)
@@ -991,6 +1102,13 @@ function GR:Command(arg)
         WM:Print(n > 0 and string.format("Roster Manager: guild notes named the main of %d character%s.", n, n == 1 and "" or "s")
             or "Roster Manager: no new alts or mains in the guild notes.")
         self:RefreshUI()
+    elseif arg == "export" then
+        local former = self.tab == "former"
+        local csv, n = self:ExportCSV(former)
+        WM.UI:ShowCopyText((former and "Former members: " or "Roster: ") .. n, csv)
+    elseif arg == "stamp" then
+        local n = self.Tools:StampAll()
+        WM:Print("Roster Manager: stamping " .. n .. " join dates into " .. (DB().stampNote == "public" and "public" or "officer") .. " notes.")
     elseif arg == "purge" then
         if self:CanPurge() then self:TogglePurge()
         else WM:Print("Roster Manager: this character can't remove guild members.") end

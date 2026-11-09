@@ -44,7 +44,7 @@ local addons = {}
 env.C_AddOns = { IsAddOnLoaded = function(n) return addons[n] or false end }
 
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua",
-                     "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua" }) do
+                     "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua", "Modules/GuildRosterTools.lua" }) do
     W.load(f)
 end
 local WM = W.WM
@@ -474,6 +474,136 @@ GR:TogglePurge()
 check("purge window opens", env.WM_GuildRosterPurge and env.WM_GuildRosterPurge:IsShown())
 GR:HidePurge()
 check("purge window closes", not env.WM_GuildRosterPurge:IsShown())
+
+-- ============ Sorting and filters ============
+-- (real clock and roster functions for these; put back afterwards)
+local fakeTime = env.time
+env.time = os.time
+local realRosterInfo, realNumMembers = env.GetGuildRosterInfo, env.GetNumGuildMembers
+local function Names(ls) local out = {} for _, l in ipairs(ls) do if l.rec then out[#out + 1] = l.rec.name end end return out end
+local function IndexOf(ls, name) for i, n in ipairs(Names(ls)) do if n == name then return i end end end
+GR.DB().groupAlts = false
+g.members["Grpa-SpineShatter"].class, g.members["Altb-SpineShatter"].class = "WARRIOR", "DRUID"
+GR.DB().rosterSort = "class"
+lines = GR:TabLines()
+check("sort by class", IndexOf(lines, "Altb-SpineShatter") < IndexOf(lines, "Grpa-SpineShatter"))
+GR.DB().rosterSort = "name"
+local nm = Names(GR:TabLines())
+local sorted = true
+for i = 2, #nm do if nm[i - 1] > nm[i] then sorted = false end end
+check("sort by name", sorted)
+g.members["Solo-SpineShatter"].online = false
+g.members["Solo-SpineShatter"].offlineHours = 30 * 24
+GR.DB().rosterSort = "lastonline"
+lines = GR:TabLines()
+check("sort by last online: most recent first", IndexOf(lines, "Solo-SpineShatter") < IndexOf(lines, "Mainy-SpineShatter")) -- Mainy: 45 days
+GR.DB().rosterFilter = "inactive"
+nm = Names(GR:TabLines())
+local onlySolo = true
+for _, n in ipairs(nm) do if (g.members[n].offlineHours or 0) < 14 * 24 then onlySolo = false end end
+check("filter: inactive only", #nm >= 1 and onlySolo)
+g.members["Paira-SpineShatter"].note = ""
+GR.DB().rosterFilter = "nonote"
+check("filter: no public note", IndexOf(GR:TabLines(), "Paira-SpineShatter") ~= nil and IndexOf(GR:TabLines(), "Alta-SpineShatter") == nil)
+GR.DB().rosterFilter, GR.DB().rosterSort, GR.DB().groupAlts = "all", "rank", true
+
+-- ============ Promote / demote ============
+local promoted, demoted = {}, {}
+env.CanGuildPromote = function() return true end
+env.CanGuildDemote = function() return true end
+env.GuildPromote = function(n) promoted[#promoted + 1] = n end
+env.GuildDemote = function(n) demoted[#demoted + 1] = n end
+env.GuildControlGetNumRanks = function() return 6 end
+env.GetGuildInfo = function() return "The Watchers", "Officer", 1 end
+local solo = g.members["Solo-SpineShatter"]
+solo.rankIndex = 4
+check("promote", GR:Promote("Solo") and promoted[1] == "Solo")
+check("demote", GR:Demote("Solo") and demoted[1] == "Solo")
+solo.rankIndex = 2
+check("can't promote to your own rank", GR:Promote("Solo") == false and #promoted == 1)
+solo.rankIndex = 5
+check("can't demote below the lowest rank", GR:Demote("Solo") == false and #demoted == 1)
+env.CanGuildPromote = function() return false end
+solo.rankIndex = 4
+check("no permission: no promote", GR:Promote("Solo") == false)
+env.CanGuildPromote = function() return true end
+GR.selected = "Solo-SpineShatter"
+GR:ShowTab("roster")
+local promoBtn
+for _, b in ipairs(env.WM_GuildRosterFrame.details.buttons) do if b:GetText() == "Promote" then promoBtn = b end end
+check("details: Promote button", promoBtn ~= nil and promoBtn:IsEnabled())
+
+-- ============ Promotion suggestions ============
+GR.DB().promoDays[4] = 30
+solo.promo = { date = os.date("%Y%m%d", os.time() - 40 * 86400), verified = true }
+local nextRank, days = GR:ReadyFor(solo)
+check("ready for the next rank after the days set", nextRank == 3 and days >= 39)
+local nlog = #g.log
+check("suggested once in the log", GR.Tools:CheckSuggestions() >= 1 and g.log[1].kind == "suggest"
+    and g.log[1].text:find("Solo has been", 1, true) and g.log[1].text:find("ready for", 1, true))
+check("not suggested again", GR.Tools:CheckSuggestions() == 0)
+GR.DB().rosterFilter = "ready"
+check("filter: ready to promote", IndexOf(GR:TabLines(), "Solo-SpineShatter") ~= nil and IndexOf(GR:TabLines(), "Mainy-SpineShatter") == nil)
+GR.DB().rosterFilter = "all"
+solo.promo = { date = os.date("%Y%m%d"), verified = true }
+check("just promoted: not ready", GR:ReadyFor(solo) == nil)
+GR.DB().promoDays[4] = nil
+
+-- ============ Export ============
+local csv, count = GR:ExportCSV()
+check("roster export: header and rows", csv:find("^Name,Main,Rank,Level,Class,Joined") and count >= 10)
+check("roster export: main shown for an alt", csv:find("\nAlta,Mainy,", 1, true) ~= nil)
+GR.tab = "roster"
+GR:Command("export")
+check("export window", env.WM_CopyTextFrame and env.WM_CopyTextFrame:IsShown())
+local fcsv = GR:ExportCSV(true)
+check("former members export has Left", fcsv:find("BanReason,Left", 1, true) ~= nil)
+
+-- ============ Join dates in notes ============
+local notes = {}
+env.CanEditOfficerNote = function() return true end
+local realCanEdit = env.C_GuildInfo and env.C_GuildInfo.CanEditOfficerNote
+if env.C_GuildInfo then env.C_GuildInfo.CanEditOfficerNote = function() return true end end
+env.GuildRosterSetOfficerNote = function(i, text) notes[#notes + 1] = { i, text } end
+local rosterNames = {}
+for name in pairs(g.members) do rosterNames[#rosterNames + 1] = name end
+table.sort(rosterNames)
+env.GetNumGuildMembers = function() return #rosterNames end
+env.GetGuildRosterInfo = function(i) return rosterNames[i] end
+solo.join = { date = "20260115", verified = true }
+solo.onote = ""
+check("stamp text", GR.Tools.StampText(solo) == "Joined 15 Jan 26")
+check("stamp goes on an empty note", GR.Tools.Stamped(solo, true) == "Joined 15 Jan 26")
+solo.onote = "Tank, main raider here please"
+check("too long: not stamped", GR.Tools.Stamped(solo, true) == nil)
+solo.onote = "Tank"
+check("added after a short note", GR.Tools.Stamped(solo, true) == "Tank Joined 15 Jan 26")
+solo.onote = "Joined 01 Jan 26"
+check("already stamped: left alone", GR.Tools.Stamped(solo, true) == nil)
+solo.onote = ""
+GR.Tools:StampOne(solo)
+check("one stamp written to their roster line", notes[1] and rosterNames[notes[1][1]] == "Solo-SpineShatter" and notes[1][2] == "Joined 15 Jan 26")
+
+-- ============ Anniversaries and birthdays ============
+local today = os.time()
+solo.join = { date = os.date("%Y%m%d", today - 366 * 86400 - (os.date("*t", today).yday > 59 and 0 or 0)), verified = true }
+local y, m, d = os.date("%Y", today), os.date("%m", today), os.date("%d", today)
+solo.join = { date = (tonumber(y) - 2) .. m .. d, verified = true }
+solo.annivYear = nil
+local mainy = g.members["Mainy-SpineShatter"]
+mainy.bday = { d = tonumber(d), m = tonumber(m) }
+mainy.bdayYear = nil
+local cel = GR.Tools:Celebrations(today)
+local texts = {}
+for _, c in ipairs(cel) do texts[#texts + 1] = c.text end
+local all = table.concat(texts, "|")
+check("guild anniversary on the day", all:find("Solo's 2-year anniversary", 1, true) ~= nil)
+check("birthday on the day", all:find("Happy birthday, Mainy!", 1, true) ~= nil)
+check("once a year", #GR.Tools:Celebrations(today) == 0)
+Sync:ClearQueue()
+env.time = fakeTime
+if env.C_GuildInfo then env.C_GuildInfo.CanEditOfficerNote = realCanEdit end
+env.GetGuildRosterInfo, env.GetNumGuildMembers = realRosterInfo, realNumMembers
 
 -- Leave the roster as the scans expect it
 for _, n in ipairs({ "Mainy", "Alta", "Altb", "Solo", "Paira", "Pairb", "Grpa", "Grpb", "Taken", "Other", "Otheralt", "Lowrank", "Highrank" }) do

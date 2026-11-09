@@ -80,7 +80,7 @@ env.InCombatLockdown = function() return false end
 
 env.WatchingMachineDB = { theme = "Default" }
 for _, f in ipairs({ "Core.lua", "UI.lua", "Profiles.lua", "Modules/ArmorySnap.lua", "Modules/ArmorySnapArmory.lua",
-                     "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua", "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua" }) do
+                     "Modules/GuildRoster.lua", "Modules/GuildRosterSync.lua", "Modules/GuildRosterUI.lua", "Modules/GuildRosterPurge.lua", "Modules/GuildRosterTools.lua" }) do
     W.load(f)
 end
 local WM = W.WM

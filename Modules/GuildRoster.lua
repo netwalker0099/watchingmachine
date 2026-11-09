@@ -33,6 +33,11 @@ local DEFAULTS = {
     levelMin = 10,          -- don't report level-ups below this
     showOnLogin = true,     -- open the log at login when something changed
     hoverDetails = true,    -- details when you hover the guild roster
+    promoDays = {},         -- [rank index] = days at that rank before suggesting the next
+    stampNote = "officer",  -- join dates go into the "officer" or "public" note
+    autoStamp = false,      -- stamp a new member's join date by itself
+    anniversaries = true,   -- guild anniversaries and birthdays in the log on the day
+    anniversaryGuild = false, -- ...and in guild chat
     groupAlts = true,       -- roster tab: alts listed under their main (+ / -)
     nameMain = true,        -- log lines about an alt end with "-- Main's alt"
     purgeDays = 30,         -- purge: every character offline at least this many days
@@ -65,10 +70,12 @@ local KINDS = {
     alts     = { "Alts",              { 0.7, 0.8, 1 } },
     dates    = { "Dates",             { 0.6, 0.85, 1 } },
     info     = { "Info",              { 1, 1, 1 } },
+    suggest  = { "Ready to promote",  { 1, 0.82, 0 } },
+    anniversary = { "Anniversaries and birthdays", { 1, 0.5, 0.8 } },
 }
 GR.KINDS = KINDS
 GR.KIND_ORDER = { "join", "rejoin", "left", "kick", "promote", "demote", "level", "note", "onote", "custom",
-    "rename", "rankname", "back", "ban", "alts", "dates", "info" }
+    "rename", "rankname", "back", "ban", "alts", "dates", "info", "suggest", "anniversary" }
 local LOG_MAX = 3000
 
 local function DB()
@@ -355,6 +362,7 @@ function GR:Scan()
     for name, rec in pairs(g.members) do if rec.guid then byGuid[rec.guid] = name end end
     local formerByGuid = {}
     for name, rec in pairs(g.former) do if rec.guid then formerByGuid[rec.guid] = name end end
+    local joined = {}
 
     for _, row in ipairs(rows) do
         local oldName = (row.guid and byGuid[row.guid]) or (g.members[row.name] and row.name)
@@ -401,6 +409,7 @@ function GR:Scan()
                 end
             end
             g.members[row.name] = rec
+            if not first then joined[#joined + 1] = rec end
             rec.rankIndex = row.rankIndex
             rec.ranks = rec.ranks or {}
             table.insert(rec.ranks, 1, { rank = row.rankName, date = first and "" or today })
@@ -474,6 +483,7 @@ function GR:Scan()
         g.notesRead = true
         self:AltsFromNotes()
     end
+    if self.Tools then self.Tools:AfterScan(joined) end
     if self.OnScanned then self:OnScanned() end
 end
 
