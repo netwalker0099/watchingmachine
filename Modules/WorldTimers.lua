@@ -154,9 +154,7 @@ local function Now()
 end
 WT.Now = Now
 
-local function CharKey()
-    return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?")
-end
+local function CharKey() return WM.PlayerKey() end
 
 -- Defaults are applied once per saved table (a profile switch swaps the
 -- table, and they are applied again)

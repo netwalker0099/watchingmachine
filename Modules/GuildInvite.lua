@@ -264,7 +264,6 @@ function GuildInvite:RegisterEvents()
     eventFrame:RegisterEvent("CHAT_MSG_RAID")
     eventFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
     eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
-    eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
@@ -331,8 +330,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "GUILD_ROSTER_UPDATE" then
         GuildInvite.rosterStale = true
         
-    elseif event == "GROUP_ROSTER_UPDATE" then
-        -- No auto-convert here; only convert when a 6th invite triggers it in InviteToRaid
     end
 end)
 

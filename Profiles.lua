@@ -71,19 +71,9 @@ local function DeepCopy(v)
 end
 P.DeepCopy = DeepCopy
 
--- "Name-Realm". Asked for on every WM:IsModuleOn (every combat log event
--- in some modules), so the key is built once per name and kept
-local keyName, keyValue
-function P.CharKey()
-    local name = UnitName and UnitName("player")
-    if keyValue and name == keyName then return keyValue end
-    local realm = GetRealmName and GetRealmName()
-    local key = (type(name) == "string" and name or "?") .. "-" .. (type(realm) == "string" and realm or "?")
-    -- Kept only once both are known (they aren't during the first frames)
-    if type(name) == "string" and type(realm) == "string" then keyName, keyValue = name, key end
-    return key
-end
-function P.ForgetCharKey() keyName, keyValue = nil, nil end
+-- "Name-Realm" (Core keeps it: WM.PlayerKey)
+function P.CharKey() return WM.PlayerKey() end
+function P.ForgetCharKey() WM.ForgetPlayerKey() end
 
 P.profiles = {}      -- [saved variable] = this character's live profile table
 P.stores = {}        -- [saved variable] = its __wm store

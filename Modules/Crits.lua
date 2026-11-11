@@ -48,7 +48,7 @@ end
 CR.DB = DB
 
 local function Now() return (GetServerTime and tonumber(GetServerTime())) or time() end
-local function CharKey() return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?") end
+local function CharKey() return WM.PlayerKey() end
 CR.CharKey = CharKey
 
 -- A character's records (made for the character you're on; read-only

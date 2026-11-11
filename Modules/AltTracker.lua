@@ -66,9 +66,7 @@ local function Now()
     return time()
 end
 
-local function CharKey()
-    return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?")
-end
+local function CharKey() return WM.PlayerKey() end
 Alts.CharKey = CharKey
 
 local function Text(value, english)

@@ -136,12 +136,7 @@ end
 -- EXPORT
 -- ============================================
 
-local function CsvField(v)
-    v = tostring(v == nil and "" or v)
-    v = v:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
-    return v
-end
+local CsvField = WM.CsvField
 
 -- The roster (former = former members) as CSV
 function GR:ExportCSV(former)
@@ -279,7 +274,7 @@ function Tools:Celebrations(today)
                 rec.annivYear = y
                 local years = y - jy
                 out[#out + 1] = { kind = "anniversary", text = "Today is " .. Short(rec.name) .. "'s " .. years
-                    .. (years == 1 and "-year" or "-year") .. " anniversary in the guild!" }
+                    .. "-year" .. " anniversary in the guild!" }
             end
         end
         local b = rec.bday

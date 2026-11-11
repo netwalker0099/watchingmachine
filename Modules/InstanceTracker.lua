@@ -76,11 +76,7 @@ local function Now()
 end
 IT.Now = Now
 
-local function CharKey()
-    local name = UnitName("player") or "?"
-    local realm = (GetRealmName and GetRealmName()) or "?"
-    return name .. "-" .. realm
-end
+local function CharKey() return WM.PlayerKey() end
 
 function IT:Print(msg) WM:ModulePrint("InstanceTracker", msg) end
 

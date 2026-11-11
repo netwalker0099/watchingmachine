@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.84"
+WM.version = "3.85"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -71,8 +71,6 @@ seterrorhandler(function(msg)
 end)
 
 -- Security Configuration (guild restriction removed — open to all)
-local REQUIRED_GUILD = nil
-local OFFICER_RANK_THRESHOLD = 1  -- Rank index 0 = GM, 1 = Officer only
 
 -- Security State (always authorized)
 local isAuthorized = true
@@ -490,6 +488,32 @@ function WM:RegisterEvents(frame, events)
         end
     end
     return n
+end
+
+-- ============================================
+-- SHARED HELPERS (one copy, for every module)
+-- ============================================
+
+-- This character's "Name-Realm". Built once per name: it is asked for on
+-- every WM:IsModuleOn, so on every combat log event in some modules.
+local keyName, keyValue
+function WM.PlayerKey()
+    local name = UnitName and UnitName("player")
+    if keyValue and name == keyName then return keyValue end
+    local realm = GetRealmName and GetRealmName()
+    local key = (type(name) == "string" and name or "?") .. "-" .. (type(realm) == "string" and realm or "?")
+    -- Kept only once both are known (they aren't during the first frames)
+    if type(name) == "string" and type(realm) == "string" then keyName, keyValue = name, key end
+    return key
+end
+function WM.ForgetPlayerKey() keyName, keyValue = nil, nil end
+
+-- One field of a CSV line: colour codes out, quoted when it needs to be
+function WM.CsvField(v)
+    v = tostring(v == nil and "" or v)
+    v = v:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
+    return v
 end
 
 function WM:RegisterModule(name, module)
@@ -2805,8 +2829,6 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
-eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
 
 local function PerformSecurityCheck()
@@ -2873,9 +2895,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         RunAfter(1, function()
             PerformSecurityCheck()
         end)
-        
-    elseif event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
-        -- Guild roster updated (modules may need this data)
         
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Restore minimap button after zone change with a small delay

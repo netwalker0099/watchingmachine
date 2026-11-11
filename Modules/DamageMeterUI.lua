@@ -665,7 +665,7 @@ function DM:RefreshBreakdown()
         local spells = self:Breakdown(bstate.key, row)
         bstate.heading = string.format("|cFFFFFFFF%s|r  %s  |cFFAAAAAA%s|r", bstate.name or "?", d.name, self:SegmentName(bstate.which))
         local healing = d.spells == "hp"
-        headCols = { d.spells == "tf" and "From" or (d.counts and "Spell" or "Spell"), "Amount", "%",
+        headCols = { d.spells == "tf" and "From" or "Spell", "Amount", "%",
             d.counts and "" or "Hits", d.counts and "" or "Crit", d.counts and "" or "Average",
             d.counts and "" or (healing and (d.key == "overheal" and "Healed" or "Overheal") or "Biggest") }
         for _, s in ipairs(spells) do

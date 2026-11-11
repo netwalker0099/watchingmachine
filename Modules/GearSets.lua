@@ -73,9 +73,7 @@ local function DB()
 end
 GS.DB = DB
 
-local function CharKey()
-    return (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
-end
+local function CharKey() return WM.PlayerKey() end
 
 -- This character's sets and state
 local function Char()

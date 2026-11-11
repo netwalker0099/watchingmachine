@@ -39,9 +39,7 @@ local function Now()
     return time()
 end
 
-local function CharKey()
-    return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?")
-end
+local function CharKey() return WM.PlayerKey() end
 
 function Log:Print(msg) WM:ModulePrint("PvPLog", msg) end
 

@@ -2,9 +2,56 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.84** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.85** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.85
+
+### Fixes
+
+- **Loot Council: no voting frame when the master looter ran
+  RCLootCouncil.** Two causes:
+  - The master looter was read with the game's old loot-method call only.
+    Newer clients report it through `C_PartyInfo.GetLootMethod` (as a
+    number), so Watching Machine fell back to "the raid leader is the
+    master looter" and ignored every session message from a loot master
+    who wasn't the raid leader.
+  - RCLootCouncil sends its council list when the council is set, and
+    after that only when asked. Watching Machine never asked, so a council
+    sent before you logged in, reloaded or joined was never seen. It now
+    asks at login in a group, on a new master looter, and when loot
+    arrives with no council; the voting frame opens when the list comes.
+  - As master looter, Watching Machine now answers RCLootCouncil users who
+    ask for the council or its settings mid-session.
+- **Keyword Monitor** stopped after any loading screen (it treated one as a
+  logout) until the next login.
+- **PvP Tracker**: the guild kill broadcast and the revenge line raised an
+  error (class colours were used before they were defined), and the hourly
+  announce check ran every frame after the first hour.
+- **World Timers**: a malformed layer in a received message raised an error.
+- **PvP Log**: a /reload inside a battleground or arena left the match
+  stuck as "now" and started a second one.
+
+### Faster
+
+- The "is this module on?" check (asked on every combat log event and
+  every frame by several modules) no longer rebuilds your character's
+  name each time, and nine modules apply their default settings once
+  rather than on every read.
+- **Damage Meter**: no new tables for every hit and heal.
+- **Debuff Tracker**: the target's debuffs are read once per update, not
+  once per category; Illidan's health is only looked for in Black Temple.
+- **Loot history**: importing no longer searches the whole history for
+  every award, and the window keeps its rows while you scroll.
+- **Roster Manager**: scrolling the roster or the log no longer sorts and
+  formats everything again.
+- **Your Characters** and **Attunements** rescan less often in combat;
+  **Guild Invite** reads guild names when it needs them; **World Timers**
+  reads the zone on zone changes; the Warlock soulstone list reads the
+  raid once a second.
+- Shared helpers (character key, CSV fields) now live in one place, and
+  some unused code is gone.
 
 ## 3.84
 

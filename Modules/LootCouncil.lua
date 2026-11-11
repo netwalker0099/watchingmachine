@@ -436,12 +436,7 @@ end
 local CSV_COLUMNS = { "Date", "Time", "Player", "Class", "Item", "ItemID", "How", "Boss", "Instance",
     "Votes", "Note", "AwardedBy" }
 
-local function CsvField(v)
-    v = tostring(v == nil and "" or v)
-    v = v:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
-    return v
-end
+local CsvField = WM.CsvField
 
 -- The awards as CSV, newest first (entries: a list, or every award)
 function LC.ExportCSV(entries)

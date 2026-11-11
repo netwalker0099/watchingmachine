@@ -38,7 +38,7 @@ end
 
 local function Now() return (GetServerTime and GetServerTime()) or time() end
 local function On() return WM:IsModuleOn("Attunements") end
-local function CharKey() return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?") end
+local function CharKey() return WM.PlayerKey() end
 local function Side() return (UnitFactionGroup and UnitFactionGroup("player")) == "Alliance" and "Alliance" or "Horde" end
 AT.CharKey = CharKey
 

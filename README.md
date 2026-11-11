@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.84 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.85 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1592,6 +1592,11 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.85
+- **Loot Council**: the voting frame now opens when the master looter runs RCLootCouncil. The master looter is read the way newer clients report it (before, a loot master who wasn't the raid leader was ignored), and the council list is asked for when it wasn't received (after a login, reload or joining late)
+- Fixed: Keyword Monitor stopped after any loading screen; PvP Tracker's kill broadcast and revenge lines raised an error; a malformed World Timers message could raise an error; a /reload inside a battleground left a match stuck in the PvP Log
+- Faster: less work on every combat log event and in the Damage Meter, Debuff Tracker, loot history, roster window, Your Characters, Attunements and Guild Invite
 
 ### Version 3.84
 - Watching Machine's menus now have a solid dark background (it wasn't being drawn, so they blended into what was behind them), and their tick marks show
