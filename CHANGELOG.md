@@ -2,9 +2,30 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.86** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.87** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.87
+
+### Fixes
+
+- **Dropdowns opened on another part of the screen** with ElvUI and other
+  UI packs. Every dropdown in every window (Sort, Show, theme, sounds and
+  the rest) and the dashboard's **...** menu used the game's dropdown
+  list, which the game places from a position divided by the UI scale.
+  They are now Watching Machine's own menu (the one the Damage Meter got
+  in 3.83), opened straight under the control you clicked. A second click
+  closes it, long lists scroll with the mouse wheel and open with the
+  current choice in view. Nothing in the addon uses the game's dropdown
+  menus any more, and a test fails if one comes back.
+
+### Changes
+
+- **Loot Council**: a **Vote** button on its dashboard card, and a
+  **Voting frame** button at the bottom of the loot history window, open
+  the voting frame at any time (it still opens by itself when loot is
+  sent for votes and you're on the council).
 
 ## 3.86
 

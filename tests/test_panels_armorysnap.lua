@@ -190,7 +190,7 @@ AS.DeleteSnapshot("2026-10-19 20:00 - Gruul's Lair")
 check("deleted snapshot gone from the menu", #W.openMenu(snapDD) == 1)
 env.ArmorySnapDB.snapshots = {}
 AS.RefreshSnapshotList()
-check("empty archive greys the snapshot dropdown", snapDD._ddEnabled == false)
+check("empty archive greys the snapshot dropdown", snapDD.isDisabled == true)
 
 -- ============ Theme ============
 check("no private theme handler", AS.OnGlobalThemeChanged == nil)

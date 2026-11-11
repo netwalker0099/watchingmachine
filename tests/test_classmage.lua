@@ -151,13 +151,13 @@ local function FindCycle(labelText)
 end
 local row = FindCycle("Portals expand")
 check("panel shows the Portals expand option", row ~= nil)
-check("it's a dropdown showing the current direction", row and row.cycle.dropdown._ddText == "Left")
+check("it's a dropdown showing the current direction", row and row.cycle.dropdown.shownText == "Left")
 local items = W.openMenu(row.cycle.dropdown)
 local labels = {}
 for _, it in ipairs(items) do labels[#labels + 1] = it.text end
 check("dropdown lists Up, Right, Down, Left, Hidden", table.concat(labels, ",") == "Up,Right,Down,Left,Hidden")
 items[1].func()
-check("choosing Up saves it and updates the text", env.MageToolsDB.portalDir == "UP" and row.cycle.dropdown._ddText == "Up")
+check("choosing Up saves it and updates the text", env.MageToolsDB.portalDir == "UP" and row.cycle.dropdown.shownText == "Up")
 check("changing it rebuilds the flyout", rebuilt >= 1)
 -- The dropdown sits level with its label and the description starts below
 -- it (beside it, the dropdown covered the description's first line)
@@ -167,7 +167,7 @@ check("description starts below the dropdown", descY <= -34 and labelY > descY +
 check("labels share a fixed-width column", row.label:GetWidth() == 185)
 check("row tall enough for the description under the dropdown", row:GetHeight() >= 34 + 22)
 local trow = FindCycle("Teleports expand")
-check("panel shows the Teleports expand option", trow and trow.cycle.dropdown._ddText == "Up")
+check("panel shows the Teleports expand option", trow and trow.cycle.dropdown.shownText == "Up")
 Mage.UpdatePortalButtonVisibility = origUpdate
 
 print(("%d passed, %d failed"):format(pass, fail))

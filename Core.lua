@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.86"
+WM.version = "3.87"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -1357,6 +1357,10 @@ local MODULE_INFO = {
     },
     LootCouncil = {
         title = "Loot Council", desc = "Loot history, council voting, awarding",
+        quick = { text = "Vote", tooltip = { "Voting frame", "Opens the voting frame: the current loot session's"
+            .. " candidates, answers and votes. It opens by itself when loot is sent for votes and you're on the"
+            .. " council; this opens it at any time (also /wmachine council vote)." },
+            func = function() Call("LootCouncil", "Command", "vote") end },
         about = "The guild's loot history: every item awarded, to whom and how it was won (Need, Greed, Minor Upgrade, off-spec, soft reserve, disenchant), starting from what Gargul and RCLootCouncil have saved. All loot ever awarded, and each player's loot beside their armory with the time since their last award.",
         command = "council", color = {1, 0.7, 0.28}, icon = "Interface\\Icons\\INV_Misc_Bag_10_Blue",
         tools = {
@@ -1599,36 +1603,18 @@ local function VisibleTools(info)
     return out
 end
 
-local toolsMenu
--- The menu hangs below `anchor` (the card's ... button). It used to open
--- at "cursor", which FrameXML positions from the cursor divided by a UI
--- scale; when UIParent's scale isn't the default (ElvUI and other UI packs
--- change it) the menu landed far from the click, near the screen bottom.
+-- A card's tools, in Watching Machine's own menu, hung below `anchor`
+-- (the card's ... button). Returns its items.
 local function ShowToolsMenu(info, anchor)
     local tools = VisibleTools(info)
     if #tools == 0 then return end
-    if not toolsMenu then
-        toolsMenu = CreateFrame("Frame", "WM_DashboardToolsMenu", UIParent, "UIDropDownMenuTemplate")
+    if anchor and WM.UI:MenuOpenFor(anchor) then WM.UI:HideMenu() return end
+    local items = { { text = info.title, isTitle = true } }
+    for _, t in ipairs(tools) do
+        items[#items + 1] = { text = t.text, func = t.func, tooltip = t.desc and { t.text, t.desc } or nil }
     end
-    UIDropDownMenu_Initialize(toolsMenu, function(self, level)
-        local item = UIDropDownMenu_CreateInfo()
-        item.text, item.isTitle, item.notCheckable = info.title, true, true
-        UIDropDownMenu_AddButton(item, level)
-        for _, t in ipairs(tools) do
-            item = UIDropDownMenu_CreateInfo()
-            item.text, item.notCheckable = t.text, true
-            item.func = function() CloseDropDownMenus(); t.func() end
-            if t.desc then
-                item.tooltipTitle, item.tooltipText, item.tooltipOnButton = t.text, t.desc, true
-            end
-            UIDropDownMenu_AddButton(item, level)
-        end
-        item = UIDropDownMenu_CreateInfo()
-        item.text, item.notCheckable = CANCEL or "Cancel", true
-        item.func = function() CloseDropDownMenus() end
-        UIDropDownMenu_AddButton(item, level)
-    end, "MENU")
-    ToggleDropDownMenu(1, nil, toolsMenu, anchor or "cursor", 0, 0)
+    WM.UI:ShowMenu(items, nil, nil, { anchor = anchor })
+    return items
 end
 WM.ShowToolsMenu = ShowToolsMenu
 
@@ -2079,6 +2065,27 @@ function WM:CreateModuleCards()
                 leftmost = toolsBtn
             end
 
+            -- A module's one most-used tool, as a button of its own on the
+            -- card: MODULE_INFO's quick = { text, tooltip, func }
+            if info.quick then
+                local quickBtn = CreateFrame("Button", nil, card, "UIPanelButtonTemplate")
+                quickBtn:SetSize(info.quick.width or 44, 20)
+                quickBtn:SetPoint("RIGHT", leftmost, "LEFT", -3, 0)
+                quickBtn:SetText(info.quick.text)
+                quickBtn:SetScript("OnClick", function()
+                    if WM:UsableModule(moduleName) then info.quick.func() end
+                end)
+                quickBtn:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:AddLine(info.quick.tooltip[1], 1, 0.8, 0)
+                    GameTooltip:AddLine(info.quick.tooltip[2], 0.8, 0.8, 0.8, true)
+                    GameTooltip:Show()
+                end)
+                quickBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                card.quickBtn = quickBtn
+                leftmost = quickBtn
+            end
+
             if HasSwitch(module) then
                 local sw = CreateFrame("CheckButton", nil, card, "UICheckButtonTemplate")
                 sw:SetSize(24, 24)
@@ -2103,6 +2110,7 @@ function WM:CreateModuleCards()
             -- rather than running underneath them
             card.textReserve = 50 + (8 + 55) + 6
                 + (card.toolsBtn and 27 or 0) + (card.switch and 26 or 0)
+                + (card.quickBtn and ((info.quick.width or 44) + 3) or 0)
             local textWidth = width - card.textReserve
 
             local titleText = card:CreateFontString(nil, "OVERLAY", "GameFontNormal")

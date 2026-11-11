@@ -260,6 +260,9 @@ function LC:CreateUI()
             .. ((S.CatchUpLength() > 0) and (", " .. S.CatchUpLength() .. " to send") or "") .. "|r") or ""
         return n .. " awards" .. (DB().lastImport and ("  |cff888888imported " .. LC.Ago(DB().lastImport) .. "|r") or "") .. sync
     end }, "LEFT")
+    panel:AddFooterButton({ text = "Voting frame", width = 100, onClick = function() LC:Command("vote") end,
+        tooltip = { "Voting frame", "The current loot session's candidates, answers and votes. It opens by itself when loot"
+            .. " is sent for votes and you're on the council; this opens it at any time." } }, "RIGHT")
     panel:AddFooterButton({ text = "Export", width = 70, onClick = function() LC:Command("export") end,
         tooltip = { "Export", "The awards shown (all, one player's, or your search) as CSV, to copy into a spreadsheet or a website." } }, "RIGHT")
     panel:AddFooterButton({ text = "Import now", width = 100, onClick = function() LC:Command("import") end,
@@ -528,7 +531,9 @@ function LC:SetupPage(L)
         .. " loot, the response frame shows each item, the gear it would replace and the master looter's buttons"
         .. " (Need, Greed, Minor Upgrade...) plus Pass, with a note. On the council, the voting frame shows everyone's"
         .. " answer, item level, gear, votes and notes, and each candidate's |cFFFFFFFFlast loot|r; hover a candidate"
-        .. " for their loot of the last 30 days. |cFFFFFF00/wmachine council test|r runs a local test session"
+        .. " for their loot of the last 30 days. The voting frame opens by itself; to open it at any time use the"
+        .. " |cFFFFFFFFVote|r button on the Loot Council card, |cFFFFFFFFVoting frame|r in the loot history window,"
+        .. " or |cFFFFFF00/wmachine council vote|r. |cFFFFFF00/wmachine council test|r runs a local test session"
         .. " (nothing is sent). With RCLootCouncil itself enabled on this character, it does the answering and"
         .. " voting, and we only record its awards.")
     L:Note("|cFFFFFFFFTwo views:|r |cFFFFFF00/wmachine council|r lists all loot ever awarded (search by item, player,"

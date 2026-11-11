@@ -176,7 +176,7 @@ local function InEditor(f)
 end
 local dds = {}
 for _, f in ipairs(allFrames) do
-    if f._template == "UIDropDownMenuTemplate" and InEditor(f) then dds[#dds + 1] = f end
+    if rawget(f, "MenuItems") and InEditor(f) then dds[#dds + 1] = f end
 end
 check("four element dropdowns per set", #dds == 16)
 -- dds[9..12] are set 3 (Healer): Air, Water, Earth, Fire
@@ -188,7 +188,7 @@ check("choosing a totem rebuilds the sequence", (Seq()):find(", Totem of Wrath$"
 items = W.openMenu(dds[9])
 items[2].func()   -- Air: None
 check("None leaves that element out", Seq() == "Healing Stream Totem, Stoneskin Totem, Totem of Wrath")
-check("dropdown shows the choice", dds[9]._ddText == "None")
+check("dropdown shows the choice", dds[9].shownText == "None")
 items = W.openMenu(dds[9])
 items[1].func()   -- back to Auto
 check("Auto goes back to the premade", env.ShamanToolsDB.sets[3].AIR == nil

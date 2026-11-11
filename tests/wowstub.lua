@@ -204,24 +204,14 @@ return function(REPO)
     env.IsInGroup = function() return false end
     env.IsInInstance = function() return false, "none" end
 
-    -- UIDropDownMenu: Initialize stores the init function; W.openMenu(dd)
-    -- runs it and returns the items it added
-    env.UIDropDownMenu_SetWidth = function(dd, w) dd._ddWidth = w end
-    env.UIDropDownMenu_SetText = function(dd, t) dd._ddText = t end
-    env.UIDropDownMenu_GetText = function(dd) return dd._ddText end
-    env.UIDropDownMenu_Initialize = function(dd, fn) dd._ddInit = fn end
-    env.UIDropDownMenu_CreateInfo = function() return {} end
-    env.UIDropDownMenu_EnableDropDown = function(dd) dd._ddEnabled = true end
-    env.UIDropDownMenu_DisableDropDown = function(dd) dd._ddEnabled = false end
-    env.CloseDropDownMenus = function() end
-    local menuItems
-    env.UIDropDownMenu_AddButton = function(info) if menuItems then menuItems[#menuItems + 1] = info end end
-    W.openMenu = function(dd)
-        menuItems = {}
-        if dd._ddInit then dd._ddInit(dd, 1) end
-        local items = menuItems
-        menuItems = nil
-        return items
+    -- Dropdowns are Watching Machine's own (UI.Dropdown): W.openMenu(dd)
+    -- gives the choices it would list, as menu items. The game's dropdown
+    -- functions are left undefined on purpose: nothing may call them.
+    env.UIDropDownMenu_GetText = function(dd) return dd.shownText end     -- (tests read the shown text with it)
+    W.openMenu = function(dd) return dd:MenuItems() end
+    for _, name in ipairs({ "UIDropDownMenu_Initialize", "UIDropDownMenu_AddButton", "UIDropDownMenu_CreateInfo",
+        "UIDropDownMenu_SetWidth", "UIDropDownMenu_SetText", "ToggleDropDownMenu", "EasyMenu", "CloseDropDownMenus" }) do
+        env[name] = function() error("the game's dropdown menu is not to be used: " .. name, 2) end
     end
 
     W.timers = {}

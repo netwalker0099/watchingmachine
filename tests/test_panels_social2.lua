@@ -203,7 +203,7 @@ items[2].func()
 check("dropdown writes the region", env.WhisperLogsDB.region == "eu")
 check("links rebuilt for the new region", env.WhisperLogsDB.whispers[1].url:find("/eu/", 1, true) ~= nil)
 check("server label follows the region", wp.serverLabel:GetText():find("(EU)", 1, true) ~= nil)
-check("dropdown text updated", dd.dropdown._ddText == "EU")
+check("dropdown text updated", dd.dropdown.shownText == "EU")
 check("dropdown has a tooltip", dd.dropdown:GetScript("OnEnter") ~= nil)
 
 local scanBtn, clearBtn = wp.footerButtons[1], wp.footerButtons[2]

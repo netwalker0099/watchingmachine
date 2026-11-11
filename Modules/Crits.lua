@@ -437,7 +437,7 @@ function CR:SetModuleEnabled(v) DB().enabled = v and true or false end
 
 function CR:OnModuleOff()
     if panel then panel:Hide() end
-    if self.menu and CloseDropDownMenus then CloseDropDownMenus() end
+    if WM.UI and WM.UI.HideMenu then WM.UI:HideMenu() end
 end
 
 -- The module's page in the guided setup

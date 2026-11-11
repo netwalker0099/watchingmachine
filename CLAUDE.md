@@ -14,6 +14,28 @@ to game tables (`StaticPopupDialogs["WM_..."] = ...`), use `hooksecurefunc`
 instead of replacing functions, and keep everything else `local`.
 `tests/test_globals.lua` fails on any other global write.
 
+## Menus and dropdowns: only Watching Machine's own
+
+Never use the game's dropdown menus (`UIDropDownMenuTemplate`,
+`UIDropDownMenu_*`, `ToggleDropDownMenu`, `EasyMenu`, `MenuUtil`). They
+place their list from the cursor or the anchor divided by a UI scale, so
+with ElvUI and other UI packs the list opens on another part of the screen
+(fixed piecemeal in 3.66, 3.83 and 3.84, and for every dropdown in 3.87).
+`tests/test_menus.lua` fails if any file uses them.
+
+- A dropdown setting: `L:Dropdown{ label, width, options, get, set,
+  tooltip }` / `row:Dropdown(...)` (`UI.Dropdown`): a button that opens its
+  choices straight under itself.
+- A menu at the cursor (right-click menus): `WM.UI:ShowMenu(items)`.
+- A menu under a button: `WM.UI:ShowMenu(items, nil, nil, { anchor =
+  button })`, and close it on a second click with `WM.UI:MenuOpenFor(button)`.
+- Items: `{ text, func, checked, isTitle, disabled, keepOpen, tooltip }`;
+  ticks that change while it stays open pass a `rebuild` function (see
+  `UI.lua`). Close it in `OnModuleOff` with `WM.UI:HideMenu()`.
+- Texture paths need doubled backslashes (`"Interface\\Buttons\\WHITE8X8"`):
+  a single one is dropped by Lua and nothing is drawn (3.84's missing menu
+  background).
+
 ## Calls the game restricts in combat
 
 `CheckInteractDistance` is blocked in combat on 2.5.x, and the game blames

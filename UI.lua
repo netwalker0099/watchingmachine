@@ -355,7 +355,10 @@ function UI.EditBox(parent, spec)
     return box
 end
 
--- Blizzard dropdown. options = list of { value =, text = } or a function
+-- A dropdown: a button showing the current choice; a click opens the
+-- choices in Watching Machine's own menu, straight under it (never the
+-- game's dropdown list, which opens elsewhere on a scaled UI: see
+-- UI:ShowMenu). options = list of { value =, text = } or a function
 -- returning one (re-read each time the menu opens, for lists that change).
 function UI.Dropdown(parent, spec)
     local box = CreateFrame("Frame", nil, parent)
@@ -368,14 +371,30 @@ function UI.Dropdown(parent, spec)
         label:SetText(spec.label)
     end
 
-    local dd = CreateFrame("Frame", spec.name or UniqueName("WM_UIDropdown"), box, "UIDropDownMenuTemplate")
-    -- The template carries ~16px of padding on its left
-    if label then
-        dd:SetPoint("LEFT", label, "RIGHT", -10, -2)
-    else
-        dd:SetPoint("LEFT", -16, -2)
+    local width = (spec.width or 120) + 24
+    local dd = CreateFrame("Button", spec.name or UniqueName("WM_UIDropdown"), box, "BackdropTemplate")
+    dd:SetSize(width, 20)
+    if label then dd:SetPoint("LEFT", label, "RIGHT", 6, 0) else dd:SetPoint("LEFT", 0, 0) end
+    dd.bg = dd:CreateTexture(nil, "BACKGROUND")
+    dd.bg:SetAllPoints(dd)
+    dd.bg:SetColorTexture(0.05, 0.05, 0.06, 0.9)
+    if dd.SetBackdrop then
+        dd:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        dd:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
     end
-    UIDropDownMenu_SetWidth(dd, spec.width or 120)
+    local hl = dd:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(dd)
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    dd.arrow = dd:CreateTexture(nil, "ARTWORK")
+    dd.arrow:SetSize(14, 14)
+    dd.arrow:SetPoint("RIGHT", -3, 0)
+    dd.arrow:SetTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+    dd.arrow:SetTexCoord(0.2, 0.8, 0.25, 0.75)
+    dd.label = dd:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    dd.label:SetPoint("LEFT", 6, 0)
+    dd.label:SetPoint("RIGHT", dd.arrow, "LEFT", -2, 0)
+    dd.label:SetJustifyH("LEFT")
+    dd.label:SetWordWrap(false)
 
     local function Options() return Eval(spec.options) or {} end
     local function TextFor(v)
@@ -384,28 +403,39 @@ function UI.Dropdown(parent, spec)
         end
         return spec.placeholder or (v ~= nil and tostring(v)) or ""
     end
+    local function Show(text)
+        dd.shownText = text
+        dd.label:SetText(text or "")
+    end
 
-    UIDropDownMenu_Initialize(dd, function(self, level)
+    -- The choices, as menu items (the current one ticked)
+    function dd:MenuItems()
         local cur = spec.get and spec.get()
+        local items = {}
         for _, o in ipairs(Options()) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text, info.value = o.text, o.value
-            info.checked = (o.value == cur)
-            info.func = function()
-                if spec.set then spec.set(o.value) end
-                UIDropDownMenu_SetText(dd, o.text)
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info, level)
+            items[#items + 1] = { text = o.text, value = o.value, checked = (o.value == cur),
+                func = function()
+                    if spec.set then spec.set(o.value) end
+                    Show(o.text)
+                end }
         end
+        return items
+    end
+
+    dd:SetScript("OnClick", function(self)
+        if self.isDisabled then return end
+        if UI:MenuOpenFor(self) then UI:HideMenu() return end
+        UI:ShowMenu(self:MenuItems(), nil, nil, { anchor = self, minWidth = width })
     end)
+    dd:SetScript("OnHide", function(self) if UI:MenuOpenFor(self) then UI:HideMenu() end end)
     UI.SetTooltip(dd, spec.tooltip)
 
     box.dropdown = dd
     function box:Refresh()
-        UIDropDownMenu_SetText(dd, TextFor(spec.get and spec.get()))
+        Show(TextFor(spec.get and spec.get()))
         if spec.disabled then
-            if spec.disabled() then UIDropDownMenu_DisableDropDown(dd) else UIDropDownMenu_EnableDropDown(dd) end
+            dd.isDisabled = spec.disabled() and true or false
+            dd:SetAlpha(dd.isDisabled and 0.4 or 1)
         end
     end
     box:Refresh()
@@ -1029,56 +1059,48 @@ function UI:ShowCopyText(title, text, note)
 end
 
 -- ============================================
--- A SMALL MENU AT THE CURSOR
+-- WATCHING MACHINE'S OWN MENU
 -- ============================================
--- UI:ShowMenu(items, rebuild): our own menu frame. The game's dropdown
--- menus open "at the cursor" from a position divided by the UI scale, so
--- with ElvUI and other UI packs they land far from the click (often off the
--- screen). items: { text, func, checked (true / false / nil for no tick),
--- isTitle, disabled, keepOpen }. Closes on a choice, a click elsewhere, or
--- Escape; a keepOpen item stays open and the menu is redrawn from
--- rebuild() (ticks that change with each click).
+-- Every menu and dropdown list in the addon is this one frame. The game's
+-- own dropdown menus (UIDropDownMenuTemplate, ToggleDropDownMenu, EasyMenu)
+-- are not used anywhere: they place their list from the cursor or the
+-- anchor divided by a UI scale, so with ElvUI and other UI packs the list
+-- opens on another part of the screen. tests/test_menus.lua fails if one
+-- comes back.
+--
+-- UI:ShowMenu(items, rebuild, stay, opts)
+--   items: { text, func, checked (true / false / nil for no tick), isTitle,
+--            disabled, keepOpen, tooltip = { title, line, ... } }
+--   rebuild: for keepOpen items, a function giving the items again (ticks
+--            that change with each click); the menu is redrawn in place
+--   opts.anchor: a frame to hang the menu under (a dropdown or a button);
+--            without it the menu opens at the cursor
+--   opts.minWidth: at least this wide (a dropdown's own width)
+-- Closes on a choice, a click elsewhere, or Escape. Long lists scroll with
+-- the mouse wheel.
 
 local menu
+local MENU_ROW, MENU_MAX = 16, 22
 
 function UI:HideMenu() if menu then menu:Hide() end end
 
-function UI:ShowMenu(items, rebuild, stay)
-    if not menu then
-        menu = CreateFrame("Frame", "WM_PopupMenu", UIParent, "BackdropTemplate")
-        menu:SetFrameStrata("FULLSCREEN_DIALOG")
-        menu:SetClampedToScreen(true)
-        menu:EnableMouse(true)
-        -- A solid dark background (always drawn, with or without backdrops)
-        -- so the menu doesn't blend into what's behind it
-        menu.bg = menu:CreateTexture(nil, "BACKGROUND")
-        menu.bg:SetAllPoints(menu)
-        menu.bg:SetColorTexture(0.02, 0.02, 0.03, 1)
-        if menu.SetBackdrop then
-            menu:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-            menu:SetBackdropBorderColor(0.55, 0.55, 0.55, 1)
-        end
-        menu.rows = {}
-        -- Escape closes it
-        if type(UISpecialFrames) == "table" then
-            local found = false
-            for _, n in ipairs(UISpecialFrames) do if n == "WM_PopupMenu" then found = true end end
-            if not found then table.insert(UISpecialFrames, "WM_PopupMenu") end
-        end
-        -- A click anywhere else closes it
-        menu:SetScript("OnEvent", function(self)
-            if self:IsShown() and not (self.IsMouseOver and self:IsMouseOver()) then self:Hide() end
-        end)
-        menu:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
-        menu:SetScript("OnHide", function(self) pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
-    end
-    local ROW, width = 16, 140
-    for i, it in ipairs(items) do
+-- Is the menu open under this frame? (a dropdown's second click closes it)
+function UI:MenuOpenFor(anchor)
+    return menu ~= nil and menu:IsShown() and menu.anchor == anchor
+end
+
+local function DrawMenu()
+    local items = menu.items
+    local visible = math.min(#items, MENU_MAX)
+    menu.offset = math.max(0, math.min(menu.offset or 0, #items - visible))
+    local width = math.max(140, menu.minWidth or 0)
+    for i = 1, visible do
+        local it = items[i + menu.offset]
         local row = menu.rows[i]
         if not row then
             row = CreateFrame("Button", nil, menu)
-            row:SetHeight(ROW)
-            row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * ROW)
+            row:SetHeight(MENU_ROW)
+            row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * MENU_ROW)
             row:SetPoint("RIGHT", menu, "RIGHT", -4, 0)
             row.hl = row:CreateTexture(nil, "HIGHLIGHT")
             row.hl:SetAllPoints(row)
@@ -1094,16 +1116,19 @@ function UI:ShowMenu(items, rebuild, stay)
                 local fn = self.func
                 if self.keepOpen and menu.rebuild then
                     if fn then fn() end
-                    UI:ShowMenu(menu.rebuild(), menu.rebuild, true)
+                    UI:ShowMenu(menu.rebuild(), menu.rebuild, true, menu.opts)
                     return
                 end
                 menu:Hide()
                 if fn then fn() end
             end)
+            row:SetScript("OnEnter", function(self) if self.tip then UI.ShowTooltip(self, self.tip) end end)
+            row:SetScript("OnLeave", function() GameTooltip:Hide() end)
             menu.rows[i] = row
         end
         row.func = (not it.isTitle and not it.disabled) and it.func or nil
         row.keepOpen = it.keepOpen
+        row.tip = it.tooltip
         row.text:SetText(it.text or "")
         if it.isTitle then row.text:SetTextColor(1, 0.82, 0)
         elseif it.disabled then row.text:SetTextColor(0.5, 0.5, 0.5)
@@ -1114,19 +1139,81 @@ function UI:ShowMenu(items, rebuild, stay)
         local w = (row.text.GetStringWidth and tonumber(row.text:GetStringWidth()) or 0) + 30
         if w > width then width = w end
     end
-    for i = #items + 1, #menu.rows do menu.rows[i]:Hide() end
-    menu:SetSize(math.min(width, 360), 8 + #items * ROW)
-    menu.rebuild = rebuild
-    menu.items = items
-    if stay and menu:IsShown() then return menu end
-    local x, y = 0, 0
-    if GetCursorPosition then
-        local cx, cy = GetCursorPosition()
-        local scale = (UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()) or 1
-        x, y = (tonumber(cx) or 0) / scale, (tonumber(cy) or 0) / scale
+    for i = visible + 1, #menu.rows do menu.rows[i]:Hide() end
+    -- More above or below: a small mark at the edge
+    menu.more:SetShown(#items > visible)
+    if #items > visible then
+        menu.more:SetText((menu.offset > 0 and "^ " or "") .. (menu.offset + visible) .. " / " .. #items
+            .. (menu.offset + visible < #items and " v" or ""))
     end
+    -- Never narrower than it has been since it opened (it would jump about while scrolling)
+    width = math.max(math.min(width, 360), menu.widest or 0)
+    menu.widest = width
+    menu:SetSize(width, 8 + visible * MENU_ROW + (#items > visible and 12 or 0))
+end
+
+function UI:ShowMenu(items, rebuild, stay, opts)
+    opts = opts or {}
+    if not menu then
+        menu = CreateFrame("Frame", "WM_PopupMenu", UIParent, "BackdropTemplate")
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu:SetClampedToScreen(true)
+        menu:EnableMouse(true)
+        -- A solid dark background (always drawn, with or without backdrops)
+        -- so the menu doesn't blend into what's behind it
+        menu.bg = menu:CreateTexture(nil, "BACKGROUND")
+        menu.bg:SetAllPoints(menu)
+        menu.bg:SetColorTexture(0.02, 0.02, 0.03, 1)
+        if menu.SetBackdrop then
+            menu:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+            menu:SetBackdropBorderColor(0.55, 0.55, 0.55, 1)
+        end
+        menu.more = menu:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        menu.more:SetPoint("BOTTOMRIGHT", -6, 3)
+        menu.rows = {}
+        WM:RegisterEscClose(menu)
+        menu:EnableMouseWheel(true)
+        menu:SetScript("OnMouseWheel", function(self, delta)
+            self.offset = (self.offset or 0) - delta * 3
+            DrawMenu()
+        end)
+        -- A click anywhere else closes it. (Not a click on the control it
+        -- hangs under: that control's own click closes it, see MenuOpenFor.)
+        menu:SetScript("OnEvent", function(self)
+            if not self:IsShown() then return end
+            if self.IsMouseOver and self:IsMouseOver() then return end
+            local a = self.anchor
+            if a and a.IsMouseOver and a:IsMouseOver() then return end
+            self:Hide()
+        end)
+        menu:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+        menu:SetScript("OnHide", function(self) pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+    end
+    local redraw = stay and menu:IsShown()
+    menu.items, menu.rebuild, menu.opts = items, rebuild, opts
+    menu.anchor, menu.minWidth = opts.anchor, opts.minWidth
+    if not redraw then
+        menu.offset, menu.widest = 0, nil
+        -- Open with the ticked choice in view
+        for i, it in ipairs(items) do
+            if it.checked == true then menu.offset = math.max(0, i - math.floor(MENU_MAX / 2)) break end
+        end
+    end
+    DrawMenu()
+    if redraw then return menu end
     menu:ClearAllPoints()
-    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    if opts.anchor then
+        -- Straight under the control, whatever the UI scale
+        menu:SetPoint("TOPLEFT", opts.anchor, "BOTTOMLEFT", 0, -2)
+    else
+        local x, y = 0, 0
+        if GetCursorPosition then
+            local cx, cy = GetCursorPosition()
+            local scale = (UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()) or 1
+            x, y = (tonumber(cx) or 0) / scale, (tonumber(cy) or 0) / scale
+        end
+        menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    end
     menu:Show()
     return menu
 end

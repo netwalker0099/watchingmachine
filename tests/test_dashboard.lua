@@ -162,26 +162,27 @@ env.UnitClass = function() return "Warrior", "WARRIOR" end
 check("warrior sees consumables + swing timer", VisibleCount(WM.MODULE_INFO.ClassTools) == 2)
 
 -- ---- right-click opens the tools menu ----
-local added, toggled = {}, 0
-env.UIDropDownMenu_CreateInfo = function() return {} end
-env.UIDropDownMenu_AddButton = function(item) added[#added + 1] = item end
-env.UIDropDownMenu_Initialize = function(frame, fn) fn(frame, 1) end
-local lastAnchor
-env.ToggleDropDownMenu = function(level, value, frame, anchor) toggled = toggled + 1; lastAnchor = anchor end
+-- (Watching Machine's own menu, hung under the card's ... button)
+local function Menu() return rawget(env, "WM_PopupMenu") end
 W.fire(cards.DebuffTracker, "OnMouseUp", "RightButton")
-check("right-click opens a menu", toggled == 1)
+check("right-click opens a menu", Menu() and Menu():IsShown())
 check("right-click menu hangs off the card's ... button, not the cursor",
-    lastAnchor == cards.DebuffTracker.toolsBtn)
-check("menu has title, every tool and cancel", #added == #WM.MODULE_INFO.DebuffTracker.tools + 2
-    and added[1].isTitle and added[#added].text)
-added = {}
+    Menu().anchor == cards.DebuffTracker.toolsBtn)
+check("menu has title and every tool", #Menu().items == #WM.MODULE_INFO.DebuffTracker.tools + 1
+    and Menu().items[1].isTitle and Menu().items[2].func ~= nil)
 W.click(cards.BuffCheck.toolsBtn)
-check("... button opens the same menu", toggled == 2 and #added == #WM.MODULE_INFO.BuffCheck.tools + 2)
-check("menu opens under the ... button that was clicked", lastAnchor == cards.BuffCheck.toolsBtn)
-added = {}
+check("... button opens the same menu", Menu():IsShown() and #Menu().items == #WM.MODULE_INFO.BuffCheck.tools + 1)
+check("menu opens under the ... button that was clicked", Menu().anchor == cards.BuffCheck.toolsBtn)
+W.click(cards.BuffCheck.toolsBtn)
+check("a second click on the ... button closes it", not Menu():IsShown())
 W.fire(cards.AutoLogger, "OnMouseUp", "RightButton")
-check("no menu for a module without tools", toggled == 2 and #added == 0)
+check("no menu for a module without tools", not Menu():IsShown())
 check("no ... button without tools", cards.AutoLogger.toolsBtn == nil)
+
+-- ---- a module's quick button on its card ----
+check("Loot Council's card has a Vote button", cards.LootCouncil and cards.LootCouncil.quickBtn ~= nil
+    and cards.LootCouncil.quickBtn:GetText() == "Vote")
+check("cards without a quick tool have none", cards.AutoLogger.quickBtn == nil and cards.DebuffTracker.quickBtn == nil)
 
 -- ---- card tooltip ----
 local lines = {}

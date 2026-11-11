@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.86 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.87 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1592,6 +1592,10 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.87
+- Every dropdown (Sort, Show, theme and the rest of the settings) and the dashboard's **...** menu now open straight under what you clicked. They used the game's dropdown list, which opened on another part of the screen with ElvUI and other UI packs; they are now Watching Machine's own menu, like the Damage Meter's. Long lists scroll with the mouse wheel
+- **Loot Council**: a **Vote** button on its dashboard card and a **Voting frame** button in the loot history window open the voting frame at any time
 
 ### Version 3.86
 - (3.85 was built but never published: its release run failed on GitHub. This is the same version, published.)

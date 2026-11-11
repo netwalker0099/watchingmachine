@@ -159,11 +159,11 @@ local dp = UI:CreatePanel({ name = "WM_DropPanel", title = "Drop" })
 local dd = dp.layout:Dropdown({ label = "Region:", options = function() return regions end,
     get = function() return ddDB.region end, set = function(v) ddDB.region = v end })
 dp:Finish()
-check("dropdown shows current option text", dd.dropdown._ddText == "Europe")
+check("dropdown shows current option text", dd.dropdown.shownText == "Europe")
 local items = W.openMenu(dd.dropdown)
 check("dropdown lists every option", #items == 3 and items[2].checked == true and items[1].checked == false)
 items[3].func()
-check("choosing an option writes set()", ddDB.region == "KR" and dd.dropdown._ddText == "Korea")
+check("choosing an option writes set()", ddDB.region == "KR" and dd.dropdown.shownText == "Korea")
 table.insert(regions, { value = "TW", text = "Taiwan" })
 check("options function re-read on open", #W.openMenu(dd.dropdown) == 4)
 

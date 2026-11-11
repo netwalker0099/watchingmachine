@@ -234,7 +234,7 @@ local function DropRow(label)
     end
 end
 local row = DropRow("Demons expand")
-check("Demons expand is a dropdown in the Warlock tab", row and row.cycle.dropdown._ddText == "Left")
+check("Demons expand is a dropdown in the Warlock tab", row and row.cycle.dropdown.shownText == "Left")
 local items = W.openMenu(row.cycle.dropdown)
 items[5].func()
 check("choosing Hidden from the dropdown", env.WarlockToolsDB.demonDir == "HIDDEN" and wl.count == 7)

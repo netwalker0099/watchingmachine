@@ -145,7 +145,7 @@ local row
 for _, f in ipairs(allFrames) do
     if rawget(f, "label") and rawget(f, "cycle") and f.label:GetText() == "Armors expand" then row = f end
 end
-check("Armors expand in the Mage tab", row ~= nil and row.cycle.dropdown._ddText == "Up")
+check("Armors expand in the Mage tab", row ~= nil and row.cycle.dropdown.shownText == "Up")
 W.openMenu(row.cycle.dropdown)[2].func()   -- Right
 check("cycling it saves and rebuilds", env.MageToolsDB.armorDir == "RIGHT" and rebuilt == 1)
 Mage.UpdateUtilityButtonVisibility = orig
