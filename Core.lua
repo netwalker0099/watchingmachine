@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.88"
+WM.version = "3.89"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -515,6 +515,101 @@ function WM.CsvField(v)
     v = v:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
     return v
+end
+
+-- What a unit is wearing: { [slot] = item link } for slots 1 to `last`
+-- (19 with the tabard, the default). The one place worn gear is read:
+-- the armory, Your Characters, GearScore and Gear Sets each had a copy.
+function WM.EquippedLinks(unit, last)
+    local links = {}
+    if not GetInventoryItemLink then return links end
+    for slot = 1, last or 19 do
+        local link = GetInventoryItemLink(unit, slot)
+        if type(link) == "string" then links[slot] = link end
+    end
+    return links
+end
+
+-- Catching guildmates up, one record at a time. Three modules share their
+-- data with the guild this way (the armory, Roster Manager, Loot Council):
+-- someone logging in asks "what changed since I was last on?", and everyone
+-- who has newer records queues them (WM.NewCatchUp below). They go out one
+-- every `gap` seconds after a random wait of 2 to 8 seconds, newest first;
+-- before each, a record someone else has sent meanwhile is skipped, so with
+-- several of us answering each record goes out about once.
+--
+-- local C = WM.NewCatchUp({
+--     enabled = function() return <sharing is on> end,
+--     current = function(data) return <the record's stamp now, nil if it's gone> end,
+--     send    = function(data) <send it; calls C:Heard itself> end,
+--     gap     = 0.6 })
+-- C:Heard(id, stamp)        a record with this stamp was sent or heard
+-- C:SentSince(id, stamp, since)   has it (or newer) gone out since C.seq was `since`?
+-- C:Offer(id, stamp, data)  queue a record for a catch-up (asked again: counts from now)
+-- C:Start()                 after the Offers: sort the new ones and start sending
+-- C:Length()                how many are waiting
+-- C:Stop(forget)            cancel; forget also drops what was heard (tests)
+function WM.NewCatchUp(opts)
+    local C = { seq = 0 }
+    local heard = {}                       -- [id] = { stamp, seq }: newest sent or heard
+    local queue, head, tail = {}, 1, 0     -- waiting, in order (a head index: no shifting)
+    local set, pending, timer = {}, {}, nil
+
+    function C:Heard(id, stamp)
+        self.seq = self.seq + 1
+        local h = heard[id]
+        if not h or h.stamp < stamp then heard[id] = { stamp = stamp, seq = self.seq }
+        elseif h.stamp == stamp then h.seq = self.seq end
+    end
+
+    function C:SentSince(id, stamp, since)
+        local h = heard[id]
+        return h ~= nil and h.stamp >= stamp and h.seq > since
+    end
+
+    local function Next()
+        timer = nil
+        if not opts.enabled() then return end
+        while head <= tail do
+            local item = queue[head]
+            queue[head] = nil
+            head = head + 1
+            set[item.id] = nil
+            local stamp = opts.current(item.data)
+            if stamp and not C:SentSince(item.id, stamp, item.seq) then
+                opts.send(item.data)
+                if head <= tail and C_Timer then timer = C_Timer.NewTimer(opts.gap or 0.6, Next) end
+                return
+            end
+        end
+    end
+
+    function C:Offer(id, stamp, data)
+        local have = set[id]
+        if have then have.seq = self.seq return end      -- asked again: what went out before doesn't count
+        local item = { id = id, stamp = stamp, seq = self.seq, data = data }
+        set[id] = item
+        pending[#pending + 1] = item
+    end
+
+    function C:Start()
+        if #pending == 0 then return end
+        table.sort(pending, function(a, b) return a.stamp > b.stamp end)
+        if head > tail then head, tail = 1, 0 end
+        for _, item in ipairs(pending) do tail = tail + 1; queue[tail] = item end
+        pending = {}
+        if not timer and C_Timer then timer = C_Timer.NewTimer(2 + math.random() * 6, Next) end
+    end
+
+    function C:Length() return math.max(0, tail - head + 1) end
+
+    function C:Stop(forget)
+        if timer then timer:Cancel(); timer = nil end
+        queue, head, tail, set, pending = {}, 1, 0, {}, {}
+        if forget then heard = {} end
+    end
+
+    return C
 end
 
 function WM:RegisterModule(name, module)

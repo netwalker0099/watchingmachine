@@ -36,6 +36,23 @@ with ElvUI and other UI packs the list opens on another part of the screen
   a single one is dropped by Lua and nothing is drawn (3.84's missing menu
   background).
 
+## Shared helpers: use them, don't copy them
+
+Before writing a helper in a module, look in `Core.lua` ("SHARED HELPERS")
+and `UI.lua`. A 3.85 to 3.89 clean-up found the same code in up to eleven
+files. In particular:
+
+- `WM.PlayerKey()` / `WM:CharKey()`: this character's "Name-Realm".
+- `WM.EquippedLinks(unit, last)`: what a unit is wearing, by slot.
+- `WM.CsvField(v)`: one field of a CSV line.
+- `WM.NewCatchUp{ enabled, current, send, gap }`: sending guildmates what
+  changed while they were offline, one record at a time (the armory,
+  Roster Manager and Loot Council use it; a new shared record should too).
+- `WM:QueueAddonMessage`, `WM.RunAfter` / `WM.RunTicker`, `WM:RegisterEvents`.
+- A module's `DB()` applies its defaults once per saved table (compare the
+  table with the one last prepared), not on every call: it is called on
+  every combat log event in some modules.
+
 ## Calls the game restricts in combat
 
 `CheckInteractDistance` is blocked in combat on 2.5.x, and the game blames

@@ -692,8 +692,7 @@ end
 local function Codec() return WM.LootCodec end
 local PREFIX_WM = "WMRosterS"
 local DRIP, MARGIN = 0.6, 3600
-local heard, seqNo = {}, 0
-local drip, dripSet, dripTimer = {}, {}, nil
+local catchUp        -- the catch-up engine (Core's WM.NewCatchUp); made below
 
 local function ChangedAt(rec, g)
     local t = 0
@@ -765,55 +764,39 @@ local function SendWM(kind, payload)
     end
 end
 
-local function Heard(name, t)
-    seqNo = seqNo + 1
-    local h = heard[name]
-    if not h or h.t < t then heard[name] = { t = t, seq = seqNo } elseif h.t == t then h.seq = seqNo end
-end
+local function Heard(name, t) catchUp:Heard(name, t) end
 
-local function DripNext()
-    dripTimer = nil
-    if not WMEnabled() then return end
-    local g = GR:Guild()
-    while #drip > 0 do
-        local item = table.remove(drip, 1)
-        dripSet[item.name] = nil
-        local rec = g and (g.members[item.name] or g.former[item.name])
-        local h = heard[item.name]
-        if rec and not (h and h.t >= ChangedAt(rec, g) and h.seq > item.seq) then
-            local w = Full.PackRecord(rec, g)
-            SendWM("E", w)
-            Heard(item.name, w.t)
-            Full.wmSent = (Full.wmSent or 0) + 1
-            if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
-            return
-        end
-    end
-end
+-- data: the member's name
+catchUp = WM.NewCatchUp({
+    gap = DRIP,
+    enabled = function() return WMEnabled() end,
+    current = function(name)
+        local g = GR:Guild()
+        local rec = g and (g.members[name] or g.former[name])
+        return rec and ChangedAt(rec, g)
+    end,
+    send = function(name)
+        local g = GR:Guild()
+        local w = Full.PackRecord(g.members[name] or g.former[name], g)
+        SendWM("E", w)
+        Heard(name, w.t)
+        Full.wmSent = (Full.wmSent or 0) + 1
+    end,
+})
 
 function Full:OnCatchUp(since)
     if not WMEnabled() then return end
     local g = GR:Guild()
     if not g then return end
-    local new = {}
     for _, src in ipairs({ g.members, g.former }) do
         for name, rec in pairs(src) do
             local t = ChangedAt(rec, g)
-            if t > since then
-                if dripSet[name] then dripSet[name].seq = seqNo
-                else
-                    dripSet[name] = { name = name, t = t, seq = seqNo }
-                    new[#new + 1] = dripSet[name]
-                end
-            end
+            if t > since then catchUp:Offer(name, t, name) end
         end
     end
-    if #new == 0 then return end
-    table.sort(new, function(a, b) return a.t > b.t end)
-    for _, it in ipairs(new) do drip[#drip + 1] = it end
-    if not dripTimer and C_Timer then dripTimer = C_Timer.NewTimer(2 + math.random() * 6, DripNext) end
+    catchUp:Start()
 end
-function Full.CatchUpLength() return #drip end
+function Full.CatchUpLength() return catchUp:Length() end
 
 local unframe
 function Full:OnWMMessage(prefix, msg, dist, sender)
@@ -842,14 +825,12 @@ function Full:HelloWM()
 end
 
 function Full:StopWM()
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
-    wipe(drip); wipe(dripSet)
+    catchUp:Stop()
     WM:ClearAddonQueue({ [PREFIX_WM] = true })
 end
 
 function Full:ResetForTests()
-    wipe(heard); wipe(drip); wipe(dripSet)
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
+    catchUp:Stop(true)
     self.greeted = nil
     self:Reset()
 end

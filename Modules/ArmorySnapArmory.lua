@@ -461,22 +461,11 @@ end
 
 local partial = {}        -- [sender .. id] = { parts, got, n, t }
 local answers = {}        -- [key .. "^" .. spec] = timer of our pending answer
-local heard = {}          -- [key .. "^" .. spec] = { t = newest scan time, seq = when } heard or sent
-local seq = 0             -- counts what's heard, so a request knows what came after it
-
-local function Heard(key, spec, t)
-    local k = key .. "^" .. spec
-    seq = seq + 1
-    local h = heard[k]
-    if not h or h.t < t then heard[k] = { t = t, seq = seq }
-    elseif h.t == t then h.seq = seq end
-end
-
--- Has this scan (or a newer one) gone out since a request came in?
-local function SentSince(id, t, since)
-    local h = heard[id]
-    return h ~= nil and h.t >= t and h.seq > since
-end
+-- The catch-up engine (Core's WM.NewCatchUp), by "key^spec"; also what a
+-- request uses to know what was sent after it came in
+local catchUp
+local function Heard(key, spec, t) catchUp:Heard(key .. "^" .. spec, t) end
+local function SentSince(id, t, since) return catchUp:SentSince(id, t, since) end
 Arm.MarkHeard = Heard
 
 -- ============================================
@@ -487,49 +476,33 @@ Arm.MarkHeard = Heard
 -- already sent is skipped, so with several of us answering each armory goes
 -- out about once. Whoever's wait ends first leads.
 
-local drip, dripSet, dripTimer = {}, {}, nil
-
 local function MyGuild() return GetGuildInfo and GetGuildInfo("player") end
 
-local function DripNext()
-    dripTimer = nil
-    if not Sharing() then return end
-    while #drip > 0 do
-        local item = table.remove(drip, 1)
-        dripSet[item[1] .. "^" .. item[2]] = nil
-        local e = (Arm.All()[item[1]] or {})[item[2]]
-        if e and not SentSince(item[1] .. "^" .. item[2], e.time or 0, item[4]) then
-            Arm:Share(item[1], e)
-            if #drip > 0 then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
-            return
-        end
-    end
-end
+-- data: { key, spec }
+catchUp = WM.NewCatchUp({
+    gap = DRIP,
+    enabled = function() return Sharing() end,
+    current = function(d)
+        local e = (Arm.All()[d[1]] or {})[d[2]]
+        return e and (e.time or 0)
+    end,
+    send = function(d) Arm:Share(d[1], (Arm.All()[d[1]] or {})[d[2]]) end,
+})
 
 function Arm:OnCatchUp(since)
     if not Sharing() then return end
     local guild = MyGuild()
-    local new = {}
     for key, specs in pairs(Arm.All()) do
         for spec, e in pairs(specs) do
-            local id = key .. "^" .. spec
             if (e.time or 0) > since and e.guild == guild then
-                if dripSet[id] then
-                    dripSet[id][4] = seq        -- asked again: what went out before doesn't count
-                else
-                    dripSet[id] = { key, spec, e.time or 0, seq }
-                    new[#new + 1] = dripSet[id]
-                end
+                catchUp:Offer(key .. "^" .. spec, e.time or 0, { key, spec })
             end
         end
     end
-    if #new == 0 then return end
-    table.sort(new, function(a, b) return a[3] > b[3] end)
-    for _, item in ipairs(new) do drip[#drip + 1] = item end
-    if not dripTimer then dripTimer = C_Timer.NewTimer(2 + math.random() * 6, DripNext) end
+    catchUp:Start()
 end
 
-function Arm.CatchUpLength() return #drip end
+function Arm.CatchUpLength() return catchUp:Length() end
 
 local function OnArmory(sender, data)
     local key, e = Arm.Deserialize(data)
@@ -555,7 +528,7 @@ local function OnQuery(sender, key, list)
         local id = key .. "^" .. spec
         if (e.time or 0) > (theirs[Clean(spec)] or 0) and not answers[id] then
             local delay = (key == me) and 0.2 or (1 + math.random() * 3)
-            local asked = seq
+            local asked = catchUp.seq
             answers[id] = C_Timer.NewTimer(delay, function()
                 answers[id] = nil
                 if not Sharing() then return end
@@ -669,8 +642,7 @@ function Arm:Stop()
     if selfTimer then selfTimer:Cancel(); selfTimer = nil end
     for id, t in pairs(answers) do t:Cancel(); answers[id] = nil end
     wipe(partial)
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
-    wipe(drip); wipe(dripSet)
+    catchUp:Stop()
     WM:ClearAddonQueue({ [PREFIX] = true })
 end
 
@@ -683,10 +655,9 @@ end
 
 -- For tests
 function Arm:ResetForTests()
-    wipe(partial); wipe(heard); wipe(asked)
+    wipe(partial); wipe(asked)
     for id, t in pairs(answers) do t:Cancel(); answers[id] = nil end
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
-    wipe(drip); wipe(dripSet)
+    catchUp:Stop(true)
     greeted = nil
 end
 Arm.PREFIX = PREFIX

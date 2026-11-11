@@ -2,9 +2,27 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.88** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.89** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.89
+
+### Housekeeping (no visible change)
+
+- **One catch-up engine.** The armory, Roster Manager and Loot Council
+  each had their own copy of the code that catches guildmates up after a
+  login (queue what changed, send one record every 0.6 seconds, skip what
+  someone else sent meanwhile). It is now one piece in Core
+  (`WM.NewCatchUp`) used by all three. The messages on the wire are the
+  same, so it works with guildmates on older versions. A long queue no
+  longer shifts every waiting record each time one is taken.
+- **One worn-gear reader** (`WM.EquippedLinks`) for the armory, Your
+  Characters, GearScore and Gear Sets.
+
+If sharing between guildmates misbehaves after this version (armories,
+roster edits or loot history not arriving after a login), this is the
+change to look at.
 
 ## 3.88
 

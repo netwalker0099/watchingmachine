@@ -173,14 +173,7 @@ local function BankBags()
     return out
 end
 
-local function Gear()
-    local gear = {}
-    for slot = 1, 19 do
-        local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
-        if type(link) == "string" then gear[slot] = link end
-    end
-    return gear
-end
+local function Gear() return WM.EquippedLinks("player") end
 
 -- Raid lockouts from the game: { name, size, difficulty, bosses, killed, reset (time) }
 local function SavedInstances(now)

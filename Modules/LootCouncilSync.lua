@@ -80,18 +80,10 @@ end
 -- SENDING
 -- ============================================
 
-local heard = {}      -- [gid] = { mod, seq }: newest change sent or heard
-local seq = 0
-local function Heard(gid, mod)
-    seq = seq + 1
-    local h = heard[gid]
-    if not h or h.mod < mod then heard[gid] = { mod = mod, seq = seq }
-    elseif h.mod == mod then h.seq = seq end
-end
-local function SentSince(gid, mod, since)
-    local h = heard[gid]
-    return h ~= nil and h.mod >= mod and h.seq > since
-end
+-- The catch-up engine (Core's WM.NewCatchUp); made further down, once the
+-- functions it sends with exist
+local catchUp
+local function Heard(gid, mod) catchUp:Heard(gid, mod) end
 
 local function Send(kind, payload, urgent)
     local text = Codec.Serialize(kind, payload)
@@ -202,65 +194,37 @@ end
 -- CATCHING UP
 -- ============================================
 
-local drip, dripSet, dripTimer = {}, {}, nil
-
-local function DripNext()
-    dripTimer = nil
-    if not Sync.Enabled() then return end
-    while #drip > 0 do
-        local item = table.remove(drip, 1)
-        dripSet[item.gid] = nil
-        if item.raid then
-            local r = DB().raids[item.raid]
-            if r and not SentSince(item.gid, r.t or 0, item.seq) then
-                Sync:ShareRaid(r, item.raid)
-                if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
-                return
-            end
-        else
-            local e = DB().history[item.id]
-            if e and not SentSince(item.gid, e.mod or e.t or 0, item.seq) then
-                Sync:Share(e)
-                if #drip > 0 and C_Timer then dripTimer = C_Timer.NewTimer(DRIP, DripNext) end
-                return
-            end
+-- data: { id = award id } or { raid = raid key }
+catchUp = WM.NewCatchUp({
+    gap = DRIP,
+    enabled = function() return Sync.Enabled() end,
+    current = function(d)
+        if d.raid then
+            local r = DB().raids[d.raid]
+            return r and (r.t or 0)
         end
-    end
-end
+        local e = DB().history[d.id]
+        return e and (e.mod or e.t or 0)
+    end,
+    send = function(d)
+        if d.raid then Sync:ShareRaid(DB().raids[d.raid], d.raid) else Sync:Share(DB().history[d.id]) end
+    end,
+})
 
 -- Someone asked for everything changed since then
 function Sync:OnCatchUp(since)
     if not Sync.Enabled() then return end
-    local new = {}
     for id, e in pairs(DB().history) do
-        if (e.mod or e.t or 0) > since then
-            local gid = LC.GlobalId(e)
-            if dripSet[gid] then
-                dripSet[gid].seq = seq
-            else
-                dripSet[gid] = { id = id, gid = gid, mod = e.mod or e.t or 0, seq = seq }
-                new[#new + 1] = dripSet[gid]
-            end
-        end
+        local mod = e.mod or e.t or 0
+        if mod > since then catchUp:Offer(LC.GlobalId(e), mod, { id = id }) end
     end
     for key, r in pairs(DB().raids or {}) do
-        if (r.t or 0) > since then
-            local gid = "raid:" .. key
-            if dripSet[gid] then
-                dripSet[gid].seq = seq
-            else
-                dripSet[gid] = { raid = key, gid = gid, mod = r.t or 0, seq = seq }
-                new[#new + 1] = dripSet[gid]
-            end
-        end
+        if (r.t or 0) > since then catchUp:Offer("raid:" .. key, r.t or 0, { raid = key }) end
     end
-    if #new == 0 then return end
-    table.sort(new, function(a, b) return a.mod > b.mod end)
-    for _, item in ipairs(new) do drip[#drip + 1] = item end
-    if not dripTimer and C_Timer then dripTimer = C_Timer.NewTimer(2 + math.random() * 6, DripNext) end
+    catchUp:Start()
 end
 
-function Sync.CatchUpLength() return #drip end
+function Sync.CatchUpLength() return catchUp:Length() end
 
 -- At login: ask the guild for what we missed
 function Sync:Hello()
@@ -294,13 +258,11 @@ function Sync:Init()
 end
 
 function Sync:Stop()
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
-    wipe(drip); wipe(dripSet)
+    catchUp:Stop()
     WM:ClearAddonQueue({ [PREFIX] = true })
 end
 
 function Sync:ResetForTests()
-    wipe(heard); wipe(drip); wipe(dripSet)
-    if dripTimer then dripTimer:Cancel(); dripTimer = nil end
+    catchUp:Stop(true)
     self.greeted = nil
 end

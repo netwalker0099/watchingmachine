@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.88 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.89 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1592,6 +1592,9 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.89
+- Under the hood, nothing to see: the guild catch-up that the armory, Roster Manager and Loot Council each had their own copy of is now one shared piece, and so is reading what a character is wearing (the armory, Your Characters, GearScore, Gear Sets). Long catch-up queues are also cheaper to work through
 
 ### Version 3.88
 - **Class Tools (Warlock)**: *Track soulstone timers* now does what it says: off, no soulstone casts are remembered (it did nothing before). Casts long past their cooldown are forgotten instead of staying saved

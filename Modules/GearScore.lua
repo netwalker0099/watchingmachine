@@ -242,9 +242,8 @@ end
 
 -- A unit's total, from what it has on
 function GS.UnitScore(unit)
-    local links, missing = {}, false
+    local links, missing = WM.EquippedLinks(unit, 18), false
     for slot = 1, 18 do
-        links[slot] = GetInventoryItemLink(unit, slot)
         if not links[slot] and slot ~= 4 and GetInventoryItemID and GetInventoryItemID(unit, slot) then
             missing = true   -- something is there, its link just isn't ready
         end

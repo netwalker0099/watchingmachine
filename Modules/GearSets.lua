@@ -212,8 +212,9 @@ end
 -- loc = { inv = slot } or { bag =, slot = }, plus str, link, locked
 function GS.Scan()
     local s = { inv = {}, all = {}, free = {} }
+    local worn = WM.EquippedLinks("player")
     for slot = 1, 19 do
-        local link = GetInventoryItemLink("player", slot)
+        local link = worn[slot]
         local str = ItemString(link)
         if str then
             knownLinks[str] = link

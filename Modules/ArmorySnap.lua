@@ -161,11 +161,11 @@ end
 ----------------------------------------------------------------------
 local function CaptureGear(unit)
     local gear = {}
+    local worn = WM.EquippedLinks(unit)
     for slotId in pairs(AS.SLOT_INFO) do
-        local link = GetInventoryItemLink(unit, slotId)
-        local tex  = GetInventoryItemTexture(unit, slotId)
+        local link = worn[slotId]
         if link then
-            gear[slotId] = { link = link, icon = tex or "" }
+            gear[slotId] = { link = link, icon = GetInventoryItemTexture(unit, slotId) or "" }
         end
     end
     return gear
