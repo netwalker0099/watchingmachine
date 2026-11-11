@@ -36,6 +36,7 @@ env.UnitGUID = function(u)
     if u == "player" then return raid[1][3] end
     local r = Idx(u) and raid[Idx(u)]; return r and r[3]
 end
+env.C_PartyInfo = {}   -- (the stub would answer its loot method with 0)
 env.GetLootMethod = function() return "master", nil, 1 end          -- we're the loot master
 env.UnitIsGroupLeader = function(u) return u == "raid1" or u == "player" end
 env.UnitIsGroupAssistant = function() return false end
@@ -186,6 +187,17 @@ check("settings, council and loot table sent to the raid", Find(out, "StartHandl
 local c = Find(out, "council")
 check("council sent by GUID", c and c.args[1]["4904-AAAA"] and c.args[1]["4904-BBBB"] and not c.args[1]["4904-CCCC"])
 check("our own session from our messages", RC.session and RC.session.ml == "Me-Nightslayer" and RC.session.items[2].itemID == 30247)
+-- A raider who reloaded asks for the council and our settings
+From("Taslan", "council_request", {})
+From("Taslan", "MLdb_request", {})
+From("Venhana", "council_request", {})
+do
+    local again = Deliver()
+    local councils = 0
+    for _, m in ipairs(again) do if m.command == "council" then councils = councils + 1 end end
+    check("council sent again when asked, once for many askers", councils == 1)
+    check("settings sent again when asked", Find(again, "mldb") ~= nil)
+end
 -- Auto-pass: the leggings are for other classes
 check("autopass: the item we can't use isn't asked", RC.session.items[2].answered == "AUTOPASS")
 local ack = Find(out, "lootAck")

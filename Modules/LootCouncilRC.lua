@@ -76,12 +76,31 @@ local function TransmitGUID(unit)
 end
 
 -- The master looter: the loot master with master loot, else the group leader
+-- Is the group on master loot, and who has it (party / raid index). Newer
+-- clients have C_PartyInfo.GetLootMethod, which gives a number (2 is
+-- master loot); older ones the global, which gives "master".
+local MASTER_LOOT = 2
+function RC.LootMethod()
+    local ok, method, partyID, raidID
+    local f = type(C_PartyInfo) == "table" and C_PartyInfo.GetLootMethod
+    if type(f) == "function" then ok, method, partyID, raidID = pcall(f) end
+    if not ok or (type(method) ~= "number" and type(method) ~= "string") then
+        f = rawget(_G, "GetLootMethod")
+        if type(f) ~= "function" then return false end
+        ok, method, partyID, raidID = pcall(f)
+        if not ok then return false end
+    end
+    local master = method == "master" or method == MASTER_LOOT
+        or (method ~= nil and type(Enum) == "table" and type(Enum.LootMethod) == "table"
+            and method == Enum.LootMethod.Masterlooter)
+    return master and true or false, tonumber(partyID), tonumber(raidID)
+end
+
 function RC.MasterLooter()
     if RC.testML then return RC.testML end
     if not (IsInGroup and IsInGroup()) then return nil end
-    local method, partyID, raidID
-    if GetLootMethod then method, partyID, raidID = GetLootMethod() end
-    if method == "master" then
+    local master, partyID, raidID = RC.LootMethod()
+    if master then
         if raidID then return UnitKey("raid" .. raidID) end
         if partyID then return partyID == 0 and MyKey() or UnitKey("party" .. partyID) end
     end
@@ -477,6 +496,22 @@ function RC:Vote(ses, name, n)
     return self:Send("vote", { ses, name, n })
 end
 
+-- Ask the master looter for the council (and its settings, if we have
+-- none). RCLootCouncil sends the council when it's set and after that only
+-- when asked, so one sent before we logged in, reloaded or joined is
+-- otherwise never seen, and the voting frame never opens.
+local askedAt = -100
+function RC:AskCouncil(force)
+    if self.local_ or not RC.Active() then return false end
+    local ml = RC.MasterLooter()
+    if not ml or ml == MyKey() then return false end
+    local now = GetTime and tonumber(GetTime()) or 0
+    if not force and now - askedAt < 10 then return false end
+    askedAt = now
+    self:Send("council_request", {})
+    return true
+end
+
 -- Messages from the master looter only
 local ML_ONLY = { lootTable = true, lt_add = true, mldb = true, council = true, awarded = true, session_end = true,
     change_response = true, offline_timer = true, StartHandleLoot = true, StopHandleLoot = true, ResponseWait = true }
@@ -498,9 +533,14 @@ function RC:Handle(prefix, command, args, sender, dist)
     -- Everything else is the session's, which we take part in only when active
     if not self.local_ and not RC.Active() then return end
     if ML_ONLY[command] and not fromML then return end
+    if command == "council_request" or command == "MLdb_request" then
+        if LC.ML and LC.ML.OnRequest and sender ~= MyKey() then LC.ML:OnRequest(command) end
+        return
+    end
     if command == "StartHandleLoot" then
         self.handleLoot = true
         if not self.mldb then self:Send("MLdb_request", {}) end
+        if next(self.council) == nil then self:AskCouncil() end
     elseif command == "StopHandleLoot" then
         self.handleLoot = false
     elseif command == "mldb" then
@@ -514,10 +554,15 @@ function RC:Handle(prefix, command, args, sender, dist)
             if name then self.council[name] = true end
         end
         Changed("council")
-    elseif command == "lootTable" then
-        if type(args[1]) == "table" then self:StartSession(sender, args[1]) end
-    elseif command == "lt_add" then
-        if type(args[1]) == "table" then self:StartSession(sender, args[1], true) end
+    elseif command == "lootTable" or command == "lt_add" then
+        if type(args[1]) == "table" then
+            self:StartSession(sender, args[1], command == "lt_add")
+            -- No council yet: ask, and the voting frame opens when it comes
+            if not self.local_ and next(self.council) == nil then
+                self:AskCouncil()
+                if not self.mldb then self:Send("MLdb_request", {}) end
+            end
+        end
     elseif command == "lootAck" then
         local data = type(args[3]) == "table" and args[3] or {}
         local s = self.session
@@ -643,8 +688,15 @@ events:SetScript("OnEvent", function(_, event, ...)
             if item.pending then RC:Resolve(item); any = any or not item.pending end
         end
         if any then Changed("items") end
-    elseif event == "GROUP_ROSTER_UPDATE" then
+    elseif event == "GROUP_ROSTER_UPDATE" or event == "PARTY_LOOT_METHOD_CHANGED" then
         if RC.session then RC:SetupCandidates(); Changed("candidate") end
+        -- A new master looter has a council of its own
+        local ml = RC.MasterLooter()
+        if ml ~= RC.lastML then
+            RC.lastML = ml
+            RC.council, RC.mldb = {}, nil
+            if ml then WM.RunAfter(3, function() RC:AskCouncil() end) end
+        end
     end
 end)
 
@@ -655,7 +707,14 @@ function RC:Init()
         pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
         pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX_VER)
     end
-    WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED", "GROUP_ROSTER_UPDATE" })
+    WM:RegisterEvents(events, { "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED", "GROUP_ROSTER_UPDATE",
+        "PARTY_LOOT_METHOD_CHANGED" })
+    -- Logged in or reloaded in a group: its council was sent before now
+    WM.RunAfter(8, function()
+        if not On() then return end
+        RC.lastML = RC.MasterLooter()
+        if RC.lastML and next(RC.council) == nil then RC:AskCouncil() end
+    end)
 end
 
 function RC:Stop()

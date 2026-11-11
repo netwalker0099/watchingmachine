@@ -843,6 +843,10 @@ function LC:InitFrames()
         if what == "session" and RC.session then
             if DB().showResponse then LC:RefreshResponse() end
             if RC:IsCouncil() and DB().openVoting then LC:ShowVoting() end
+        elseif what == "council" then
+            -- The council arrived after the loot did
+            if RC.session and RC:IsCouncil() and DB().openVoting then LC:ShowVoting() end
+            LC:RefreshVoting()
         elseif what == "end" then
             if resp then resp:Hide() end
             if vote then LC:RefreshVoting() end

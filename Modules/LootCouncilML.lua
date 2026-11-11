@@ -138,6 +138,33 @@ function ML:MLDB()
 end
 
 -- Send the waiting items for answers and votes. test: test loot
+-- The council as RCLootCouncil sends it: { [GUID without "Player-"] = true }
+function ML:CouncilForTransmit()
+    local council = {}
+    for _, unit in pairs(self:Council()) do
+        local g = UnitGUID and UnitGUID(unit)
+        if g then council[(g:gsub("^Player%-", ""))] = true end
+    end
+    return council
+end
+
+-- Someone asked for the council or our settings (they logged in, reloaded
+-- or joined after we sent them). Answered while we run a session; the
+-- council at most once every 5 seconds, as many ask at once.
+local councilSentAt = -100
+function ML:OnRequest(command)
+    if not (RC.session and RC.session.ml == MyKey()) or RC.local_ then return false end
+    if command == "MLdb_request" then
+        return RC:Send("mldb", { self:MLDB() })
+    elseif command == "council_request" then
+        local now = GetTime and tonumber(GetTime()) or 0
+        if now - councilSentAt < 5 then return false end
+        councilSentAt = now
+        return RC:Send("council", { self:CouncilForTransmit() })
+    end
+    return false
+end
+
 function ML:Start(test)
     if not RC.local_ and not self:IsML() and not (test and IsInGroup and IsInGroup() and UnitIsGroupLeader and UnitIsGroupLeader("player")) then
         Print("Only the master looter (or the group leader, for test loot) can send loot for votes.")
@@ -146,11 +173,7 @@ function ML:Start(test)
     if #self.pending == 0 then Print("No items to send. Open the loot window, Alt-click an item, or /wmachine council add <item>.") return false end
     self.test = test and true or false
     RC.testML = test and MyKey() or nil
-    local council = {}
-    for name, unit in pairs(self:Council()) do
-        local g = UnitGUID and UnitGUID(unit)
-        if g then council[(g:gsub("^Player%-", ""))] = true end
-    end
+    local council = self:CouncilForTransmit()
     local lt = {}
     self.sessionItems = {}
     for i, p in ipairs(self.pending) do

@@ -32,6 +32,7 @@ env.UnitGUID = function(u)
     if u == "player" then return raid[1][3] end
     local i = tonumber(tostring(u):match("^raid(%d+)$")); return i and raid[i] and raid[i][3]
 end
+env.C_PartyInfo = {}   -- (the stub would answer its loot method with 0)
 env.GetLootMethod = function() return "master", nil, 2 end      -- Venhana is the loot master
 env.UnitIsGroupLeader = function(u) return u == "raid2" end
 env.GetGuildInfo = function() return "Socks and Sandals", "Raider", 3 end
@@ -104,6 +105,34 @@ LC.Add({ link = "|cffa335ee|Hitem:30242|h[Helm of the Vanquished Champion]|h|r",
     how = "Mainspec/Need", class = "ROGUE", src = { wm = 1 }, srcKind = "wm" })
 
 check("master looter: the loot master", RC.MasterLooter() == "Venhana-Nightslayer")
+-- Newer clients: C_PartyInfo.GetLootMethod gives a number (2 is master loot)
+do
+    local old = env.GetLootMethod
+    env.GetLootMethod = nil
+    env.UnitIsGroupLeader = function(u) return u == "raid3" end
+    check("no loot method to read: the group leader", RC.MasterLooter() == "Taslan-Nightslayer")
+    env.C_PartyInfo = { GetLootMethod = function() return 2, nil, 2 end }
+    check("master loot read from C_PartyInfo", RC.MasterLooter() == "Venhana-Nightslayer")
+    env.C_PartyInfo = { GetLootMethod = function() return 1 end }
+    check("group loot in C_PartyInfo: the group leader", RC.MasterLooter() == "Taslan-Nightslayer")
+    env.C_PartyInfo = {}
+    env.GetLootMethod = old
+    env.UnitIsGroupLeader = function(u) return u == "raid2" end
+end
+
+-- ============ Loot arrives before we have the council ============
+-- (it was sent before we logged in): we ask, and the voting frame opens
+-- when the council comes
+sent = {}
+From("Venhana", "lootTable", { { { string = "30242", session = 1, boss = "Lady Vashj" } } })
+check("no council yet: no voting frame", not (rawget(env, "WM_LootVotingFrame") and env.WM_LootVotingFrame:IsShown()))
+check("no council yet: asked the master looter for it", Find(Out(), "council_request") ~= nil)
+From("Venhana", "council", { { ["4904-AAAA"] = true } })
+check("the council arrives: the voting frame opens", env.WM_LootVotingFrame and env.WM_LootVotingFrame:IsShown())
+From("Venhana", "session_end", {})
+env.WM_LootVotingFrame:Hide()
+RC.council, RC.mldb = {}, nil
+sent = {}
 
 -- ============ A session from an RCLootCouncil master looter ============
 From("Venhana", "StartHandleLoot", {})
