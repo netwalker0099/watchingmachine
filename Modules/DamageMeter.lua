@@ -36,14 +36,18 @@ DM.DEFAULTS = DEFAULTS
 local MAX_WINDOWS = 8
 DM.MAX_WINDOWS = MAX_WINDOWS
 
+-- Defaults are applied once per saved table (asked for on every hit)
+local dbReady
 local function DB()
     WMDamageMeterDB = WMDamageMeterDB or {}
     local db = WMDamageMeterDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.windows) ~= "table" then
         db.windows = { { display = "damage", segment = "current" } }
     end
     if type(db.history) ~= "table" then db.history = {} end
+    dbReady = db
     return db
 end
 DM.DB = DB
@@ -107,19 +111,28 @@ local function Guid(unit)
     return type(g) == "string" and g or nil
 end
 
+-- { unit, pet unit } lists, built once (asked for every 0.3 s in a fight);
+-- read only
+local SOLO_UNITS = { { "player", "pet" } }
+local RAID_UNITS, PARTY_UNITS = { SOLO_UNITS[1] }, { SOLO_UNITS[1] }
+for i = 1, 40 do RAID_UNITS[#RAID_UNITS + 1] = { "raid" .. i, "raidpet" .. i } end
+for i = 1, 4 do PARTY_UNITS[#PARTY_UNITS + 1] = { "party" .. i, "partypet" .. i } end
 local function GroupUnits()
-    local out = { { "player", "pet" } }
-    if IsInRaid and IsInRaid() then
-        for i = 1, 40 do out[#out + 1] = { "raid" .. i, "raidpet" .. i } end
-    elseif IsInGroup and IsInGroup() then
-        for i = 1, 4 do out[#out + 1] = { "party" .. i, "partypet" .. i } end
-    end
-    return out
+    if IsInRaid and IsInRaid() then return RAID_UNITS end
+    if IsInGroup and IsInGroup() then return PARTY_UNITS end
+    return SOLO_UNITS
 end
 DM.GroupUnits = GroupUnits
 
 function DM:ScanGroup()
     for k in pairs(unitOf) do unitOf[k] = nil end
+    -- Each totem or guardian summon adds an owner and none was ever
+    -- removed: out of a fight, once there are many, start again
+    if not self:InFight() then
+        local n = 0
+        for _ in pairs(owners) do n = n + 1 end
+        if n > 300 then for k in pairs(owners) do owners[k] = nil end end
+    end
     for _, u in ipairs(GroupUnits()) do
         local g = Guid(u[1])
         if g then
@@ -343,6 +356,7 @@ function DM:Reset()
     db.history = {}
     db.overall = nil
     for k in pairs(lastAct) do lastAct[k] = nil end
+    for k in pairs(joined) do joined[k] = nil end
     for _, w in ipairs(db.windows) do
         if type(w.segment) == "number" then w.segment = "current" end
     end
@@ -367,14 +381,28 @@ local function HealthPct(guid)
     return math.floor(hp / max * 100 + 0.5)
 end
 
-local function Remember(guid, e)
+-- The last DEATH_EVENTS things that happened to a group member. The
+-- oldest entry's table is used again for the newest (one per hit otherwise).
+local function Remember(guid, spell, src, amount, heal, crit)
     local list = recent[guid]
     if not list then list = {}; recent[guid] = list end
+    local e = #list >= DEATH_EVENTS and table.remove(list, 1) or {}
+    e.spell, e.src, e.amount, e.heal, e.crit = spell, src, amount, heal, crit
     e.t = Now()
     e.hp = HealthPct(guid)
     list[#list + 1] = e
-    if #list > DEATH_EVENTS then table.remove(list, 1) end
 end
+
+-- "Spell (Pet)" / "Spell (Source)": joined once, not on every hit
+local joined = {}
+local function Join(a, b)
+    local t = joined[a]
+    if not t then t = {}; joined[a] = t end
+    local v = t[b]
+    if not v then v = a .. " (" .. b .. ")"; t[b] = v end
+    return v
+end
+DM.Join = Join
 DM.recent = recent
 
 function DM:Died(guid, name)
@@ -396,7 +424,8 @@ function DM:Died(guid, name)
     end
     local death = { n = ShortName(name), c = ClassOf(guid), at = math.max(0, t - (seg.start or t)), date = Stamp(),
         log = log, killer = killer and ((killer.spell or "?") .. (killer.src and (" (" .. killer.src .. ")") or "")) or nil }
-    for _, s in ipairs({ seg, overall }) do
+    for pass = 1, 2 do
+        local s = pass == 1 and seg or overall
         local a = Actor(s, guid, name)
         a.dth = a.dth + 1
         s.deaths[#s.deaths + 1] = death
@@ -472,8 +501,10 @@ local function Damage(srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, sp
         end
     end
     local seg, overall = Targets()
-    local key = pet and ((spell or "Melee") .. " (" .. pet .. ")") or (spell or "Melee")
-    for _, s in ipairs({ seg, overall }) do
+    local key = pet and Join(spell or "Melee", pet) or (spell or "Melee")
+    local from = victim and ((type(srcName) == "string" and ShortName(srcName)) or "Environment")
+    for pass = 1, 2 do
+        local s = pass == 1 and seg or overall
         if cg then
             local a = Actor(s, cg, cn)
             if friendly then
@@ -493,16 +524,14 @@ local function Damage(srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, sp
             local v = Actor(s, dstGUID, dstName)
             v.tk = v.tk + amount
             v.tf = v.tf or {}
-            local from = (type(srcName) == "string" and ShortName(srcName)) or "Environment"
-            local sp = Spell(v.tf, spell and (spell .. " (" .. from .. ")") or from, id)
+            local sp = Spell(v.tf, spell and Join(spell, from) or from, id)
             sp.a, sp.h = sp.a + amount, sp.h + 1
             if crit then sp.c = sp.c + 1 end
             if amount > sp.m then sp.m = amount end
         end
     end
     if victim then
-        Remember(dstGUID, { spell = spell or "Melee", src = type(srcName) == "string" and ShortName(srcName) or nil,
-            amount = amount, crit = crit and true or nil })
+        Remember(dstGUID, spell or "Melee", type(srcName) == "string" and from or nil, amount, nil, crit and true or nil)
     end
     seg.last = t
     DM:Changed()
@@ -523,8 +552,9 @@ local function Heal(srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, spel
     local cg, cn, pet = Credit(srcGUID, srcName, srcFlags)
     local seg, overall = Targets()
     if cg then
-        local key = pet and ((spell or "?") .. " (" .. pet .. ")") or (spell or "?")
-        for _, s in ipairs({ seg, overall }) do
+        local key = pet and Join(spell or "?", pet) or (spell or "?")
+        for pass = 1, 2 do
+        local s = pass == 1 and seg or overall
             local a = Actor(s, cg, cn)
             a.heal, a.oh = a.heal + eff, a.oh + over
             a.hp = a.hp or {}
@@ -537,8 +567,7 @@ local function Heal(srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, spel
         end
     end
     if IsGroupTarget(dstGUID, dstFlags) and eff > 0 then
-        Remember(dstGUID, { spell = spell, src = type(srcName) == "string" and ShortName(srcName) or nil,
-            amount = eff, heal = true, crit = crit and true or nil })
+        Remember(dstGUID, spell, type(srcName) == "string" and ShortName(srcName) or nil, eff, true, crit and true or nil)
     end
     seg.last = t
     DM:Changed()
@@ -550,7 +579,8 @@ local function Count(field, listField, srcGUID, srcName, srcFlags, what)
     local cg, cn = Credit(srcGUID, srcName, srcFlags)
     if not cg then return end
     local seg, overall = Targets()
-    for _, s in ipairs({ seg, overall }) do
+    for pass = 1, 2 do
+        local s = pass == 1 and seg or overall
         local a = Actor(s, cg, cn)
         a[field] = a[field] + 1
         if what then

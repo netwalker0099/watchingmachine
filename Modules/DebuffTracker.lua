@@ -1048,10 +1048,22 @@ function DebuffTracker:ResetDoomWarning()
     doomWarned = false
 end
 
+-- Black Temple (instance map 564). True when the game can't say, so the
+-- warning still works there.
+local BLACK_TEMPLE_MAP = 564
+local function MaybeBlackTemple()
+    if not GetInstanceInfo then return true end
+    local ok, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
+    if not ok or type(id) ~= "number" then return true end
+    return id == BLACK_TEMPLE_MAP
+end
+
 function DebuffTracker:CheckDoomWarning()
     if doomWarned or not inCombat then return end
     if not DebuffTrackerDB or not DebuffTrackerDB.illidanDoomWarning then return end
     if not IsInRaid() then return end
+    -- Looking for Illidan reads 88 units: only where he is
+    if not MaybeBlackTemple() then return end
 
     local pct = FindIllidanHealth()
     if not pct or pct > DOOM_THRESHOLD then return end
@@ -2224,21 +2236,33 @@ function DebuffTracker:VerbosePrint(msg)
     WM:VerbosePrint("DebuffTracker", msg)
 end
 
--- Find active debuff from a category on unit
-local function GetActiveDebuff(unit, category)
-    if not UnitExists(unit) then return nil end
+-- The unit's debuffs, read once per update and shared by every category
+-- (each category used to read all of them again)
+local seen = { n = 0, name = {}, icon = {}, count = {}, duration = {}, expires = {}, id = {} }
+local function ReadDebuffs(unit)
+    seen.n = 0
+    if not UnitExists(unit) then return seen end
+    for i = 1, 40 do
+        local name, icon, count, _, duration, expirationTime, _, _, _, spellId = UnitDebuff(unit, i)
+        if not name then break end
+        seen.n = i
+        seen.name[i], seen.icon[i], seen.count[i] = name, icon, count
+        seen.duration[i], seen.expires[i], seen.id[i] = duration, expirationTime, spellId
+    end
+    return seen
+end
 
+-- Find the active debuff from a category among the debuffs just read
+local function GetActiveDebuff(category)
     local bestDebuff = nil
     local bestPriority = 0
 
     -- Get the per-debuff enable/disable table for this category
     local debuffToggles = DebuffTrackerDB and DebuffTrackerDB.trackedDebuffs and DebuffTrackerDB.trackedDebuffs[category.name]
 
-    for i = 1, 40 do
-        local name, icon, count, debuffType, duration, expirationTime, source, isStealable,
-              nameplateShowPersonal, spellId = UnitDebuff(unit, i)
-
-        if not name then break end
+    for i = 1, seen.n do
+        local name, icon, count = seen.name[i], seen.icon[i], seen.count[i]
+        local duration, expirationTime, spellId = seen.duration[i], seen.expires[i], seen.id[i]
 
         -- Match by name (more reliable in Classic), then by spellID; pick
         -- the highest-priority enabled definition among the matches
@@ -2832,6 +2856,7 @@ function DebuffTracker:UpdateDebuffs()
         return
     end
     
+    ReadDebuffs(unit)
     for _, catFrame in ipairs(categoryFrames) do
         local category = catFrame.category
         
@@ -2840,7 +2865,7 @@ function DebuffTracker:UpdateDebuffs()
         else
             catFrame:Show()
             
-            local activeDebuff = GetActiveDebuff(unit, category)
+            local activeDebuff = GetActiveDebuff(category)
             catFrame.currentDebuff = activeDebuff
             
             if activeDebuff then
