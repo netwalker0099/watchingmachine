@@ -7,6 +7,14 @@ WM:RegisterModule("PvPTracker", PvPTracker)
 
 PvPTracker.version = "2.8"
 
+-- Class colours for names (here, above everything that uses them)
+local CLASS_COLORS = {
+    WARRIOR = "C79C6E", PALADIN = "F58CBA", HUNTER = "ABD473",
+    ROGUE = "FFF569", PRIEST = "FFFFFF", DEATHKNIGHT = "C41E3A",
+    SHAMAN = "0070DE", MAGE = "69CCF0", WARLOCK = "9482C9",
+    DRUID = "FF7D0A",
+}
+
 -- ============================================
 -- DEFAULT SETTINGS
 -- ============================================
@@ -536,7 +544,10 @@ function PvPTracker:RegisterSync()
             if PvPTrackerDB and PvPTrackerDB.leaderboardEnabled then
                 local now = GetTime()
                 if now - lastAnnounceTime >= ANNOUNCE_INTERVAL then
-                    pcall(PvPTracker.CheckPeriodicAnnounce, PvPTracker)
+                    -- Once an hour, whatever the announce mode (it used
+                    -- to be asked every frame after the first hour)
+                    lastAnnounceTime = now
+                    pcall(PvPTracker.CheckPeriodicAnnounce, PvPTracker, true)
                 end
             end
         end)
@@ -656,13 +667,6 @@ local function FormatTimeAgo(timestamp)
 end
 
 -- Class colors for display
-local CLASS_COLORS = {
-    WARRIOR = "C79C6E", PALADIN = "F58CBA", HUNTER = "ABD473",
-    ROGUE = "FFF569", PRIEST = "FFFFFF", DEATHKNIGHT = "C41E3A",
-    SHAMAN = "0070DE", MAGE = "69CCF0", WARLOCK = "9482C9",
-    DRUID = "FF7D0A",
-}
-
 -- ============================================
 -- KILL TRACKING
 -- ============================================
@@ -1055,13 +1059,14 @@ function PvPTracker:CheckLeaderChange()
 end
 
 -- Periodic announcement (called from timer)
-function PvPTracker:CheckPeriodicAnnounce()
+-- due: the timer already checked the hour
+function PvPTracker:CheckPeriodicAnnounce(due)
     if not On() or not PvPTrackerDB or not PvPTrackerDB.leaderboardEnabled then return end
     if not PvPTrackerDB.guildSync then return end
     if PvPTrackerDB.leaderboardAnnounce ~= "hourly" then return end
     
     local now = GetTime()
-    if now - lastAnnounceTime < ANNOUNCE_INTERVAL then return end
+    if not due and now - lastAnnounceTime < ANNOUNCE_INTERVAL then return end
     lastAnnounceTime = now
     
     local leader, points = self:GetLeader()

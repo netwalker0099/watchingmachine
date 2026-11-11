@@ -33,11 +33,16 @@ local DEFAULTS = {
     tooltips = true,       -- records on spell tooltips
 }
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     WMCritsDB = WMCritsDB or {}
     local db = WMCritsDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.chars) ~= "table" then db.chars = {} end
+    dbReady = db
     return db
 end
 CR.DB = DB

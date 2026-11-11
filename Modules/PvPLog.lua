@@ -100,7 +100,17 @@ function Log:Start()
     local kind = PvPKind()
     if not kind then return end
     local name = GetInstanceInfo and GetInstanceInfo() or GetRealZoneText and GetRealZoneText() or "?"
-    if current and current.name == name and not current.done then return end   -- reload inside
+    if current and current.name == name and not current.done then return end   -- zone event inside
+    if not current then
+        -- A /reload inside: carry on with the saved match, not a second one
+        local last = DB().matches[1]
+        if type(last) == "table" and not last.done and last.name == name and last.char == CharKey()
+            and Now() - (tonumber(last.started) or 0) < 7200 then
+            current = last
+            self:RefreshUI()
+            return
+        end
+    end
     if current then self:Finish(nil) end
     local db = DB()
     current = {

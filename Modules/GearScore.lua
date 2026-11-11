@@ -42,14 +42,19 @@ local DEFAULTS = {
 }
 GS.DEFAULTS = DEFAULTS
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     WMGearScoreDB = WMGearScoreDB or {}
     local db = WMGearScoreDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do
         if db[k] == nil then db[k] = v end
     end
     if type(db.players) ~= "table" then db.players = {} end
     if type(db.pos) ~= "table" then db.pos = {} end
+    dbReady = db
     return db
 end
 

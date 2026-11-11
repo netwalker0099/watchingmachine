@@ -456,10 +456,13 @@ check("off: never", not q:IsShown())
 alt = false
 GS.DB().slotMenu = "hover"
 check("an old 'quick menu off' setting carries over", (function()
-    local saved = env.WMGearSetsDB.slotMenu
-    env.WMGearSetsDB.slotMenu, env.WMGearSetsDB.quickMenu = nil, false
+    -- An old save is a different table: defaults are applied once per table
+    local saved, old = env.WMGearSetsDB, {}
+    for k, v in pairs(saved) do old[k] = v end
+    old.slotMenu, old.quickMenu = nil, false
+    env.WMGearSetsDB = old
     local mode = GS.DB().slotMenu
-    env.WMGearSetsDB.slotMenu, env.WMGearSetsDB.quickMenu = saved, nil
+    env.WMGearSetsDB = saved
     return mode == "off"
 end)())
 

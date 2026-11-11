@@ -158,12 +158,17 @@ local function CharKey()
     return (UnitName("player") or "?") .. "-" .. ((GetRealmName and GetRealmName()) or "?")
 end
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     if type(WorldTimersDB) ~= "table" then WorldTimersDB = {} end
     local db = WorldTimersDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.realms) ~= "table" then db.realms = {} end
     if type(db.chars) ~= "table" then db.chars = {} end
+    dbReady = db
     return db
 end
 WT.DB = DB
@@ -801,8 +806,8 @@ function WT:MergeNWB(t, now)
     if type(t.layers) == "table" then
         for key in pairs(t.layers) do if type(key) ~= "number" then return 0 end end
         for key, lt in pairs(t.layers) do
-            local seen = tonumber(lt.lastSeenNPC)
-            if type(lt) == "table" and seen and now - seen <= LAYER_EXPIRE and seen <= now + 30 then
+            local seen = type(lt) == "table" and tonumber(lt.lastSeenNPC)
+            if seen and now - seen <= LAYER_EXPIRE and seen <= now + 30 then
                 local layer = self:GetLayer(key, true)
                 if layer then
                     if seen > (layer.lastSeenNPC or 0) then layer.lastSeenNPC = seen; taken = taken + 1 end

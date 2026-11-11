@@ -36,13 +36,18 @@ local DEFAULTS = {
     gap = 0.2,             -- seconds between two alerts
 }
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     HazardsDB = HazardsDB or {}
     local db = HazardsDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.sounds) ~= "table" then db.sounds = {} end
     for _, k in ipairs(KINDS) do if db.sounds[k.key] == nil then db.sounds[k.key] = k.default end end
     if type(db.muted) ~= "table" then db.muted = {} end      -- [spell ID] = true
+    dbReady = db
     return db
 end
 HZ.DB = DB

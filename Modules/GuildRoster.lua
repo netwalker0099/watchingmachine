@@ -79,9 +79,13 @@ GR.KIND_ORDER = { "join", "rejoin", "left", "kick", "promote", "demote", "level"
     "rename", "rankname", "back", "ban", "alts", "dates", "info", "suggest", "anniversary" }
 local LOG_MAX = 3000
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     WMGuildRosterDB = WMGuildRosterDB or {}
     local db = WMGuildRosterDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.guilds) ~= "table" then db.guilds = {} end
     if type(db.toLog) ~= "table" then db.toLog = {} end
@@ -90,6 +94,7 @@ local function DB()
         if db.toLog[k] == nil then db.toLog[k] = true end
         if db.toChat[k] == nil then db.toChat[k] = (k ~= "level" and k ~= "info") end
     end
+    dbReady = db
     return db
 end
 GR.DB = DB

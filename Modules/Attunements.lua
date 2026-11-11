@@ -22,12 +22,17 @@ local DEFAULTS = {
     announce = true,       -- chat line when a step or attunement is done
 }
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     AttunementsDB = AttunementsDB or {}
     local db = AttunementsDB
+    if db == dbReady then return db end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.chars) ~= "table" then db.chars = {} end
     if type(db.guild) ~= "table" then db.guild = {} end
+    dbReady = db
     return db
 end
 

@@ -57,13 +57,18 @@ local DEFAULTS = {
     slotMenu = "hover",      -- character sheet slots show what else fits: hover / alt / off
 }
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     WMGearSetsDB = WMGearSetsDB or {}
     local db = WMGearSetsDB
+    if db == dbReady then return db end
     -- 3.47 and before: an Alt-only menu, on unless turned off
     if db.slotMenu == nil and db.quickMenu == false then db.slotMenu = "off" end
     for k, v in pairs(DEFAULTS) do if db[k] == nil then db[k] = v end end
     if type(db.chars) ~= "table" then db.chars = {} end
+    dbReady = db
     return db
 end
 GS.DB = DB

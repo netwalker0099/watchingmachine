@@ -46,9 +46,13 @@ IT.DEFAULTS = DEFAULTS
 -- SAVED DATA
 -- ============================================
 
+-- Defaults are applied once per saved table (a profile switch swaps the
+-- table, and they are applied again)
+local dbReady
 local function DB()
     if type(InstanceTrackerDB) ~= "table" then InstanceTrackerDB = {} end
     local db = InstanceTrackerDB
+    if db == dbReady then return db end
     if type(db.runs) ~= "table" then db.runs = {} end
     if type(db.nextId) ~= "number" then db.nextId = 1 end
     -- Every run has an id, for chat links (runs from before ids get one)
@@ -58,6 +62,7 @@ local function DB()
     for k, v in pairs(DEFAULTS) do
         if db[k] == nil then db[k] = v end
     end
+    dbReady = db
     return db
 end
 IT.DB = DB

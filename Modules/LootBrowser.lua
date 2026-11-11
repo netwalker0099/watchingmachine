@@ -28,8 +28,18 @@ local DEFAULTS = {
 }
 LB.DEFAULTS = DEFAULTS
 
+-- Defaults are applied once per saved table (a profile switch swaps it)
+local dbReady
 local function DB()
     LootBrowserDB = LootBrowserDB or {}
+    if LootBrowserDB == dbReady then
+        -- Deleting the last list leaves a fresh Favourites
+        if #dbReady.listOrder == 0 then
+            dbReady.listOrder[1] = "Favourites"
+            dbReady.lists.Favourites = dbReady.lists.Favourites or {}
+        end
+        return dbReady
+    end
     for k, v in pairs(DEFAULTS) do
         if LootBrowserDB[k] == nil then LootBrowserDB[k] = v end
     end
@@ -45,6 +55,7 @@ local function DB()
     end
     if type(LootBrowserDB.bis) ~= "table" then LootBrowserDB.bis = {} end
     if type(LootBrowserDB.chars) ~= "table" then LootBrowserDB.chars = {} end
+    dbReady = LootBrowserDB
     return LootBrowserDB
 end
 LB.DB = DB

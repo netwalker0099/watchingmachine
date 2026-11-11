@@ -663,7 +663,8 @@ end
 local eventFrame = CreateFrame("Frame")
 -- Don't register CHAT_MSG_CHANNEL here - wait for Initialize() to call EnableChatMonitoring()
 eventFrame:RegisterEvent("PLAYER_LOGOUT")
-eventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
+-- (Not PLAYER_LEAVING_WORLD: that fires at every loading screen, and
+-- monitoring then stayed off until the next login.)
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     -- Registered at load: does nothing (and leaves the saved data alone)
@@ -673,7 +674,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         -- Extra safety check
         if not KeywordMonitorDB then return end
         OnChatMessage(self, event, ...)
-    elseif event == "PLAYER_LOGOUT" or event == "PLAYER_LEAVING_WORLD" then
+    elseif event == "PLAYER_LOGOUT" then
         -- Stop monitoring immediately
         isMonitoringPaused = true
         
