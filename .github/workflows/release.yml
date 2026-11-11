@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # A fixed image: "ubuntu-latest" moves to a new Ubuntu from time to time
+    runs-on: ubuntu-24.04
     env:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
@@ -24,8 +25,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The package servers time out now and then (3.85's release stopped
+      # here): short timeouts, and up to four tries
       - name: Lua 5.1 for the tests
-        run: sudo apt-get update && sudo apt-get install -y lua5.1
+        run: |
+          opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          for try in 1 2 3 4; do
+            sudo apt-get $opts update || true
+            if sudo apt-get $opts install -y lua5.1; then break; fi
+            echo "apt try $try failed"
+            sleep 15
+          done
+          lua5.1 -v
 
       - name: Tests
         run: sh tests/run.sh

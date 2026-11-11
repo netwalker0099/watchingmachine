@@ -2,11 +2,15 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.85** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.86** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
 
-## 3.85
+## 3.86
+
+3.85 was built but never published (its release run failed while GitHub
+installed Lua for the tests; the release workflow now retries that step on
+a fixed Ubuntu image). This is that version.
 
 ### Fixes
 
