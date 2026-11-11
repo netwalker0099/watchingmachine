@@ -22,9 +22,11 @@ local function Who(e)
     if e.de and not e.to then return "|cff999999Disenchanted|r" end
     return "|c" .. ClassHex(e.class) .. LC.Short(e.to) .. "|r"
 end
+local nameMissing = false      -- an item's name wasn't loaded yet (rows aren't kept then)
 local function ItemText(e)
     if e.link then return e.link end
     local name = e.itemID and WM.ItemName and WM.ItemName(e.itemID)
+    if not name then nameMissing = true end
     return "|cffa335ee[" .. (name or ("Item " .. tostring(e.itemID))) .. "]|r"
 end
 LC.ItemText = ItemText
@@ -82,9 +84,16 @@ local function Matches(e, q)
 end
 
 -- Rows for the current tab: { cols = { ... }, entry?, player? }
+-- Kept until the history, the search, the tab or the player changes (the
+-- list asked for them again on every wheel tick, all 2,000 awards)
+local rowsKey, rowsKept
 function LC:Rows()
     local q = (self.search or ""):lower()
+    local key = table.concat({ tostring(self.tab), q, tostring(self.player), tostring(LC.version),
+        self.tab == "players" and tostring(math.floor((time and time() or 0) / 60)) or "" }, "|~|")
+    if rowsKept and rowsKey == key then return rowsKept end
     local out = {}
+    nameMissing = false
     if self.tab == "players" then
         for _, p in ipairs(LC.Players()) do
             if q == "" or LC.Short(p.key):lower():find(q, 1, true) then
@@ -100,6 +109,8 @@ function LC:Rows()
             out[#out + 1] = { entry = e, cols = { date("%d %b %y", e.t or 0), ItemText(e), Who(e), LC.HowText(e), e.boss or "" } }
         end
     end
+    -- Kept unless a name is still loading (it shows as "Item 123" until then)
+    rowsKey, rowsKept = key, (not nameMissing) and out or nil
     return out
 end
 

@@ -174,6 +174,7 @@ check("buff NPC killed", Last():find("Overlord Runthak has just been killed", 1,
 
 -- ---- Songflowers ----
 mapID = 1448
+WT:OnEvent("ZONE_CHANGED_NEW_AREA")    -- the zone is read on zone changes
 px, py = 0.401, 0.444                    -- Shatter Scar Vale
 buffs = { { name = "Songflower Serenade", id = 15366, expires = clock + 3600 } }
 CLEU("SPELL_AURA_APPLIED", "Player-1-0001", "Player-1-0001", "Tanky", 15366)
@@ -187,6 +188,7 @@ CLEU("SPELL_AURA_APPLIED", "Player-1-0002", "Player-1-0002", "Picker", 15366)
 check("someone seen before picking: a pick", data().layers[11872].flowers[1] == now)
 buffs = {}
 mapID = 1955
+WT:OnEvent("ZONE_CHANGED_NEW_AREA")
 
 -- ---- Nova World Buffs data ----
 now = 1792004000

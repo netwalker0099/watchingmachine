@@ -109,6 +109,12 @@ end
 
 function GuildInvite:IsInGuild(playerName)
     if not playerName then return false end
+    -- The roster changed since the names were last read: read them now
+    -- (not on every roster update, which comes every few seconds)
+    if self.rosterStale then
+        self.rosterStale = false
+        self:UpdateGuildRoster()
+    end
     local checkName = playerName:lower()
     local shortName = strsplit("-", checkName)
     return guildRoster[checkName] or guildRoster[shortName]
@@ -323,7 +329,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         
     elseif event == "GUILD_ROSTER_UPDATE" then
-        GuildInvite:UpdateGuildRoster()
+        GuildInvite.rosterStale = true
         
     elseif event == "GROUP_ROSTER_UPDATE" then
         -- No auto-convert here; only convert when a 6th invite triggers it in InviteToRaid

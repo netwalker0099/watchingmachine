@@ -714,6 +714,7 @@ end
 -- SONGFLOWERS
 -- ============================================
 
+local inFelwood            -- are we in Felwood? nil until first asked; set on zone changes
 local seenInFelwood = {}   -- GUID -> GetTime() first seen (so login buffs aren't picks)
 
 local function PlayerXY()
@@ -762,7 +763,9 @@ function WT:OnCombatEvent(_, sub, _, srcGUID, _, _, _, dstGUID, dstName, _, _, s
         self:OnUnitDied(dstName)
         return
     end
-    if MapID() == FELWOOD then
+    -- (the zone is read on zone changes, not on every combat log event)
+    if inFelwood == nil then inFelwood = MapID() == FELWOOD end
+    if inFelwood then
         if dstGUID and not seenInFelwood[dstGUID] and dstGUID:find("^Player") then seenInFelwood[dstGUID] = GetTime() end
         if srcGUID and not seenInFelwood[srcGUID] and srcGUID:find("^Player") then seenInFelwood[srcGUID] = GetTime() end
     end
@@ -1527,8 +1530,10 @@ function WT:OnEvent(event, ...)
     elseif event == "GROUP_JOINED" then
         self:OnGroupJoined()
     elseif event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
-        if MapID() == TEROKKAR then self.terokTargetSeen = false end
-        if MapID() ~= FELWOOD then wipe(seenInFelwood) end
+        local map = MapID()
+        inFelwood = map == FELWOOD
+        if map == TEROKKAR then self.terokTargetSeen = false end
+        if not inFelwood then wipe(seenInFelwood) end
     elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_STOPPED_MOVING" then
         self:NoteMoving(event == "PLAYER_STARTED_MOVING")
     elseif event == "TRADE_SHOW" then

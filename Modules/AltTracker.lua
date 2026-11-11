@@ -619,7 +619,9 @@ end
 
 function Alts:RefreshList()
     if not panel or not panel.listChild then return end
-    self:Update()
+    -- Bags, gear and professions are read again, unless that has just been
+    -- done (an event) or only the search text changed
+    if not self.justUpdated and not self.searching then self:Update() end
     local child, rows = panel.listChild, panel.rows
     local width = math.max(520, (panel:GetWidth() or 680) - 50)
     child:SetWidth(width)
@@ -954,7 +956,9 @@ function Alts:CreateUI()
         if not userInput then return end
         local t = strtrim(self:GetText() or "")
         Alts.searchText = #t >= 2 and t or nil
+        Alts.searching = true
         Alts:RefreshList()
+        Alts.searching = nil
     end)
     e:SetScript("OnEscapePressed", function(self) self:SetText(""); Alts.searchText = nil; Alts:RefreshList(); self:ClearFocus() end)
     panel.searchBox = box
@@ -1011,11 +1015,16 @@ local function Recording() return WM:ShouldRun("AltTracker") end
 local function Soon()
     if pending then return end
     pending = true
-    WM.RunAfter(1, function()
+    -- In combat XP, durability and bags change all the time: every 5
+    -- seconds is enough for a record of this character
+    local fighting = InCombatLockdown and InCombatLockdown() == true
+    WM.RunAfter(fighting and 5 or 1, function()
         pending = false
         if not Recording() then return end
         Alts:Update()
+        Alts.justUpdated = true        -- the window needn't read it all again
         Alts:RefreshUI()
+        Alts.justUpdated = nil
     end)
 end
 

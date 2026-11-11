@@ -202,7 +202,7 @@ end
 -- them.
 
 local STONE_COOLDOWN = 1800
-local STONE_TICK = 0.5
+local STONE_TICK = 1      -- seconds between reads of the raid's soulstones (40 units' buffs each time)
 
 local function Now() return (GetServerTime and GetServerTime()) or time() end
 

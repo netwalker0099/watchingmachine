@@ -724,7 +724,9 @@ local queued = false
 local function Soon()
     if queued then return end
     queued = true
-    WM.RunAfter(2, function()
+    -- Every attunement is checked again: less often in combat
+    local fighting = InCombatLockdown and InCombatLockdown() == true
+    WM.RunAfter(fighting and 10 or 2, function()
         queued = false
         if On() then AT:Update() end
     end)

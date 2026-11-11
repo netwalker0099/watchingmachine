@@ -140,11 +140,36 @@ end
 
 local listeners = {}
 function LC.OnChange(fn) listeners[#listeners + 1] = fn end
-local function Changed()
+-- LC.version goes up with every change (windows keep their rows until it
+-- does). During an import (LC.Quietly) listeners hear of it once, at the end.
+LC.version = 0
+local sameIndex, sameIndexFor       -- awards by item and winner, for FindSame
+local quiet, quietChanged = 0, false
+local function Notify()
     byPlayer = nil
+    LC.version = LC.version + 1
+    if quiet > 0 then quietChanged = true return end
     for _, fn in ipairs(listeners) do pcall(fn) end
 end
+-- An award was edited or removed (the index is built again when next needed)
+local function Changed()
+    sameIndex = nil
+    Notify()
+end
 LC.Changed = Changed
+
+-- Run fn (many LC.Add calls); listeners are told once afterwards
+function LC.Quietly(fn, ...)
+    quiet = quiet + 1
+    local ok, a, b = pcall(fn, ...)
+    quiet = quiet - 1
+    if quiet == 0 and quietChanged then
+        quietChanged = false
+        for _, l in ipairs(listeners) do pcall(l) end
+    end
+    if not ok then geterrorhandler()(a) return nil end
+    return a, b
+end
 
 -- Every entry, newest first (filter(e) -> true to keep)
 function LC.All(filter)
@@ -235,9 +260,27 @@ end
 
 local MERGE = 3 * 3600
 
+-- The same award already saved (same item and winner within 3 hours, from
+-- another source). Looked up in an index by item and winner: scanning the
+-- whole history for every award made a first import millions of steps.
+local function SameKey(e) return tostring(e.itemID) .. "|" .. tostring(e.to) end
+local function SameBucket(e)
+    local history = DB().history
+    if not sameIndex or sameIndexFor ~= history then
+        sameIndex, sameIndexFor = {}, history
+        for _, o in pairs(history) do
+            local k = SameKey(o)
+            local b = sameIndex[k]
+            if not b then b = {}; sameIndex[k] = b end
+            b[#b + 1] = o
+        end
+    end
+    return sameIndex[SameKey(e)]
+end
+
 local function FindSame(e)
     local best, bestGap
-    for _, o in pairs(DB().history) do
+    for _, o in ipairs(SameBucket(e) or {}) do
         if not o.deleted and o.itemID == e.itemID and o.to == e.to and not (o.src and e.src and o.src[e.srcKind]) then
             local gap = math.abs((o.t or 0) - (e.t or 0))
             if gap <= MERGE and (not bestGap or gap < bestGap) then best, bestGap = o, gap end
@@ -302,10 +345,17 @@ function LC.Add(e)
         e.mod = e.mod or e.t
         db.history[id] = e
         entry = e
+        -- Into the index (FindSame has just built it for this history)
+        if sameIndex and sameIndexFor == db.history then
+            local k = SameKey(e)
+            local b = sameIndex[k]
+            if not b then b = {}; sameIndex[k] = b end
+            b[#b + 1] = e
+        end
     end
     if srcId then db.sources[srcId] = id end
     LC.GlobalId(entry)
-    Changed()
+    Notify()
     if share then Share(entry) end
     return id, not same
 end
@@ -626,7 +676,7 @@ end
 -- Both, quietly; returns how many new awards
 function LC:ImportAll()
     if not On() then return 0 end
-    local n = self:ImportRCLC() + self:ImportGargul()
+    local n = LC.Quietly(function() return self:ImportRCLC() + self:ImportGargul() end) or 0
     DB().lastImport = Now()
     return n
 end

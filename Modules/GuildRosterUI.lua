@@ -689,10 +689,14 @@ local function MakeRow(list, i)
     return row
 end
 
-function GR:RefreshList()
+-- scrolling: only the wheel moved, so the lines built for the last refresh
+-- are shown from another offset (building them sorts the whole roster, or
+-- formats the whole log)
+function GR:RefreshList(scrolling)
     if not panel or not panel:IsShown() then return end
     local list = panel.list
-    local lines = self:TabLines()
+    local lines = (scrolling and list.lines) or self:TabLines()
+    list.lines = lines
     local h = list:GetHeight() or 0
     local visible = math.max(1, math.floor(h / ROW_H))
     local maxOffset = math.max(0, #lines - visible)
@@ -843,7 +847,7 @@ function GR:CreateUI()
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(self, delta)
         self.offset = (self.offset or 0) - delta * 3
-        GR:RefreshList()
+        GR:RefreshList(true)
     end)
     list.rows = {}
     panel.list = list
