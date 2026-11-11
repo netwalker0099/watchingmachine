@@ -306,22 +306,26 @@ local p1 = #W.printed
 Zone("Stratholme", 329)
 check("entered line can be turned off", #W.printed == p1)
 Zone(nil)
--- Older clients: SetItemRef hook and the item tooltip guard
+-- Older clients: SetItemRef is hooked, and our links are a type the game's
+-- item tooltip takes quietly (no game function is replaced)
 env.LinkUtil = false   -- (nil would read as a stub frame)
 local hooked
 env.hooksecurefunc = function(name, fn) if name == "SetItemRef" then hooked = fn end end
 env.SetItemRef = function() end
-local shownLink
-env.ItemRefTooltip = { SetHyperlink = function(_, link) shownLink = link end }
+local tipFn = function() end
+env.ItemRefTooltip = { SetHyperlink = tipFn }
 WM.chatLinksReady = nil
 WM:SetupChatLinks()
+check("the item tooltip's SetHyperlink is left alone", env.ItemRefTooltip.SetHyperlink == tipFn)
+local oldLink = WM:ChatLink("itlog", "", "x")
+check("older client: links are written as a quiet type", oldLink:find("|Hgarrmission:wmlink:itlog:|h", 1, true) ~= nil)
 f:Hide()
-hooked("wmlink:itlog:", "x", "LeftButton")
+hooked("garrmission:wmlink:itlog:", "x", "LeftButton")
 check("older client: SetItemRef hook opens the log", f:IsShown())
-env.ItemRefTooltip:SetHyperlink("wmlink:itlog:")
-check("item tooltip ignores our links", shownLink == nil)
-env.ItemRefTooltip:SetHyperlink("item:1234")
-check("but still shows real ones", shownLink == "item:1234")
+f:Hide()
+hooked("garrmission:1234:abc", "x", "LeftButton")
+check("someone else's link of that type isn't ours", not f:IsShown() and WM:HandleChatLink("garrmission:1234") == false)
+WM.chatLinkPrefix = nil
 
 print(pass .. " passed, " .. fail .. " failed")
 if fail > 0 then os.exit(1) end

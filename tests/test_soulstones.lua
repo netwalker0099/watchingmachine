@@ -105,5 +105,15 @@ check("module off: hidden, and nothing to show", not f:IsShown() and #Rows() == 
 WM:SetModuleOn("ClassWarlock", true)
 check("module on: back", f:IsShown())
 
+-- "Track soulstone timers": off remembers nothing; old casts are forgotten
+env.WarlockToolsDB.stones = { Gone = { at = server - 2 * 3600, target = "Tank" } }
+CT:SetEnabled("WARLOCK", "soulstones", false)
+Lock:OnCombatLog("SPELL_AURA_APPLIED", "Thirdlock", "Tank", "Soulstone Resurrection")
+check("timers off: a cast isn't remembered", env.WarlockToolsDB.stones.Thirdlock == nil)
+CT:SetEnabled("WARLOCK", "soulstones", true)
+Lock:OnCombatLog("SPELL_AURA_APPLIED", "Thirdlock", "Tank", "Soulstone Resurrection")
+check("timers on: remembered", env.WarlockToolsDB.stones.Thirdlock ~= nil)
+check("a cast long past its cooldown is forgotten", env.WarlockToolsDB.stones.Gone == nil)
+
 print(("%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

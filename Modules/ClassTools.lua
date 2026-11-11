@@ -502,16 +502,21 @@ function ClassTools.Clock(left)
 end
 
 -- The player's group: "player" then party or raid units (not the player twice)
+-- (unit names made once: this is asked several times a second)
+local RAID_UNIT, PARTY_UNIT = {}, {}
+for i = 1, 40 do RAID_UNIT[i] = "raid" .. i end
+for i = 1, 4 do PARTY_UNIT[i] = "party" .. i end
+ClassTools.RAID_UNIT, ClassTools.PARTY_UNIT = RAID_UNIT, PARTY_UNIT
 function ClassTools.GroupUnits()
     local units = { "player" }
     if IsInRaid() then
         for i = 1, GetNumGroupMembers() do
-            local u = "raid" .. i
+            local u = RAID_UNIT[i] or ("raid" .. i)
             if not UnitIsUnit(u, "player") then units[#units + 1] = u end
         end
     elseif IsInGroup() then
         for i = 1, 4 do
-            if UnitExists("party" .. i) then units[#units + 1] = "party" .. i end
+            if UnitExists(PARTY_UNIT[i]) then units[#units + 1] = PARTY_UNIT[i] end
         end
     end
     return units

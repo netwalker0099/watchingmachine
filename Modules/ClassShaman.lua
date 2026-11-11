@@ -524,14 +524,13 @@ local function SpellName(id, fallback)
     return spellNames[id]
 end
 
+local function KnowsBy(fn, id)
+    if type(fn) ~= "function" then return false end
+    local ok, v = pcall(fn, id)
+    return ok and v == true
+end
 local function Knows(id)
-    for _, fn in ipairs({ IsPlayerSpell, IsSpellKnown }) do
-        if type(fn) == "function" then
-            local ok, v = pcall(fn, id)
-            if ok and v == true then return true end
-        end
-    end
-    return false
+    return KnowsBy(IsPlayerSpell, id) or KnowsBy(IsSpellKnown, id)
 end
 
 -- A buff on a unit by name, optionally only one you cast:
@@ -548,9 +547,10 @@ local function FindBuff(unit, name, mine, now)
 end
 
 -- Your own Water or Lightning Shield: name, charges, seconds left, icon
+local OWN_SHIELDS = { { WATER_SHIELD, "Water Shield", ICON_WATER }, { LIGHTNING_SHIELD, "Lightning Shield", ICON_LIGHTNING } }
 function Shaman:OwnShield(now)
     now = now or GetTime()
-    for _, s in ipairs({ { WATER_SHIELD, "Water Shield", ICON_WATER }, { LIGHTNING_SHIELD, "Lightning Shield", ICON_LIGHTNING } }) do
+    for _, s in ipairs(OWN_SHIELDS) do
         local name = SpellName(s[1], s[2])
         local count, left, icon = FindBuff("player", name, false, now)
         if count then return name, count, left, icon or s[3] end
@@ -577,9 +577,10 @@ end
 
 function Shaman:EarthShieldTarget() return esTarget end
 
+local SEEN_TOO = { "target", "focus", "mouseover" }
 local function SeeUnits()
     local units = Tools() and Tools().GroupUnits() or { "player" }
-    for _, u in ipairs({ "target", "focus", "mouseover" }) do units[#units + 1] = u end
+    for _, u in ipairs(SEEN_TOO) do units[#units + 1] = u end
     return units
 end
 
@@ -588,8 +589,23 @@ end
 local function EarthShieldUnit(now)
     local esName = SpellName(EARTH_SHIELD, "Earth Shield")
     if esTarget then
-        for _, u in ipairs(SeeUnits()) do
-            if UnitExists(u) and UnitGUID(u) == esTarget.guid then return u end
+        -- Four times a second: straight through the unit names, no list made
+        local guid = esTarget.guid
+        if UnitGUID("player") == guid then return "player" end
+        local tools = Tools()
+        if tools and IsInRaid() then
+            for i = 1, GetNumGroupMembers() do
+                local u = tools.RAID_UNIT[i]
+                if u and UnitExists(u) and UnitGUID(u) == guid then return u end
+            end
+        elseif tools and IsInGroup() then
+            for i = 1, 4 do
+                local u = tools.PARTY_UNIT[i]
+                if UnitExists(u) and UnitGUID(u) == guid then return u end
+            end
+        end
+        for _, u in ipairs(SEEN_TOO) do
+            if UnitExists(u) and UnitGUID(u) == guid then return u end
         end
         return nil
     end
@@ -601,13 +617,6 @@ local function EarthShieldUnit(now)
             return u
         end
     end
-end
-
-local function ClassColor(unit)
-    local _, class = UnitClass(unit)
-    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-    if c then return c.r, c.g, c.b end
-    return 1, 1, 1
 end
 
 -- The rows the Shields frame shows now (your own shield)

@@ -393,11 +393,6 @@ function MailLogger:ResetInboxSnapshot()
     pendingEmpty = false
 end
 
--- Back-compat: older code/tests called this
-function MailLogger:ResetTakeGuard()
-    self:ResetInboxSnapshot()
-end
-
 -- Write one log line for a unit that left the inbox
 function MailLogger:LogReceivedUnit(m)
     if not m or not MailLoggerDB then return end
@@ -978,10 +973,16 @@ local tradeSuccessful = false
 -- Poll the inbox while the mailbox is open. An open-all fires MAIL_INBOX_UPDATE
 -- far too often to diff on, and may finish a burst between any two events, so a
 -- steady re-read is both cheaper and more reliable.
+-- While the inbox is changing (and for 3 seconds after its last change)
+-- that is every DIFF_INTERVAL; with nothing happening, every 2 seconds, so
+-- an open mailbox you're only reading isn't re-read 2.5 times a second.
+local IDLE_INTERVAL, BUSY_FOR = 2, 3
+local busyUntil = 0
 eventFrame:SetScript("OnUpdate", function(self, elapsed)
     if not isMailboxOpen or not WM:IsModuleOn("MailLogger") then return end
     diffAccum = diffAccum + elapsed
-    if diffAccum < DIFF_INTERVAL then return end
+    local busy = (GetTime and tonumber(GetTime()) or 0) < busyUntil
+    if diffAccum < (busy and DIFF_INTERVAL or IDLE_INTERVAL) then return end
     diffAccum = 0
     pcall(MailLogger.DiffInbox, MailLogger)
 end)
@@ -991,9 +992,11 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if not WM:IsModuleOn("MailLogger") then return end
     if event == "MAIL_SHOW" then
         isMailboxOpen = true
+        busyUntil = (GetTime and tonumber(GetTime()) or 0) + BUSY_FOR
         MailLogger:ResetInboxSnapshot()
 
     elseif event == "MAIL_INBOX_UPDATE" then
+        busyUntil = (GetTime and tonumber(GetTime()) or 0) + BUSY_FOR
         -- Nothing to do here: the periodic diff below picks the change up.
         -- Acting on this event directly is what broke before, because it
         -- fires continuously throughout an open-all.

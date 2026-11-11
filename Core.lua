@@ -5,7 +5,7 @@
 local AddonName, WM = ...
 _G.WatchingMachine = WM
 
-WM.version = "3.87"
+WM.version = "3.88"
 WM.modules = {}
 
 -- The heading for our keys in the game's Key Bindings (Bindings.xml)
@@ -418,9 +418,14 @@ end
 -- mouse button. The link is "|Hwmlink:<kind>:<arg>|h<text>|h".
 --
 -- On the 2.5.6 client, LinkUtil.RegisterLinkHandler claims the "wmlink"
--- type, so SetItemRef stops there and the item tooltip never sees it. On
--- older clients, SetItemRef is hooked and the item tooltip is told to
--- ignore our links.
+-- type, so SetItemRef stops there and the item tooltip never sees it.
+-- On clients without it, SetItemRef is hooked (after the fact, with
+-- hooksecurefunc) and our links are written as "garrmission:wmlink:...": a
+-- link type the game's item tooltip accepts without an error, as other
+-- addons' chat links do. (We used to replace ItemRefTooltip.SetHyperlink
+-- to swallow "wmlink:"; replacing a game function is what CLAUDE.md
+-- forbids.)
+local QUIET_PREFIX = "garrmission:"
 
 local chatLinkHandlers = {}
 
@@ -429,12 +434,14 @@ function WM:RegisterChatLink(kind, handler)
 end
 
 function WM:ChatLink(kind, arg, text)
-    return "|Hwmlink:" .. kind .. ":" .. tostring(arg or "") .. "|h" .. text .. "|h"
+    self:SetupChatLinks()      -- (which kind of link this client needs)
+    return "|H" .. (self.chatLinkPrefix or "") .. "wmlink:" .. kind .. ":" .. tostring(arg or "") .. "|h" .. text .. "|h"
 end
 
 -- Returns true if the link was ours
 function WM:HandleChatLink(link, button)
     if type(link) ~= "string" then return false end
+    if link:sub(1, #QUIET_PREFIX) == QUIET_PREFIX then link = link:sub(#QUIET_PREFIX + 1) end
     local kind, arg = link:match("^wmlink:([^:]+):?(.*)$")
     if not kind then return false end
     local handler = chatLinkHandlers[kind]
@@ -455,15 +462,9 @@ function WM:SetupChatLinks()
         end)
         return
     end
+    self.chatLinkPrefix = QUIET_PREFIX
     if hooksecurefunc and SetItemRef then
         hooksecurefunc("SetItemRef", function(link, _, button) WM:HandleChatLink(link, button) end)
-    end
-    if ItemRefTooltip and ItemRefTooltip.SetHyperlink then
-        local original = ItemRefTooltip.SetHyperlink
-        ItemRefTooltip.SetHyperlink = function(tip, link, ...)
-            if type(link) == "string" and link:find("^wmlink:") then return end
-            return original(tip, link, ...)
-        end
     end
 end
 
@@ -798,18 +799,6 @@ function WM:CheckGuildSecurity()
     return true
 end
 
-function WM:IsAuthorized()
-    return isAuthorized
-end
-
-function WM:IsOfficer()
-    return isOfficer
-end
-
-function WM:IsSecurityCheckComplete()
-    return securityCheckComplete
-end
-
 function WM:OnSecurityCheckFailed()
     -- Hide dashboard if open (but keep minimap button visible for user preference).
     -- WM.dashboard, not the file-local: that local is declared further down.
@@ -923,7 +912,6 @@ end
 -- ============================================
 
 local minimapButton = nil
-local minimapButtonDB = {} -- Local reference to settings
 
 -- Position update function (defined early so it's available everywhere)
 local function UpdateMinimapPosition()
@@ -1593,7 +1581,6 @@ local function ModuleOn(name)
     if module and module.IsModuleEnabled then return module:IsModuleEnabled() and true or false end
     return true
 end
-WM.ModuleOn = ModuleOn
 
 local function VisibleTools(info)
     local out = {}
@@ -2855,8 +2842,6 @@ local function PerformSecurityCheck()
     return true
 end
 
-local retryCount = 0
-local maxRetries = 5
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == AddonName then

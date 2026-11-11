@@ -124,19 +124,6 @@ end
 -- INVITE FUNCTIONALITY
 -- ============================================
 
--- Check if we have permission to invite (leader, assist, or solo/party leader)
-local function CanInvite()
-    if IsInRaid() then
-        -- In raid: need leader or assist
-        return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
-    elseif IsInGroup() then
-        -- In party: need leader
-        return UnitIsGroupLeader("player")
-    end
-    -- Solo: can always invite (creates a new group)
-    return true
-end
-
 -- Check if the player has permission to invite
 -- Solo: can always invite (forms a new party)
 -- Party: must be leader

@@ -2,7 +2,7 @@
 
 **Comprehensive Monitoring Suite for WoW TBC Classic Anniversary**
 
-Version 3.87 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
+Version 3.88 | Author: Robert | Interface 20506 (TBC Anniversary patch 2.5.6)
 
 ## Overview
 
@@ -1592,6 +1592,12 @@ Copy-paste release announcements for Discord and CurseForge are in
 [`docs/RELEASE-NOTES-v3.11-v3.11.2.md`](docs/RELEASE-NOTES-v3.11-v3.11.2.md),
 and 2.9 to 3.11 in
 [`docs/RELEASE-NOTES-v2.9-v3.11.md`](docs/RELEASE-NOTES-v2.9-v3.11.md).
+
+### Version 3.88
+- **Class Tools (Warlock)**: *Track soulstone timers* now does what it says: off, no soulstone casts are remembered (it did nothing before). Casts long past their cooldown are forgotten instead of staying saved
+- **PvP Tracker**: the enemy list reuses its rows (it made new ones on every refresh and left the old behind) and its "no enemies" text no longer stays over the list
+- Lighter: the Shaman shield tracker, PvP Tracker's hit tracking and Mail Logger's inbox check while the mailbox sits open
+- About 20 unused functions removed; Watching Machine no longer replaces a game function for its chat links on older clients
 
 ### Version 3.87
 - Every dropdown (Sort, Show, theme and the rest of the settings) and the dashboard's **...** menu now open straight under what you clicked. They used the game's dropdown list, which opened on another part of the screen with ElvUI and other UI packs; they are now Watching Machine's own menu, like the Damage Meter's. Long lists scroll with the mouse wheel

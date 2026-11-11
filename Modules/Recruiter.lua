@@ -114,18 +114,6 @@ function Recruiter:IsOnCooldown(playerName)
     return (time() - lastWhispered) < cooldownSeconds
 end
 
-function Recruiter:FormatTime(seconds)
-    local days = math.floor(seconds / 86400)
-    local hours = math.floor((seconds % 86400) / 3600)
-    if days > 0 then
-        return string.format("%dd %dh", days, hours)
-    elseif hours > 0 then
-        return string.format("%dh", hours)
-    else
-        return "< 1h"
-    end
-end
-
 -- Chat filter to hide our own outgoing recruitment whispers from chat frame
 function Recruiter:ChatFilter(self, event, msg, player, ...)
     if not On() or not RecruitingToolDB or not RecruitingToolDB.hideWhispers then return false end

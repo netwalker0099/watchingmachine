@@ -952,11 +952,6 @@ function DebuffTracker:ProcessCombatLog()
     self:AnnouncePull(sourceName, trackedBossGUIDs[destGUID])
 end
 
--- Back-compat alias (older call sites / user macros)
-function DebuffTracker:ProcessPullDetection()
-    return self:ProcessCombatLog()
-end
-
 function DebuffTracker:AnnouncePull(pullerName, bossName)
     if not pullerName then return end
     

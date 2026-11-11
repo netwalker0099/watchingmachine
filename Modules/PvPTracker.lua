@@ -45,6 +45,13 @@ local mainFrame = nil
 local eventFrame = nil
 local lastDamageSource = {}     -- Track who last hit us for kill attribution
 local lastDamageDealt = {}      -- Track who we last hit for revenge detection: lastDamageDealt["Name"] = { guid, time }
+-- Enemies hit and not killed stayed here all session: dropped a minute on
+local function PruneDamageDealt()
+    local now = GetTime()
+    for name, d in pairs(lastDamageDealt) do
+        if now - (d.time or 0) > 60 then lastDamageDealt[name] = nil end
+    end
+end
 local alertTimestamps = {}      -- alertTimestamps["Name"] = time of last alert
 local detectedEnemies = {}      -- Currently detected nearby enemies
 local scanTimer = 0
@@ -277,20 +284,6 @@ function PvPTracker:GetTotalKills(enemyName)
         end
     end
     return total
-end
-
--- Get a summary of guild reporters for an enemy
-function PvPTracker:GetGuildReporters(enemyName)
-    local enemy = PvPTrackerDB.enemies[enemyName]
-    if not enemy or not enemy.guildKills then return "" end
-    
-    local parts = {}
-    for reporter, rdata in pairs(enemy.guildKills) do
-        table.insert(parts, reporter .. "(" .. (rdata.kills or 0) .. ")")
-    end
-    if #parts == 0 then return "" end
-    table.sort(parts)
-    return table.concat(parts, ", ")
 end
 
 -- Merge a received enemy record from a guild member
@@ -801,6 +794,9 @@ function PvPTracker:ScanNameplates()
     
     -- Clear old detections
     detectedEnemies = {}
+    PruneDamageDealt()
+    -- Nobody on the list: no nameplates to look through
+    if next(PvPTrackerDB.enemies) == nil then return end
     
     local myFaction = UnitFactionGroup and UnitFactionGroup("player")
     
@@ -1133,11 +1129,7 @@ function PvPTracker:ProcessCombatLog()
             if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
                subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
                subevent == "SPELL_INSTAKILL" then
-                lastDamageSource = {
-                    name = sourceName,
-                    guid = sourceGUID,
-                    time = GetTime(),
-                }
+                lastDamageSource.name, lastDamageSource.guid, lastDamageSource.time = sourceName, sourceGUID, GetTime()
             end
         end
     end
@@ -1146,7 +1138,7 @@ function PvPTracker:ProcessCombatLog()
     if subevent == "UNIT_DIED" and destGUID == playerGUID then
         if lastDamageSource.name and lastDamageSource.time and (GetTime() - lastDamageSource.time) < 5 then
             self:RecordKill(lastDamageSource.name, lastDamageSource.guid)
-            lastDamageSource = {}
+            lastDamageSource.name, lastDamageSource.guid, lastDamageSource.time = nil, nil, nil
         end
     end
     
@@ -1163,10 +1155,11 @@ function PvPTracker:ProcessCombatLog()
             if subevent == "SWING_DAMAGE" or subevent == "RANGE_DAMAGE" or
                subevent == "SPELL_DAMAGE" or subevent == "SPELL_PERIODIC_DAMAGE" or
                subevent == "SPELL_INSTAKILL" then
-                lastDamageDealt[destName] = {
-                    guid = destGUID,
-                    time = GetTime(),
-                }
+                -- (one table per enemy, used again for each hit; those not
+                -- hit for a minute are dropped, see PruneDamageDealt)
+                local d = lastDamageDealt[destName]
+                if not d then d = {}; lastDamageDealt[destName] = d end
+                d.guid, d.time = destGUID, GetTime()
             end
         end
     end
@@ -1515,21 +1508,22 @@ function PvPTracker:RefreshList()
     
     local scrollChild = mainFrame.scrollChild
     
-    -- Clear existing rows
-    for _, row in ipairs(mainFrame.rows) do
-        row:Hide()
-        row:SetParent(nil)
-    end
+    -- Rows are made once and filled again on each refresh (every refresh
+    -- used to make new frames and leave the old ones behind)
+    mainFrame.pool = mainFrame.pool or {}
+    for _, row in ipairs(mainFrame.pool) do row:Hide() end
+    if mainFrame.emptyText then mainFrame.emptyText:Hide() end
     mainFrame.rows = {}
-    
+
     -- Sort enemies: by kill count descending, then by last kill time
     local sorted = {}
     for name, data in pairs(PvPTrackerDB.enemies) do
         table.insert(sorted, { name = name, data = data })
     end
+    -- (each enemy's total worked out once, not on every comparison)
+    for _, entry in ipairs(sorted) do entry.total = PvPTracker:GetTotalKills(entry.name) end
     table.sort(sorted, function(a, b)
-        local aTotal = PvPTracker:GetTotalKills(a.name)
-        local bTotal = PvPTracker:GetTotalKills(b.name)
+        local aTotal, bTotal = a.total, b.total
         if aTotal ~= bTotal then
             return aTotal > bTotal
         end
@@ -1573,126 +1567,128 @@ function PvPTracker:RefreshList()
     for i, entry in ipairs(sorted) do
         local name = entry.name
         local data = entry.data
-        
-        local row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
-        row:SetSize(scrollChild:GetWidth(), rowHeight)
-        row:SetPoint("TOPLEFT", 0, -scrollY)
-        
-        -- Alternating row background
-        if i % 2 == 0 then
-            row:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-            row:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
+
+        local row = mainFrame.pool[i]
+        if not row then
+            row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
+            row.shade = row:CreateTexture(nil, "BACKGROUND")
+            row.shade:SetAllPoints(row)
+            row.shade:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+            row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.nameText:SetPoint("LEFT", 5, 0)
+            row.nameText:SetWidth(148)
+            row.nameText:SetJustifyH("LEFT")
+            row.killText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.killText:SetPoint("LEFT", 158, 0)
+            row.killText:SetWidth(38)
+            row.zoneText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.zoneText:SetPoint("LEFT", 198, 0)
+            row.zoneText:SetWidth(148)
+            row.zoneText:SetJustifyH("LEFT")
+            row.timeText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.timeText:SetPoint("LEFT", 348, 0)
+            row.timeText:SetWidth(60)
+            row.timeText:SetJustifyH("LEFT")
+
+            -- Remove button (X); it reads its row's enemy when used
+            local removeBtn = CreateFrame("Button", nil, row)
+            removeBtn:SetSize(14, 14)
+            removeBtn:SetPoint("RIGHT", -2, 0)
+            local removeText = removeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            removeText:SetAllPoints()
+            removeText:SetText("|cFFFF4444x|r")
+            local removeHighlight = removeBtn:CreateTexture(nil, "HIGHLIGHT")
+            removeHighlight:SetAllPoints()
+            removeHighlight:SetColorTexture(1, 0, 0, 0.15)
+            removeBtn:SetScript("OnClick", function()
+                PvPTracker:RemoveEnemy(row.enemyName)
+                PvPTracker:RefreshList()
+            end)
+            removeBtn:SetScript("OnEnter", function(self)
+                local name, data = row.enemyName, row.enemyData
+                if not name or not data then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("Remove " .. name, 1, 0.3, 0.3)
+                if data.notes and data.notes ~= "" then
+                    GameTooltip:AddLine("Notes: " .. data.notes, 0.8, 0.8, 0.8, true)
+                end
+                if data.guild and data.guild ~= "" then
+                    GameTooltip:AddLine("Guild: <" .. data.guild .. ">", 0.6, 0.6, 0.6)
+                end
+                if (data.kills or 0) > 0 then
+                    GameTooltip:AddLine("Your kills: " .. data.kills, 0.9, 0.3, 0.3)
+                    GameTooltip:AddLine("First killed you: " .. FormatDate(data.firstKill), 0.6, 0.6, 0.6)
+                    GameTooltip:AddLine("Last killed you: " .. FormatDate(data.lastKill), 0.6, 0.6, 0.6)
+                end
+                -- Guild sync kill data
+                if data.guildKills and next(data.guildKills) then
+                    GameTooltip:AddLine(" ")
+                    GameTooltip:AddLine("Guild reports:", 1, 0.8, 0)
+                    for reporter, rdata in pairs(data.guildKills) do
+                        local rKills = rdata.kills or 0
+                        local rZone = rdata.lastZone or ""
+                        if rZone ~= "" then
+                            GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x (last: " .. rZone .. ")", 0.7, 0.7, 0.5)
+                        else
+                            GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x", 0.7, 0.7, 0.5)
+                        end
+                    end
+                    GameTooltip:AddLine("Total: " .. PvPTracker:GetTotalKills(name), 1, 0.4, 0.4)
+                end
+                GameTooltip:Show()
+            end)
+            removeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            row.removeBtn = removeBtn
+            mainFrame.pool[i] = row
         end
-        
+        row.enemyName, row.enemyData = name, data
+        row:SetSize(scrollChild:GetWidth(), rowHeight)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, -scrollY)
+        row.shade:SetShown(i % 2 == 0)       -- alternating row background
+
         -- Name (class colored)
         local colorCode = CLASS_COLORS[data.class] or "AAAAAA"
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        nameText:SetPoint("LEFT", 5, 0)
-        nameText:SetWidth(148)
-        nameText:SetJustifyH("LEFT")
-        nameText:SetText("|cFF" .. colorCode .. name .. "|r")
-        
+        row.nameText:SetText("|cFF" .. colorCode .. name .. "|r")
+
         -- Kill count (total = yours + guild)
-        local totalKills = PvPTracker:GetTotalKills(name)
-        local killText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        killText:SetPoint("LEFT", 158, 0)
-        killText:SetWidth(38)
+        local totalKills = entry.total
         if totalKills > 0 then
             if data.guildKills and next(data.guildKills) then
-                killText:SetText("|cFFFF3333" .. totalKills .. "|r|cFFFFCC00*|r")
+                row.killText:SetText("|cFFFF3333" .. totalKills .. "|r|cFFFFCC00*|r")
             else
-                killText:SetText("|cFFFF3333" .. totalKills .. "|r")
+                row.killText:SetText("|cFFFF3333" .. totalKills .. "|r")
             end
         else
-            killText:SetText("|cFF888888-|r")
+            row.killText:SetText("|cFF888888-|r")
         end
-        
+
         -- Zone (truncated)
-        local zoneText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        zoneText:SetPoint("LEFT", 198, 0)
-        zoneText:SetWidth(148)
-        zoneText:SetJustifyH("LEFT")
         local zoneStr = data.lastZone or ""
         if #zoneStr > 25 then zoneStr = zoneStr:sub(1, 24) .. ".." end
-        zoneText:SetText("|cFFCCCCCC" .. zoneStr .. "|r")
-        
+        row.zoneText:SetText("|cFFCCCCCC" .. zoneStr .. "|r")
+
         -- Last kill time
-        local timeText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        timeText:SetPoint("LEFT", 348, 0)
-        timeText:SetWidth(60)
-        timeText:SetJustifyH("LEFT")
-        timeText:SetText("|cFF888888" .. FormatTimeAgo(data.lastKill) .. "|r")
-        
-        -- Remove button (X)
-        local removeBtn = CreateFrame("Button", nil, row)
-        removeBtn:SetSize(14, 14)
-        removeBtn:SetPoint("RIGHT", -2, 0)
-        
-        local removeText = removeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        removeText:SetAllPoints()
-        removeText:SetText("|cFFFF4444x|r")
-        
-        local removeHighlight = removeBtn:CreateTexture(nil, "HIGHLIGHT")
-        removeHighlight:SetAllPoints()
-        removeHighlight:SetColorTexture(1, 0, 0, 0.15)
-        
-        removeBtn:SetScript("OnClick", function()
-            PvPTracker:RemoveEnemy(name)
-            PvPTracker:RefreshList()
-        end)
-        
-        removeBtn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Remove " .. name, 1, 0.3, 0.3)
-            if data.notes and data.notes ~= "" then
-                GameTooltip:AddLine("Notes: " .. data.notes, 0.8, 0.8, 0.8, true)
-            end
-            if data.guild and data.guild ~= "" then
-                GameTooltip:AddLine("Guild: <" .. data.guild .. ">", 0.6, 0.6, 0.6)
-            end
-            if data.kills > 0 then
-                GameTooltip:AddLine("Your kills: " .. data.kills, 0.9, 0.3, 0.3)
-                GameTooltip:AddLine("First killed you: " .. FormatDate(data.firstKill), 0.6, 0.6, 0.6)
-                GameTooltip:AddLine("Last killed you: " .. FormatDate(data.lastKill), 0.6, 0.6, 0.6)
-            end
-            -- Guild sync kill data
-            if data.guildKills and next(data.guildKills) then
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("Guild reports:", 1, 0.8, 0)
-                for reporter, rdata in pairs(data.guildKills) do
-                    local rKills = rdata.kills or 0
-                    local rZone = rdata.lastZone or ""
-                    if rZone ~= "" then
-                        GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x (last: " .. rZone .. ")", 0.7, 0.7, 0.5)
-                    else
-                        GameTooltip:AddLine("  " .. reporter .. ": " .. rKills .. "x", 0.7, 0.7, 0.5)
-                    end
-                end
-                local totalKills2 = PvPTracker:GetTotalKills(name)
-                GameTooltip:AddLine("Total: " .. totalKills2, 1, 0.4, 0.4)
-            end
-            GameTooltip:Show()
-        end)
-        removeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        
+        row.timeText:SetText("|cFF888888" .. FormatTimeAgo(data.lastKill) .. "|r")
+
+        row:Show()
         table.insert(mainFrame.rows, row)
         scrollY = scrollY + rowHeight
     end
-    
+
     -- Empty state
     if #sorted == 0 then
-        local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        emptyText:SetPoint("CENTER", scrollChild, "TOP", 0, -40)
-        emptyText:SetText("|cFF888888No enemies tracked yet.\nGet killed in world PvP or add names manually.|r")
-        emptyText:SetJustifyH("CENTER")
-        
-        local emptyRow = CreateFrame("Frame", nil, scrollChild)
-        emptyRow:SetSize(1, 80)
-        emptyRow._emptyText = emptyText
-        table.insert(mainFrame.rows, emptyRow)
+        if not mainFrame.emptyText then
+            local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            emptyText:SetPoint("CENTER", scrollChild, "TOP", 0, -40)
+            emptyText:SetText("|cFF888888No enemies tracked yet.\nGet killed in world PvP or add names manually.|r")
+            emptyText:SetJustifyH("CENTER")
+            mainFrame.emptyText = emptyText
+        end
+        mainFrame.emptyText:Show()
         scrollY = 80
     end
-    
+
     scrollChild:SetHeight(scrollY + 10)
 end
 

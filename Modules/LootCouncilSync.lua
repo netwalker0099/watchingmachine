@@ -304,4 +304,3 @@ function Sync:ResetForTests()
     if dripTimer then dripTimer:Cancel(); dripTimer = nil end
     self.greeted = nil
 end
-Sync.PREFIX = PREFIX

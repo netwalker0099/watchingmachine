@@ -2,9 +2,41 @@
 
 All notable changes to Watching Machine. Versions are listed newest first.
 
-Current release: **3.87** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
+Current release: **3.88** — TBC Classic Anniversary patch 2.5.6 (Interface `20506`)
 
 ---
+
+## 3.88
+
+### Fixes
+
+- **Class Tools (Warlock): "Track soulstone timers" did nothing.** It now
+  controls whether soulstone casts read from the combat log are remembered
+  (for the 30-minute cooldown in the Soulstones frame). Casts long past
+  their cooldown are forgotten; every warlock ever seen casting one used
+  to stay saved.
+- **PvP Tracker**: the enemy list made new rows on every refresh and left
+  the old ones behind, and its "No enemies tracked yet" text stayed over
+  the list once it had shown. The rows are now made once and reused.
+
+### Faster
+
+- **Shaman shield tracker**: no new tables four times a second.
+- **PvP Tracker**: no new table for every hit you take or deal; enemies
+  you hit but didn't kill are forgotten after a minute; nameplates aren't
+  scanned when your enemy list is empty.
+- **Mail Logger**: with the mailbox open and nothing changing, the inbox
+  is checked every 2 seconds instead of 2.5 times a second (still every
+  0.4 seconds while mail is being taken).
+
+### Housekeeping
+
+- About 20 functions nothing called are removed.
+- **Chat links on older clients**: Watching Machine replaced the game's
+  `ItemRefTooltip.SetHyperlink` to keep its chat links from raising an
+  error. On clients without the newer link handler its links are now
+  written as a link type the game accepts quietly, and no game function
+  is replaced.
 
 ## 3.87
 

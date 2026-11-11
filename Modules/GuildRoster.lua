@@ -521,7 +521,6 @@ local function Has(t, v)
     for _, x in ipairs(t) do if x == v then return true end end
     return false
 end
-GR.Has = Has
 
 local function GroupOf(g, name)
     local rec = g.members[name] or g.former[name]
@@ -921,14 +920,6 @@ end
 -- ============================================
 -- QUERIES FOR THE WINDOW
 -- ============================================
-
-function GR:Members(includeFormer)
-    local g, out = self:Guild(), {}
-    if not g then return out end
-    for _, rec in pairs(g.members) do out[#out + 1] = rec end
-    if includeFormer then for _, rec in pairs(g.former) do out[#out + 1] = rec end end
-    return out
-end
 
 function GR:Counts()
     local g = self:Guild()

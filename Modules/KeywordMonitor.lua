@@ -211,10 +211,6 @@ function KeywordMonitor:IsPaused()
     return isMonitoringPaused
 end
 
-function KeywordMonitor:SetPaused(paused)
-    isMonitoringPaused = paused
-end
-
 -- ============================================
 -- CHAT HANDLER
 -- ============================================

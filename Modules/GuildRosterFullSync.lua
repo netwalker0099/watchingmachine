@@ -31,7 +31,6 @@ local function DB() return GR.DB() end
 local function On() return WM:IsModuleOn("GuildRoster") end
 local function Now() return time() end
 local function Me() return GR.MyName() end
-local function Print(msg) WM:ModulePrint("GuildRoster", msg) end
 
 -- ============================================
 -- SENDING, WITH SEQUENCE NUMBERS
@@ -41,7 +40,6 @@ local function Whisper(target, body)
     if #body > MAX_BODY then return false end
     return WM:QueueAddonMessage(PREFIX_SYNC, body, "WHISPER", target, true)
 end
-Full.Whisper = Whisper
 
 -- A packed message: "TAG?R?" then items until the next one wouldn't fit,
 -- each message ending "?seq" (or "~|~seq"). Returns the messages sent.
@@ -172,7 +170,6 @@ end
 
 local function Fields(payload) local t = {} for f in payload:gmatch("[^?]+") do t[#t + 1] = f end return t end
 local function TFields(payload) local t = {} for f in payload:gmatch("[^~|]+") do t[#t + 1] = f end return t end
-Full.Fields, Full.TFields = Fields, TFields
 
 -- The sequence number at the end of a body
 local function SeqOf(payload)

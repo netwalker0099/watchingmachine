@@ -23,6 +23,8 @@ local SACRIFICE_BUFFS = {
     ["Touch of Shadow"] = "Succubus",    -- +15% Shadow damage
     ["Fel Energy"]      = "Felhunter",   -- periodic mana
 }
+local SACRIFICE_NAMES = {}
+for name in pairs(SACRIFICE_BUFFS) do SACRIFICE_NAMES[#SACRIFICE_NAMES + 1] = name end
 
 local ARMOR_BUFFS = { "Fel Armor", "Demon Armor", "Demon Skin" }
 local SOUL_LINK_BUFF = "Soul Link"
@@ -222,9 +224,18 @@ end
 function Warlock:OnCombatLog(sub, srcName, destName, spellName)
     if sub ~= "SPELL_AURA_APPLIED" and sub ~= "SPELL_AURA_REFRESH" then return end
     if spellName ~= SOULSTONE_BUFF or not srcName then return end
+    -- "Track soulstone timers" off: nothing is remembered
+    local tools = Tools()
+    if tools and not tools:IsEnabled(CLASS, "soulstones") then return end
     local short = Ambiguate and Ambiguate(srcName, "short") or srcName
     local dest = destName and (Ambiguate and Ambiguate(destName, "short") or destName)
-    Stones()[short] = { at = Now(), target = dest }
+    local stones, now = Stones(), Now()
+    -- Long past their cooldown: forgotten (every warlock ever seen casting
+    -- one in range used to stay saved)
+    for name, rec in pairs(stones) do
+        if now - (tonumber(rec.at) or 0) > STONE_COOLDOWN * 2 then stones[name] = nil end
+    end
+    stones[short] = { at = now, target = dest }
 end
 
 -- The warlocks in the group, and the soulstones on group members by caster.
@@ -352,7 +363,7 @@ local function Monitor()
     -- --- Demonic Sacrifice ---
     -- Only meaningful if the talent is actually taken. If a demon is out,
     -- the player has chosen to keep the pet, so don't nag.
-    local sacBuff = PlayerHasAnyBuff({ "Burning Wish", "Fel Stamina", "Touch of Shadow", "Fel Energy" })
+    local sacBuff = PlayerHasAnyBuff(SACRIFICE_NAMES)
     if tools:IsEnabled(CLASS, "sacrifice") and TalentRank(TALENT_DEMONIC_SACRIFICE) > 0 then
         if sacBuff or UnitExists("pet") then
             tools:ClearAlert("wl_sac")
@@ -495,7 +506,7 @@ function Warlock:RegisterFeatures()
     })
     tools:RegisterFeature(CLASS, {
         key = "soulstones", name = "Track soulstone timers",
-        desc = "Soulstones on you and others in range. /wmachine soulstone",
+        desc = "Remembers when each warlock in range used their soulstone (read from the combat log), for the 30-minute cooldown the Soulstones frame shows. Off: nothing is remembered, and the frame shows only soulstones that are up now.",
         default = true,
     })
     tools:RegisterFeature(CLASS, {

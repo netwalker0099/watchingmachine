@@ -184,13 +184,6 @@ function MT:Hosts()
     return host, own
 end
 
--- The bar the spark mainly goes on (and whether it's our own)
-function MT:Host()
-    local host = self:Hosts()
-    if host then return host, false end
-    return self:OwnBar(), true
-end
-
 local function Spark(parent, r, g, b)
     local t = parent:CreateTexture(nil, "OVERLAY")
     t:SetColorTexture(r, g, b, 0.95)
